@@ -13,24 +13,28 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>  // inet_ntop, inet_pton
 #else
+#include <arpa/inet.h> //inet_ntop
+#include <netinet/in.h>
 #include <sys/socket.h>
+#include <unistd.h>  //close
 #endif
+
+#define HEADER_SIZE 1024
 
 using namespace rapidjson;
 
 class DaemonRpc
 {
    public:
-    DaemonRpc(u_long rpc_ip, u_short rpc_port, const char* auth_header);
-    void SendRequest(int id, const char* method,
-                     std::vector<const char*> params);
-    ~DaemonRpc();
+    DaemonRpc(u_long rpc_ip, u_short rpc_port, std::string auth_header);
+    char* SendRequest(int id, const char* method,
+                     const char* params);
 
    private:
-    void Init();
-    SOCKET sockfd;
+    int sockfd;
     sockaddr_in rpc_addr;
-    const char* auth_header;
+    std::string auth_header;
     std::string host_header;
+    
 };
 #endif

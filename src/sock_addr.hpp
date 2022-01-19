@@ -1,7 +1,11 @@
 #ifndef SOCKADDR_HPP_
 #define SOCKADDR_HPP_
 
+#ifdef _WIN32
 #include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#endif
 
 #include <string>
 
@@ -16,7 +20,7 @@ class SockAddr
         port_str =
             sockAddrStr.substr(sockAddrStr.find(':') + 1, sockAddrStr.size());
 
-        inet_pton(AF_INET, ip_str.c_str(), &ip);
+        ip = inet_addr(ip_str.c_str());
         port = htons(std::stoi(port_str));
     }
     unsigned short port;
