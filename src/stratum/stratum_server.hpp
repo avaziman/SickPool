@@ -34,6 +34,7 @@
 #include "verus_job.hpp"
 
 using namespace rapidjson;
+using namespace std::chrono;
 
 class StratumServer
 {
@@ -61,14 +62,18 @@ class StratumServer
 
     void HandleShare(StratumClient* cli, int id, Share& share);
     void RejectShare(StratumClient* cli, int id, ShareError error);
-    void SubmitBlock(Job* job, Share& blockShare, std::string headerHex);
+    bool SubmitBlock(std::string blockHex);
 
     void UpdateDifficulty(StratumClient* cli);
 
     void BroadcastJob(Job* job);
     void BroadcastJob(StratumClient* cli, Job* job);
 
-    char* SendRpcReq(int id, const char* method,
-                     const char* params);
+    void CheckAcceptedBlock(uint32_t height);
+
+    std::string GetCoinbaseTx(std::string addr, int64_t value, uint32_t curtime,
+                              uint32_t height);
+
+    char* SendRpcReq(int id, std::string method, std::string params = "");
 };
 #endif

@@ -9,8 +9,6 @@
 #define SOCK_ERR (errno)
 #endif
 
-#define LOG(x, y) (std::cout << x << ": " << y << std::endl)
-
 using namespace std;
 
 DaemonRpc::DaemonRpc(u_long rpcIp, u_short rpcPort, std::string authHeader)
@@ -25,8 +23,10 @@ DaemonRpc::DaemonRpc(u_long rpcIp, u_short rpcPort, std::string authHeader)
     rpc_addr.sin_port = rpcPort;
 }
 
-char* DaemonRpc::SendRequest(int id, const char* method, const char* param)
+char* DaemonRpc::SendRequest(int id, std::string method, std::string param)
 {
+    const char *body, *sendBuffer;
+    std::string bodyStr, httpReqStr;
     char /**body, *sendBuffer,*/* recvBuffer;
     int bodySize, sendSize, recvSize, errCode, resCode;
     int sent, contentLength, contentReceived;
@@ -38,13 +38,13 @@ char* DaemonRpc::SendRequest(int id, const char* method, const char* param)
     // bodySize = sprintf(body,
     // "{\"id\":%d,\"method\":\"%s\",\"params\":[\"%s\"]}",
     //                    id, method, param);
-
-    std::ostringstream ss;
-    ss << "{\"id\":" << id << ",\"method\":" << method << ",\"params\":[\""
-       << param << "\"])";
-    auto s = ss.str();
-    bodySize = s.size();
-    const char* body = s.c_str();
+    if (param != "") param = '\"' + param +'\"';
+    std::ostringstream bodyS;
+    bodyS << "{\"id\":" << id << ",\"method\":\"" << method
+          << "\",\"params\":[" << param << "]}";
+    bodyStr = bodyS.str();
+    bodySize = bodyStr.size();
+    body = bodyStr.c_str();
 
     // sendBuffer = new char[bodySize + 256];
     // sendSize =
@@ -57,16 +57,16 @@ char* DaemonRpc::SendRequest(int id, const char* method, const char* param)
     //             "%s\r\n\r\n",
     //             host_header.c_str(), auth_header.c_str(), bodySize, body);
 
-    std::ostringstream sss;
-    sss << "POST / HTTP/1.1\r\n";
-    sss << "Host: " << host_header << "\r\n";
-    sss << "Authorization: Basic " << auth_header << "\r\n";
-    sss << "Content-Type: application/json\r\n";
-    sss << "Content-Length: " << bodySize << "\r\n\r\n";
-    sss << body << "\r\n\r\n";
-    auto ff = sss.str();
-    const char* sendBuffer = ff.c_str();
-    sendSize = ff.size();
+    std::ostringstream httpReqS;
+    httpReqS << "POST / HTTP/1.1\r\n";
+    httpReqS << "Host: " << host_header << "\r\n";
+    httpReqS << "Authorization: Basic " << auth_header << "\r\n";
+    httpReqS << "Content-Type: application/json\r\n";
+    httpReqS << "Content-Length: " << bodySize << "\r\n\r\n";
+    httpReqS << body << "\r\n\r\n";
+    httpReqStr = httpReqS.str();
+    sendBuffer = httpReqStr.c_str();
+    sendSize = httpReqStr.size();
 
     // initialize the socket
     sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -91,7 +91,7 @@ char* DaemonRpc::SendRequest(int id, const char* method, const char* param)
 
     sent = send(sockfd, sendBuffer, sendSize, 0);
 
-    std::cout << "sent " << sent << " out of " << sendSize << std::endl;
+    // std::cout << "sent " << sent << " out of " << sendSize << std::endl;
     // TODO: add while here (if it ever gives a problem)
     if (sent < 0) return nullptr;
 
@@ -159,13 +159,12 @@ char* DaemonRpc::SendRequest(int id, const char* method, const char* param)
     resBuffer[contentReceived] = '\0';
 
     // delete[] body;
-    delete[] recvBuffer;
     // delete[] sendBuffer;
+    delete[] recvBuffer;
 #ifdef _WIN32
     closesocket(sockfd);
 #else
     close(sockfd);
 #endif
     return resBuffer;
-    // return "o";
 }

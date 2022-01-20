@@ -23,7 +23,7 @@
 //     "/media/sickguy/B0A8A4E4A8A4A9F4/Projects/Pool/pool-server/config/coins/" \
 //     "VRSC.json"
 
-void ParseCoinConfig(CoinConfig* cnfg, const char* path);
+bool ParseCoinConfig(CoinConfig* cnfg, const char* path);
 
 int main(int argc, char** argv)
 {
@@ -32,7 +32,12 @@ int main(int argc, char** argv)
     if (WSAStartup(MAKEWORD(2, 2), &wsdata) != 0) exit(-1);
 #endif
     CoinConfig coinConfig;
-    ParseCoinConfig(&coinConfig, CONFIG_PATH_VRSC);
+    if (!ParseCoinConfig(&coinConfig, CONFIG_PATH_VRSC))
+    {
+        std::cerr << "START UP ERROR: "
+                  << "failed to parse coinconfig";
+        return EXIT_FAILURE;
+    }
 
     try
     {
@@ -52,43 +57,37 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
 }
 
-void ParseCoinConfig(CoinConfig* cnfg, const char* path)
+bool ParseCoinConfig(CoinConfig* cnfg, const char* path)
 {
-    std::ifstream configFile(CONFIG_PATH_VRSC);
-    IStreamWrapper is(configFile);
-
-    rapidjson::Document configDoc(rapidjson::kObjectType);
-    configDoc.ParseStream(is);
-
-    cnfg->name = configDoc["name"].GetString();
-    cnfg->symbol = configDoc["symbol"].GetString();
-    cnfg->algo = configDoc["algo"].GetString();
-    cnfg->stratum_port = configDoc["stratum_port"].GetUint();
-    cnfg->pow_fee = configDoc["pow_fee"].GetFloat();
-    cnfg->pos_fee = configDoc["pos_fee"].GetFloat();
-    cnfg->default_diff = configDoc["default_difficulty"].GetDouble();
-    auto rpcs = configDoc["rpcs"].GetArray();
-
-    for (int i = 0; i < rpcs.Size(); i++)
+    try
     {
-        cnfg->rpcs[i].host = rpcs[i]["host"].GetString();
-        cnfg->rpcs[i].auth = rpcs[i]["auth"].GetString();
+        std::ifstream configFile(CONFIG_PATH_VRSC);
+        IStreamWrapper is(configFile);
+
+        rapidjson::Document configDoc(rapidjson::kObjectType);
+        configDoc.ParseStream(is);
+
+        cnfg->name = configDoc["name"].GetString();
+        cnfg->symbol = configDoc["symbol"].GetString();
+        cnfg->algo = configDoc["algo"].GetString();
+        cnfg->stratum_port = configDoc["stratum_port"].GetUint();
+        cnfg->pow_fee = configDoc["pow_fee"].GetFloat();
+        cnfg->pos_fee = configDoc["pos_fee"].GetFloat();
+        cnfg->default_diff = configDoc["default_difficulty"].GetDouble();
+        cnfg->pool_addr = configDoc["pool_addr"].GetString();
+        auto rpcs = configDoc["rpcs"].GetArray();
+
+        for (int i = 0; i < rpcs.Size(); i++)
+        {
+            cnfg->rpcs[i].host = rpcs[i]["host"].GetString();
+            cnfg->rpcs[i].auth = rpcs[i]["auth"].GetString();
+        }
+
+        configFile.close();
+        return true;
     }
-
-    configFile.close();
+    catch(...)
+    {
+        return false;
+    }
 }
-
-// SockAddr so("127.0.0.1:27486");
-// DaemonRpc dr(so.ip, so.port,
-//              "c2lja3Bvb2w6MEU2d3ptTTE4VWVmZWl6SmxWWXRBZ21ENVdGZnJuVUZTOUc0"
-//              "YUxTd2hsdw==");
-// char* buffer;
-// try
-// {
-//     buffer = dr.SendRequest(1, "getblocktemplate", {});
-// }
-// catch (const std::exception& e)
-// {
-//     std::cerr << "BLOCK UPDATE RPC ERROR: " << e.what() << std::endl;
-// }
-// std::cout << "BUFFER: " << buffer << std::endl;

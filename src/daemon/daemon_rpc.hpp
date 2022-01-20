@@ -27,8 +27,7 @@ class DaemonRpc
 {
    public:
     DaemonRpc(u_long rpc_ip, u_short rpc_port, std::string auth_header);
-    char* SendRequest(int id, const char* method,
-                     const char* params);
+    char* SendRequest(int id, std::string method, std::string params = "");
 
    private:
     int sockfd;
