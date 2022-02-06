@@ -2,15 +2,12 @@
 #define STRATUM_SERVER_HPP_
 #define VERUS_MAX_BLOCK_SIZE (1024 * 1024 * 2)
 
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>  // inet_ntop, inet_pton
-#else
 #include <sys/socket.h>
-#endif
 
 #include <rapidjson/document.h>
+#include <sw/redis++/redis++.h>
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <thread>
@@ -28,10 +25,17 @@
 #include "../daemon/daemon_rpc.hpp"
 #include "../sock_addr.hpp"
 #include "job.hpp"
+#include "redis_manager.hpp"
 #include "share.hpp"
-#include "share_error.hpp"
+#include "share_result.hpp"
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
+
+// how we store stale and invalid shares in database
+#define STALE_SHARE_DIFF -1
+#define INVALID_SHARE_DIFF -2
+
+using namespace sw::redis;
 
 using namespace rapidjson;
 using namespace std::chrono;
@@ -40,12 +44,16 @@ class StratumServer
 {
    public:
     StratumServer(CoinConfig config);
+    ~StratumServer();
     void StartListening();
     int sockfd;
 
    private:
     CoinConfig coinConfig;
     sockaddr_in addr;
+    uint32_t job_count;
+
+    RedisManager* redis_manager;
 
     std::vector<DaemonRpc*> rpcs;
     std::vector<StratumClient*> clients;
@@ -61,13 +69,15 @@ class StratumServer
     void HandleSubmit(StratumClient* cli, int id, Value& params);
 
     void HandleShare(StratumClient* cli, int id, Share& share);
-    void RejectShare(StratumClient* cli, int id, ShareError error);
+    void RejectShare(StratumClient* cli, int id, ShareResult error);
     bool SubmitBlock(std::string blockHex);
 
     void UpdateDifficulty(StratumClient* cli);
 
     void BroadcastJob(Job* job);
     void BroadcastJob(StratumClient* cli, Job* job);
+
+    Job* GetJobById(std::string id);
 
     void CheckAcceptedBlock(uint32_t height);
 

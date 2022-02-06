@@ -9,13 +9,30 @@ file(GLOB_RECURSE SRC_FILES
 
 find_package(Boost 1.68 REQUIRED)
 
+# Makes the executable run the fastest on host cpu
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+
 add_executable(${PROJECT_NAME} ${SRC_FILES})
+
+# <------------ add hiredis dependency here --------------->
+find_path(HIREDIS_HEADER hiredis)
+target_include_directories(${PROJECT_NAME} PUBLIC ${HIREDIS_HEADER})
+
+find_library(HIREDIS_LIB hiredis)
+target_link_libraries(${PROJECT_NAME} ${HIREDIS_LIB})
+
+# <------------ add redis-plus-plus dependency here -------------->
+find_path(REDIS_PLUS_PLUS_HEADER sw)      # NOTE: this should be *sw* NOT *redis++*
+target_include_directories(${PROJECT_NAME} PUBLIC ${REDIS_PLUS_PLUS_HEADER})
+
+find_library(REDIS_PLUS_PLUS_LIB redis++)
+target_link_libraries(${PROJECT_NAME} ${REDIS_PLUS_PLUS_LIB})
 
 target_link_libraries(
     ${PROJECT_NAME}
     Boost::boost
     pthread
-    )
+)
 
 if(WIN32) 
 target_link_libraries(

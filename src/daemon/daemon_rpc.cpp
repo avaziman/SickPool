@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <iostream>
+#include "../sock_addr.hpp"
 
 #ifdef _WIN32
 #define SOCK_ERR (WSAGetLastError())
@@ -11,19 +12,17 @@
 
 using namespace std;
 
-DaemonRpc::DaemonRpc(u_long rpcIp, u_short rpcPort, std::string authHeader)
-    : auth_header(authHeader)
+DaemonRpc::DaemonRpc(std::string hostHeader, std::string authHeader)
+    : host_header(hostHeader), auth_header(authHeader)
 {
-    char ip_str[16];
-    inet_ntop(AF_INET, &rpcIp, ip_str, sizeof(ip_str));
-    host_header = std::string(ip_str) + ":" + std::to_string(ntohs(rpcPort));
+    SockAddr sock_addr(hostHeader);
 
     rpc_addr.sin_family = AF_INET;
-    rpc_addr.sin_addr.s_addr = rpcIp;
-    rpc_addr.sin_port = rpcPort;
+    rpc_addr.sin_addr.s_addr = sock_addr.ip;
+    rpc_addr.sin_port = sock_addr.port;
 }
 
-char* DaemonRpc::SendRequest(int id, std::string method, std::string param)
+char* DaemonRpc::SendRequest(int id, std::string method, std::string params)
 {
     const char *body, *sendBuffer;
     std::string bodyStr, httpReqStr;
@@ -38,10 +37,10 @@ char* DaemonRpc::SendRequest(int id, std::string method, std::string param)
     // bodySize = sprintf(body,
     // "{\"id\":%d,\"method\":\"%s\",\"params\":[\"%s\"]}",
     //                    id, method, param);
-    if (param != "") param = '\"' + param +'\"';
+    // if (param != "") param = '\"' + param +'\"';
     std::ostringstream bodyS;
     bodyS << "{\"id\":" << id << ",\"method\":\"" << method
-          << "\",\"params\":[" << param << "]}";
+          << "\",\"params\":[" << params << "]}";
     bodyStr = bodyS.str();
     bodySize = bodyStr.size();
     body = bodyStr.c_str();
@@ -96,7 +95,7 @@ char* DaemonRpc::SendRequest(int id, std::string method, std::string param)
     if (sent < 0) return nullptr;
 
     recvBuffer = new char[HEADER_SIZE];
-
+    //TODO: fix memory leaks when returning nulltpr
     int totalRecv = 0;
     char* endOfHeader = 0;
     // receive http header (and potentially part or the whole body)
@@ -121,13 +120,21 @@ char* DaemonRpc::SendRequest(int id, std::string method, std::string param)
     } while ((endOfHeader = std::strstr(recvBuffer, "\r\n\r\n")) == NULL);
 
     endOfHeader += 4;
-    recvBuffer[totalRecv] = '\0';
+    recvBuffer[totalRecv - 1] = '\0';
 
     resCode = std::atoi(recvBuffer + std::strlen("HTTP/1.1 "));
+
+    if (resCode != 200)
+    {
+        std::cerr << "RPC HTTP request error res code: " << resCode
+                  << std::endl;
+        return nullptr;
+    }
+
     contentLength = std::atoi(std::strstr(recvBuffer, "Content-Length: ") +
                               std::strlen("Content-Length: "));
     contentReceived = std::strlen(endOfHeader);
-
+    
     // std::cout << "HTTP CODE: " << resCode << std::endl;
     // std::cout << "CONTENT LENGTH: " << contentLength << std::endl;
     // std::cout << "CONTENT RECEIVED: " << contentReceived << std::endl;
@@ -156,7 +163,7 @@ char* DaemonRpc::SendRequest(int id, std::string method, std::string param)
         }
         contentReceived += recvRes;
     }
-    resBuffer[contentReceived] = '\0';
+    resBuffer[contentReceived - 1] = '\0';
 
     // delete[] body;
     // delete[] sendBuffer;
