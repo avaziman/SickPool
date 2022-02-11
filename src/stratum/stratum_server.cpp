@@ -122,6 +122,9 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[])
     // std::cout << buffer << std::endl;
     int id = 0;
     std::string method;
+
+    auto start = std::chrono::steady_clock::now();
+
     Value params(kArrayType);
 
     Document req(kObjectType);
@@ -131,6 +134,12 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[])
 
     method = req["method"].GetString();
     params = req["params"].GetArray();
+
+    auto end = std::chrono::steady_clock::now();
+    auto dur =
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+            .count();
+    std::cout << "req parse took: " << dur << "micro seconds." << std::endl;
 
     if (method == "mining.subscribe")
         HandleSubscribe(cli, id, params);
@@ -352,10 +361,11 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 {
     Job *job = GetJobById(share.jobId);
 
-    if (job == nullptr){
+    if (job == nullptr)
+    {
         redis_manager->AddShare(share.worker, STALE_SHARE_DIFF);
         return RejectShare(cli, id, ShareResult::JOB_NOT_FOUND);
-    } 
+    }
 
     // TODO: check duplicate
 
@@ -377,7 +387,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     std::cout << "share difficulty: " << shareDiff << std::endl;
     // std::cout << "client target   : " << cli->GetDifficulty() << std::endl;
 
-    if (shareDiff < cli->GetDifficulty()){
+    if (shareDiff < cli->GetDifficulty())
+    {
         redis_manager->AddShare(share.worker, INVALID_SHARE_DIFF);
         return RejectShare(cli, id, ShareResult::LOW_DIFFICULTY_SHARE);
     }

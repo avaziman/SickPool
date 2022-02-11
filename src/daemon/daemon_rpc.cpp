@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <iostream>
+
 #include "../sock_addr.hpp"
 
 #ifdef _WIN32
@@ -39,8 +40,8 @@ char* DaemonRpc::SendRequest(int id, std::string method, std::string params)
     //                    id, method, param);
     // if (param != "") param = '\"' + param +'\"';
     std::ostringstream bodyS;
-    bodyS << "{\"id\":" << id << ",\"method\":\"" << method
-          << "\",\"params\":[" << params << "]}";
+    bodyS << "{\"id\":" << id << ",\"method\":\"" << method << "\",\"params\":["
+          << params << "]}";
     bodyStr = bodyS.str();
     bodySize = bodyStr.size();
     body = bodyStr.c_str();
@@ -95,7 +96,7 @@ char* DaemonRpc::SendRequest(int id, std::string method, std::string params)
     if (sent < 0) return nullptr;
 
     recvBuffer = new char[HEADER_SIZE];
-    //TODO: fix memory leaks when returning nulltpr
+    // TODO: fix memory leaks when returning nulltpr
     int totalRecv = 0;
     char* endOfHeader = 0;
     // receive http header (and potentially part or the whole body)
@@ -134,7 +135,7 @@ char* DaemonRpc::SendRequest(int id, std::string method, std::string params)
     contentLength = std::atoi(std::strstr(recvBuffer, "Content-Length: ") +
                               std::strlen("Content-Length: "));
     contentReceived = std::strlen(endOfHeader);
-    
+
     // std::cout << "HTTP CODE: " << resCode << std::endl;
     // std::cout << "CONTENT LENGTH: " << contentLength << std::endl;
     // std::cout << "CONTENT RECEIVED: " << contentReceived << std::endl;

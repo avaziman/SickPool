@@ -9,9 +9,6 @@ file(GLOB_RECURSE SRC_FILES
 
 find_package(Boost 1.68 REQUIRED)
 
-# Makes the executable run the fastest on host cpu
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
 add_executable(${PROJECT_NAME} ${SRC_FILES})
 
 # <------------ add hiredis dependency here --------------->

@@ -13,7 +13,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>  // inet_ntop, inet_pton
 #else
-#include <arpa/inet.h> //inet_ntop
+#include <arpa/inet.h>  //inet_ntop
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>  //close
@@ -34,6 +34,5 @@ class DaemonRpc
     sockaddr_in rpc_addr;
     std::string auth_header;
     std::string host_header;
-    
 };
 #endif

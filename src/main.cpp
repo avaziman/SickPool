@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 
+#include "crypto/base58.h"
 #include "crypto/hash_wrapper.hpp"
 #include "crypto/verus_transaction.hpp"
 #include "crypto/verushash/arith_uint256.h"
@@ -12,7 +13,6 @@
 #include "rapidjson/rapidjson.h"
 #include "sock_addr.hpp"
 #include "stratum/stratum_server.hpp"
-#include "crypto/base58.h"
 
 #define CONFIG_PATH_VRSC                                              \
     "//home/sickguy/Documents/Projects/SickPool/server/config/coins/" \
@@ -27,11 +27,12 @@ void ParseCoinConfig(CoinConfig* cnfg, const char* path);
 
 // int valid(const char* s)
 // {
-//     unsigned char dec[32], d1[SHA256_DIGEST_LENGTH], d2[SHA256_DIGEST_LENGTH];
+//     unsigned char dec[32], d1[SHA256_DIGEST_LENGTH],
+//     d2[SHA256_DIGEST_LENGTH];
 
 //     coin_err = "";
 //     if (!unbase58(s, dec)) return 0;
-    
+
 //     SHA256(SHA256(dec, 21, d1), SHA256_DIGEST_LENGTH, d2);
 
 //     if (memcmp(dec + 21, d2, 4)) return 0;
@@ -69,15 +70,16 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
 }
 
-void AssignJson(const char* name, std::string &obj, Document &doc){
-    if(doc.HasMember(name) && doc[name].IsString())
+void AssignJson(const char* name, std::string& obj, Document& doc)
+{
+    if (doc.HasMember(name) && doc[name].IsString())
         obj = doc[name].GetString();
     else
         throw std::runtime_error(std::string("Invalid or no \"") + name +
                                  "\" (string) variable in config file");
 }
 
-void AssignJson(const char* name, u_short &obj, Document& doc)
+void AssignJson(const char* name, u_short& obj, Document& doc)
 {
     if (doc.HasMember(name) && doc[name].IsUint())
         obj = doc[name].GetUint();
@@ -86,7 +88,7 @@ void AssignJson(const char* name, u_short &obj, Document& doc)
                                  "\" (uint) variable in config file");
 }
 
-void AssignJson(const char* name, double &obj, Document& doc)
+void AssignJson(const char* name, double& obj, Document& doc)
 {
     if (doc.HasMember(name) && doc[name].IsDouble())
         obj = doc[name].GetDouble();
@@ -120,9 +122,10 @@ void ParseCoinConfig(CoinConfig* cnfg, const char* path)
     AssignJson("pool_addr", cnfg->pool_addr, configDoc);
     AssignJson("redis_host", cnfg->redis_host, configDoc);
 
-    if(!configDoc.HasMember("rpcs") || !configDoc["rpcs"].IsArray())
-        throw std::runtime_error(std::string("Invalid or no \"") + "rpcs" +
-                                 "\"; ([string host, string auth]) variable in config file");
+    if (!configDoc.HasMember("rpcs") || !configDoc["rpcs"].IsArray())
+        throw std::runtime_error(
+            std::string("Invalid or no \"") + "rpcs" +
+            "\"; ([string host, string auth]) variable in config file");
     auto rpcs = configDoc["rpcs"].GetArray();
 
     for (int i = 0; i < rpcs.Size(); i++)

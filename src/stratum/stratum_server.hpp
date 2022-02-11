@@ -2,10 +2,9 @@
 #define STRATUM_SERVER_HPP_
 #define VERUS_MAX_BLOCK_SIZE (1024 * 1024 * 2)
 
-#include <sys/socket.h>
-
 #include <rapidjson/document.h>
 #include <sw/redis++/redis++.h>
+#include <sys/socket.h>
 
 #include <algorithm>
 #include <chrono>
