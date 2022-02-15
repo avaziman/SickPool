@@ -33,7 +33,8 @@ StratumServer::StratumServer(CoinConfig cnfg) : coinConfig(cnfg)
     }
 
     // init hash functions if needed
-    if (coinConfig.algo == "verushash") CVerusHashV2::init();
+    // if (coinConfig.algo == "verushash")
+    HashWrapper::InitVerusHash();
 }
 
 StratumServer::~StratumServer()
@@ -171,7 +172,6 @@ void StratumServer::HandleBlockUpdate(Value &params)
     int64_t coinbaseValue = res["coinbasetxn"]["coinbasevalue"].GetInt64();
     uint32_t curtime = res["curtime"].GetInt();
 
-    std::string bits = res["bits"].GetString();
     std::string heightHex = ToHex(height);
 
     Block *block;
@@ -179,13 +179,18 @@ void StratumServer::HandleBlockUpdate(Value &params)
 
     if (coinConfig.name == "verus")
     {
+        const char *bits = res["bits"].GetString();
+        char verHex[8 + 1];
+        char curTimeHex[8 + 1];
+        ToHex(verHex, bswap_32(res["version"].GetInt()));
+        ToHex(curTimeHex, bswap_32(curtime));
         bh = new VerusBlockHeader(
-            res["version"].GetInt(),
-            ReverseHex(res["previousblockhash"].GetString()), curtime,
-            ReverseHex(bits),
-            ReverseHex(res["finalsaplingroothash"].GetString()),
-            res["solution"].GetString());
-        block = new Block(bh, HashWrapper::SHA256, HashWrapper::VerushashV2b2);
+            verHex,
+            ReverseHex((char *)res["previousblockhash"].GetString(), 64),
+            curTimeHex, (char *)bits,
+            (char *)res["finalsaplingroothash"].GetString(),
+            (char *)res["solution"].GetString());
+        block = new Block(bh, HashWrapper::SHA256d, HashWrapper::VerushashV2b2);
     }
 
     std::string coinbaseTx =
@@ -196,7 +201,7 @@ void StratumServer::HandleBlockUpdate(Value &params)
     // itr++)
     //     block->AddTransaction((*itr)["data"].GetString());
 
-    this->redis_manager->SetJobId(++this->job_count);
+    // this->redis_manager->SetJobId(++this->job_count);
 
     Job *job = new VerusJob(this->job_count, *block);
     jobs.push_back(job);
@@ -359,6 +364,7 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id, Value &params)
 
 void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 {
+    auto start = std::chrono::steady_clock::now();
     Job *job = GetJobById(share.jobId);
 
     if (job == nullptr)
@@ -372,17 +378,26 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     std::string nonce = cli->GetExtraNonce() + share.nonce2;
     nonce += share.solution;
 
-    std::string headerHex =
-        job->Header()->GetHex(share.time, job->GetMerkleRoot(), nonce);
+    char *headerHex = job->Header()->GetHex(
+        (char *)share.time, (char *)job->GetMerkleRoot(),
+        (char *)nonce.c_str());
 
-    std::string hash_str = ReverseHex(job->GetHash(headerHex));
-    uint256 hash256 = uint256S(hash_str.c_str());
+    char hashBuff[32];
+    job->GetHash(headerHex, hashBuff);
+    auto end = std::chrono::steady_clock::now();
+    auto duration =
+        std::chrono::duration_cast<microseconds>(end - start).count();
+    std::cout << "duration x " << duration << "microseconds." << std::endl;
+
+    std::vector<unsigned char> v(hashBuff, hashBuff + 32);
+    // uint256 hash256 = uint256S(hashBuff);
+    uint256 hash256(v);
 
     double shareDiff =
         DifficultyFromBits(UintToArith256(hash256).GetCompact(false));
 
     // std::cout << "header hex: " << headerHex << std::endl;
-    std::cout << "block hash      : " << hash_str << std::endl;
+    std::cout << "block hash      : " << hash256.GetHex() << std::endl;
     std::cout << "block difficulty: " << job->GetTargetDiff() << std::endl;
     std::cout << "share difficulty: " << shareDiff << std::endl;
     // std::cout << "client target   : " << cli->GetDifficulty() << std::endl;
@@ -401,7 +416,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
         if (submissionGood)
         {
             std::cout << "Submit block successful." << std::endl;
-            redis_manager->InsertPendingBlock(hash_str);
+            // redis_manager->InsertPendingBlock(hash_str);
         }
         else
         {
@@ -410,7 +425,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
         }
     }
 
-    redis_manager->AddShare(share.worker, shareDiff);
+    // redis_manager->AddShare(share.worker, shareDiff);
     std::cout << "share accepted" << std::endl;
 }
 
@@ -490,14 +505,17 @@ bool StratumServer::SubmitBlock(std::string blockHex)
 void StratumServer::UpdateDifficulty(StratumClient *cli)
 {
     // TODO: format diff
+    std::string diffStr =
+        "0002ffae00000000000000000000000000000000000000000000000000000000";
+    // std::string diffStr = ReverseHex(DiffToTarget(cli->GetDifficulty()));
+
     char request[1024];
     int len = snprintf(
         request, sizeof(request),
         "{\"id\": null, \"method\": \"mining.set_target\", \"params\": "
-        "[\"0000004000000000000000000000000000000000000000000000000000000000\"]"
-        "}\n");
-    // cli->GetDifficulty().c_str());
-    // "0000000400000000000000000000000000000000000000000000000000000000");
+        "[\"%s\"]"
+        "}\n", diffStr
+            .c_str());
 
     send(cli->GetSock(), request, len, 0);
 }
@@ -541,7 +559,6 @@ Job *StratumServer::GetJobById(std::string id)
         if (id == (*it)->GetId())
         {
             return (*it);
-            break;
         }
     }
     return nullptr;

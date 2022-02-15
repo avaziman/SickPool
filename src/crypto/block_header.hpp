@@ -9,34 +9,27 @@
 class BlockHeader
 {
    public:
-    BlockHeader(uint32_t ver, std::string prevBlock, uint32_t time,
-                std::string bits)
-        : version(ver), hashPrevBlock(prevBlock), nTime(time), nBits(bits)
+    BlockHeader(char* ver, char* prevBlock, char* time,
+                char* bits) 
     {
+        memcpy(this->version, ver, 8 + 1);
+        memcpy(this->hashPrevBlock, prevBlock, 64 + 1);
+        memcpy(this->nTime, time, 8 + 1);
+        memcpy(this->nBits, bits, 8 + 1);
     }
 
-    virtual std::string GetHex(std::string time, std::string merkleRootHash,
-                               std::string nonce) = 0;
-    std::string GetVersion()
-    {
-        std::stringstream ss;
-        ss << std::hex << std::setfill('0') << std::setw(8) << htobe32(version);
-        return ss.str();
-    }
-    std::string GetPrevBlockhash() { return hashPrevBlock; }
-    std::string GetTime()
-    {
-        std::stringstream ss;
-        ss << std::hex << std::setfill('0') << std::setw(8) << htobe32(nTime);
-        return ss.str();
-    }
-    std::string GetBits() { return nBits; }
+    virtual char* GetHex(char* time, char* merkleRootHash,
+                               char* nonce) = 0;
+    char* GetVersion() { return version; }
+    char* GetPrevBlockhash() { return hashPrevBlock; }
+    char* GetTime() { return nTime; }
+    char* GetBits() { return nBits; }
 
    protected:
-    uint32_t version;
-    std::string hashPrevBlock;
-    // std::string hashMerkleRoot;
-    uint32_t nTime;
-    std::string nBits;
+    char* hex;
+    char version      [8  + 1];
+    char hashPrevBlock[64 + 1];
+    char nTime        [8  + 1];
+    char nBits        [8  + 1];
 };
 #endif
