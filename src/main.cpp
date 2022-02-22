@@ -14,14 +14,14 @@
 #include "sock_addr.hpp"
 #include "stratum/stratum_server.hpp"
 
-#define CONFIG_PATH_VRSC                                              \
+#define COIN_VRSC 1
+#define POOL_COIN COIN_VRSC
+
+#define CONFIG_PATH                                                   \
     "//home/sickguy/Documents/Projects/SickPool/server/config/coins/" \
     "VRSC.json"
 // #define CONFIG_PATH_VRSC \
 //     "C:\\projects\\pool\\pool-server\\config\\coins\\VRSC.json"
-// #define CONFIG_PATH_VRSC                                                      \
-//     "/media/sickguy/B0A8A4E4A8A4A9F4/Projects/Pool/pool-server/config/coins/" \
-//     "VRSC.json"
 
 void ParseCoinConfig(CoinConfig* cnfg, const char* path);
 
@@ -58,7 +58,7 @@ int main(int argc, char** argv)
 
     try
     {
-        ParseCoinConfig(&coinConfig, CONFIG_PATH_VRSC);
+        ParseCoinConfig(&coinConfig, CONFIG_PATH);
         StratumServer stratumServer(coinConfig);
         stratumServer.StartListening();
     }
@@ -100,11 +100,11 @@ void AssignJson(const char* name, double& obj, Document& doc)
 void ParseCoinConfig(CoinConfig* cnfg, const char* path)
 {
     std::ifstream configfStream;
-    configfStream.open(CONFIG_PATH_VRSC);
+    configfStream.open(CONFIG_PATH);
     if (!configfStream.is_open())
     {
         throw std::runtime_error(
-            std::string("Failed to open coin config file ") + CONFIG_PATH_VRSC);
+            std::string("Failed to open coin config file ") + CONFIG_PATH);
     }
 
     IStreamWrapper is(configfStream);
@@ -126,8 +126,8 @@ void ParseCoinConfig(CoinConfig* cnfg, const char* path)
         throw std::runtime_error(
             std::string("Invalid or no \"") + "rpcs" +
             "\"; ([string host, string auth]) variable in config file");
-    auto rpcs = configDoc["rpcs"].GetArray();
 
+    auto rpcs = configDoc["rpcs"].GetArray();
     for (int i = 0; i < rpcs.Size(); i++)
     {
         cnfg->rpcs[i].host = rpcs[i]["host"].GetString();

@@ -35,7 +35,7 @@ inline std::string ReverseHex(std::string input)
     return std::string(str);
 }
 
-inline char* ReverseHex(char* input, uint16_t size)
+inline char* ReverseHex(const char* input, uint16_t size)
 {
     char* str = new char[size + 1];
     for (int i = 0; i < size / 2; i += 2)
@@ -68,6 +68,64 @@ inline std::string Unhexlify(const std::string& hex)
 
     std::string result(bytes.begin(), bytes.end());
     return result;
+}
+
+constexpr const char* BoolToCstring(const bool b) { return b ? "true" : "false"; }
+
+inline char GetHex(char c)
+{
+    // assumes all hex is in lowercase
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    else if (c >= 'a' && c <= 'f')
+        return 10 + (c - 'a');
+
+    return 0;
+}
+
+inline void HexlifyLE(unsigned char* src, int srcSize, char* res)
+{
+    const char hex[] = "0123456789abcdef";
+
+    // each byte is 2 characters in hex
+    for (int i = 0; i < srcSize; i++)
+    {
+        unsigned char val = src[i];
+
+        char c1 = '0', c2 = '0';
+        if (val < 16)
+            c2 = hex[val];
+        else
+        {
+            char c2Val = val % 16;
+            c2 = hex[c2Val];
+            c1 = hex[(val - c2Val) / 16];
+        }
+        res[i * 2] = c1;
+        res[i * 2 + 1] = c2;
+    }
+}
+
+inline void Unhexlify(unsigned char* arr, int size)
+{
+    // each byte is 2 characters in hex
+    for (int i = 0; i < size / 2; i++)
+    {
+        unsigned char char1 = GetHex(arr[i * 2]);
+        unsigned char char2 = GetHex(arr[i * 2 + 1]);
+        arr[i] = char1 + char2 * 16;
+    }
+}
+
+inline void Unhexlify(char* src, int size, unsigned char* dest)
+{
+    // each byte is 2 characters in hex
+    for (int i = 0; i < size / 2; i++)
+    {
+        unsigned char char1 = GetHex(src[i * 2]);
+        unsigned char char2 = GetHex(src[i * 2 + 1]);
+        dest[i] = char1 + char2 * 16;
+    }
 }
 
 inline std::string ToHex(uint32_t num)
