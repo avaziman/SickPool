@@ -55,7 +55,11 @@ int main(int argc, char** argv)
     // return 0;
 
     CoinConfig coinConfig;
+    std::cout << ToHex(DiffToBits(2)) << std::endl;
+    std::cout << BitsToDiff(DiffToBits(2)) << std::endl;
+    // std::cout << BitsToDiff(DiffToBits(4096)) << std::endl;
 
+    // std::cout << BitsToDiff(DiffToTarget(1));
     try
     {
         ParseCoinConfig(&coinConfig, CONFIG_PATH);

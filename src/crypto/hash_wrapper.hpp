@@ -8,7 +8,6 @@
 
 #include "verushash/sha256.h"
 #include "verushash/verus_hash.h"
-#include "utils.hpp"
 
 #define VERUS_HASH_SIZE 32
 

@@ -1,8 +1,6 @@
 #ifndef STRATUM_SERVER_HPP_
 #define STRATUM_SERVER_HPP_
 #define VERUS_MAX_BLOCK_SIZE (1024 * 1024 * 2)
-#include "byteswap.h"
-
 #include <rapidjson/document.h>
 #include <sw/redis++/redis++.h>
 #include <sys/socket.h>
@@ -12,6 +10,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <cerrno>
 
 #include "../coin_config.hpp"
 #include "../crypto/block.hpp"
@@ -24,6 +23,7 @@
 #include "../crypto/verushash/verus_hash.h"
 #include "../daemon/daemon_rpc.hpp"
 #include "../sock_addr.hpp"
+#include "byteswap.h"
 #include "job.hpp"
 #include "redis_manager.hpp"
 #include "share.hpp"
@@ -81,7 +81,7 @@ class StratumServer
 
     void CheckAcceptedBlock(uint32_t height);
 
-    std::string GetCoinbaseTx(std::string addr, int64_t value, uint32_t curtime,
+    std::vector<unsigned char>* GetCoinbaseTx(int64_t value, uint32_t curtime,
                               uint32_t height);
 
     char* SendRpcReq(int id, std::string method, std::string params = "");

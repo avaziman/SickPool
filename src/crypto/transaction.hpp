@@ -10,32 +10,33 @@
 #include "base58.h"
 #include "utils.hpp"
 
-#define PUBKEYHASH_BYTES 20
+#define PUBKEYHASH_BYTES_LEN 20
+#define STD_SCRIPT_SIZE (PUBKEYHASH_BYTES_LEN + 5)
 
 #define OP_DUP 0x76
 #define OP_HASH160 0xa9
 #define OP_EQUALVERIFY 0x88
 #define OP_CHECKSIG 0xac
-#define OP_CRYPTOCONDITION = 0xfc
+#define OP_CRYPTOCONDITION 0xfc
 
-    // the specific part of a specific output list in a transaction (txid +
-    // index)
-    struct OutPoint
+// the specific part of a specific output list in a transaction (txid +
+// index)
+struct OutPoint
 {
-    std::string hash;  // txid
+    unsigned char hash[32];  // txid
     uint32_t index;
 };
 
 struct Output
 {
     int64_t value;  // number of satoshis
-    std::string pk_script;
+    std::vector<unsigned char> pk_script;
 };
 
 struct Input
 {
     OutPoint previous_output;
-    std::string signature_script;
+    std::vector<unsigned char> signature_script;
     uint32_t sequence;
     // supposed to be used for replacement, set to UINT32_MAX to mark as final
 };
@@ -43,36 +44,46 @@ struct Input
 class Transaction
 {
    protected:
+    std::vector<unsigned char> bytes;
     int32_t version;
     std::vector<Input> vin;
     std::vector<Output> vout;
     uint32_t lock_time;
 
-    std::string GetScript(std::string toAddress)
+    void GetScript(const char* toAddress, std::vector<unsigned char> &res)
     {
+        const unsigned char pubkeyhash_bytes_len = PUBKEYHASH_BYTES_LEN;
+
         std::vector<unsigned char> vchRet;
-        bool res = DecodeBase58(toAddress, vchRet);
+        bool decRes = DecodeBase58(toAddress, vchRet);
 
-        std::stringstream script;
-        script << std::hex << OP_DUP << OP_HASH160;
+        int written = 0;
 
-        script << std::hex << std::setfill('0') << std::setw(2)
-               << PUBKEYHASH_BYTES;
-
-        for (int i = 1; i <= PUBKEYHASH_BYTES; i++)
-            script << std::hex << std::setfill('0') << std::setw(2)
-                   << int(vchRet[i]);
-
-        script << std::hex << OP_EQUALVERIFY << OP_CHECKSIG;
-        return script.str();
+        memcpy(res + written, &OP_DUP, 1);
+        written += 1;
+        memcpy(res + written, &OP_HASH160, 1);
+        written += 1;
+        memcpy(res + written, &pubkeyhash_bytes_len, 1);
+        written += 1;
+        memcpy(res + written, vchRet.data(), pubkeyhash_bytes_len);
+        written += pubkeyhash_bytes_len;
+        memcpy(res + written, &OP_EQUALVERIFY, 1);
+        written += 1;
+        memcpy(res + written, &OP_CHECKSIG, 1);
+        written += 1;
     }
 
    public:
-    Transaction(int32_t ver, uint32_t locktime) : version(ver) , lock_time(locktime){}
-    void AddInput(std::string prevTxid, uint32_t prevIndex, std::string signature, uint32_t sequence) {
+    Transaction(int32_t ver, uint32_t locktime)
+        : version(ver), lock_time(locktime)
+    {
+    }
+    void AddInput(unsigned char* prevTxId, uint32_t prevIndex,
+                  std::vector<unsigned char> signature, uint32_t sequence)
+    {
         Input input;
         OutPoint point;
-        point.hash = prevTxid;
+        memcpy(point.hash, prevTxId, 32);
         point.index = prevIndex;
         input.previous_output = point;
         input.signature_script = signature;
@@ -81,17 +92,17 @@ class Transaction
     }
 
     // standard p2pkh transaction
-    void AddStdOutput(std::string toAddress, int64_t value)
+    void AddStdOutput(const char* toAddress, int64_t value)
     {
         Output output;
         output.value = value;
-        output.pk_script = GetScript(toAddress);
+        GetScript(toAddress, output.pk_script.data());
         vout.push_back(output);
     }
 
     // std::string GetCoinbase1() { return coinbase1; }
     // std::string GetCoinbase2() { return coinbase2; }
 
-    virtual std::string GetHex() = 0;
+    virtual std::vector<unsigned char>* GetBytes() = 0;
 };
 #endif

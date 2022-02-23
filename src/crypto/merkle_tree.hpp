@@ -14,17 +14,17 @@ class MerkleTree
     std::vector<unsigned char*> txIds;
 
    public:
-    MerkleTree(std::vector<std::string> txs)
+    MerkleTree(std::vector<std::vector<unsigned char>*> txs)
     {
-        for (int i = 0; i < txs.size(); i++) AddTx(txs[i].c_str(), txs[i].size());
+        for (int i = 0; i < txs.size(); i++) AddTx(txs[i]->data(), txs[i]->size());
     }
 
-    void AddTx(const char* txHex, int size)
+    void AddTx(unsigned char* txBytes, int size)
     {
         unsigned char txId[32];
         // TODO: unhexlify
 #if COIN_CONFIG == COIN_VRSC
-        HashWrapper::SHA256d((unsigned char*)txHex, size, txId);
+        HashWrapper::SHA256d(txBytes, size, txId);
 #endif
         txIds.push_back(txId);
     }
