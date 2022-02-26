@@ -14,8 +14,7 @@
 #include "sock_addr.hpp"
 #include "stratum/stratum_server.hpp"
 
-#define COIN_VRSC 1
-#define POOL_COIN COIN_VRSC
+#define COIN_VRSCTEST 1
 
 #define CONFIG_PATH                                                   \
     "//home/sickguy/Documents/Projects/SickPool/server/config/coins/" \
@@ -55,8 +54,10 @@ int main(int argc, char** argv)
     // return 0;
 
     CoinConfig coinConfig;
-    std::cout << ToHex(DiffToBits(2)) << std::endl;
-    std::cout << BitsToDiff(DiffToBits(2)) << std::endl;
+    // make tests
+    // std::cout << std::hex << std::setfill('0') << std::setw(8)
+    //           << DiffToBits(32768) << std::endl;
+    // std::cout << BitsToDiff(DiffToBits(32768)) << std::endl;
     // std::cout << BitsToDiff(DiffToBits(4096)) << std::endl;
 
     // std::cout << BitsToDiff(DiffToTarget(1));
@@ -83,7 +84,7 @@ void AssignJson(const char* name, std::string& obj, Document& doc)
                                  "\" (string) variable in config file");
 }
 
-void AssignJson(const char* name, u_short& obj, Document& doc)
+void AssignJson(const char* name, ushort& obj, Document& doc)
 {
     if (doc.HasMember(name) && doc[name].IsUint())
         obj = doc[name].GetUint();

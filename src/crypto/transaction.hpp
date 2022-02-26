@@ -11,7 +11,7 @@
 #include "utils.hpp"
 
 #define PUBKEYHASH_BYTES_LEN 20
-#define STD_SCRIPT_SIZE (PUBKEYHASH_BYTES_LEN + 5)
+#define P2PKH_SCRIPT_SIZE (PUBKEYHASH_BYTES_LEN + 5)
 
 #define OP_DUP 0x76
 #define OP_HASH160 0xa9
@@ -31,6 +31,9 @@ struct Output
 {
     int64_t value;  // number of satoshis
     std::vector<unsigned char> pk_script;
+
+    uint64_t script_compact_val;
+    char script_compact_len;
 };
 
 struct Input
@@ -38,39 +41,41 @@ struct Input
     OutPoint previous_output;
     std::vector<unsigned char> signature_script;
     uint32_t sequence;
+
+    uint64_t sig_compact_val;
+    char sig_compact_len;
     // supposed to be used for replacement, set to UINT32_MAX to mark as final
 };
 
 class Transaction
 {
    protected:
-    std::vector<unsigned char> bytes;
+    int tx_len = 0;
+    // std::vector<unsigned char> bytes;
     int32_t version;
     std::vector<Input> vin;
     std::vector<Output> vout;
     uint32_t lock_time;
 
-    void GetScript(const char* toAddress, std::vector<unsigned char> &res)
+    void GetP2PKHScript(const char* toAddress, std::vector<unsigned char> &res)
     {
-        const unsigned char pubkeyhash_bytes_len = PUBKEYHASH_BYTES_LEN;
-
         std::vector<unsigned char> vchRet;
         bool decRes = DecodeBase58(toAddress, vchRet);
 
-        int written = 0;
+        res.resize(P2PKH_SCRIPT_SIZE);
+        res[0] = OP_DUP;
+        res[1] = OP_HASH160;
+        res[2] = PUBKEYHASH_BYTES_LEN;
+        for (int i = 0; i < PUBKEYHASH_BYTES_LEN; i++) res[3 + i] = vchRet[i + 1];
+        res[2 + PUBKEYHASH_BYTES_LEN + 1] = OP_EQUALVERIFY;
+        res[2 + PUBKEYHASH_BYTES_LEN + 2] = OP_CHECKSIG;
 
-        memcpy(res + written, &OP_DUP, 1);
-        written += 1;
-        memcpy(res + written, &OP_HASH160, 1);
-        written += 1;
-        memcpy(res + written, &pubkeyhash_bytes_len, 1);
-        written += 1;
-        memcpy(res + written, vchRet.data(), pubkeyhash_bytes_len);
-        written += pubkeyhash_bytes_len;
-        memcpy(res + written, &OP_EQUALVERIFY, 1);
-        written += 1;
-        memcpy(res + written, &OP_CHECKSIG, 1);
-        written += 1;
+        // res.push_back(OP_DUP);
+        // res.push_back(OP_HASH160);
+        // res.push_back(PUBKEYHASH_BYTES_LEN);
+        // res.insert(res.end(), vchRet.begin(), vchRet.begin() + 20);
+        // res.push_back(OP_EQUALVERIFY);
+        // res.push_back(OP_CHECKSIG);
     }
 
    public:
@@ -85,10 +90,19 @@ class Transaction
         OutPoint point;
         memcpy(point.hash, prevTxId, 32);
         point.index = prevIndex;
+
         input.previous_output = point;
         input.signature_script = signature;
         input.sequence = sequence;
+
+        uint64_t varIntVal = signature.size();
+        char varIntLen = VarInt(varIntVal);
+
+        input.sig_compact_val = varIntVal;
+        input.sig_compact_len = varIntLen;
+
         vin.push_back(input);
+        tx_len += varIntLen + input.signature_script.size() + sizeof(OutPoint) + sizeof(sequence);
     }
 
     // standard p2pkh transaction
@@ -96,13 +110,21 @@ class Transaction
     {
         Output output;
         output.value = value;
-        GetScript(toAddress, output.pk_script.data());
+        GetP2PKHScript(toAddress, output.pk_script);
+
+        uint64_t varIntVal = output.pk_script.size();
+        char varIntLen = VarInt(varIntVal);
+
+        output.script_compact_val = varIntVal;
+        output.script_compact_len = varIntLen;
+
         vout.push_back(output);
+        tx_len += varIntLen + output.pk_script.size() + sizeof(output.value);
     }
 
     // std::string GetCoinbase1() { return coinbase1; }
     // std::string GetCoinbase2() { return coinbase2; }
 
-    virtual std::vector<unsigned char>* GetBytes() = 0;
+    virtual std::vector<unsigned char> GetBytes() = 0;
 };
 #endif

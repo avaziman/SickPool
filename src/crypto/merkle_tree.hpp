@@ -2,9 +2,11 @@
 #ifndef MERKLE_TREE_HPP
 #define MERKLE_TREE_HPP
 
+#include <array>
 #include <iostream>
 #include <string>
 #include <vector>
+#include <experimental/array>
 
 #include "utils.hpp"
 
@@ -14,44 +16,43 @@ class MerkleTree
     std::vector<unsigned char*> txIds;
 
    public:
-    MerkleTree(std::vector<std::vector<unsigned char>*> txs)
+    static void CalcRoot(std::vector<std::vector<unsigned char>>& txs,
+                         unsigned char* res)
     {
-        for (int i = 0; i < txs.size(); i++) AddTx(txs[i]->data(), txs[i]->size());
-    }
+        std::vector<std::array<unsigned char, 32>> txIds(txs.size());
 
-    void AddTx(unsigned char* txBytes, int size)
-    {
-        unsigned char txId[32];
-        // TODO: unhexlify
-#if COIN_CONFIG == COIN_VRSC
-        HashWrapper::SHA256d(txBytes, size, txId);
-#endif
-        txIds.push_back(txId);
-    }
-
-    void CalcRoot(unsigned char* res)
-    {
-        std::vector<unsigned char*> leafs(txIds);
-
-        while (leafs.size() != 1)
+        for (int i = 0; i < txs.size(); i++)
         {
-            if (leafs.size() % 2 != 0) leafs.push_back(leafs[leafs.size() - 1]);
-
-            std::vector<unsigned char*> tempLeafs;
-
-            for (int i = 0; i < leafs.size(); i += 2)
-            {
-                // std::string combined = (leafs[i]) + (leafs[i + 1]);
-                unsigned char combinedHash[32];
-#if COIN_CONFIG == COIN_VRSC
-                HashWrapper::SHA256d(leafs[i], 32 * 2, combinedHash);
+#if COIN_CONFIG == COIN_VRSCTEST
+            HashWrapper::SHA256d(txs[i].data(), txs[i].size(), txIds[i].data());
 #endif
-                tempLeafs.push_back(combinedHash);
-            }
-
-            leafs = tempLeafs;
         }
-        std::memcpy(res, leafs[0], 32);
+
+        while (txIds.size() > 1)
+        {
+            std::vector<std::array<unsigned char, 32>> temp;
+            for (int i = 0; i < txIds.size(); i += 2)
+            {
+                unsigned char combined[32 * 2];
+                unsigned char combinedHash[32];
+
+                if (i >= txIds.size())
+                {
+                    txIds.push_back(txIds.back());
+                }
+
+                memcpy(combined, txIds[i].data(), 32);
+                memcpy(combined + 32, txIds[i + 1].data(), 32);
+#if COIN_CONFIG == COIN_VRSCTEST
+                HashWrapper::SHA256d(combined, 64, combinedHash);
+#endif
+
+                temp.push_back(std::experimental::to_array(combinedHash));
+            }
+            txIds = temp;
+        }
+
+        memcpy(res, txIds[0].data(), 32);
     }
 };
 #endif

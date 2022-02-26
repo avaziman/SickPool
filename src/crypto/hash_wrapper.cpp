@@ -1,21 +1,19 @@
 #include "hash_wrapper.hpp"
 #include <chrono>
-bool HashWrapper::VERUSHASH_V2b2_INITIALIZED = false;
-CVerusHashV2* HashWrapper::cverusHashV2 = nullptr;
 
 void HashWrapper::InitVerusHash() { CVerusHashV2::init();
     CVerusHashV2::init();
-    cverusHashV2 = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
+    // cverusHashV2 = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 }
 
 void HashWrapper::VerushashV2b2(unsigned char* in, int size, unsigned char* res){
     // Make sure its initialized before this
-    // cverusHashV2->Reset();
-    // cverusHashV2->Write((unsigned char*)in, size);
-    // cverusHashV2->Finalize2b((unsigned char*)res);
-    CVerusHashV2::Hash(res, in, size);
+    CVerusHashV2 *cverusHashV2 = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 
-    
+    cverusHashV2->Reset();
+    cverusHashV2->Write((unsigned char*)in, size);
+    cverusHashV2->Finalize2b((unsigned char*)res);
+    // CVerusHashV2::Hash(res, in, size);
 
 }
 void HashWrapper::SHA256d(unsigned char* in, int size, unsigned char* res)

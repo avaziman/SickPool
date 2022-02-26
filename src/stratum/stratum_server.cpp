@@ -39,7 +39,7 @@ StratumServer::StratumServer(CoinConfig cnfg) : coinConfig(cnfg)
     }
 
     // init hash functions if needed
-#if POOL_COIN == COIN_VRSC
+#if POOL_COIN == COIN_VRSCTEST
     HashWrapper::InitVerusHash();
 #endif
 }
@@ -90,39 +90,41 @@ void StratumServer::HandleSocket(int conn_fd)
         new StratumClient(conn_fd, time(NULL), this->coinConfig.default_diff);
     this->clients.push_back(client);
 
+    char buffer[REQ_BUFF_SIZE];
+    char *reqEnd;
+    int total = 0, res = 0;
+
     while (true)
     {
-        char buffer[1024 * 4];
-        int total = 0;
-        int res = -1;
         do
         {
-            res = recv(conn_fd, buffer + total, sizeof(buffer) - total - 1, 0);
-            std::cout << res << std::endl;
-            std::cout << "char->" << (int)buffer[total - 1] << std::endl;
-            std::cout << buffer << std::endl;
-            if (res > 0)
-                total += res;
-            else
-                break;
-        } while (buffer[total - 1] != '\n');
+            res = recv(conn_fd, buffer + total, REQ_BUFF_SIZE - total - 1, 0);
 
-        if (res == 0)
+            if (res <= 0) break;
+            total += res;
+            buffer[total] = 0;
+        } while ((reqEnd = std::strchr(buffer, '\n')) == NULL);
+        reqEnd += 1;
+
+        if (res <= 0)
         {
             // miner disconnected
-            std::cout << "client disconnected." << std::endl;
+            std::cout << "client disconnected. res: " << res << std::endl;
             close(client->GetSock());
             clients.erase(std::find(clients.begin(), clients.end(), client));
             break;
         }
 
-        buffer[total - 1] = '\0';
-
+        std::cout << "buff" << std::endl;
         std::cout << buffer << std::endl;
-        // std::cout << ++this->job_count << std::endl;
-        // std::thread(&StratumServer::HandleReq, this, client,
-        // buffer).detach();
+
+        total = 0;
+
         HandleReq(client, buffer);
+
+        int nextReqLen = std::strlen(reqEnd);
+        std::memcpy(buffer, reqEnd, nextReqLen);
+        total = nextReqLen;
     }
 }
 
@@ -139,9 +141,7 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[])
     req.Parse(buffer);
 
     auto member = req.FindMember("id");
-    if (member == req.MemberEnd())
-        return;
-    else if (member->value.IsInt())
+    if (member != req.MemberEnd() && member->value.IsInt())
         id = member->value.GetInt();
 
     member = req.FindMember("method");
@@ -170,17 +170,22 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[])
 
 void StratumServer::HandleBlockUpdate(Value &params)
 {
-    char *buffer = SendRpcReq(1, "getblocktemplate");
-    if (buffer == nullptr)
+    std::string reqParams = "";
+    std::vector<char> resBody;
+    int resCode = SendRpcReq(resBody, 1, "getblocktemplate", reqParams);
+
+    while (resCode != 200)
     {
-        std::cerr << "Block update socket error: Failed to get blocktemplate "
-                  << std::endl;
-        return HandleBlockUpdate(params);
+        resCode = SendRpcReq(resBody, 1, "getblocktemplate", reqParams);
+        std::cerr << "Block update socket error: Failed to get blocktemplate, "
+                     "http code: "
+                  << resCode << ", retrying..." << std::endl;
+
+        std::this_thread::sleep_for(5ms);
     }
 
     Document blockT(kObjectType);
-    blockT.Parse(buffer);
-    delete[] buffer;
+    blockT.Parse(resBody.data());
 
     GenericObject res = blockT["result"].GetObject();
     const char *prevBlockHash = res["previousblockhash"].GetString();
@@ -201,25 +206,27 @@ void StratumServer::HandleBlockUpdate(Value &params)
 
     // Block *block;
 
-    std::vector<std::vector<unsigned char>*> transactions;
-    std::vector<unsigned char>* coinbaseTx =
+    std::vector<std::vector<unsigned char>> transactions(1);
+    std::vector<unsigned char> coinbaseTx =
         GetCoinbaseTx(coinbaseValue, curtime, height);
 
-    transactions.push_back(coinbaseTx);
+    transactions[0] = coinbaseTx;
 
     Job *job;
 
-#if POOL_COIN == COIN_VRSC
+#if POOL_COIN == COIN_VRSCTEST
     const char *finalSaplingRoot = res["finalsaplingroothash"].GetString();
     const char *solution = res["solution"].GetString();
 
-    job =
-        new VerusJob(this->job_count, transactions, true, verHex, prevBlockHash,
-                     curTimeHex, bits, finalSaplingRoot, (char *)solution);
+    job = new VerusJob(this->job_count, transactions, true, verHex,
+                       ReverseHex(prevBlockHash, 64), curTimeHex,
+                       ReverseHex(bits, 8), ReverseHex(finalSaplingRoot, 64),
+                       solution);
 #endif
 
     // block->AddTransaction(coinbaseTx);
-    // for (Value::ConstValueIterator itr = txs.begin(); itr != txs.end();
+    // for (Value::ConstValueIterator itr = txs.begin(); itr !=
+    txs.end();
     // itr++)
     //     block->AddTransaction((*itr)["data"].GetString());
 
@@ -238,19 +245,19 @@ void StratumServer::HandleBlockUpdate(Value &params)
 // TODO: check if rpc response contains error
 void StratumServer::CheckAcceptedBlock(uint32_t height)
 {
+    std::vector<char> resBody;
     std::string params = "\"" + std::to_string(height - 1) + "\"";
-    char *resStr = SendRpcReq(1, "getblock", params);
+    int resCode = SendRpcReq(resBody, 1, "getblock", params);
 
-    if (resStr == nullptr)
+    if (resCode != 200)
     {
-        std::cerr << "CheckAcceptedBlock socket error: Failed to getblock "
-                  << std::endl;
+        std::cerr << "CheckAcceptedBlock error: Failed to getblock, http code: "
+                  << resCode << std::endl;
         return CheckAcceptedBlock(height);
     }
 
     Document doc(kObjectType);
-    doc.Parse(resStr);
-    delete[] resStr;
+    doc.Parse(resBody.data());
 
     GenericObject res = doc["result"].GetObject();
     GenericArray txIds = res["tx"].GetArray();
@@ -261,10 +268,9 @@ void StratumServer::CheckAcceptedBlock(uint32_t height)
     params = std::string("\"") + std::string(txIds[0].GetString()) +
              std::string("\",1");  // 1 = verboose (json)
 
-    resStr = SendRpcReq(1, "getrawtransaction", params);
+    resCode = SendRpcReq(resBody, 1, "getrawtransaction", params);
     Document txDoc(kObjectType);
-    txDoc.Parse(resStr);
-    delete[] resStr;
+    txDoc.Parse(resBody.data());
 
     std::string solverAddr =
         txDoc["result"]["vout"][0]["scriptPubKey"]["addresses"][0].GetString();
@@ -302,8 +308,8 @@ void StratumServer::HandleSubscribe(StratumClient *cli, int id, Value &params)
 
     char response[1024];
     int len = snprintf(response, sizeof(response),
-             "{\"id\":%d,\"result\":[null,\"%s\"],\"error\":null}\n", id,
-             cli->GetExtraNonce());
+                       "{\"id\":%d,\"result\":[null,\"%s\"],\"error\":null}\n",
+                       id, cli->GetExtraNonce());
     // std::cout << response << std::endl;
     send(cli->GetSock(), response, len, 0);
     this->UpdateDifficulty(cli);
@@ -335,25 +341,26 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id, Value &params)
     }
     else
     {
-        addr = worker_full.substr(0, split);
-        worker = worker_full.substr(split + 1, worker_full.size() - 1);
+        // addr = worker_full.substr(0, split);
+        // worker = worker_full.substr(split + 1, worker_full.size() - 1);
 
-        std::string params = "\"" + addr + "\"";
-        char *res = SendRpcReq(1, "validateaddress", params);
-        Document doc(kObjectType);
-        doc.Parse(res);
+        // std::string params = "\"" + addr + "\"";
+        // char *res = SendRpcReq(1, "validateaddress", params);
+        // Document doc(kObjectType);
+        // doc.Parse(res);
 
-        bool isvalid = doc.HasMember("result") && doc["result"].IsObject() &&
-                       doc["result"].HasMember("isvalid") &&
-                       doc["result"]["isvalid"].IsBool() &&
-                       doc["result"]["isvalid"] == true;
+        // bool isvalid = doc.HasMember("result") && doc["result"].IsObject() &&
+        //                doc["result"].HasMember("isvalid") &&
+        //                doc["result"]["isvalid"].IsBool() &&
+        //                doc["result"]["isvalid"] == true;
 
-        if (!isvalid)
-            error =
-                "invalid address or identity, use format: address/id@.worker";
+        // if (!isvalid)
+        //     error =
+        //         "invalid address or identity, use format:
+        //         address/id@.worker";
 
-        std::cout << "Address: " << addr << ", worker: " << worker
-                  << ", authorized: " << isvalid << std::endl;
+        // std::cout << "Address: " << addr << ", worker: " << worker
+        //           << ", authorized: " << isvalid << std::endl;
     }
 
     std::string result = error == "null" ? "true" : "false";
@@ -374,6 +381,7 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id, Value &params)
     share.time = params[2].GetString();
     share.nonce2 = params[3].GetString();
     share.solution = params[4].GetString();
+    share.solutionSize = params[4].GetStringLength();
 
     auto start = std::chrono::steady_clock::now();
     HandleShare(cli, id, share);
@@ -397,8 +405,9 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 
     // TODO: check duplicate
 
-    unsigned char *headerData = job->GetData(share.time, cli->GetExtraNonce(),
-                                             share.nonce2, share.solution);
+    unsigned char *headerData =
+        job->GetData(share.time, cli->GetExtraNonce(), share.nonce2,
+                     share.solution, share.solutionSize);
     unsigned char hashBuff[32];
 
     job->GetHash(hashBuff);
@@ -407,14 +416,12 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     // uint256 hash256 = uint256S(hashBuff);
     uint256 hash256(v);
 
-    double shareDiff =
-        BitsToDiff(UintToArith256(hash256).GetCompact(false));
+    double shareDiff = BitsToDiff(UintToArith256(hash256).GetCompact(false));
 
-    // std::cout << "header hex: " << headerHex << std::endl;
-    // std::cout << "block hash      : " << hash256.GetHex() << std::endl;
-    // std::cout << "block difficulty: " << job->GetTargetDiff() << std::endl;
-    // std::cout << "share difficulty: " << shareDiff << std::endl;
-    // std::cout << "client target   : " << cli->GetDifficulty() << std::endl;
+    std::cout << "block hash      : " << hash256.GetHex() << std::endl;
+    std::cout << "block difficulty: " << job->GetTargetDiff() << std::endl;
+    std::cout << "share difficulty: " << shareDiff << std::endl;
+    std::cout << "client target   : " << cli->GetDifficulty() << std::endl;
     // auto end = std::chrono::steady_clock::now();
     // auto duration =
     //     std::chrono::duration_cast<microseconds>(end - start).count();
@@ -484,54 +491,59 @@ void StratumServer::RejectShare(StratumClient *cli, int id, ShareResult error)
 bool StratumServer::SubmitBlock(std::string blockHex)
 {
     // std::cout << "block hex: " << hex << std::endl;
+    std::vector<char> resultBody;
     std::string params = "\"" + blockHex + "\"";
-    char *resStr = SendRpcReq(1, "submitblock", params);
-    if (resStr == nullptr)
+    int resCode = SendRpcReq(resultBody, 1, "submitblock", params);
+
+    if (resCode != 200)
     {
-        std::cerr << "Failed to send block submission." << std::endl;
-        delete[] resStr;
+        std::cerr << "Failed to send block submission, http code: " << resCode
+                  << std::endl;
         return false;
     }
 
     Document res(kObjectType);
-    res.Parse(resStr);
+    res.Parse(resultBody.data());
 
-    if (res.HasMember("error") && !res["error"].IsNull())
+    auto member = res.FindMember("error");
+
+    if (member == res.MemberEnd() || !member->value.IsNull())
     {
         std::string error = "unknown";
-        if (res["error"].HasMember("message"))
-            error = res["error"]["message"].GetString();
+        member = res.FindMember("message");
+
+        if (member != res.MemberEnd() && member->value.IsString())
+            error = member->value.GetString();
 
         std::cerr << "Block submission rejected, rpc error: " << error
                   << std::endl;
-        delete[] resStr;
         return false;
     }
-    else if (res.HasMember("result") && res["result"].IsNull())
+
+    member = res.FindMember("result");
+
+    if (member == res.MemberEnd() || !member->value.IsNull())
     {
-        delete[] resStr;
-        return true;
+        std::cerr << "Block submission failed: "
+                  << "result not found: " << resultBody.data() << std::endl;
+        return false;
     }
 
-    std::cerr << "Block submission failed, unknown rpc result: " << resStr
-              << std::endl;
-    delete[] resStr;
-    return false;
+    std::cerr << "Block submission successful!" << std::endl;
+    return true;
 }
 
 void StratumServer::UpdateDifficulty(StratumClient *cli)
 {
     uint32_t diffBits = DiffToBits(cli->GetDifficulty());
     uint256 diff256;
-    UintToArith256(diff256).SetCompact(diffBits);
+    arith_uint256 arith256 = UintToArith256(diff256).SetCompact(diffBits);
 
     char request[1024];
-    int len =
-        snprintf(request, sizeof(request),
-                 "{\"id\":null,\"method\":\"mining.set_target\",\"params\":["
-                 "\"%s"
-                 "0000\"]}\n",
-                 diff256.GetHex().c_str());
+    int len = snprintf(
+        request, sizeof(request),
+        "{\"id\":null,\"method\":\"mining.set_target\",\"params\":[\"%s\"]}\n",
+        arith256.GetHex().c_str());
 
     send(cli->GetSock(), request, len, 0);
 }
@@ -549,23 +561,22 @@ void StratumServer::BroadcastJob(StratumClient *cli, Job *job)
     send(cli->GetSock(), job->GetNotifyBuff(), job->GetNotifyBuffSize(), 0);
 }
 
-std::vector<unsigned char>* StratumServer::GetCoinbaseTx(int64_t value,
+std::vector<unsigned char> StratumServer::GetCoinbaseTx(int64_t value,
                                                         uint32_t curtime,
                                                         uint32_t height)
 {
     unsigned char prevTxIn[32] = {0};
-    std::vector<unsigned char> signature;
-    const unsigned char sizeOfHeight = 0x03;
-    signature.push_back(sizeOfHeight);
+    std::vector<unsigned char> signature(1 + 4);
+    signature[0] = 0x03;  // var int
 
-    memcpy(signature.data(), &height, 4);
+    memcpy(signature.data() + 1, &height, 4);
 
     // todo: make txVersionGroup updateable without reset
     uint32_t txVersionGroup = 0x892f2085;
     VerusTransaction coinbaseTx(4, curtime, true, txVersionGroup);
-    coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature,
-                        UINT32_MAX);
-    coinbaseTx.AddStdOutput(this->coinConfig.pool_addr.c_str(), value);  // TODO: add i address check
+    coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
+    coinbaseTx.AddStdOutput(this->coinConfig.pool_addr.c_str(),
+                            value);  // TODO: add i address check
     coinbaseTx.AddTestnetCoinbaseOutput();
     return coinbaseTx.GetBytes();
 }
@@ -582,14 +593,14 @@ Job *StratumServer::GetJobById(std::string id)
     return nullptr;
 }
 
-char *StratumServer::SendRpcReq(int id, std::string method, std::string params)
+int StratumServer::SendRpcReq(std::vector<char> &result, int id,
+                              const char *method, std::string &params)
 {
     for (DaemonRpc *rpc : this->rpcs)
     {
-        char *res = rpc->SendRequest(id, method, params);
-        if (res == nullptr) break;
-        return res;
+        int res = rpc->SendRequest(result, id, method, params);
+        if (res != -1) return res;
     }
 
-    return nullptr;
+    return -2;
 }

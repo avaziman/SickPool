@@ -19,7 +19,7 @@ endif()
 include_directories(lib/rapidjson/include)
 
 add_subdirectory(src)
-# add_subdirectory(block_notifier)
+add_subdirectory(block_notifier)
 add_subdirectory(lib/googletest)
 add_subdirectory(lib/redis-plus-plus)
 # add_subdirectory(tests)

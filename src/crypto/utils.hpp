@@ -10,6 +10,11 @@
 #include "verushash/endian.h"
 #include "verushash/uint256.h"
 
+#define POOL_COIN COIN_VRSCTEST
+#if POOL_COIN == COIN_VRSCTEST
+#define DIFF1_BITS 0x200f0f0f
+#endif
+
 // bool IsAddressValid(std::string addr){
 //     std::vector<unsigned char> bytes;
 
@@ -87,7 +92,7 @@ inline char GetHex(char c)
     return 0;
 }
 
-inline void HexlifyLE(unsigned char* src, int srcSize, char* res)
+inline void Hexlify(unsigned char* src, int srcSize, char* res)
 {
     const char hex[] = "0123456789abcdef";
 
@@ -117,7 +122,7 @@ inline void Unhexlify(unsigned char* arr, int size)
     {
         unsigned char char1 = GetHex(arr[i * 2]);
         unsigned char char2 = GetHex(arr[i * 2 + 1]);
-        arr[i] = char1 + char2 * 16;
+        arr[i] = char2 + char1 * 16;
     }
 }
 
@@ -128,7 +133,7 @@ inline void Unhexlify(char* src, int size, unsigned char* dest)
     {
         unsigned char char1 = GetHex(src[i * 2]);
         unsigned char char2 = GetHex(src[i * 2 + 1]);
-        dest[i] = char1 + char2 * 16;
+        dest[i] = char2 + char1 * 16;
     }
 }
 
@@ -141,7 +146,7 @@ inline std::string ToHex(uint32_t num)
 
 inline void ToHex(char* dest, uint32_t num) { sprintf(dest, "%08x", num); }
 
-inline uint32_t FromHex(std::string str)
+inline uint32_t FromHex(const char* str)
 {
     uint32_t val;
     std::stringstream ss;
@@ -203,14 +208,12 @@ inline int intPow(int x, unsigned int p)
 static double BitsToDiff(int64_t nBits)
 {
     // from chain params
-    uint256 powLimit256 = uint256S(
-        "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
-    uint32_t powLimit = UintToArith256(powLimit256).GetCompact(false);
+
     int nShift = (nBits >> 24) & 0xff;
-    int nShiftAmount = (powLimit >> 24) & 0xff;
+    int nShiftAmount = (DIFF1_BITS >> 24) & 0xff;
 
     double dDiff =
-        (double)(powLimit & 0x00ffffff) / (double)(nBits & 0x00ffffff);
+        (double)(DIFF1_BITS & 0x00ffffff) / (double)(nBits & 0x00ffffff);
     while (nShift < nShiftAmount)
     {
         dDiff *= 256.0;
@@ -226,60 +229,28 @@ static double BitsToDiff(int64_t nBits)
     return dDiff;
 }
 
-// static double DiffToBits(double diff)
-// {
-//     int word, shiftBytes;
-//     uint256 powLimit256 = uint256S(
-//         "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
-//     uint32_t powLimit = UintToArith256(powLimit256).GetCompact(false);
-//     std::cout << "powlimit: " << std::hex<< powLimit << std::endl;
-
-//     int nShift = (powLimit >> 24) & 0xff;
-//     for (shiftBytes = 1; true; shiftBytes++)
-//     {
-//         word = (0x0f0f0f * pow(0x100, shiftBytes)) / diff;
-//         if (word >= 0xffff) break;
-//     }
-//     word &= 0xffffff;  // convert to int < 0xffffff
-
-//     auto size = 0x20 - shiftBytes;
-//     // the 0x00800000 bit denotes the sign, so if it is already set, divide
-//     // the mantissa by 0x100 and increase the size by a byte
-//     // if (word & 0x800000)
-//     // {
-//     //     word >>= 8;
-//     //     size++;
-//     // }
-
-//     uint32_t bits = (size << 24) | word;
-//     return bits;
-// }
-
-// https://github.com/romkk/explorer-kv/blob/e042e343639782e140e4b81632756adae5484642/jiexi/src/Common.cc
-inline uint32_t DiffToBits(uint64_t diff)
+// https://bitcoin.stackexchange.com/questions/30467/what-are-the-equations-to-convert-between-bits-and-difficulty
+static uint32_t DiffToBits(double difficulty)
 {
-    uint64_t origdiff = diff;
-    uint64_t nbytes = (0x200f0f0f >> 24) & 0xff;
-    uint64_t value = 0x200f0f0f & 0xffffffULL;
-
-    // if (diff == 0)
-
-    while (diff % 256 == 0)
+    int shiftBytes;
+    int64_t word;
+    for (shiftBytes = 1; true; shiftBytes++)
     {
-        nbytes -= 1;
-        diff /= 256;
+        word =
+            ((DIFF1_BITS & 0x00FFFFFF) * pow(0x100, shiftBytes)) / difficulty;
+        if (word >= 0xffff) break;
     }
-    if (value % diff == 0)
+    word &= 0xffffff;  // convert to int < 0xffffff
+    int size = (DIFF1_BITS >> 24) - shiftBytes;
+    // the 0x00800000 bit denotes the sign, so if it is already set, divide the
+    // mantissa by 0x100 and increase the size by a byte
+    if (word & 0x800000)
     {
-        value /= diff;
+        word >>= 8;
+        size++;
     }
-    else if ((value << 8) % diff == 0)
-    {
-        nbytes -= 1;
-        value <<= 8;
-        value /= diff;
-    }
-    return (uint32_t)(value | (nbytes << 24));
+    uint32_t bits = (size << 24) | word;
+    return bits;
 }
 // static std::string DiffToTarget(double diff)
 // {
