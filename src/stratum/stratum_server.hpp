@@ -1,16 +1,16 @@
 #ifndef STRATUM_SERVER_HPP_
 #define STRATUM_SERVER_HPP_
-#define VERUS_MAX_BLOCK_SIZE (1024 * 1024 * 2)
 #include <rapidjson/document.h>
 #include <sw/redis++/redis++.h>
 #include <sys/socket.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
+#include <ctime>
 #include <iostream>
 #include <thread>
 #include <vector>
-#include <cerrno>
 
 #include "../coin_config.hpp"
 #include "../crypto/block.hpp"
@@ -23,6 +23,7 @@
 #include "../crypto/verushash/verus_hash.h"
 #include "../daemon/daemon_rpc.hpp"
 #include "../sock_addr.hpp"
+#include "difficulty_manager.hpp"
 #include "byteswap.h"
 #include "job.hpp"
 #include "redis_manager.hpp"
@@ -32,6 +33,7 @@
 #include "verus_job.hpp"
 
 #define REQ_BUFF_SIZE 1024 * 16
+#define SOCK_TIMEOUT 5;
 
 // how we store stale and invalid shares in database
 #define STALE_SHARE_DIFF -1
@@ -48,15 +50,16 @@ class StratumServer
     StratumServer(CoinConfig config);
     ~StratumServer();
     void StartListening();
-    int sockfd;
 
    private:
-    CoinConfig coinConfig;
+    int sockfd;
+    CoinConfig coin_config;
     sockaddr_in addr;
     uint32_t job_count;
 
     RedisManager* redis_manager;
 
+    std::mutex clients_mutex;
     std::vector<DaemonRpc*> rpcs;
     std::vector<StratumClient*> clients;
     std::vector<Job*> jobs;
@@ -64,7 +67,7 @@ class StratumServer
     void Listen();
     void HandleSocket(int sockfd);
     void HandleReq(StratumClient* cli, char buffer[]);
-    void HandleBlockUpdate(Value &params);
+    void HandleBlockUpdate(Value& params);
 
     void HandleSubscribe(StratumClient* cli, int id, Value& params);
     void HandleAuthorize(StratumClient* cli, int id, Value& params);
@@ -86,7 +89,7 @@ class StratumServer
     void CheckAcceptedBlock(uint32_t height);
 
     std::vector<unsigned char> GetCoinbaseTx(int64_t value, uint32_t curtime,
-                              uint32_t height);
+                                             uint32_t height);
 
     int SendRpcReq(std::vector<char>& result, int id, const char* method,
                    std::string& params);

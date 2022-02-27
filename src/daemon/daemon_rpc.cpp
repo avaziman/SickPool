@@ -77,14 +77,14 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id, const char* method
 
     if (sent < 0) return -1;
 
-    char* headerBuff = new char[HEADER_SIZE + 1];
+    char* headerBuff = new char[HTTP_HEADER_SIZE + 1];
 
     int headerRecv = 0;
     char* endOfHeader = 0;
     // receive http header (and potentially part or the whole body)
     do
     {
-        int recvRes = recv(sockfd, headerBuff + headerRecv, HEADER_SIZE - headerRecv, 0);
+        int recvRes = recv(sockfd, headerBuff + headerRecv, HTTP_HEADER_SIZE - headerRecv, 0);
         if (recvRes <= 0)
         {
             std::cerr << "rpc socket receive error code: " << errno
@@ -104,7 +104,7 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id, const char* method
     contentLength = std::atoi(std::strstr(headerBuff, "Content-Length: ") +
                               std::strlen("Content-Length: "));
     contentReceived = std::strlen(endOfHeader);
-    headerLength = HEADER_SIZE - contentReceived - 1;
+    headerLength = HTTP_HEADER_SIZE - contentReceived - 1;
 
     // std::cout << "HTTP CODE: " << resCode << std::endl;
     // std::cout << "CONTENT LENGTH: " << contentLength << std::endl;

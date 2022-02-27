@@ -1,6 +1,6 @@
 #include "stratum_server.hpp"
 
-StratumServer::StratumServer(CoinConfig cnfg) : coinConfig(cnfg)
+StratumServer::StratumServer(CoinConfig cnfg) : coin_config(cnfg)
 {
     for (int i = 0; i < 4; i++)
     {
@@ -11,12 +11,12 @@ StratumServer::StratumServer(CoinConfig cnfg) : coinConfig(cnfg)
         }
     }
 
-    // redis_manager = new RedisManager(cnfg.symbol, cnfg.redis_host);
+    redis_manager = new RedisManager(cnfg.symbol, cnfg.redis_host);
 
-    job_count = 0;
-    // job_count = redis_manager->GetJobId();
+    job_count = redis_manager->GetJobCount();
 
     std::cout << "Job count: " << job_count << std::endl;
+
 
     int optval = 1;
 
@@ -31,6 +31,7 @@ StratumServer::StratumServer(CoinConfig cnfg) : coinConfig(cnfg)
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = htons(cnfg.stratum_port);
+
 
     if (bind(sockfd, (const sockaddr *)&addr, sizeof(addr)) != 0)
     {
@@ -73,6 +74,7 @@ void StratumServer::Listen()
         int conn_fd;
         sockaddr_in conn_addr;
         conn_fd = accept(sockfd, (sockaddr *)&addr, (socklen_t *)&addr_len);
+        
         if (conn_fd <= 0)
         {
             std::cerr << "Invalid connecting socket accepted. Ignoring..."
@@ -87,8 +89,10 @@ void StratumServer::Listen()
 void StratumServer::HandleSocket(int conn_fd)
 {
     StratumClient *client =
-        new StratumClient(conn_fd, time(NULL), this->coinConfig.default_diff);
+        new StratumClient(conn_fd, time(0), this->coin_config.default_diff);
+    clients_mutex.lock();
     this->clients.push_back(client);
+    clients_mutex.unlock();
 
     char buffer[REQ_BUFF_SIZE];
     char *reqEnd;
@@ -111,12 +115,14 @@ void StratumServer::HandleSocket(int conn_fd)
             // miner disconnected
             std::cout << "client disconnected. res: " << res << std::endl;
             close(client->GetSock());
+            clients_mutex.lock();
             clients.erase(std::find(clients.begin(), clients.end(), client));
+            clients_mutex.unlock();
             break;
         }
 
-        std::cout << "buff" << std::endl;
-        std::cout << buffer << std::endl;
+        // std::cout << "buff" << std::endl;
+        // std::cout << buffer << std::endl;
 
         total = 0;
 
@@ -206,6 +212,8 @@ void StratumServer::HandleBlockUpdate(Value &params)
 
     // Block *block;
 
+    auto start = std::chrono::steady_clock::now();
+
     std::vector<std::vector<unsigned char>> transactions(1);
     std::vector<unsigned char> coinbaseTx =
         GetCoinbaseTx(coinbaseValue, curtime, height);
@@ -224,13 +232,19 @@ void StratumServer::HandleBlockUpdate(Value &params)
                        solution);
 #endif
 
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "Generated job: " << job->GetId() << " in " << std::dec
+              << std::chrono::duration_cast<std::chrono::microseconds>(end -
+                                                                       start)
+                     .count()
+              << "us" << std::endl;
     // block->AddTransaction(coinbaseTx);
     // for (Value::ConstValueIterator itr = txs.begin(); itr !=
     txs.end();
     // itr++)
     //     block->AddTransaction((*itr)["data"].GetString());
 
-    // this->redis_manager->SetJobId(++this->job_count);
+    this->redis_manager->SetJobCount(++this->job_count);
 
     jobs.push_back(job);
     this->BroadcastJob(job);
@@ -275,11 +289,12 @@ void StratumServer::CheckAcceptedBlock(uint32_t height)
     std::string solverAddr =
         txDoc["result"]["vout"][0]["scriptPubKey"]["addresses"][0].GetString();
 
-    if (solverAddr != coinConfig.pool_addr) return;
+    if (solverAddr != coin_config.pool_addr) return;
 
     if (validationType == "work")
     {
         std::cout << "PoW block accepted!" << std::endl;
+        redis_manager->EndRound(height - 1);
     }
     else if (validationType == "stake")
     {
@@ -396,61 +411,72 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 {
     // auto start = std::chrono::steady_clock::now();
     Job *job = GetJobById(share.jobId);
+    std::time_t time = std::time(0);
+    cli->SetLastShare(time);
 
     if (job == nullptr)
     {
-        // redis_manager->AddShare(share.worker, STALE_SHARE_DIFF);
+        redis_manager->AddShare(share.worker, STALE_SHARE_DIFF, time);
         return RejectShare(cli, id, ShareResult::JOB_NOT_FOUND);
     }
 
     // TODO: check duplicate
 
     unsigned char *headerData =
-        job->GetData(share.time, cli->GetExtraNonce(), share.nonce2,
+        job->GetHeaderData(share.time, cli->GetExtraNonce(), share.nonce2,
                      share.solution, share.solutionSize);
     unsigned char hashBuff[32];
 
+    std::cout << "header: ";
+    for (int i = 0; i < BLOCK_HEADER_SIZE; i++)
+        std::cout << std::hex << std::setfill('0') << std::setw(2) << (int)headerData[i];
+    std::cout << std::endl;
     job->GetHash(hashBuff);
 
     std::vector<unsigned char> v(hashBuff, hashBuff + 32);
-    // uint256 hash256 = uint256S(hashBuff);
     uint256 hash256(v);
 
     double shareDiff = BitsToDiff(UintToArith256(hash256).GetCompact(false));
 
-    std::cout << "block hash      : " << hash256.GetHex() << std::endl;
-    std::cout << "block difficulty: " << job->GetTargetDiff() << std::endl;
+    // std::cout << "block hash      : " << hash256.GetHex() << std::endl;
+    // std::cout << "block difficulty: " << job->GetTargetDiff() << std::endl;
     std::cout << "share difficulty: " << shareDiff << std::endl;
-    std::cout << "client target   : " << cli->GetDifficulty() << std::endl;
+    // std::cout << "client target   : " << cli->GetDifficulty() << std::endl;
     // auto end = std::chrono::steady_clock::now();
     // auto duration =
     //     std::chrono::duration_cast<microseconds>(end - start).count();
     // std::cout << "duration x " << duration << "microseconds." << std::endl;
 
-    if (shareDiff >= job->GetTargetDiff())
-    {
-        // std::cout << "found block solution!!!" << std::endl;
-        // std::string blockHex = job->GetHex(headerHex);
+    // if (shareDiff >= job->GetTargetDiff())
+    // {
+        // std::cout << "Found block solution!" << std::endl;
+        char blockData [job->GetBlockSize() + 3];
+        blockData[0] = '\"';
+        blockData[job->GetBlockSize() + 1] = '\"';
 
-        // bool submissionGood = SubmitBlock(blockHex);
-        // if (submissionGood)
-        // {
-        //     std::cout << "Submit block successful." << std::endl;
-        //     // redis_manager->InsertPendingBlock(hash_str);
-        // }
-        // else
-        // {
-        //     std::cerr << "Error submitting block, retrying..." << std::endl;
-        //     submissionGood = SubmitBlock(blockHex);
-        // }
-    }
-    else if (shareDiff < cli->GetDifficulty())
-    {
-        // redis_manager->AddShare(share.worker, INVALID_SHARE_DIFF);
-        return RejectShare(cli, id, ShareResult::LOW_DIFFICULTY_SHARE);
-    }
-    // redis_manager->AddShare(share.worker, shareDiff);
-    // std::cout << "share accepted" << std::endl;
+        job->GetBlockHex(blockData + 1);
+        blockData[job->GetBlockSize() + 2] = 0;
+        std::cout << (char *)blockData << std::endl;
+
+        bool submissionGood = SubmitBlock(std::string((const char*)blockData));
+        if (submissionGood)
+        {
+            std::cout << "Submit block successful." << std::endl;
+            // redis_manager->InsertPendingBlock(hash_str);
+        }
+        else
+        {
+            std::cerr << "Error submitting block, retrying..." << std::endl;
+            // submissionGood = SubmitBlock(blockHex);
+        }
+    // }
+    // else if (shareDiff < cli->GetDifficulty())
+    // {
+    //     redis_manager->AddShare(share.worker, INVALID_SHARE_DIFF, time);
+    //     return RejectShare(cli, id, ShareResult::LOW_DIFFICULTY_SHARE);
+    // }
+    redis_manager->AddShare(share.worker, shareDiff, time);
+    std::cout << "share accepted" << std::endl;
 }
 
 void StratumServer::RejectShare(StratumClient *cli, int id, ShareResult error)
@@ -492,8 +518,8 @@ bool StratumServer::SubmitBlock(std::string blockHex)
 {
     // std::cout << "block hex: " << hex << std::endl;
     std::vector<char> resultBody;
-    std::string params = "\"" + blockHex + "\"";
-    int resCode = SendRpcReq(resultBody, 1, "submitblock", params);
+    // std::string params = "\"" + blockHex + "\"";
+    int resCode = SendRpcReq(resultBody, 1, "submitblock", blockHex);
 
     if (resCode != 200)
     {
@@ -550,10 +576,12 @@ void StratumServer::UpdateDifficulty(StratumClient *cli)
 
 void StratumServer::BroadcastJob(Job *job)
 {
+    clients_mutex.lock();
     std::vector<StratumClient *>::iterator it;
     for (it = clients.begin(); it != clients.end(); it++)
         send((*it)->GetSock(), job->GetNotifyBuff(), job->GetNotifyBuffSize(),
              0);
+    clients_mutex.unlock();
 }
 
 void StratumServer::BroadcastJob(StratumClient *cli, Job *job)
@@ -575,7 +603,7 @@ std::vector<unsigned char> StratumServer::GetCoinbaseTx(int64_t value,
     uint32_t txVersionGroup = 0x892f2085;
     VerusTransaction coinbaseTx(4, curtime, true, txVersionGroup);
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
-    coinbaseTx.AddStdOutput(this->coinConfig.pool_addr.c_str(),
+    coinbaseTx.AddStdOutput(this->coin_config.pool_addr.c_str(),
                             value);  // TODO: add i address check
     coinbaseTx.AddTestnetCoinbaseOutput();
     return coinbaseTx.GetBytes();

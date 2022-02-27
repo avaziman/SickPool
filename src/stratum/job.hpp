@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "../crypto/merkle_tree.hpp"
 #include "../crypto/utils.hpp"
@@ -20,34 +21,65 @@ class Job
         ver, char* prevBlock, char* time, char* bits)*/
         : jobId(jobId)
     {
-        // only generating notify message once for efficiency
-        // we need to have all values in bytes, not
-
         ToHex(jobIdStr, jobId);
         jobIdStr[8] = 0;
+
+        uint64_t varIntVal = txs.size();
+        int varIntLen = VarInt(varIntVal);
+        int txDataLen = 0;
+
+        for (int i = 0; i < txs.size(); i++) txDataLen += txs[i].size();
+        
+        //TODO: fix sizes
+        // insert the txdata as hex as we will need to submit it as hex anyway
+        txDataHex.resize((txDataLen + varIntLen) * 2);
+
+        unsigned char varInt[8];
+        memcpy(varInt, &varIntVal, varIntLen);
+        Hexlify(varInt, varIntLen, txDataHex.data());
+
+        int written = varIntLen * 2;
+
+        for (int i = 0; i < txs.size(); i++)
+        {
+            Hexlify(txs[i].data(), txs[i].size(), txDataHex.data() + written);
+            written += txs[i].size() * 2;
+        }
     }
 
-    virtual unsigned char* GetData(const char* time, const char* nonce1, const char* nonce2, const char* additional, int solSize) = 0;
+    virtual unsigned char* GetHeaderData(const char* time, const char* nonce1,
+                                         const char* nonce2,
+                                         const char* additional,
+                                         int solSize) = 0;
+
+    void GetBlockHex(char* res)
+    {
+        Hexlify(headerData, BLOCK_HEADER_SIZE, res);
+        // TODO: CHECK WHY BLOCK_HEADER_SIZE * 2 WON"T WORK (SKIPS 72 bytes)
+        memcpy(res + (2974), txDataHex.data(), txDataHex.size());
+    }
+
     void GetHash(unsigned char* res)
     {
 #if POOL_COIN == COIN_VRSCTEST
-        HashWrapper::VerushashV2b2(this->blockData, BLOCK_HEADER_SIZE, res);
+        HashWrapper::VerushashV2b2(this->headerData, BLOCK_HEADER_SIZE, res);
 #endif
     }
     // char* GetVersion() { return version; }
     // char* GetPrevBlockhash() { return hashPrevBlock; }
     // char* GetTime() { return nTime; }
     // char* GetBits() { return nBits; }
+    const int GetBlockSize() { return (BLOCK_HEADER_SIZE * 2) + txDataHex.size(); }
     const char* GetId() { return jobIdStr; }
     char* GetNotifyBuff() { return notifyBuff; }
     uint16_t GetNotifyBuffSize() { return notifyBuffSize; }
     double GetTargetDiff() { return targetDiff; }
 
    protected:
-    MerkleTree merkleTree;
+    unsigned char headerData[BLOCK_HEADER_SIZE];
+    std::vector<char> txDataHex;
     uint32_t jobId;
     char jobIdStr[9];
-    unsigned char blockData[BLOCK_HEADER_SIZE];
     uint16_t notifyBuffSize;
     char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
     double targetDiff;

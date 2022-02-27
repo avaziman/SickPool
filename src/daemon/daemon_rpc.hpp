@@ -19,7 +19,7 @@
 #include <unistd.h>  //close
 #endif
 
-#define HEADER_SIZE 1024
+#define HTTP_HEADER_SIZE 1024
 
 using namespace rapidjson;
 

@@ -12,6 +12,7 @@
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/rapidjson.h"
 #include "sock_addr.hpp"
+#include "stratum/difficulty_manager.hpp"
 #include "stratum/stratum_server.hpp"
 
 #define COIN_VRSCTEST 1
@@ -124,6 +125,7 @@ void ParseCoinConfig(CoinConfig* cnfg, const char* path)
     AssignJson("pow_fee", cnfg->pow_fee, configDoc);
     AssignJson("pos_fee", cnfg->pos_fee, configDoc);
     AssignJson("default_diff", cnfg->default_diff, configDoc);
+    AssignJson("target_shares_rate", cnfg->target_shares_rate, configDoc);
     AssignJson("pool_addr", cnfg->pool_addr, configDoc);
     AssignJson("redis_host", cnfg->redis_host, configDoc);
 

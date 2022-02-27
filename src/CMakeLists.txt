@@ -1,4 +1,5 @@
 include_directories(daemon)
+include_directories(stratum)
 
 file(GLOB_RECURSE SRC_FILES
      "*.h"
@@ -6,6 +7,8 @@ file(GLOB_RECURSE SRC_FILES
      "*.hpp"
      "*.cpp"
      )
+
+     message(${SRC_FILES})
 
 find_package(Boost 1.68 REQUIRED)
 

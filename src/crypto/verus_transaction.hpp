@@ -83,7 +83,7 @@ class VerusTransaction : public Transaction
         Output output;
         output.value = 0;
         output.pk_script = std::vector<unsigned char>(
-            coinbaseOutputScript, coinbaseOutputScript + 79);
+            coinbaseOutputScript, coinbaseOutputScript + 80);
 
         uint64_t varIntVal = output.pk_script.size();
         char varIntLen = VarInt(varIntVal);

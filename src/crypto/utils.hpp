@@ -1,6 +1,7 @@
 #ifndef UTILS_HPP_
 #define UTILS_HPP_
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -158,7 +159,6 @@ inline uint32_t FromHex(const char* str)
 // https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
 inline char VarInt(uint64_t& len)
 {
-    std::stringstream ss;
     if (len < 0xfd)
         return 1;
     else if (len <= 0xffffffff){

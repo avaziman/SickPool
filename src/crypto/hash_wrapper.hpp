@@ -8,6 +8,7 @@
 
 #include "verushash/sha256.h"
 #include "verushash/verus_hash.h"
+#include "verushash/verus_clhash.h"
 
 #define VERUS_HASH_SIZE 32
 
@@ -17,6 +18,7 @@ class HashWrapper
     static void InitVerusHash();
     static void VerushashV2b2(unsigned char* in, int size, unsigned char* res);
     static void SHA256d(unsigned char* in, int size, unsigned char* res);
-
+    private:
+     static CVerusHashV2* cverusHashV2;
 };
 #endif

@@ -14,6 +14,7 @@ struct CoinConfig
     double pow_fee;
     double pos_fee;
     double default_diff;
+    double target_shares_rate;
     ushort stratum_port;
     std::string redis_host;
     RpcConfig rpcs[4];

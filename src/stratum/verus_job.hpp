@@ -15,7 +15,6 @@ class VerusJob : public Job
              const char* sol)
         : Job(jobId, txs)
     {
-        std::memset(blockData, 0, HEADER_SIZE);
         uint32_t bitsUint = bswap_32(FromHex(bits));
         this->targetDiff = BitsToDiff(bitsUint);
 
@@ -31,9 +30,9 @@ class VerusJob : public Job
         WriteHex(ver, 8);
         WriteHex(prevBlock, 64);
 
-        MerkleTree::CalcRoot(txs, blockData + written);
+        MerkleTree::CalcRoot(txs, headerData + written);
         // we need the hexlified merkle root for the notification
-        Hexlify(blockData + written, 32, merkleRootHex);
+        Hexlify(headerData + written, 32, merkleRootHex);
         written += 32;
 
         WriteHex(finalSaplingRoot, 64);
@@ -57,49 +56,33 @@ class VerusJob : public Job
             GetId(), ver, prevBlock, merkleRootHex, finalSaplingRoot, time, bits,
             BoolToCstring(clean), sol144);
         std::cout << notifyBuff << std::endl;
-
-        std::cout << "merkle root: " << std::endl;
-        for (char i : merkleRootHex) std::cout << i;
-        
-        std::cout << std::endl;
-
-        std::cout << "block data: " << std::endl;
-        for (unsigned char i : blockData)
-            std::cout << std::hex << std::setw(2) << std::setfill('0')
-                      << (int)i;
-        std::cout << std::endl;
     }
 
-    unsigned char* GetData(const char* time, const char* nonce1,
+    unsigned char* GetHeaderData(const char* time, const char* nonce1,
                            const char* nonce2, const char* sol,
                            int solSize) override
     {
-        Unhexlify((char*)time, 8, this->blockData + 4 + 32 * 3);
-        Unhexlify((char*)nonce1, 8, this->blockData + 4 * 3 + 32 * 3);
-        Unhexlify((char*)nonce2, 64 - 8, this->blockData + 4 + 4 * 3 + 32 * 3);
+        Unhexlify((char*)time, 8, this->headerData + 4 + 32 * 3);
+        Unhexlify((char*)nonce1, 8, this->headerData + 4 * 3 + 32 * 3);
+        Unhexlify((char*)nonce2, 64 - 8, this->headerData + 4 + 4 * 3 + 32 * 3);
         Unhexlify((char*)sol, solSize,
-                  this->blockData + 4 * 3 + 32 * 4);
+                  this->headerData + 4 * 3 + 32 * 4);
 
-        std::cout << "block data: " << std::endl;
-        for (unsigned char i : blockData)
-            std::cout << std::hex << std::setw(2) << std::setfill('0')
-                      << (int)i;
-        std::cout << std::endl;
 
-        return this->blockData;
+        return this->headerData;
     }
 
    private:
     inline void WriteHex(const char* data, int size)
     {
-        Unhexlify((char*)data, size, blockData + written);
+        Unhexlify((char*)data, size, headerData + written);
         written += size / 2;
     }
 
     template <class T>
     inline void Write(T* data, int size)
     {
-        memcpy(blockData + written, data, size);
+        memcpy(headerData + written, data, size);
         written += size;
     }
 
