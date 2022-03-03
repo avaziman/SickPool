@@ -3,6 +3,7 @@
 #include <rapidjson/document.h>
 #include <sw/redis++/redis++.h>
 #include <sys/socket.h>
+#include <simdjson.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -32,7 +33,7 @@
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
 
-#define REQ_BUFF_SIZE 1024 * 16
+#define REQ_BUFF_SIZE (1024 * 3)
 #define SOCK_TIMEOUT 5;
 
 // how we store stale and invalid shares in database
@@ -42,6 +43,7 @@
 using namespace sw::redis;
 
 using namespace rapidjson;
+using namespace simdjson;
 using namespace std::chrono;
 
 class StratumServer
@@ -56,6 +58,8 @@ class StratumServer
     CoinConfig coin_config;
     sockaddr_in addr;
     uint32_t job_count;
+    ondemand::parser reqParser;
+    ondemand::parser httpParser;
 
     RedisManager* redis_manager;
 
@@ -66,16 +70,17 @@ class StratumServer
 
     void Listen();
     void HandleSocket(int sockfd);
-    void HandleReq(StratumClient* cli, char buffer[]);
-    void HandleBlockUpdate(Value& params);
+    void HandleReq(StratumClient* cli, char buffer[], int reqSize);
+    void HandleBlockNotify(ondemand::array& params);
+    void HandleWalletNotify(ondemand::array& params);
 
-    void HandleSubscribe(StratumClient* cli, int id, Value& params);
-    void HandleAuthorize(StratumClient* cli, int id, Value& params);
-    void HandleSubmit(StratumClient* cli, int id, Value& params);
+    void HandleSubscribe(StratumClient* cli, int id, ondemand::array& params);
+    void HandleAuthorize(StratumClient* cli, int id, ondemand::array& params);
+    void HandleSubmit(StratumClient* cli, int id, ondemand::array& params);
 
     void HandleShare(StratumClient* cli, int id, Share& share);
     void RejectShare(StratumClient* cli, int id, ShareResult error);
-    bool SubmitBlock(std::string blockHex);
+    bool SubmitBlock(const char* blockHex, int blockHexLen);
 
     void UpdateDifficulty(StratumClient* cli);
 
@@ -84,14 +89,12 @@ class StratumServer
 
     void GetNextReq(int sockfd, int received, char* buffer);
 
-    Job* GetJobById(std::string id);
-
-    void CheckAcceptedBlock(uint32_t height);
+    Job* GetJobById(std::string_view id);
 
     std::vector<unsigned char> GetCoinbaseTx(int64_t value, uint32_t curtime,
                                              uint32_t height);
 
     int SendRpcReq(std::vector<char>& result, int id, const char* method,
-                   std::string& params);
+                   const char* params, int paramsLen);
 };
 #endif

@@ -39,7 +39,6 @@ void ParseCoinConfig(CoinConfig* cnfg, const char* path);
 
 //     return 1;
 // }
-
 int main(int argc, char** argv)
 {
     // const char* s[] = {"1Q1pE5vPGEEMqRcVRMbtBK842Y6Pzo6nK9",
@@ -53,7 +52,6 @@ int main(int argc, char** argv)
     //     printf("%s: %s\n", s[i], status ? "Ok" : "NO OK");
     // }
     // return 0;
-
     CoinConfig coinConfig;
     // make tests
     // std::cout << std::hex << std::setfill('0') << std::setw(8)

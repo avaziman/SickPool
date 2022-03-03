@@ -5,7 +5,7 @@
     "stratum_port": 4444,
     "pow_fee": 0.5,
     "pos_fee": 5.0,
-    "default_diff": 1000.1,
+    "default_diff": 1.0,
     "target_shares_rate": 120.0,
     "pool_addr": "RSickPooLhHZ3zRBzhFVsXYiGN18BF1Wh6",
     "redis_host": "127.0.0.1:6379",
@@ -13,7 +13,7 @@
         {
             "host1": "127.0.0.1:27486",
             "host": "127.0.0.1:20656",
-            "auth": "dXNlcjIxNDQwMzMwMDpwYXNzZDg5YmQ3Zjk1NGRhYTMzZjdjNDc5NDllN2QwYTQ5MjBmN2IzNjU0YTU5MjM0ZDllZDhmODBlNGU1ODgzNzMxNjY0" 
+            "auth": "YWRtaW4xOnBhc3MxMjM=" 
         }
     ]
 }

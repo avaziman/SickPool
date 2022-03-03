@@ -42,9 +42,8 @@
 //     return std::string(str);
 // }
 
-inline char* ReverseHex(const char* input, uint16_t size)
+inline void ReverseHex(const char* input, uint16_t size, char* dest)
 {
-    char* str = new char[size + 1];
     for (int i = 0; i < size / 2; i += 2)
     {
         char left = input[i];
@@ -52,13 +51,11 @@ inline char* ReverseHex(const char* input, uint16_t size)
         char right = input[size - (i + 1)];
         char right1 = input[size - (i + 2)];
 
-        str[i + 1] = right;
-        str[i] = right1;
-        str[size - (i + 2)] = left;
-        str[size - (i + 1)] = left1;
+        dest[i + 1] = right;
+        dest[i] = right1;
+        dest[size - (i + 2)] = left;
+        dest[size - (i + 1)] = left1;
     }
-    str[size] = '\0';
-    return str;
 }
 
 inline std::string Unhexlify(const std::string& hex)
@@ -127,7 +124,7 @@ inline void Unhexlify(unsigned char* arr, int size)
     }
 }
 
-inline void Unhexlify(char* src, int size, unsigned char* dest)
+inline void Unhexlify(const char* src, int size, unsigned char* dest)
 {
     // each byte is 2 characters in hex
     for (int i = 0; i < size / 2; i++)
@@ -152,7 +149,7 @@ inline uint32_t FromHex(const char* str)
     uint32_t val;
     std::stringstream ss;
     ss << std::hex << str;
-    ss >> val;
+    ss >>   val;
     return val;
 }
 
@@ -171,7 +168,7 @@ inline char VarInt(uint64_t& len)
         return 5;
     }
 
-    len = ((uint64_t)0xff << 64) | len;
+    // len = ((uint64_t)0xff << 64) | len;
     return 9;
 }
 

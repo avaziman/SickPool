@@ -19,7 +19,9 @@
 #include <unistd.h>  //close
 #endif
 
-#define HTTP_HEADER_SIZE 1024
+#include <simdjson.h>
+
+#define HTTP_HEADER_SIZE (1024 * 4)
 
 using namespace rapidjson;
 
@@ -28,7 +30,7 @@ class DaemonRpc
    public:
     DaemonRpc(std::string host_header, std::string auth_header);
     int SendRequest(std::vector<char>& result, int id, const char* method,
-                    std::string& params);
+                    const char* params, int len);
 
    private:
     int sockfd;

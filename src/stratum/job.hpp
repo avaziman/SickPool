@@ -9,7 +9,7 @@
 #include "../crypto/utils.hpp"
 
 #if POOL_COIN == COIN_VRSCTEST
-#define BLOCK_HEADER_SIZE 140 + 3 + 1344
+#define BLOCK_HEADER_SIZE (140 + 3 + 1344)
 #define MAX_NOTIFY_MESSAGE_SIZE 512
 // with true 444
 #endif
@@ -30,7 +30,6 @@ class Job
 
         for (int i = 0; i < txs.size(); i++) txDataLen += txs[i].size();
         
-        //TODO: fix sizes
         // insert the txdata as hex as we will need to submit it as hex anyway
         txDataHex.resize((txDataLen + varIntLen) * 2);
 
@@ -47,16 +46,15 @@ class Job
         }
     }
 
-    virtual unsigned char* GetHeaderData(const char* time, const char* nonce1,
-                                         const char* nonce2,
-                                         const char* additional,
-                                         int solSize) = 0;
+    virtual unsigned char* GetHeaderData(std::string_view time, std::string_view nonce1,
+                                         std::string_view nonce2,
+                                         std::string_view additional) = 0;
 
     void GetBlockHex(char* res)
     {
         Hexlify(headerData, BLOCK_HEADER_SIZE, res);
+        memcpy(res + (BLOCK_HEADER_SIZE * 2), txDataHex.data(), txDataHex.size());
         // TODO: CHECK WHY BLOCK_HEADER_SIZE * 2 WON"T WORK (SKIPS 72 bytes)
-        memcpy(res + (2974), txDataHex.data(), txDataHex.size());
     }
 
     void GetHash(unsigned char* res)

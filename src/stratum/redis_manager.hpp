@@ -17,10 +17,11 @@ class RedisManager
     {
         
     }
-    void AddShare(std::string worker, double diff, std::time_t time)
+    void AddShare(std::string_view worker, double diff, std::time_t time)
     {
+
         auto res = redis.zadd(coin_symbol + ":shares",
-                              worker + ":" + std::to_string(diff), time);
+                              std::string(worker) + ":" + std::to_string(diff), time);
 
         if (res < 1)
         {
@@ -30,7 +31,7 @@ class RedisManager
         // only include valid shares
         if (diff > 0)
         {
-            std::string address = worker.substr(0, worker.find('.'));
+            std::string_view address = worker.substr(0, worker.find('.'));
             res = redis.hincrbyfloat(coin_symbol + ":current_round", address,
                                      diff);
 

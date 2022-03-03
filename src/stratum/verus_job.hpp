@@ -10,34 +10,31 @@ class VerusJob : public Job
 {
    public:
     VerusJob(uint32_t jobId, std::vector<std::vector<unsigned char>>& txs,
-             bool clean, const char* ver, const char* prevBlock,
-             const char* time, const char* bits, const char* finalSaplingRoot,
-             const char* sol)
+             bool clean, uint32_t ver, const char* prevBlock, uint32_t time,
+             const char* bits, const char* finalSaplingRoot, const char* sol144)
         : Job(jobId, txs)
     {
+        /* we use cstring for "readable" generation of notify message
+         and because we need to reverse (copy) the string_views anyway so might
+         as well add a null char
+        */
+        char merkleRootHex[65];
+        merkleRootHex[64] = '\0';
+
         uint32_t bitsUint = bswap_32(FromHex(bits));
         this->targetDiff = BitsToDiff(bitsUint);
 
-        char merkleRootHex[65];
-        char sol144[145];
-        // cstring for sprintf
-        merkleRootHex[64] = sol144[144] = 0;
-
-        memcpy(sol144, sol, 144);
-
-        // we first need to copy the values because we can't modify cstring
-        // then we can unhexlify them
-        WriteHex(ver, 8);
-        WriteHex(prevBlock, 64);
+        Write(&ver, 4);
+        WriteUnhex(prevBlock, 64);
 
         MerkleTree::CalcRoot(txs, headerData + written);
-        // we need the hexlified merkle root for the notification
+        // we need the hexlified merkle root for the notification message
         Hexlify(headerData + written, 32, merkleRootHex);
         written += 32;
 
-        WriteHex(finalSaplingRoot, 64);
+        WriteUnhex(finalSaplingRoot, 64);
 
-        WriteHex(time, 8);    // we overwrite time later
+        Write(&time, 4);      // we overwrite time later
         Write(&bitsUint, 4);  // use the uint for the correct byte order
 
         // only write the sol size and 72 first bytes of sol
@@ -49,31 +46,34 @@ class VerusJob : public Job
 
         // only generating notify message once for efficiency
 
-        notifyBuffSize = snprintf(
-            notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
-            "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%s\","
-            "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%s,\"%s\"]}\n",
-            GetId(), ver, prevBlock, merkleRootHex, finalSaplingRoot, time, bits,
-            BoolToCstring(clean), sol144);
+        notifyBuffSize =
+            snprintf(notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
+                     "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+                     "[\"%s\",\"%08x\",\"%s\",\"%s\",\"%s\",\"%08x\",\"%s\",%s,"
+                     "\"%s\"]}\n",
+                     GetId(), bswap_32(ver), prevBlock, merkleRootHex, finalSaplingRoot,
+                     bswap_32(time), bits, BoolToCstring(clean), sol144);
         std::cout << notifyBuff << std::endl;
     }
 
-    unsigned char* GetHeaderData(const char* time, const char* nonce1,
-                           const char* nonce2, const char* sol,
-                           int solSize) override
+    unsigned char* GetHeaderData(std::string_view time, std::string_view nonce1,
+                                 std::string_view nonce2,
+                                 std::string_view sol) override
     {
-        Unhexlify((char*)time, 8, this->headerData + 4 + 32 * 3);
-        Unhexlify((char*)nonce1, 8, this->headerData + 4 * 3 + 32 * 3);
-        Unhexlify((char*)nonce2, 64 - 8, this->headerData + 4 + 4 * 3 + 32 * 3);
-        Unhexlify((char*)sol, solSize,
-                  this->headerData + 4 * 3 + 32 * 4);
-
+        // here we don't mutate the parameters so we use string_views as
+        // received by the json parser
+        Unhexlify(time.data(), time.size(), this->headerData + 4 + 32 * 3);
+        Unhexlify(nonce1.data(), nonce1.size(),
+                  this->headerData + 4 * 3 + 32 * 3);
+        Unhexlify(nonce2.data(), 64 - nonce1.size(),
+                  this->headerData + 4 * 4 + 32 * 3);
+        Unhexlify(sol.data(), sol.size(), this->headerData + 4 * 3 + 32 * 4);
 
         return this->headerData;
     }
 
    private:
-    inline void WriteHex(const char* data, int size)
+    inline void WriteUnhex(const char* data, int size)
     {
         Unhexlify((char*)data, size, headerData + written);
         written += size / 2;

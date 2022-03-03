@@ -407,6 +407,12 @@ redis++_LIB_DEPENDS:STATIC=general;/usr/local/lib/libhiredis.so;
 redis++_SOURCE_DIR:STATIC=/home/sickguy/Documents/Projects/SickPool/server/lib/redis-plus-plus
 
 //Value Computed by CMake
+stratum_notifier_BINARY_DIR:STATIC=/home/sickguy/Documents/Projects/SickPool/server/stratum_notifier
+
+//Value Computed by CMake
+stratum_notifier_SOURCE_DIR:STATIC=/home/sickguy/Documents/Projects/SickPool/server/stratum_notifier
+
+//Value Computed by CMake
 test_redis++_BINARY_DIR:STATIC=/home/sickguy/Documents/Projects/SickPool/server/lib/redis-plus-plus/test
 
 //Value Computed by CMake
