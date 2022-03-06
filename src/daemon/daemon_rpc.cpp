@@ -98,7 +98,7 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id, const char* method
         }
         headerRecv += recvRes;
         // for the response end check, gets overriden
-        headerBuff[headerRecv - 1] = '\0';
+        headerBuff[headerRecv] = '\0';
     } while ((endOfHeader = std::strstr(headerBuff, "\r\n\r\n")) == NULL);
 
     endOfHeader += 4;
@@ -113,10 +113,10 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id, const char* method
     // std::cout << "HTTP CODE: " << resCode << std::endl;
     // std::cout << "CONTENT LENGTH: " << contentLength << std::endl;
     // std::cout << "CONTENT RECEIVED: " << contentReceived << std::endl;
-    // std::cout << "TOTAL RECEIVED: " << totalRecv << std::endl;
+    // std::cout << "TOTAL RECEIRSickPooLhHZ3zRBzhFVsXYiGN18BF1Wh6VED: " << totalRecv << std::endl;
 
     // simd json parser requires some extra bytes
-    result.resize(contentLength + simdjson::SIMDJSON_PADDING - 1);
+    result.resize(contentLength + simdjson::SIMDJSON_PADDING);
     // sometimes we will get 404 message after the json
     // (its length not included in content-length)
     // contentReceived = std::min(contentReceived, contentLength);

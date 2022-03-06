@@ -13,8 +13,9 @@ StratumServer::StratumServer(CoinConfig cnfg)
     }
 
     redis_manager = new RedisManager(cnfg.symbol, cnfg.redis_host);
+    diff_manager = new DifficultyManager()
 
-    job_count = redis_manager->GetJobCount();
+        job_count = redis_manager->GetJobCount();
 
     std::cout << "Job count: " << job_count << std::endl;
 
@@ -39,6 +40,7 @@ StratumServer::StratumServer(CoinConfig cnfg)
     }
 
     // init hash functions if needed
+    HashWrapper::InitSHA256();
 #if POOL_COIN == COIN_VRSCTEST
     HashWrapper::InitVerusHash();
 #endif
@@ -82,7 +84,8 @@ void StratumServer::Listen()
             continue;
         };
 
-        std::thread(&StratumServer::HandleSocket, this, conn_fd).detach();
+        // std::thread(&StratumServer::HandleSocket, this, conn_fd).detach();
+        std::thread(&StratumServer::HandleSocket, this, conn_fd).join();
     }
 }
 
@@ -96,8 +99,9 @@ void StratumServer::HandleSocket(int conn_fd)
 
     // simdjson requires some extra bytes
     char buffer[REQ_BUFF_SIZE + SIMDJSON_PADDING];
-    char *reqEnd = nullptr;
-    int total = 0, res = 0;
+    char *reqEnd = nullptr, *reqStart = nullptr;
+    int total = 0, res = 0, reqLen = 0, nextReqLen = 0;
+    bool isTooBig = false;
 
     while (true)
     {
@@ -107,38 +111,54 @@ void StratumServer::HandleSocket(int conn_fd)
 
             if (res <= 0) break;
             total += res;
-            buffer[total] = '\0';
-        } while ((reqEnd = std::strchr(buffer, '\n')) == NULL);
-        // reqEnd += 1;
+            buffer[total] = '\0';  // replaces \n
+            reqEnd = std::strchr(buffer, '\n');
+        } while (reqEnd == NULL && total < REQ_BUFF_SIZE - 1);
+
 
         if (res <= 0)
         {
             // miner disconnected
-            std::cout << "client disconnected. res: " << res << std::endl;
+            std::cout << "client disconnected. res: " << res
+                      << ", errno: " << errno << std::endl;
             close(client->GetSock());
             clients_mutex.lock();
             clients.erase(std::find(clients.begin(), clients.end(), client));
             clients_mutex.unlock();
             break;
         }
+        // std::cout << "buff: " << buffer << std::endl;
 
-        // std::cout << "buffer: " << buffer << std::endl;
-        // there can be multiple messages
-        
-        do
+        if (std::strchr(buffer, '\n') == NULL)
         {
-            int reqLen = reqEnd - buffer;
-            int nextReqLen = total - reqLen - 1;
-            std::cout << "len: " << reqLen << std::endl;
-            std::cout << "total: " << total << std::endl;
-            // without \n
-            buffer[reqLen] = '\0';
-            HandleReq(client, buffer, reqLen);
-            // after the \n
-            std::memcpy(buffer, reqEnd + 1, nextReqLen);
-            total = nextReqLen;
+            std::cout << "Request too big." << std::endl;
+            reqStart = &buffer[0];
+            while (strchr(reqStart, '{') != NULL)
+            {
+                reqStart = strchr(buffer, '{');
+            }
+
+            total = total - (&buffer[REQ_BUFF_SIZE] - reqStart);
+            continue;
+        }
+
+        // there can be multiple messages
+        while (reqEnd != NULL)
+        {
+            reqStart = strchr(buffer, '{');
+            reqLen = reqEnd - reqStart;
+            HandleReq(client, reqStart, reqLen);
+
+            // nextReqLen = total - reqLen - 1;
+            nextReqLen = std::strlen(reqEnd + 1);
+            std::memmove(buffer, reqEnd + 1, nextReqLen);
             buffer[nextReqLen] = '\0';
-        } while ((reqEnd = std::strchr(buffer, '\n')) != NULL);
+
+            reqEnd = strchr(buffer, '\n');
+        }
+
+        total = nextReqLen;
+        // std::cout << "total: " << total << std::endl;
     }
 }
 
@@ -151,17 +171,17 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[], int reqSize)
 
     auto start = std::chrono::steady_clock::now();
 
-
+    ondemand::document doc =
+        reqParser.iterate(buffer, reqSize, REQ_BUFF_SIZE + SIMDJSON_PADDING);
+    // std::cout << "last char -> " << (int)buffer[]
     try
     {
-    ondemand::document doc =
-        reqParser.iterate(buffer, reqSize, reqSize + SIMDJSON_PADDING);
-    ondemand::object req = doc.get_object();
-    id = req["id"].get_int64();
-    method = req["method"].get_string();
-    params = req["params"].get_array();
+        ondemand::object req = doc.get_object();
+        id = req["id"].get_int64();
+        method = req["method"].get_string();
+        params = req["params"].get_array();
     }
-    catch (simdjson::simdjson_error err)
+    catch (simdjson::simdjson_error &err)
     {
         std::cerr << "Req json parse error: " << err.what() << std::endl;
     }
@@ -172,7 +192,6 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[], int reqSize)
             .count();
     std::cout << "req parse took: " << dur << "micro seconds." << std::endl;
 
-    // if (!strcmp(method, "mining.subscribe"))
     if (method == "mining.subscribe")
         HandleSubscribe(cli, id, params);
     else if (method == "mining.authorize")
@@ -196,6 +215,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     char reqParams[] = "";
     std::vector<char> resBody;
     int resCode = SendRpcReq(resBody, 1, "getblocktemplate", reqParams, 0);
+
     while (resCode != 200)
     {
         resCode = SendRpcReq(resBody, 1, "getblocktemplate", reqParams,
@@ -206,7 +226,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 
         std::this_thread::sleep_for(5ms);
     }
-
+    
     Job *job;
 
     try
@@ -244,9 +264,9 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         char bitsRev[8 + 1];
         char sol144[144 + 1];
 
-        ReverseHex(prevBlockHash.data(), 64, prevBlockRev);
-        ReverseHex(finalSRoot.data(), 64, finalSRootRev);
-        ReverseHex(bits.data(), 8, bitsRev);
+        ReverseHex(prevBlockRev, prevBlockHash.data(), 64);
+        ReverseHex(finalSRootRev, finalSRoot.data(), 64);
+        ReverseHex(bitsRev, bits.data(), 8);
         memcpy(sol144, solution.data(), 144);
 
         prevBlockRev[64] = '\0';
@@ -283,7 +303,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
                   << std::endl;
         std::cout << "Broadcasted job: " << job->GetId() << std::endl;
     }
-    catch (simdjson::simdjson_error err)
+    catch (simdjson::simdjson_error &err)
     {
         std::cerr << "getblocktemplate json parse error: " << err.what()
                   << std::endl;
@@ -303,8 +323,8 @@ void StratumServer::HandleWalletNotify(ondemand::array &params)
     char rpcParams[64];
     int len = snprintf(rpcParams, sizeof(rpcParams), "\"%s\",1",
                        std::string(txId).c_str());
-    rpcParams[len] = 0;
 
+    rpcParams[len] = 0;
     int resCode = SendRpcReq(resBody, 1, "getrawtransaction", rpcParams, len);
 
     if (resCode != 200)
@@ -318,7 +338,6 @@ void StratumServer::HandleWalletNotify(ondemand::array &params)
     ondemand::document doc =
         httpParser.iterate(resBody.data(), resBody.size() - 32, resBody.size());
 
-    std::cout << "f: " << doc.count_fields() << std::endl;
     // ondemand::object res = doc["result"].get_object();
     // std::string_view validationType = res["validationtype"].get_string();
 
@@ -361,7 +380,6 @@ void StratumServer::HandleSubscribe(StratumClient *cli, int id,
                        id, cli->GetExtraNonce());
     // std::cout << response << std::endl;
     send(cli->GetSock(), response, len, 0);
-    this->UpdateDifficulty(cli);
 
     if (jobs.size() == 0)
     {
@@ -369,9 +387,7 @@ void StratumServer::HandleSubscribe(StratumClient *cli, int id,
         return;
     }
 
-    this->BroadcastJob(cli, jobs.back());
-
-    std::cout << "client subscribed, broadcasted latest job." << std::endl;
+    std::cout << "client subscribed!" << std::endl;
 }
 
 void StratumServer::HandleAuthorize(StratumClient *cli, int id,
@@ -417,10 +433,12 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     std::string result = error == "null" ? "true" : "false";
 
     len = snprintf(response, sizeof(response),
-                   "{\"id\":%i,\"result\":%s,\"error\":\"%s\"}\n", id,
-                   result.c_str(), error.c_str());
-
+                   "{\"id\":2,\"result\":true,\"error\":null}\n");
+    //    result.c_str(), error.c_str());
+    // std::cout << response << std::endl;
     send(cli->GetSock(), response, len, 0);
+    this->UpdateDifficulty(cli);
+    this->BroadcastJob(cli, jobs.back());
 }
 
 // https://zips.z.cash/zip-0301#mining-submit
@@ -436,15 +454,15 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
     share.nonce2 = (*++it).get_string();
     share.solution = (*++it).get_string();
 
-    auto end = std::chrono::steady_clock::now();
     HandleShare(cli, id, share);
+    auto end = std::chrono::steady_clock::now();
     auto duration =
         std::chrono::duration_cast<microseconds>(end - start).count();
     std::cout << "Share processed in " << duration << "microseconds."
               << std::endl;
 }
 
-void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
+void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 {
     // auto start = std::chrono::steady_clock::now();
     Job *job = GetJobById(share.jobId);
@@ -587,7 +605,7 @@ bool StratumServer::SubmitBlock(const char *blockHex, int blockHexLen)
         //     return false;
         // }
     }
-    catch (simdjson::simdjson_error err)
+    catch (simdjson::simdjson_error &err)
     {
         std::cerr << "Submit block response parse error: " << err.what()
                   << std::endl;

@@ -16,9 +16,12 @@ class HashWrapper
 {
    public:
     static void InitVerusHash();
-    static void VerushashV2b2(unsigned char* in, int size, unsigned char* res);
-    static void SHA256d(unsigned char* in, int size, unsigned char* res);
-    private:
-     static CVerusHashV2* cverusHashV2;
+    static void InitSHA256();
+    static void VerushashV2b2(unsigned char* dest, unsigned char* in, int size);
+    static void SHA256d(unsigned char* dest, unsigned char* in, int size);
+
+   private:
+    static CVerusHashV2 cverusHashV2;
+    static CSHA256 csha256;
 };
 #endif

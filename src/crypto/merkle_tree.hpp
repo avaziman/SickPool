@@ -12,9 +12,6 @@
 
 class MerkleTree
 {
-   private:
-    std::vector<unsigned char*> txIds;
-
    public:
     static void CalcRoot(std::vector<std::vector<unsigned char>>& txs,
                          unsigned char* res)
@@ -24,7 +21,7 @@ class MerkleTree
         for (int i = 0; i < txs.size(); i++)
         {
 #if COIN_CONFIG == COIN_VRSCTEST
-            HashWrapper::SHA256d(txs[i].data(), txs[i].size(), txIds[i].data());
+            HashWrapper::SHA256d(txIds[i].data(), txs[i].data(), txs[i].size());
 #endif
         }
 
@@ -44,7 +41,7 @@ class MerkleTree
                 memcpy(combined, txIds[i].data(), 32);
                 memcpy(combined + 32, txIds[i + 1].data(), 32);
 #if COIN_CONFIG == COIN_VRSCTEST
-                HashWrapper::SHA256d(combined, 64, combinedHash);
+                HashWrapper::SHA256d(combinedHash, combined, 64);
 #endif
 
                 temp.push_back(std::experimental::to_array(combinedHash));

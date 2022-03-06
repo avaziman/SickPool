@@ -1,32 +1,40 @@
 #include "hash_wrapper.hpp"
 #include <chrono>
 
-CVerusHashV2* HashWrapper::cverusHashV2;
+CVerusHashV2 HashWrapper::cverusHashV2;
+CSHA256 HashWrapper::csha256;
 void HashWrapper::InitVerusHash() { 
     CVerusHashV2::init();
+}
+
+void HashWrapper::InitSHA256()
+{
+    csha256 = CSHA256();
     // cverusHashV2 = ;
 }
 
-void HashWrapper::VerushashV2b2(unsigned char* in, int size, unsigned char* res){
-    // Make sure its initialized before this
-    if (cverusHashV2 == nullptr) cverusHashV2 = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
-
-    cverusHashV2->Reset();
-    cverusHashV2->Write((unsigned char*)in, size);
-    cverusHashV2->Finalize2b((unsigned char*)res);
-    // CVerusHashV2::Hash(res, in, size);
-
-}
-void HashWrapper::SHA256d(unsigned char* in, int size, unsigned char* res)
+void HashWrapper::VerushashV2b2(unsigned char* dest, unsigned char* in, int size)
 {
+    // Make sure its initialized before this
+    cverusHashV2 = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
+
+    cverusHashV2.Reset();
+    cverusHashV2.Write(in, size);
+    cverusHashV2.Finalize2b(dest);
+    // CVerusHashV2::Hash(res, in, size);
+}
+void HashWrapper::SHA256d(unsigned char* dest, unsigned char* in, int size)
+{
+    // Make sure its initialized before this
+
     unsigned char hash1[32];
 
-    CSHA256 sha256;
-    sha256.Write(in, size);
-    sha256.Finalize(hash1);
+    csha256.Reset();
+    csha256.Write(in, size);
+    csha256.Finalize(hash1);
 
-    sha256.Reset();
+    csha256.Reset();
 
-    sha256.Write(hash1, 32);
-    sha256.Finalize(res);
+    csha256.Write(hash1, 32);
+    csha256.Finalize(dest);
 }

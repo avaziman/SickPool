@@ -1,11 +1,11 @@
 #ifndef UTILS_HPP_
 #define UTILS_HPP_
-#include <iostream>
+#include <cmath>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <cmath>
 
 #include "verushash/arith_uint256.h"
 #include "verushash/endian.h"
@@ -22,27 +22,7 @@
 //     // if(!DecodeBase58(addr, bytes) return false;
 // }
 
-// inline std::string ReverseHex(std::string input)
-// {
-//     int size = input.size();
-//     char str[size + 1];
-//     for (int i = 0; i < size / 2; i += 2)
-//     {
-//         char left = input[i];
-//         char left1 = input[i + 1];
-//         char right = input[size - (i + 1)];
-//         char right1 = input[size - (i + 2)];
-
-//         str[i + 1] = right;
-//         str[i] = right1;
-//         str[size - (i + 2)] = left;
-//         str[size - (i + 1)] = left1;
-//     }
-//     str[size] = '\0';
-//     return std::string(str);
-// }
-
-inline void ReverseHex(const char* input, uint16_t size, char* dest)
+inline void ReverseHex(char* dest, const char* input, uint16_t size)
 {
     for (int i = 0; i < size / 2; i += 2)
     {
@@ -56,22 +36,6 @@ inline void ReverseHex(const char* input, uint16_t size, char* dest)
         dest[size - (i + 2)] = left;
         dest[size - (i + 1)] = left1;
     }
-}
-
-inline std::string Unhexlify(const std::string& hex)
-{
-    std::vector<unsigned char> bytes;
-
-    for (unsigned int i = 0; i < hex.length(); i += 2)
-    {
-        std::string byteString = hex.substr(i, 2);
-        unsigned char byte =
-            (unsigned char)strtol(byteString.c_str(), NULL, 16);
-        bytes.push_back(byte);
-    }
-
-    std::string result(bytes.begin(), bytes.end());
-    return result;
 }
 
 constexpr const char* BoolToCstring(const bool b)
@@ -90,7 +54,7 @@ inline char GetHex(char c)
     return 0;
 }
 
-inline void Hexlify(unsigned char* src, int srcSize, char* res)
+inline void Hexlify(char* dest, unsigned char* src, int srcSize)
 {
     const char hex[] = "0123456789abcdef";
 
@@ -108,23 +72,12 @@ inline void Hexlify(unsigned char* src, int srcSize, char* res)
             c2 = hex[c2Val];
             c1 = hex[(val - c2Val) / 16];
         }
-        res[i * 2] = c1;
-        res[i * 2 + 1] = c2;
+        dest[i * 2] = c1;
+        dest[i * 2 + 1] = c2;
     }
 }
 
-inline void Unhexlify(unsigned char* arr, int size)
-{
-    // each byte is 2 characters in hex
-    for (int i = 0; i < size / 2; i++)
-    {
-        unsigned char char1 = GetHex(arr[i * 2]);
-        unsigned char char2 = GetHex(arr[i * 2 + 1]);
-        arr[i] = char2 + char1 * 16;
-    }
-}
-
-inline void Unhexlify(const char* src, int size, unsigned char* dest)
+inline void Unhexlify(unsigned char* dest, const char* src, int size)
 {
     // each byte is 2 characters in hex
     for (int i = 0; i < size / 2; i++)
@@ -149,7 +102,7 @@ inline uint32_t FromHex(const char* str)
     uint32_t val;
     std::stringstream ss;
     ss << std::hex << str;
-    ss >>   val;
+    ss >> val;
     return val;
 }
 
@@ -158,7 +111,8 @@ inline char VarInt(uint64_t& len)
 {
     if (len < 0xfd)
         return 1;
-    else if (len <= 0xffffffff){
+    else if (len <= 0xffffffff)
+    {
         len = (0xfd << 16) | len;
         return 3;
     }

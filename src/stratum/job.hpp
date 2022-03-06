@@ -35,13 +35,13 @@ class Job
 
         unsigned char varInt[8];
         memcpy(varInt, &varIntVal, varIntLen);
-        Hexlify(varInt, varIntLen, txDataHex.data());
+        Hexlify(txDataHex.data(), varInt, varIntLen);
 
         int written = varIntLen * 2;
 
         for (int i = 0; i < txs.size(); i++)
         {
-            Hexlify(txs[i].data(), txs[i].size(), txDataHex.data() + written);
+            Hexlify(txDataHex.data() + written, txs[i].data(), txs[i].size());
             written += txs[i].size() * 2;
         }
     }
@@ -52,7 +52,7 @@ class Job
 
     void GetBlockHex(char* res)
     {
-        Hexlify(headerData, BLOCK_HEADER_SIZE, res);
+        Hexlify(res, headerData, BLOCK_HEADER_SIZE);
         memcpy(res + (BLOCK_HEADER_SIZE * 2), txDataHex.data(), txDataHex.size());
         // TODO: CHECK WHY BLOCK_HEADER_SIZE * 2 WON"T WORK (SKIPS 72 bytes)
     }
@@ -60,7 +60,7 @@ class Job
     void GetHash(unsigned char* res)
     {
 #if POOL_COIN == COIN_VRSCTEST
-        HashWrapper::VerushashV2b2(this->headerData, BLOCK_HEADER_SIZE, res);
+        HashWrapper::VerushashV2b2(res, this->headerData, BLOCK_HEADER_SIZE);
 #endif
     }
     // char* GetVersion() { return version; }

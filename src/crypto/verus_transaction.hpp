@@ -78,12 +78,14 @@ class VerusTransaction : public Transaction
             "1a040300010114a23f82866c21819f55a1668ba7b9932e6d326b1ecc3204031401"
             "0114a23f82866c21819f55a1668ba7b9932e6d326b1e1701a6ef9ea235635e3281"
             "24ff3429db9f9e91b64e2d000175";
-        Unhexlify(coinbaseOutputScript, 160);
+        const int outputScriptSize = sizeof(coinbaseOutputScript) - 1;
+        Unhexlify(coinbaseOutputScript, (const char*)coinbaseOutputScript,
+                  outputScriptSize);
 
         Output output;
         output.value = 0;
         output.pk_script = std::vector<unsigned char>(
-            coinbaseOutputScript, coinbaseOutputScript + 80);
+            coinbaseOutputScript, coinbaseOutputScript + outputScriptSize / 2);
 
         uint64_t varIntVal = output.pk_script.size();
         char varIntLen = VarInt(varIntVal);

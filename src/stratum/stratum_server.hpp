@@ -62,6 +62,7 @@ class StratumServer
     ondemand::parser httpParser;
 
     RedisManager* redis_manager;
+    DifficultyManager* diff_manager;
 
     std::mutex clients_mutex;
     std::vector<DaemonRpc*> rpcs;
@@ -78,7 +79,7 @@ class StratumServer
     void HandleAuthorize(StratumClient* cli, int id, ondemand::array& params);
     void HandleSubmit(StratumClient* cli, int id, ondemand::array& params);
 
-    void HandleShare(StratumClient* cli, int id, Share& share);
+    void HandleShare(StratumClient* cli, int id, const Share& share);
     void RejectShare(StratumClient* cli, int id, ShareResult error);
     bool SubmitBlock(const char* blockHex, int blockHexLen);
 

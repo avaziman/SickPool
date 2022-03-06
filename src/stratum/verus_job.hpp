@@ -29,7 +29,7 @@ class VerusJob : public Job
 
         MerkleTree::CalcRoot(txs, headerData + written);
         // we need the hexlified merkle root for the notification message
-        Hexlify(headerData + written, 32, merkleRootHex);
+        Hexlify(merkleRootHex, headerData + written, 32);
         written += 32;
 
         WriteUnhex(finalSaplingRoot, 64);
@@ -45,14 +45,22 @@ class VerusJob : public Job
         // WriteUnhexlify(sol144, 144);
 
         // only generating notify message once for efficiency
+        auto start = std::chrono::steady_clock::now();
 
-        notifyBuffSize =
-            snprintf(notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
-                     "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
-                     "[\"%s\",\"%08x\",\"%s\",\"%s\",\"%s\",\"%08x\",\"%s\",%s,"
-                     "\"%s\"]}\n",
-                     GetId(), bswap_32(ver), prevBlock, merkleRootHex, finalSaplingRoot,
-                     bswap_32(time), bits, BoolToCstring(clean), sol144);
+        notifyBuffSize = snprintf(
+            notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
+            "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+            "[\"%s\",\"%08x\",\"%s\",\"%s\",\"%s\",\"%08x\",\"%s\",%s,"
+            "\"%s\"]}\n",
+            GetId(), bswap_32(ver), prevBlock, merkleRootHex, finalSaplingRoot,
+            bswap_32(time), bits, BoolToCstring(clean), sol144);
+
+        auto end = std::chrono::steady_clock::now();
+
+        std::cout << "sprintf dur: "
+                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+                  << "us" << std::endl;
+        ;
         std::cout << notifyBuff << std::endl;
     }
 
@@ -62,12 +70,12 @@ class VerusJob : public Job
     {
         // here we don't mutate the parameters so we use string_views as
         // received by the json parser
-        Unhexlify(time.data(), time.size(), this->headerData + 4 + 32 * 3);
-        Unhexlify(nonce1.data(), nonce1.size(),
-                  this->headerData + 4 * 3 + 32 * 3);
-        Unhexlify(nonce2.data(), 64 - nonce1.size(),
-                  this->headerData + 4 * 4 + 32 * 3);
-        Unhexlify(sol.data(), sol.size(), this->headerData + 4 * 3 + 32 * 4);
+        Unhexlify(this->headerData + 4 + 32 * 3, time.data(), time.size());
+        Unhexlify(this->headerData + 4 * 3 + 32 * 3, nonce1.data(),
+                  nonce1.size());
+        Unhexlify(this->headerData + 4 * 4 + 32 * 3, nonce2.data(),
+                  64 - nonce1.size());
+        Unhexlify(this->headerData + 4 * 3 + 32 * 4, sol.data(), sol.size());
 
         return this->headerData;
     }
@@ -75,7 +83,7 @@ class VerusJob : public Job
    private:
     inline void WriteUnhex(const char* data, int size)
     {
-        Unhexlify((char*)data, size, headerData + written);
+        Unhexlify(headerData + written, data, size);
         written += size / 2;
     }
 
