@@ -1,5 +1,5 @@
 #include "stratum_server.hpp"
-
+ 
 StratumServer::StratumServer(CoinConfig cnfg)
     : coin_config(cnfg), reqParser(REQ_BUFF_SIZE)
 {
@@ -13,9 +13,9 @@ StratumServer::StratumServer(CoinConfig cnfg)
     }
 
     redis_manager = new RedisManager(cnfg.symbol, cnfg.redis_host);
-    diff_manager = new DifficultyManager()
+    diff_manager = new DifficultyManager(cnfg.target_shares_rate, clients);
 
-        job_count = redis_manager->GetJobCount();
+    job_count = redis_manager->GetJobCount();
 
     std::cout << "Job count: " << job_count << std::endl;
 

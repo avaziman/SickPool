@@ -13,6 +13,7 @@
 #include <thread>
 #include <vector>
 
+#include "./difficulty_manager.hpp"
 #include "../coin_config.hpp"
 #include "../crypto/block.hpp"
 #include "../crypto/block_header.hpp"
@@ -24,7 +25,6 @@
 #include "../crypto/verushash/verus_hash.h"
 #include "../daemon/daemon_rpc.hpp"
 #include "../sock_addr.hpp"
-#include "difficulty_manager.hpp"
 #include "byteswap.h"
 #include "job.hpp"
 #include "redis_manager.hpp"

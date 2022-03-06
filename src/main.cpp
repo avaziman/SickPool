@@ -12,7 +12,6 @@
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/rapidjson.h"
 #include "sock_addr.hpp"
-#include "stratum/difficulty_manager.hpp"
 #include "stratum/stratum_server.hpp"
 
 #define COIN_VRSCTEST 1
