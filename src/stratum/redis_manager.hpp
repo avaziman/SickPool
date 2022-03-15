@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../config.hpp"
+#define STRINGIFICATOR(X) #X
 
 class RedisManager
 {
@@ -26,61 +27,60 @@ class RedisManager
 
     void AddWorker(std::string_view worker)
     {
-        redisReply *reply;
+        // redisReply *reply;
 
         redisAppendCommand(
             rc,
             "TS.CREATE " COIN_SYMBOL
             ":shares:%b"
-            " RETENTION %d"          // time to live
-            " ENCODING COMPRESSED"   // very data efficient
-            " DUPLICATE_POLICY SUM"  // if two shares received at same ms
+            " RETENTION " STRINGIFICATOR(DB_RETENTION)  // time to live
+            " ENCODING COMPRESSED"        // very data efficient
+            " DUPLICATE_POLICY SUM"       // if two shares received at same ms
                                      // (rare), sum instead of ignoring (BLOCK)
             " LABELS coin " COIN_SYMBOL " type shares server IL worker %b ",
-            worker.data(), worker.size(), DB_RETENTION, worker.data(),
+            worker.data(), worker.size(), worker.data(),
             worker.size());
 
-        std::string_view workerAddr = worker.substr(0, worker.find('.'));
+        // std::string_view workerAddr = worker.substr(0, worker.find('.'));
 
-        redisAppendCommand(rc,
-                           "TS.CREATE " COIN_SYMBOL
-                           ":balance:%b"
-                           " RETENTION 0"  // never expire balance log
-                           " ENCODING COMPRESSED"
-                           " LABELS coin " COIN_SYMBOL
-                           " server IL address %b type balance",
-                           workerAddr.data(), workerAddr.size(),
-                           workerAddr.data(), workerAddr.size());
+        // redisAppendCommand(rc,
+        //                    "TS.CREATE " COIN_SYMBOL
+        //                    ":balance:%b"
+        //                    " RETENTION 0"  // never expire balance log
+        //                    " ENCODING COMPRESSED"
+        //                    " LABELS coin " COIN_SYMBOL
+        //                    " server IL address %b type balance",
+        //                    workerAddr.data(), workerAddr.size(),
+        //                    workerAddr.data(), workerAddr.size());
 
-        // reply for first TS.CREATE
-        if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
-        {
-            std::cout << "Failed to add worker timeseries." << std::endl;
-        }
-        freeReplyObject(reply);
+        // // reply for first TS.CREATE
+        // if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
+        // {
+        //     std::cout << "Failed to add worker timeseries." << std::endl;
+        // }
+        // freeReplyObject(reply);
 
-        // reply for second TS.CREATE
-        if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
-        {
-            std::cout << "Failed to add worker timeseries." << std::endl;
-        }
-        freeReplyObject(reply);
+        // // reply for second TS.CREATE
+        // if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
+        // {
+        //     std::cout << "Failed to add worker timeseries." << std::endl;
+        // }
+        // freeReplyObject(reply);
     }
     void AddShare(std::string_view worker, double diff, std::time_t time)
     {
         redisReply *reply;
         redisAppendCommand(rc, "TS.ADD " COIN_SYMBOL ":shares:%b %lu %f",
-                            worker.data(), worker.size(),
-                           time, diff);
+                           worker.data(), worker.size(), time, diff);
 
         // only include valid shares in round total
         if (diff > 0)
         {
             // shares
             std::string_view address = worker.substr(0, worker.find('.'));
-            redisAppendCommand(rc, "HINCRBYFLOAT " COIN_SYMBOL ":current_round %b %f",
-                            address.data(),
-                               address.size(), diff);
+            redisAppendCommand(
+                rc, "HINCRBYFLOAT " COIN_SYMBOL ":current_round %b %f",
+                address.data(), address.size(), diff);
         }
 
         if (redisGetReply(rc, (void **)&reply) != REDIS_OK)  // reply for TS.ADD
@@ -107,7 +107,7 @@ class RedisManager
 
         redisReply *hashReply, *balReply;
 
-        redisAppendCommand(rc, "HGETALL %s:current_round", coin_symbol.c_str());
+        redisAppendCommand(rc, "HGETALL " COIN_SYMBOL ":current_round");
 
         if (redisGetReply(rc, (void **)&hashReply) !=
             REDIS_OK)  // reply for TS.ADD
@@ -130,8 +130,8 @@ class RedisManager
             double workShare = minerEffort / totalEffort;
             double minerReward = workShare * reward;
 
-            redisAppendCommand(rc, "TS.ADD %s:balance:%s * %f",
-                               coin_symbol.c_str(), miner, minerReward);
+            redisAppendCommand(rc, "TS.ADD " COIN_SYMBOL ":balance:%s * %f",
+                               miner, minerReward);
 
             if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
             {
