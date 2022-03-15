@@ -20,16 +20,9 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${HIREDIS_HEADER})
 
 find_library(HIREDIS_LIB hiredis)
 
-# <------------ add redis-plus-plus dependency here -------------->
-find_path(REDIS_PLUS_PLUS_HEADER sw)      # NOTE: this should be *sw* NOT *redis++*
-target_include_directories(${PROJECT_NAME} PUBLIC ${REDIS_PLUS_PLUS_HEADER})
-
-find_library(REDIS_PLUS_PLUS_LIB redis++)
-
 target_link_libraries(
     ${PROJECT_NAME}
     ${HIREDIS_LIB}
-    ${REDIS_PLUS_PLUS_LIB}
     Boost::boost
     pthread
 )

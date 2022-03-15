@@ -15,7 +15,6 @@ file(GLOB_RECURSE SRC_FILES
 
 list(REMOVE_ITEM SRC_FILES "${PARENT_DIR}/src/main.cpp")
 
-
 set_source_files_properties(${PARENT_DIR}/src/crypto/verushash/verus_clhash.cpp PROPERTIES COMPILE_FLAGS " -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")
 set_source_files_properties(${PARENT_DIR}/src/crypto/verushash/verus_hash.cpp PROPERTIES COMPILE_FLAGS "   -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")
 set_source_files_properties(${PARENT_DIR}/src/crypto/verushash/haraka.c PROPERTIES COMPILE_FLAGS "         -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")
@@ -33,12 +32,6 @@ find_path(HIREDIS_HEADER hiredis)
 target_include_directories(${PROJECT_NAME}_tests PUBLIC ${HIREDIS_HEADER})
 
 find_library(HIREDIS_LIB hiredis)
-
-# <------------ add redis-plus-plus dependency here -------------->
-find_path(REDIS_PLUS_PLUS_HEADER sw)      # NOTE: this should be *sw* NOT *redis++*
-target_include_directories(${PROJECT_NAME}_tests PUBLIC ${REDIS_PLUS_PLUS_HEADER})
-
-find_library(REDIS_PLUS_PLUS_LIB redis++)
 
 target_link_libraries(
     ${PROJECT_NAME}_tests

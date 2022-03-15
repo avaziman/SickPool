@@ -56,3 +56,51 @@ make: *** [Makefile:121: cmTC_fe18f/fast] Error 2
 
 
 
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WSHORTEN_64_TO_32 failed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_11663/fast && /usr/bin/make -f CMakeFiles/cmTC_11663.dir/build.make CMakeFiles/cmTC_11663.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_11663.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors -DHAVE_CXX_FLAG_WSHORTEN_64_TO_32  -Wshorten-64-to-32   -Wshorten-64-to-32 -o CMakeFiles/cmTC_11663.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wshorten-64-to-32'
+c++: error: unrecognized command-line option '-Wshorten-64-to-32'
+make[1]: *** [CMakeFiles/cmTC_11663.dir/build.make:66: CMakeFiles/cmTC_11663.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_11663/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WD654 failed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_afd10/fast && /usr/bin/make -f CMakeFiles/cmTC_afd10.dir/build.make CMakeFiles/cmTC_afd10.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_afd10.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DHAVE_CXX_FLAG_WD654  -wd654   -wd654 -o CMakeFiles/cmTC_afd10.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-wd654'
+c++: error: unrecognized command-line option '-wd654'
+make[1]: *** [CMakeFiles/cmTC_afd10.dir/build.make:66: CMakeFiles/cmTC_afd10.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_afd10/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WTHREAD_SAFETY failed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_41906/fast && /usr/bin/make -f CMakeFiles/cmTC_41906.dir/build.make CMakeFiles/cmTC_41906.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_41906.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DHAVE_CXX_FLAG_WTHREAD_SAFETY  -Wthread-safety   -Wthread-safety -o CMakeFiles/cmTC_41906.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wthread-safety'
+c++: error: unrecognized command-line option '-Wthread-safety'
+make[1]: *** [CMakeFiles/cmTC_41906.dir/build.make:66: CMakeFiles/cmTC_41906.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_41906/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }

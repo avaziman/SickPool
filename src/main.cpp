@@ -14,8 +14,6 @@
 #include "sock_addr.hpp"
 #include "stratum/stratum_server.hpp"
 
-#define COIN_VRSCTEST 1
-
 #define CONFIG_PATH                                                   \
     "//home/sickguy/Documents/Projects/SickPool/server/config/coins/" \
     "VRSC.json"

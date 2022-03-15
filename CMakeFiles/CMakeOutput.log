@@ -495,3 +495,303 @@ make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMa
 
 
 
+Determining if the function shm_open exists in the rt passed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_c62f6/fast && /usr/bin/make -f CMakeFiles/cmTC_c62f6.dir/build.make CMakeFiles/cmTC_c62f6.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c62f6.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=shm_open   -o CMakeFiles/cmTC_c62f6.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_c62f6
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c62f6.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=shm_open    CMakeFiles/cmTC_c62f6.dir/CheckFunctionExists.c.o  -o cmTC_c62f6  -lrt 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_STD_CXX11 succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_a8959/fast && /usr/bin/make -f CMakeFiles/cmTC_a8959.dir/build.make CMakeFiles/cmTC_a8959.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_a8959.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG -DHAVE_CXX_FLAG_STD_CXX11  -std=c++11   -std=c++11 -o CMakeFiles/cmTC_a8959.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_a8959
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a8959.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG -DHAVE_CXX_FLAG_STD_CXX11  -std=c++11    CMakeFiles/cmTC_a8959.dir/src.cxx.o  -o cmTC_a8959 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WALL succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_cc892/fast && /usr/bin/make -f CMakeFiles/cmTC_cc892.dir/build.make CMakeFiles/cmTC_cc892.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_cc892.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11 -DHAVE_CXX_FLAG_WALL  -Wall   -Wall -o CMakeFiles/cmTC_cc892.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_cc892
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cc892.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11 -DHAVE_CXX_FLAG_WALL  -Wall    CMakeFiles/cmTC_cc892.dir/src.cxx.o  -o cmTC_cc892 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WEXTRA succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_46fe3/fast && /usr/bin/make -f CMakeFiles/cmTC_46fe3.dir/build.make CMakeFiles/cmTC_46fe3.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_46fe3.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall -DHAVE_CXX_FLAG_WEXTRA  -Wextra   -Wextra -o CMakeFiles/cmTC_46fe3.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_46fe3
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_46fe3.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall -DHAVE_CXX_FLAG_WEXTRA  -Wextra    CMakeFiles/cmTC_46fe3.dir/src.cxx.o  -o cmTC_46fe3 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WSHADOW succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_483dc/fast && /usr/bin/make -f CMakeFiles/cmTC_483dc.dir/build.make CMakeFiles/cmTC_483dc.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_483dc.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra -DHAVE_CXX_FLAG_WSHADOW  -Wshadow   -Wshadow -o CMakeFiles/cmTC_483dc.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_483dc
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_483dc.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra -DHAVE_CXX_FLAG_WSHADOW  -Wshadow    CMakeFiles/cmTC_483dc.dir/src.cxx.o  -o cmTC_483dc 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WFLOAT_EQUAL succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_397a9/fast && /usr/bin/make -f CMakeFiles/cmTC_397a9.dir/build.make CMakeFiles/cmTC_397a9.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_397a9.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow -DHAVE_CXX_FLAG_WFLOAT_EQUAL  -Wfloat-equal   -Wfloat-equal -o CMakeFiles/cmTC_397a9.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_397a9
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_397a9.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow -DHAVE_CXX_FLAG_WFLOAT_EQUAL  -Wfloat-equal    CMakeFiles/cmTC_397a9.dir/src.cxx.o  -o cmTC_397a9 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WERROR succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_3d28e/fast && /usr/bin/make -f CMakeFiles/cmTC_3d28e.dir/build.make CMakeFiles/cmTC_3d28e.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_3d28e.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal -DHAVE_CXX_FLAG_WERROR  -Werror   -Werror -o CMakeFiles/cmTC_3d28e.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_3d28e
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_3d28e.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal -DHAVE_CXX_FLAG_WERROR  -Werror    CMakeFiles/cmTC_3d28e.dir/src.cxx.o  -o cmTC_3d28e 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_PEDANTIC succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_eaf8b/fast && /usr/bin/make -f CMakeFiles/cmTC_eaf8b.dir/build.make CMakeFiles/cmTC_eaf8b.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_eaf8b.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal -DHAVE_CXX_FLAG_PEDANTIC  -pedantic   -pedantic -o CMakeFiles/cmTC_eaf8b.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_eaf8b
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_eaf8b.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal -DHAVE_CXX_FLAG_PEDANTIC  -pedantic    CMakeFiles/cmTC_eaf8b.dir/src.cxx.o  -o cmTC_eaf8b 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_PEDANTIC_ERRORS succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_596a4/fast && /usr/bin/make -f CMakeFiles/cmTC_596a4.dir/build.make CMakeFiles/cmTC_596a4.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_596a4.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic -DHAVE_CXX_FLAG_PEDANTIC_ERRORS  -pedantic-errors   -pedantic-errors -o CMakeFiles/cmTC_596a4.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_596a4
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_596a4.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic -DHAVE_CXX_FLAG_PEDANTIC_ERRORS  -pedantic-errors    CMakeFiles/cmTC_596a4.dir/src.cxx.o  -o cmTC_596a4 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_FSTRICT_ALIASING succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_73416/fast && /usr/bin/make -f CMakeFiles/cmTC_73416.dir/build.make CMakeFiles/cmTC_73416.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_73416.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors -DHAVE_CXX_FLAG_FSTRICT_ALIASING  -fstrict-aliasing   -fstrict-aliasing -o CMakeFiles/cmTC_73416.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_73416
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_73416.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors -DHAVE_CXX_FLAG_FSTRICT_ALIASING  -fstrict-aliasing    CMakeFiles/cmTC_73416.dir/src.cxx.o  -o cmTC_73416 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WNO_DEPRECATED_DECLARATIONS succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_bb994/fast && /usr/bin/make -f CMakeFiles/cmTC_bb994.dir/build.make CMakeFiles/cmTC_bb994.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_bb994.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing -DHAVE_CXX_FLAG_WNO_DEPRECATED_DECLARATIONS  -Wno-deprecated-declarations   -Wno-deprecated-declarations -o CMakeFiles/cmTC_bb994.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_bb994
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_bb994.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing -DHAVE_CXX_FLAG_WNO_DEPRECATED_DECLARATIONS  -Wno-deprecated-declarations    CMakeFiles/cmTC_bb994.dir/src.cxx.o  -o cmTC_bb994 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WNO_DEPRECATED succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_86a93/fast && /usr/bin/make -f CMakeFiles/cmTC_86a93.dir/build.make CMakeFiles/cmTC_86a93.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_86a93.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations -DHAVE_CXX_FLAG_WNO_DEPRECATED  -Wno-deprecated   -Wno-deprecated -o CMakeFiles/cmTC_86a93.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_86a93
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_86a93.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations -DHAVE_CXX_FLAG_WNO_DEPRECATED  -Wno-deprecated    CMakeFiles/cmTC_86a93.dir/src.cxx.o  -o cmTC_86a93 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WSTRICT_ALIASING succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_8de44/fast && /usr/bin/make -f CMakeFiles/cmTC_8de44.dir/build.make CMakeFiles/cmTC_8de44.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_8de44.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations -DHAVE_CXX_FLAG_WSTRICT_ALIASING  -Wstrict-aliasing   -Wstrict-aliasing -o CMakeFiles/cmTC_8de44.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_8de44
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_8de44.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations -DHAVE_CXX_FLAG_WSTRICT_ALIASING  -Wstrict-aliasing    CMakeFiles/cmTC_8de44.dir/src.cxx.o  -o cmTC_8de44 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_COVERAGE succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_e3177/fast && /usr/bin/make -f CMakeFiles/cmTC_e3177.dir/build.make CMakeFiles/cmTC_e3177.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_e3177.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DHAVE_CXX_FLAG_COVERAGE  --coverage   --coverage -o CMakeFiles/cmTC_e3177.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_e3177
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_e3177.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DHAVE_CXX_FLAG_COVERAGE  --coverage    CMakeFiles/cmTC_e3177.dir/src.cxx.o  -o cmTC_e3177 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_HAS_HIDDEN_VISIBILITY succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_d7cd7/fast && /usr/bin/make -f CMakeFiles/cmTC_d7cd7.dir/build.make CMakeFiles/cmTC_d7cd7.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_d7cd7.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DCOMPILER_HAS_HIDDEN_VISIBILITY   -fvisibility=hidden -o CMakeFiles/cmTC_d7cd7.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_d7cd7
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_d7cd7.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DCOMPILER_HAS_HIDDEN_VISIBILITY    CMakeFiles/cmTC_d7cd7.dir/src.cxx.o  -o cmTC_d7cd7 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_77b25/fast && /usr/bin/make -f CMakeFiles/cmTC_77b25.dir/build.make CMakeFiles/cmTC_77b25.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_77b25.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DCOMPILER_HAS_HIDDEN_INLINE_VISIBILITY   -fvisibility-inlines-hidden -o CMakeFiles/cmTC_77b25.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_77b25
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_77b25.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DCOMPILER_HAS_HIDDEN_INLINE_VISIBILITY    CMakeFiles/cmTC_77b25.dir/src.cxx.o  -o cmTC_77b25 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_HAS_DEPRECATED_ATTR succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_b302a/fast && /usr/bin/make -f CMakeFiles/cmTC_b302a.dir/build.make CMakeFiles/cmTC_b302a.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_b302a.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DCOMPILER_HAS_DEPRECATED_ATTR   -o CMakeFiles/cmTC_b302a.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_b302a
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_b302a.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DCOMPILER_HAS_DEPRECATED_ATTR    CMakeFiles/cmTC_b302a.dir/src.cxx.o  -o cmTC_b302a 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+__attribute__((__deprecated__)) int somefunc() { return 0; }
+    int main() { return somefunc();}
+Performing C++ SOURCE FILE Test BENCHMARK_HAS_O3_FLAG succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_7e302/fast && /usr/bin/make -f CMakeFiles/cmTC_7e302.dir/build.make CMakeFiles/cmTC_7e302.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_7e302.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DBENCHMARK_HAS_O3_FLAG   -O3 -o CMakeFiles/cmTC_7e302.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_7e302
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_7e302.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DBENCHMARK_HAS_O3_FLAG    CMakeFiles/cmTC_7e302.dir/src.cxx.o  -o cmTC_7e302 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test BENCHMARK_HAS_WNO_ODR succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_66caf/fast && /usr/bin/make -f CMakeFiles/cmTC_66caf.dir/build.make CMakeFiles/cmTC_66caf.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_66caf.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DBENCHMARK_HAS_WNO_ODR   -Wno-odr -o CMakeFiles/cmTC_66caf.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_66caf
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_66caf.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DBENCHMARK_HAS_WNO_ODR    CMakeFiles/cmTC_66caf.dir/src.cxx.o  -o cmTC_66caf 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test BENCHMARK_HAS_WNO_LTO_TYPE_MISMATCH succeeded with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_4ddb1/fast && /usr/bin/make -f CMakeFiles/cmTC_4ddb1.dir/build.make CMakeFiles/cmTC_4ddb1.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_4ddb1.dir/src.cxx.o
+/usr/bin/c++    -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DBENCHMARK_HAS_WNO_LTO_TYPE_MISMATCH   -Wno-lto-type-mismatch -o CMakeFiles/cmTC_4ddb1.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_4ddb1
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_4ddb1.dir/link.txt --verbose=1
+/usr/bin/c++   -march=native -O3 -Ofast -DNDEBUG  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DBENCHMARK_HAS_WNO_LTO_TYPE_MISMATCH    CMakeFiles/cmTC_4ddb1.dir/src.cxx.o  -o cmTC_4ddb1 
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }

@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <ctime>
 
 #include "../crypto/merkle_tree.hpp"
 #include "../crypto/utils.hpp"
@@ -19,7 +20,7 @@ class Job
    public:
     Job(uint32_t jobId, std::vector<std::vector<unsigned char>>& txs) /*, char*
         ver, char* prevBlock, char* time, char* bits)*/
-        : jobId(jobId)
+        : jobId(jobId)//, time(std::time(0))
     {
         ToHex(jobIdStr, jobId);
         jobIdStr[8] = 0;
@@ -81,6 +82,7 @@ class Job
     uint16_t notifyBuffSize;
     char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
     double targetDiff;
+    //std::time_t created;
     // char version[4];
     // char hashPrevBlock[32];
     // char hashMerkleRoot[32];

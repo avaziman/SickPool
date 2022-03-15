@@ -23,8 +23,9 @@ DaemonRpc::DaemonRpc(std::string hostHeader, std::string authHeader)
     rpc_addr.sin_port = sock_addr.port;
 }
 
-int DaemonRpc::SendRequest(std::vector<char>& result, int id, const char* method,
-                             const char* params, int paramsLen)
+int DaemonRpc::SendRequest(std::vector<char>& result, int id,
+                           const char* method, const char* params,
+                           int paramsLen)
 {
     int bodySize, sendSize, recvSize, errCode, resCode;
     int sent, contentLength, contentReceived, headerLength;
@@ -55,13 +56,17 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id, const char* method
     const int bodyLen = paramsLen + 64;
     char* body = new char[bodyLen];
 
-    // bodySize = snprintf(body, bodyLen,
-    //                     "{\"id\":%d,\"method\":\"%s\",\"params\":[%s]}", id,
-    //                     method, params);
-
-    bodySize =
-        snprintf(body, bodyLen, "{\"id\":%d,\"method\":\"%s\"}",
-                 id, method);
+    if (params != nullptr)
+    {
+        bodySize = snprintf(body, bodyLen,
+                            "{\"id\":%d,\"method\":\"%s\",\"params\":[%s]}", id,
+                            method, params);
+    }
+    else
+    {
+        bodySize = snprintf(body, bodyLen, "{\"id\":%d,\"method\":\"%s\"}", id,
+                            method);
+    }
 
     const int sendBufferLen = bodySize + 256;
     char* sendBuffer = new char[bodySize + 256];
@@ -88,17 +93,18 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id, const char* method
     // receive http header (and potentially part or the whole body)
     do
     {
-        int recvRes = recv(sockfd, headerBuff + headerRecv, HTTP_HEADER_SIZE - headerRecv - 1, 0);
+        int recvRes = recv(sockfd, headerBuff + headerRecv,
+                           HTTP_HEADER_SIZE - headerRecv - 1, 0);
         if (recvRes <= 0)
         {
             resCode = std::atoi(headerBuff + std::strlen("HTTP/1.1 "));
-            std::cerr << "rpc socket receive error (no body) code: " << errno << ", http code: " << resCode
-                      << std::endl;
+            std::cerr << "rpc socket receive error (no body) code: " << errno
+                      << ", http code: " << resCode << std::endl;
             return -1;
         }
         headerRecv += recvRes;
         // for the response end check, gets overriden
-        headerBuff[headerRecv] = '\0';
+        headerBuff[headerRecv - 1] = '\0';
     } while ((endOfHeader = std::strstr(headerBuff, "\r\n\r\n")) == NULL);
 
     endOfHeader += 4;
@@ -107,16 +113,16 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id, const char* method
 
     contentLength = std::atoi(std::strstr(headerBuff, "Content-Length: ") +
                               std::strlen("Content-Length: "));
-    contentReceived = std::strlen(endOfHeader) + 1;
+    contentReceived = std::strlen(endOfHeader);
 
     // std::cout << "HEADER: " << headerBuff << std::endl;
     // std::cout << "HTTP CODE: " << resCode << std::endl;
     // std::cout << "CONTENT LENGTH: " << contentLength << std::endl;
     // std::cout << "CONTENT RECEIVED: " << contentReceived << std::endl;
-    // std::cout << "TOTAL RECEIRSickPooLhHZ3zRBzhFVsXYiGN18BF1Wh6VED: " << totalRecv << std::endl;
+    // std::cout << "TOTAL RECEIVED: " << totalRecv << std::endl;
 
     // simd json parser requires some extra bytes
-    result.resize(contentLength + simdjson::SIMDJSON_PADDING);
+    result.resize(contentLength + simdjson::SIMDJSON_PADDING - 1);
     // sometimes we will get 404 message after the json
     // (its length not included in content-length)
     // contentReceived = std::min(contentReceived, contentLength);

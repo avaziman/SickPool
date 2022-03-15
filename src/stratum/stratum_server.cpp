@@ -1,7 +1,7 @@
 #include "stratum_server.hpp"
- 
+
 StratumServer::StratumServer(CoinConfig cnfg)
-    : coin_config(cnfg), reqParser(REQ_BUFF_SIZE)
+    : coin_config(cnfg), reqParser(REQ_BUFF_SIZE), target_shares_rate(cnfg.target_shares_rate)
 {
     for (int i = 0; i < 4; i++)
     {
@@ -13,7 +13,11 @@ StratumServer::StratumServer(CoinConfig cnfg)
     }
 
     redis_manager = new RedisManager(cnfg.symbol, cnfg.redis_host);
-    diff_manager = new DifficultyManager(cnfg.target_shares_rate, clients);
+
+    //diff_manager = new DifficultyManager(cnfg.target_shares_rate, clients);
+    //std::thread(&DifficultyManager::Start, diff_manager,
+    //            std::ref(clients_mutex))
+    //    .detach();
 
     job_count = redis_manager->GetJobCount();
 
@@ -77,6 +81,9 @@ void StratumServer::Listen()
         sockaddr_in conn_addr;
         conn_fd = accept(sockfd, (sockaddr *)&addr, (socklen_t *)&addr_len);
 
+        std::cout << "tcp client connected, starting new thread..."
+                  << std::endl;
+
         if (conn_fd <= 0)
         {
             std::cerr << "Invalid connecting socket accepted. Ignoring..."
@@ -84,8 +91,7 @@ void StratumServer::Listen()
             continue;
         };
 
-        // std::thread(&StratumServer::HandleSocket, this, conn_fd).detach();
-        std::thread(&StratumServer::HandleSocket, this, conn_fd).join();
+        std::thread(&StratumServer::HandleSocket, this, conn_fd).detach();
     }
 }
 
@@ -114,7 +120,6 @@ void StratumServer::HandleSocket(int conn_fd)
             buffer[total] = '\0';  // replaces \n
             reqEnd = std::strchr(buffer, '\n');
         } while (reqEnd == NULL && total < REQ_BUFF_SIZE - 1);
-
 
         if (res <= 0)
         {
@@ -190,7 +195,7 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[], int reqSize)
     auto dur =
         std::chrono::duration_cast<std::chrono::microseconds>(end - start)
             .count();
-    std::cout << "req parse took: " << dur << "micro seconds." << std::endl;
+    // std::cout << "req parse took: " << dur << "micro seconds." << std::endl;
 
     if (method == "mining.subscribe")
         HandleSubscribe(cli, id, params);
@@ -212,21 +217,21 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     this->jobs.clear();
     auto start = std::chrono::steady_clock::now();
 
-    char reqParams[] = "";
     std::vector<char> resBody;
-    int resCode = SendRpcReq(resBody, 1, "getblocktemplate", reqParams, 0);
+    int resCode = SendRpcReq(resBody, 1, "getblocktemplate", nullptr, 0);
+    std::cout << "res: " << resBody.data() << std::endl;
 
     while (resCode != 200)
     {
-        resCode = SendRpcReq(resBody, 1, "getblocktemplate", reqParams,
-                             sizeof(reqParams));
+        resCode = SendRpcReq(resBody, 1, "getblocktemplate", nullptr,
+                             0);
         std::cerr << "Block update socket error: Failed to get blocktemplate, "
                      "http code: "
                   << resCode << ", retrying..." << std::endl;
 
         std::this_thread::sleep_for(5ms);
     }
-    
+    uint32_t curtime;
     Job *job;
 
     try
@@ -247,7 +252,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 #endif
         ondemand::array txs = res["transactions"].get_array();
         int value = res["coinbasetxn"]["coinbasevalue"].get_int64();
-        uint32_t curtime = res["curtime"].get_int64();
+        curtime = res["curtime"].get_int64();
         std::string_view bits = res["bits"].get_string();
         uint32_t height = res["height"].get_int64();
 
@@ -310,7 +315,12 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     }
 
     jobs.push_back(job);
-    this->BroadcastJob(job);
+
+    for (auto it = clients.begin(); it != clients.end(); it++)
+    {
+        AdjustDifficulty(*it, curtime);
+        BroadcastJob(*it, job);
+    }
 }
 
 void StratumServer::HandleWalletNotify(ondemand::array &params)
@@ -319,25 +329,31 @@ void StratumServer::HandleWalletNotify(ondemand::array &params)
 
     std::cout << "Received transaction: " << txId << std::endl;
 
-    std::vector<char> resBody;
-    char rpcParams[64];
-    int len = snprintf(rpcParams, sizeof(rpcParams), "\"%s\",1",
-                       std::string(txId).c_str());
+    redis_manager->CloseRound(12, 1);
+    // std::vector<char> resBody;
+    // char rpcParams[64];
+    // rpcParams[0] = '\"';
+    // memcpy(rpcParams + 1, txId.data(), txId.size());
+    // rpcParams[txId.size() + 1] = '\"';
+    // rpcParams[txId.size() + 2] = ',';
+    // rpcParams[txId.size() + 3] = '1';
+    // int len = txId.size() + 4;
 
-    rpcParams[len] = 0;
-    int resCode = SendRpcReq(resBody, 1, "getrawtransaction", rpcParams, len);
+    // int resCode = SendRpcReq(resBody, 1, "getrawtransaction", rpcParams, len);
 
-    if (resCode != 200)
-    {
-        std::cerr << "CheckAcceptedBlock error: Failed to getrawtransaction, "
-                     "http code: "
-                  << resCode << std::endl;
-        // return CheckAcceptedBlock(height);
-    }
+    // if (resCode != 200)
+    // {
+    //     std::cerr << "CheckAcceptedBlock error: Failed to getrawtransaction, "
+    //                  "http code: "
+    //               << resCode << std::endl;
+    //     // return CheckAcceptedBlock(height);
+    // }
 
-    ondemand::document doc =
-        httpParser.iterate(resBody.data(), resBody.size() - 32, resBody.size());
+    // ondemand::document doc =
+    //     httpParser.iterate(resBody.data(), resBody.size() - 32, resBody.size());
 
+
+    // ProcessRound(1);
     // ondemand::object res = doc["result"].get_object();
     // std::string_view validationType = res["validationtype"].get_string();
 
@@ -395,10 +411,11 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
 {
     char response[1024];
     int len = 0, split = 0;
-    std::string error = "null", addr, worker, worker_full;
+    std::string error = "null", addr, worker;
 
     // worker name format: address.worker_name
-    /*worker_full = */  // params.at(0).get_string();
+    std::string_view worker_full =
+        (*params.begin()).get_string();  // params.at(0).get_string();
     // split = worker_full.find('.');
 
     // if (split == std::string::npos)
@@ -430,6 +447,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     //     //           << ", authorized: " << isvalid << std::endl;
     // }
 
+    redis_manager->AddWorker(worker_full);
     std::string result = error == "null" ? "true" : "false";
 
     len = snprintf(response, sizeof(response),
@@ -466,7 +484,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 {
     // auto start = std::chrono::steady_clock::now();
     Job *job = GetJobById(share.jobId);
-    std::time_t time = std::time(0);
+    std::time_t time = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     cli->SetLastShare(time);
 
     if (job == nullptr)
@@ -493,9 +511,9 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 
     double shareDiff = BitsToDiff(UintToArith256(hash256).GetCompact(false));
 
-    std::cout << "block hash      : " << hash256.GetHex() << std::endl;
-    std::cout << "block difficulty: " << job->GetTargetDiff() << std::endl;
-    std::cout << "share difficulty: " << shareDiff << std::endl;
+    // std::cout << "block hash      : " << hash256.GetHex() << std::endl;
+    // std::cout << "block difficulty: " << job->GetTargetDiff() << std::endl;
+    // std::cout << "share difficulty: " << shareDiff << std::endl;
     // std::cout << "client target   : " << cli->GetDifficulty() << std::endl;
     // auto end = std::chrono::steady_clock::now();
     // auto duration =
@@ -536,7 +554,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
                        "{\"id\":%d,\"result\":true,\"error\":null}\n", id);
     send(cli->GetSock(), buffer, len, 0);
     redis_manager->AddShare(share.worker, shareDiff, time);
-    std::cout << "share accepted" << std::endl;
+
+    // std::cout << "share accepted" << std::endl;
 }
 
 void StratumServer::RejectShare(StratumClient *cli, int id, ShareResult error)
@@ -571,7 +590,7 @@ void StratumServer::RejectShare(StratumClient *cli, int id, ShareResult error)
                  (int)error, errorMessage.c_str());
     send(cli->GetSock(), buffer, len, 0);
 
-    std::cout << "rejected share: " << errorMessage << std::endl;
+    // std::cout << "rejected share: " << errorMessage << std::endl;
 }
 
 bool StratumServer::SubmitBlock(const char *blockHex, int blockHexLen)
@@ -631,14 +650,29 @@ void StratumServer::UpdateDifficulty(StratumClient *cli)
     send(cli->GetSock(), request, len, 0);
 }
 
-void StratumServer::BroadcastJob(Job *job)
-{
-    clients_mutex.lock();
-    std::vector<StratumClient *>::iterator it;
-    for (it = clients.begin(); it != clients.end(); it++)
-        send((*it)->GetSock(), job->GetNotifyBuff(), job->GetNotifyBuffSize(),
-             0);
-    clients_mutex.unlock();
+void StratumServer::AdjustDifficulty(StratumClient* cli, std::time_t curTime){
+    std::time_t period = curTime - cli->GetLastAdjusted();
+
+    if (period < 15) return;
+
+    double minuteRate = ((double)60 / period) * (double)cli->GetShareCount();
+
+    std::cout << "share minute rate: " << minuteRate << std::endl;
+
+    // we allow 20% difference from target
+    if (minuteRate > target_shares_rate * 1.2 ||
+        minuteRate < target_shares_rate * 0.8)
+    {
+        std::cout << "old diff: " << cli->GetDifficulty() << std::endl;
+        
+        // similar to bitcoin difficulty calculation
+        double newDiff =
+            (minuteRate / target_shares_rate) * cli->GetDifficulty();
+        cli->SetDifficulty(newDiff, curTime);
+        this->UpdateDifficulty(cli);
+        std::cout << "new diff: " << newDiff << std::endl;
+    }
+    cli->ResetShareCount();
 }
 
 void StratumServer::BroadcastJob(StratumClient *cli, Job *job)

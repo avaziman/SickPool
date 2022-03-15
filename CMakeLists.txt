@@ -20,8 +20,10 @@ include_directories(lib/rapidjson/include)
 include_directories(lib/simdjson)
 
 add_subdirectory(src)
-add_subdirectory(lib/redis-plus-plus)
 add_subdirectory(stratum_notifier)
-#add_subdirectory(lib/googletest)
+add_subdirectory(benchmark)
+
+add_subdirectory(lib/googletest)
+add_subdirectory(lib/benchmark)
 
 #add_subdirectory(tests)

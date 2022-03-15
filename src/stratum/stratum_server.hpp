@@ -58,11 +58,13 @@ class StratumServer
     CoinConfig coin_config;
     sockaddr_in addr;
     uint32_t job_count;
+    double target_shares_rate;
+
     ondemand::parser reqParser;
     ondemand::parser httpParser;
 
     RedisManager* redis_manager;
-    DifficultyManager* diff_manager;
+    // DifficultyManager* diff_manager;
 
     std::mutex clients_mutex;
     std::vector<DaemonRpc*> rpcs;
@@ -84,8 +86,8 @@ class StratumServer
     bool SubmitBlock(const char* blockHex, int blockHexLen);
 
     void UpdateDifficulty(StratumClient* cli);
+    void AdjustDifficulty(StratumClient* cli, std::time_t curTime);
 
-    void BroadcastJob(Job* job);
     void BroadcastJob(StratumClient* cli, Job* job);
 
     void GetNextReq(int sockfd, int received, char* buffer);
