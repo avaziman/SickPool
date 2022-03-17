@@ -20,6 +20,7 @@
 // #define CONFIG_PATH_VRSC \
 //     "C:\\projects\\pool\\pool-server\\config\\coins\\VRSC.json"
 
+#include "logger.hpp"
 void ParseCoinConfig(CoinConfig* cnfg, const char* path);
 
 // int valid(const char* s)
@@ -38,28 +39,25 @@ void ParseCoinConfig(CoinConfig* cnfg, const char* path);
 // }
 int main(int argc, char** argv)
 {
-    // const char* s[] = {"1Q1pE5vPGEEMqRcVRMbtBK842Y6Pzo6nK9",
-    //                    "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62i",
-    //                    "1Q1pE5vPGEEMqRcVRMbtBK842Y6Pzo6nJ9",
-    //                    "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62I", 0};
-    // int i;
-    // for (i = 0; s[i]; i++)
-    // {
-    //     int status = valid(s[i]);
-    //     printf("%s: %s\n", s[i], status ? "Ok" : "NO OK");
-    // }
-    // return 0;
-    CoinConfig coinConfig;
-    // make tests
-    // std::cout << std::hex << std::setfill('0') << std::setw(8)
-    //           << DiffToBits(32768) << std::endl;
-    // std::cout << BitsToDiff(DiffToBits(32768)) << std::endl;
-    // std::cout << BitsToDiff(DiffToBits(4096)) << std::endl;
+    Logger::Log(LogType::Info, LogField::Config, "Starting SickPool!");
 
-    // std::cout << BitsToDiff(DiffToTarget(1));
+    Logger::Log(LogType::Info, LogField::Config, "Static config:");
+    Logger::Log(LogType::Info, LogField::Config, "Coin symbol: %s", COIN_SYMBOL);
+    Logger::Log(LogType::Info, LogField::Config, "DB retention: %dms", DB_RETENTION);
+
+    Logger::Log(LogType::Info, LogField::Config, "Loading dynamic config...");
+    
+    CoinConfig coinConfig;
+    
     try
     {
         ParseCoinConfig(&coinConfig, CONFIG_PATH);
+
+        Logger::Log(LogType::Info, LogField::Config, "Coin config loaded:");
+        Logger::Log(LogType::Info, LogField::Config, "Pool address: %s", coinConfig.pool_addr.c_str());
+        Logger::Log(LogType::Info, LogField::Config, "PoW fee: %f%", coinConfig.pow_fee);
+        Logger::Log(LogType::Info, LogField::Config, "PoS fee: %f%", coinConfig.pos_fee);
+
         StratumServer stratumServer(coinConfig);
         stratumServer.StartListening();
     }
@@ -138,3 +136,23 @@ void ParseCoinConfig(CoinConfig* cnfg, const char* path)
 
     configfStream.close();
 }
+
+// make tests
+// std::cout << std::hex << std::setfill('0') << std::setw(8)
+//           << DiffToBits(32768) << std::endl;
+// std::cout << BitsToDiff(DiffToBits(32768)) << std::endl;
+// std::cout << BitsToDiff(DiffToBits(4096)) << std::endl;
+
+// std::cout << BitsToDiff(DiffToTarget(1));
+
+// const char* s[] = {"1Q1pE5vPGEEMqRcVRMbtBK842Y6Pzo6nK9",
+//                    "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62i",
+//                    "1Q1pE5vPGEEMqRcVRMbtBK842Y6Pzo6nJ9",
+//                    "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62I", 0};
+// int i;
+// for (i = 0; s[i]; i++)
+// {
+//     int status = valid(s[i]);
+//     printf("%s: %s\n", s[i], status ? "Ok" : "NO OK");
+// }
+// return 0;

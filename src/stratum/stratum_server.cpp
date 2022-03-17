@@ -69,8 +69,8 @@ void StratumServer::StartListening()
 
 void StratumServer::Listen()
 {
-    std::cout << "Started listenning on port: " << ntohs(this->addr.sin_port)
-              << std::endl;
+    Logger::Log(LogType::Info, LogField::Stratum,
+                "Started listenning on port: %d", ntohs(this->addr.sin_port));
 
     while (true)
     {
@@ -188,7 +188,8 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[], int reqSize)
     }
     catch (simdjson::simdjson_error &err)
     {
-        std::cerr << "Req json parse error: " << err.what() << std::endl;
+        Logger::Log(LogType::Error, LogField::Stratum,
+                    "JSON parse error: %s\nRequest: %s\n", err.what(), buffer);
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -238,7 +239,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         // std::cout << resBody.data() << std::endl;
 
         ondemand::document doc = httpParser.iterate(
-            resBody.data(), resBody.size() - SIMDJSON_PADDING, resBody.size());
+            resBody.data(), resBody.size() - SIMDJSON_PADDING, resBody.size()+1);
 
         ondemand::object res = doc["result"].get_object();
 
@@ -311,6 +312,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     {
         std::cerr << "getblocktemplate json parse error: " << err.what()
                   << std::endl;
+        return;
     }
 
     jobs.push_back(job);
@@ -404,8 +406,9 @@ void StratumServer::HandleSubscribe(StratumClient *cli, int id,
 
     if (jobs.size() == 0)
     {
-        std::cerr << "no job to broadcast to connected client." << std::endl;
-        return;
+        Logger::Log(LogType::Critical, LogField::Stratum,
+                    "no job to broadcast to connected client.");
+        exit(EXIT_FAILURE);
     }
 
     std::cout << "client subscribed!" << std::endl;
@@ -493,7 +496,11 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 
     Job *job = GetJobById(share.jobId);
 
-    ShareProcessor::Process(time, *cli, *job, share);
+    ShareResult res = ShareProcessor::Process(time, *cli, *job, share);
+    if (res.Code >= ShareCode::VALID_SHARE)  // valid share or valid block
+    {
+        // if(res.)
+    }
     return;
     // cli->SetLastShare(time);
 
@@ -597,8 +604,8 @@ void StratumServer::RejectShare(StratumClient *cli, int id, ShareResult error)
     // char buffer[1024];
     // int len =
     //     snprintf(buffer, sizeof(buffer),
-    //              "{\"id\":%d,\"result\":null,\"error\":[%d,\"%s\",null]}\n", id,
-    //              (int)error, errorMessage.c_str());
+    //              "{\"id\":%d,\"result\":null,\"error\":[%d,\"%s\",null]}\n",
+    //              id, (int)error, errorMessage.c_str());
     // send(cli->GetSock(), buffer, len, 0);
 
     // std::cout << "rejected share: " << errorMessage << std::endl;
@@ -712,7 +719,7 @@ std::vector<unsigned char> StratumServer::GetCoinbaseTx(int64_t value,
     return coinbaseTx.GetBytes();
 }
 
-//TODO: add a lock jobs
+// TODO: add a lock jobs
 Job *StratumServer::GetJobById(std::string_view id)
 {
     for (auto it = jobs.begin(), end = jobs.end(); it != end; it++)

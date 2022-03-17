@@ -33,13 +33,10 @@
 #include "share_processor.hpp"
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
+#include "../logger.hpp"
 
-#define REQ_BUFF_SIZE (1024 * 3)
+#define REQ_BUFF_SIZE (1024 * 32)
 #define SOCK_TIMEOUT 5;
-
-// how we store stale and invalid shares in database
-#define STALE_SHARE_DIFF -1
-#define INVALID_SHARE_DIFF -2
 
 using namespace sw::redis;
 

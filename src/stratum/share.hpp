@@ -19,8 +19,13 @@ enum class ShareCode
     NOT_SUBSCRIBED = 25,
 
     // non-standard
-    VALID_BLOCK = 30,
-    VALID_SHARE = 31
+    VALID_SHARE = 30,
+    VALID_BLOCK = 31,
+};
+
+struct ShareResult{
+    ShareCode Code;
+    const char* Message;
 };
 
 #endif

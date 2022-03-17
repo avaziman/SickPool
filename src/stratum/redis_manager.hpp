@@ -2,15 +2,21 @@
 #define REDIS_MANAGER_HPP_
 #include <hiredis/hiredis.h>
 
+#include <chrono>
 #include <ctime>
 #include <iostream>
 #include <iterator>
 #include <unordered_map>
 #include <vector>
-#include <chrono>
 
 #include "../config.hpp"
-#define STRINGIFICATOR(X) #X
+#include "../logger.hpp"
+#define xstr(s) str(s)
+#define str(s) #s
+
+// how we store stale and invalid shares in database
+#define STALE_SHARE_DIFF -1
+#define INVALID_SHARE_DIFF -2
 
 class RedisManager
 {
@@ -19,6 +25,7 @@ class RedisManager
         : coin_symbol(coinSymbol)
     {
         rc = redisConnect("127.0.0.1", 6379);
+
         if (rc->err)
         {
             std::cerr << "Failed to connect to redis: " << rc->errstr
@@ -37,13 +44,12 @@ class RedisManager
             rc,
             "TS.CREATE " COIN_SYMBOL
             ":shares:%b"
-            " RETENTION " STRINGIFICATOR(DB_RETENTION)  // time to live
-            " ENCODING COMPRESSED"        // very data efficient
-            " DUPLICATE_POLICY SUM"       // if two shares received at same ms
+            " RETENTION " xstr(DB_RETENTION)  // time to live
+            " ENCODING COMPRESSED"            // very data efficient
+            " DUPLICATE_POLICY SUM"  // if two shares received at same ms
                                      // (rare), sum instead of ignoring (BLOCK)
-            " LABELS coin " COIN_SYMBOL " type shares server IL worker %b ",
-            worker.data(), worker.size(), worker.data(),
-            worker.size());
+            " LABELS coin " COIN_SYMBOL " type shares server IL worker %b",
+            worker.data(), worker.size(), worker.data(), worker.size());
 
         std::string_view workerAddr = worker.substr(0, worker.find('.'));
 
@@ -53,25 +59,29 @@ class RedisManager
                            " RETENTION 0"  // never expire balance log
                            " ENCODING COMPRESSED"
                            " LABELS coin " COIN_SYMBOL
-                           " server IL address %b type balance",
+                           " type balance server IL address %b",
                            workerAddr.data(), workerAddr.size(),
                            workerAddr.data(), workerAddr.size());
 
         // reply for first TS.CREATE
-        if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
         {
-            std::cout << "Failed to add worker timeseries." << std::endl;
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to add worker (share) timeseries: %s",
+                        rc->errstr);
         }
         freeReplyObject(reply);
 
         // reply for second TS.CREATE
-        if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
         {
-            std::cout << "Failed to add worker timeseries." << std::endl;
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to add worker (balance) timeseries: %s",
+                        rc->errstr);
         }
         freeReplyObject(reply);
     }
-    void AddShare(std::string_view worker, double diff, std::time_t time)
+    void AddShare(std::string_view worker, std::time_t time, double diff)
     {
         redisReply *reply;
         redisAppendCommand(rc, "TS.ADD " COIN_SYMBOL ":shares:%b %lu %f",
@@ -92,7 +102,6 @@ class RedisManager
             std::cerr << "Redis: Failed to append share (stats):" << std::endl;
         }
         freeReplyObject(reply);
-
 
         auto end = std::chrono::steady_clock::now();
         if (diff <= 0) return;

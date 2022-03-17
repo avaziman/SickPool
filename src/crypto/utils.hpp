@@ -38,7 +38,9 @@ inline void SetHighPriorityThread(std::thread& thr)
 
     param.sched_priority = sched_get_priority_max(SCHED_FIFO);
     int res = pthread_setschedparam(thr.native_handle(), SCHED_FIFO, &param);
-    if(res != 0) std::cerr << "Failed to set thread priority to realtime! (need admin)" << std::endl;
+    if (res != 0)
+        std::cerr << "Failed to set thread priority to realtime! (need admin)"
+                  << std::endl;
 }
 
 inline void ReverseHex(char* dest, const char* input, uint16_t size)
@@ -71,6 +73,17 @@ inline char GetHex(char c)
         return 10 + (c - 'a');
 
     return 0;
+}
+
+inline uint32_t HexToUint(const char* hex, int size)
+{
+    uint32_t val = 0;
+    for (int i = 0; i < size; i++)
+    {
+        val *= 16;
+        val += GetHex(hex[i]);
+    }
+    return val;
 }
 
 inline void Hexlify(char* dest, unsigned char* src, int srcSize)
