@@ -59,11 +59,15 @@ TEST(HashWrapperTest, VerusHash2_2)
     unsigned char dataBytes[(sizeof(data)) / 2];
     Unhexlify(dataBytes, data, sizeof(data) - 1);
 
+
+
     unsigned char result[32];
     HashWrapper::VerushashV2b2(result, dataBytes, sizeof(dataBytes));
 
     char hex[64];
     Hexlify(hex, result, 32);
+
+    printf("res: %.64s\n", hex);
 
     char expected[] =
         "c7860153c2390efe7481b1bbe041dd3c95404b64309852397f1e000000000000";

@@ -5,13 +5,13 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "verushash/arith_uint256.h"
 #include "verushash/endian.h"
 #include "verushash/uint256.h"
 
-#define POOL_COIN COIN_VRSCTEST
 #if POOL_COIN == COIN_VRSCTEST
 #define DIFF1_BITS 0x200f0f0f
 #endif
@@ -21,6 +21,25 @@
 
 //     // if(!DecodeBase58(addr, bytes) return false;
 // }
+inline int fast_atoi(const char* str, int size)
+{
+    int val = 0;
+    for (int i = 0; i < size; i++)
+    {
+        val = val * 10 + str[i] - '0';
+    }
+    return val;
+}
+
+inline void SetHighPriorityThread(std::thread& thr)
+{
+    struct sched_param param;
+    int maxPriority;
+
+    param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    int res = pthread_setschedparam(thr.native_handle(), SCHED_FIFO, &param);
+    if(res != 0) std::cerr << "Failed to set thread priority to realtime! (need admin)" << std::endl;
+}
 
 inline void ReverseHex(char* dest, const char* input, uint16_t size)
 {

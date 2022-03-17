@@ -12,7 +12,7 @@ class VerusJob : public Job
     VerusJob(uint32_t jobId, std::vector<std::vector<unsigned char>>& txs,
              bool clean, uint32_t ver, const char* prevBlock, uint32_t time,
              const char* bits, const char* finalSaplingRoot, const char* sol144)
-        : Job(jobId, txs)
+        : Job(jobId, txs, time)
     {
         /* we use cstring for "readable" generation of notify message
          and because we need to reverse (copy) the string_views anyway so might

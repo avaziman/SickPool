@@ -7,6 +7,7 @@
 #include <iterator>
 #include <unordered_map>
 #include <vector>
+#include <chrono>
 
 #include "../config.hpp"
 #define STRINGIFICATOR(X) #X
@@ -22,12 +23,15 @@ class RedisManager
         {
             std::cerr << "Failed to connect to redis: " << rc->errstr
                       << std::endl;
+            exit(1);
         }
+        // increase performance by not freeing buffer
+        // rc->reader->maxbuf = 0;
     }
 
     void AddWorker(std::string_view worker)
     {
-        // redisReply *reply;
+        redisReply *reply;
 
         redisAppendCommand(
             rc,
@@ -41,31 +45,31 @@ class RedisManager
             worker.data(), worker.size(), worker.data(),
             worker.size());
 
-        // std::string_view workerAddr = worker.substr(0, worker.find('.'));
+        std::string_view workerAddr = worker.substr(0, worker.find('.'));
 
-        // redisAppendCommand(rc,
-        //                    "TS.CREATE " COIN_SYMBOL
-        //                    ":balance:%b"
-        //                    " RETENTION 0"  // never expire balance log
-        //                    " ENCODING COMPRESSED"
-        //                    " LABELS coin " COIN_SYMBOL
-        //                    " server IL address %b type balance",
-        //                    workerAddr.data(), workerAddr.size(),
-        //                    workerAddr.data(), workerAddr.size());
+        redisAppendCommand(rc,
+                           "TS.CREATE " COIN_SYMBOL
+                           ":balance:%b"
+                           " RETENTION 0"  // never expire balance log
+                           " ENCODING COMPRESSED"
+                           " LABELS coin " COIN_SYMBOL
+                           " server IL address %b type balance",
+                           workerAddr.data(), workerAddr.size(),
+                           workerAddr.data(), workerAddr.size());
 
-        // // reply for first TS.CREATE
-        // if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
-        // {
-        //     std::cout << "Failed to add worker timeseries." << std::endl;
-        // }
-        // freeReplyObject(reply);
+        // reply for first TS.CREATE
+        if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
+        {
+            std::cout << "Failed to add worker timeseries." << std::endl;
+        }
+        freeReplyObject(reply);
 
-        // // reply for second TS.CREATE
-        // if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
-        // {
-        //     std::cout << "Failed to add worker timeseries." << std::endl;
-        // }
-        // freeReplyObject(reply);
+        // reply for second TS.CREATE
+        if (!redisGetReply(rc, (void **)&reply) == REDIS_OK)
+        {
+            std::cout << "Failed to add worker timeseries." << std::endl;
+        }
+        freeReplyObject(reply);
     }
     void AddShare(std::string_view worker, double diff, std::time_t time)
     {
@@ -89,6 +93,8 @@ class RedisManager
         }
         freeReplyObject(reply);
 
+
+        auto end = std::chrono::steady_clock::now();
         if (diff <= 0) return;
 
         // reply for HINCRBYFLOAT

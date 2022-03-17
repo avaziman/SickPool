@@ -1,10 +1,10 @@
 #ifndef JOB_HPP_
 #define JOB_HPP_
+#include <ctime>
 #include <iomanip>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <ctime>
 
 #include "../crypto/merkle_tree.hpp"
 #include "../crypto/utils.hpp"
@@ -18,9 +18,11 @@
 class Job
 {
    public:
-    Job(uint32_t jobId, std::vector<std::vector<unsigned char>>& txs) /*, char*
-        ver, char* prevBlock, char* time, char* bits)*/
-        : jobId(jobId)//, time(std::time(0))
+    Job(uint32_t jobId, std::vector<std::vector<unsigned char>>& txs,
+        uint32_t time)
+        /*, char*
+ver, char* prevBlock, char* time, char* bits)*/
+        : jobId(jobId), time(time)  //, time(std::time(0))
     {
         ToHex(jobIdStr, jobId);
         jobIdStr[8] = 0;
@@ -30,7 +32,7 @@ class Job
         int txDataLen = 0;
 
         for (int i = 0; i < txs.size(); i++) txDataLen += txs[i].size();
-        
+
         // insert the txdata as hex as we will need to submit it as hex anyway
         txDataHex.resize((txDataLen + varIntLen) * 2);
 
@@ -47,34 +49,37 @@ class Job
         }
     }
 
-    virtual unsigned char* GetHeaderData(std::string_view time, std::string_view nonce1,
+    virtual unsigned char* GetHeaderData(std::string_view time,
+                                         std::string_view nonce1,
                                          std::string_view nonce2,
                                          std::string_view additional) = 0;
+
+    unsigned char* GetHeaderData() { return this->headerData; }
 
     void GetBlockHex(char* res)
     {
         Hexlify(res, headerData, BLOCK_HEADER_SIZE);
-        memcpy(res + (BLOCK_HEADER_SIZE * 2), txDataHex.data(), txDataHex.size());
+        memcpy(res + (BLOCK_HEADER_SIZE * 2), txDataHex.data(),
+               txDataHex.size());
         // TODO: CHECK WHY BLOCK_HEADER_SIZE * 2 WON"T WORK (SKIPS 72 bytes)
     }
 
-    void GetHash(unsigned char* res)
-    {
-#if POOL_COIN == COIN_VRSCTEST
-        HashWrapper::VerushashV2b2(res, this->headerData, BLOCK_HEADER_SIZE);
-#endif
-    }
     // char* GetVersion() { return version; }
     // char* GetPrevBlockhash() { return hashPrevBlock; }
     // char* GetTime() { return nTime; }
     // char* GetBits() { return nBits; }
-    const int GetBlockSize() { return (BLOCK_HEADER_SIZE * 2) + txDataHex.size(); }
+    const int GetBlockSize()
+    {
+        return (BLOCK_HEADER_SIZE * 2) + txDataHex.size();
+    }
     const char* GetId() { return jobIdStr; }
+    uint32_t GetTime() { return time; }
     char* GetNotifyBuff() { return notifyBuff; }
     uint16_t GetNotifyBuffSize() { return notifyBuffSize; }
     double GetTargetDiff() { return targetDiff; }
 
    protected:
+    uint32_t time;
     unsigned char headerData[BLOCK_HEADER_SIZE];
     std::vector<char> txDataHex;
     uint32_t jobId;
@@ -82,11 +87,11 @@ class Job
     uint16_t notifyBuffSize;
     char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
     double targetDiff;
-    //std::time_t created;
-    // char version[4];
-    // char hashPrevBlock[32];
-    // char hashMerkleRoot[32];
-    // char nTime[4];
-    // char nBits[4];
+    // std::time_t created;
+    //  char version[4];
+    //  char hashPrevBlock[32];
+    //  char hashMerkleRoot[32];
+    //  char nTime[4];
+    //  char nBits[4];
 };
 #endif

@@ -1,26 +1,28 @@
 #include "hash_wrapper.hpp"
 #include <chrono>
 
-CVerusHashV2 HashWrapper::cverusHashV2;
+CVerusHashV2 HashWrapper::cverusHashV2(SOLUTION_VERUSHHASH_V2_2);
 CSHA256 HashWrapper::csha256;
 void HashWrapper::InitVerusHash() { 
     CVerusHashV2::init();
+    // cverusHashV2 = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 }
 
 void HashWrapper::InitSHA256()
 {
     csha256 = CSHA256();
-    // cverusHashV2 = ;
 }
 
-void HashWrapper::VerushashV2b2(unsigned char* dest, unsigned char* in, int size)
-{
-    // Make sure its initialized before this
-    cverusHashV2 = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
+void HashWrapper::VerushashV2b2(unsigned char* dest, unsigned char* in,
+                                int size, CVerusHashV2* hasher)
 
-    cverusHashV2.Reset();
-    cverusHashV2.Write(in, size);
-    cverusHashV2.Finalize2b(dest);
+{
+    
+    hasher->Write(in, size);
+    auto start = std::chrono::steady_clock::now();
+    hasher->Finalize2b(dest);
+    auto end = std::chrono::steady_clock::now();
+    hasher->Reset();
     // CVerusHashV2::Hash(res, in, size);
 }
 void HashWrapper::SHA256d(unsigned char* dest, unsigned char* in, int size)

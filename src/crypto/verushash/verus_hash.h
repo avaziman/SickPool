@@ -149,9 +149,12 @@ class CVerusHashV2
             int size = pdesc->keySizeInBytes;
             int refreshsize = verusclhasher::keymask(size) + 1;
             // skip keygen if it is the current key
+            // note generating keys is expensive, x3-5 worse hash time
+            
             if (pdesc->seed != *((uint256 *)seedBytes32))
             {
-                // generate a new key by chain hashing with Haraka256 from the last curbuf
+                // generate a new key by chain hashing with Haraka256 from the
+                // last curbuf
                 int n256blks = size >> 5;
                 int nbytesExtra = size & 0x1f;
                 unsigned char *pkey = key;

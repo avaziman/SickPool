@@ -30,6 +30,7 @@
 #include "redis_manager.hpp"
 #include "share.hpp"
 #include "share_result.hpp"
+#include "share_processor.hpp"
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
 
@@ -42,7 +43,6 @@
 
 using namespace sw::redis;
 
-using namespace rapidjson;
 using namespace simdjson;
 using namespace std::chrono;
 
@@ -63,7 +63,7 @@ class StratumServer
     ondemand::parser reqParser;
     ondemand::parser httpParser;
 
-    RedisManager* redis_manager;
+    RedisManager redis_manager;
     // DifficultyManager* diff_manager;
 
     std::mutex clients_mutex;

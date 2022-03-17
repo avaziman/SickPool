@@ -9,4 +9,18 @@ struct Share{
     std::string_view solution;
 };
 
+enum class ShareCode
+{
+    UNKNOWN = 20,
+    JOB_NOT_FOUND = 21,
+    DUPLICATE_SHARE = 22,
+    LOW_DIFFICULTY_SHARE = 23,
+    UNAUTHORIZED_WORKER = 24,
+    NOT_SUBSCRIBED = 25,
+
+    // non-standard
+    VALID_BLOCK = 30,
+    VALID_SHARE = 31
+};
+
 #endif
