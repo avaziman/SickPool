@@ -20,7 +20,7 @@ class MerkleTree
 
         for (int i = 0; i < txs.size(); i++)
         {
-#if COIN_CONFIG == COIN_VRSCTEST
+#if POOL_COIN == COIN_VRSCTEST
             HashWrapper::SHA256d(txIds[i].data(), txs[i].data(), txs[i].size());
 #endif
         }
@@ -40,7 +40,7 @@ class MerkleTree
 
                 memcpy(combined, txIds[i].data(), 32);
                 memcpy(combined + 32, txIds[i + 1].data(), 32);
-#if COIN_CONFIG == COIN_VRSCTEST
+#if POOL_COIN == COIN_VRSCTEST
                 HashWrapper::SHA256d(combinedHash, combined, 64);
 #endif
 

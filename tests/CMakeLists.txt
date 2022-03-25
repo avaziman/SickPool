@@ -24,6 +24,7 @@ include_directories(../src)
 add_executable(${PROJECT_NAME}_tests ${SRC_FILES} 
         hash_wrapper_test.cpp
         merkle_root_test.cpp
+        difficulty_test.cpp
         #stratum_test.cpp
         )
 

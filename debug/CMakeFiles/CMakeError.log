@@ -1,0 +1,106 @@
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_2a10c/fast && /usr/bin/make -f CMakeFiles/cmTC_2a10c.dir/build.make CMakeFiles/cmTC_2a10c.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_2a10c.dir/src.c.o
+/usr/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD   -o CMakeFiles/cmTC_2a10c.dir/src.c.o   -c /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_2a10c
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_2a10c.dir/link.txt --verbose=1
+/usr/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD    CMakeFiles/cmTC_2a10c.dir/src.c.o  -o cmTC_2a10c 
+/usr/bin/ld: CMakeFiles/cmTC_2a10c.dir/src.c.o: in function `main':
+src.c:(.text+0x46): undefined reference to `pthread_create'
+/usr/bin/ld: src.c:(.text+0x52): undefined reference to `pthread_detach'
+/usr/bin/ld: src.c:(.text+0x63): undefined reference to `pthread_join'
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_2a10c.dir/build.make:87: cmTC_2a10c] Error 1
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_2a10c/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_cbec6/fast && /usr/bin/make -f CMakeFiles/cmTC_cbec6.dir/build.make CMakeFiles/cmTC_cbec6.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_cbec6.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_cbec6.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+Linking C executable cmTC_cbec6
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_cbec6.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create    CMakeFiles/cmTC_cbec6.dir/CheckFunctionExists.c.o  -o cmTC_cbec6  -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_cbec6.dir/build.make:87: cmTC_cbec6] Error 1
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_cbec6/fast] Error 2
+
+
+
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WSHORTEN_64_TO_32 failed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_898ca/fast && /usr/bin/make -f CMakeFiles/cmTC_898ca.dir/build.make CMakeFiles/cmTC_898ca.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_898ca.dir/src.cxx.o
+/usr/bin/c++    -O0 -g  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors -DHAVE_CXX_FLAG_WSHORTEN_64_TO_32  -Wshorten-64-to-32   -Wshorten-64-to-32 -o CMakeFiles/cmTC_898ca.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wshorten-64-to-32'
+c++: error: unrecognized command-line option '-Wshorten-64-to-32'
+make[1]: *** [CMakeFiles/cmTC_898ca.dir/build.make:66: CMakeFiles/cmTC_898ca.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_898ca/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WD654 failed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_37d9c/fast && /usr/bin/make -f CMakeFiles/cmTC_37d9c.dir/build.make CMakeFiles/cmTC_37d9c.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_37d9c.dir/src.cxx.o
+/usr/bin/c++    -O0 -g  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DHAVE_CXX_FLAG_WD654  -wd654   -wd654 -o CMakeFiles/cmTC_37d9c.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-wd654'
+c++: error: unrecognized command-line option '-wd654'
+make[1]: *** [CMakeFiles/cmTC_37d9c.dir/build.make:66: CMakeFiles/cmTC_37d9c.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_37d9c/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WTHREAD_SAFETY failed with the following output:
+Change Dir: /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_43f8c/fast && /usr/bin/make -f CMakeFiles/cmTC_43f8c.dir/build.make CMakeFiles/cmTC_43f8c.dir/build
+make[1]: Entering directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_43f8c.dir/src.cxx.o
+/usr/bin/c++    -O0 -g  -std=c++11  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -Wstrict-aliasing -DHAVE_CXX_FLAG_WTHREAD_SAFETY  -Wthread-safety   -Wthread-safety -o CMakeFiles/cmTC_43f8c.dir/src.cxx.o -c /home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wthread-safety'
+c++: error: unrecognized command-line option '-Wthread-safety'
+make[1]: *** [CMakeFiles/cmTC_43f8c.dir/build.make:66: CMakeFiles/cmTC_43f8c.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/sickguy/Documents/Projects/SickPool/server/debug/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_43f8c/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }

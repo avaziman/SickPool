@@ -1,0 +1,81 @@
+#include <chrono>
+#include <iostream>
+
+#include "../crypto/utils.hpp"
+#include "../crypto/verushash/verus_hash.h"
+#include "job.hpp"
+#include "share.hpp"
+#include "share_result.hpp"
+#include "stratum_client.hpp"
+
+using namespace std::chrono;
+
+class ShareProcessor
+{
+   public:
+    static ShareResult Process(std::time_t curTime, StratumClient& cli,
+                               Job& job, const Share& share)
+    {
+        ShareResult result;
+        unsigned char* headerData;
+        // uint256 takes vector as param
+        std::vector<unsigned char> hashBytes(32);
+
+        // veirfy params before even hashing
+        // convert share time to uint32 (fast)
+        uint32_t shareTime = HexToUint(share.time.data(), share.time.size());
+        shareTime = bswap_32(shareTime); // swap to little endian
+
+        uint32_t minTime = job.GetTime();
+        uint32_t maxTime = curTime / 1000;
+
+        if (shareTime < minTime || shareTime > maxTime)
+        {
+            result.Code = ShareCode::UNKNOWN;
+            result.Message = "Invalid nTime";
+            return result;
+        }
+        // TODO: verify solution
+
+        headerData = job.GetHeaderData(share.time, cli.GetExtraNonce(),
+                                       share.nonce2, share.solution);
+
+#if POOL_COIN == COIN_VRSCTEST
+        // takes about 6-8 microseconds vs 8-12 on snomp
+        HashWrapper::VerushashV2b2(hashBytes.data(), headerData,
+                                   BLOCK_HEADER_SIZE, cli.GetHasher());
+#endif
+        uint256 hash(hashBytes);
+        // Logger::Log(Debug, Stratum, "block hash      : %s ", hash.GetHex().c_str());
+
+        // take from the end as first will have zeros
+        // convert to uint32, (this will lose data)
+        uint32_t shareEnd = hash.GetCheapHash() & 0xFFFFFFFF;
+        if (!cli.SetLastShare(shareEnd, curTime))
+        {
+            result.Code = ShareCode::DUPLICATE_SHARE;
+            result.Message = "Duplicate share";
+            return result;
+        }
+
+        result.Diff = BitsToDiff(UintToArith256(hash).GetCompact(false));
+
+        if (result.Diff >= job.GetTargetDiff())
+        {
+            result.Code = ShareCode::VALID_SHARE;
+            return result;
+        }
+        else if (result.Diff / cli.GetDifficulty() < 0.95)  // allow 5% below
+        {
+            result.Code = ShareCode::LOW_DIFFICULTY_SHARE;
+            result.Message = "Low difficulty share";
+            return result;
+        }
+
+        result.Code = ShareCode::VALID_SHARE;
+        return result;
+    }
+
+//    private:
+    // std::vector<Job*> jobs;
+};

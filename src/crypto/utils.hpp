@@ -11,10 +11,10 @@
 #include "verushash/arith_uint256.h"
 #include "verushash/endian.h"
 #include "verushash/uint256.h"
+#include "../config.hpp"
 
-#if POOL_COIN == COIN_VRSCTEST
-#define DIFF1_BITS 0x200f0f0f
-#endif
+#define DIFF_US(end, start) duration_cast<microseconds>(end - start).count()
+#define TIME_NOW() std::chrono::steady_clock::now()
 
 // bool IsAddressValid(std::string addr){
 //     std::vector<unsigned char> bytes;
@@ -186,6 +186,13 @@ inline int intPow(int x, unsigned int p)
         return tmp * tmp;
     else
         return x * tmp * tmp;
+}
+
+inline double difficulty(const unsigned bits)
+{
+    const unsigned exponent_diff = 8 * (0x20 - ((bits >> 24) & 0xFF));
+    const double significand = bits & 0xFFFFFF;
+    return std::ldexp(0x0f0f0f / significand, exponent_diff);
 }
 
 static double BitsToDiff(int64_t nBits)

@@ -21,22 +21,20 @@
 class RedisManager
 {
    public:
-    RedisManager(std::string coinSymbol, std::string host)
-        : coin_symbol(coinSymbol)
+    RedisManager(std::string_view host)
     {
         rc = redisConnect("127.0.0.1", 6379);
 
         if (rc->err)
         {
-            std::cerr << "Failed to connect to redis: " << rc->errstr
-                      << std::endl;
-            exit(1);
+            Logger::Log(LogType::Critical, LogField::Redis, "Failed to connect to redis: %s", rc->errstr);
+            exit(EXIT_FAILURE);
         }
         // increase performance by not freeing buffer
         // rc->reader->maxbuf = 0;
     }
 
-    void AddWorker(std::string_view worker)
+    bool AddWorker(std::string_view worker)
     {
         redisReply *reply;
 
@@ -53,6 +51,24 @@ class RedisManager
 
         std::string_view workerAddr = worker.substr(0, worker.find('.'));
 
+        redisAppendCommand(
+            rc,
+            "TS.CREATE " COIN_SYMBOL
+            ":hashrate:%b"
+            " RETENTION " xstr(DB_RETENTION)  // time to live
+            " ENCODING COMPRESSED"            // very data efficient
+            " LABELS coin " COIN_SYMBOL " type hashrate server IL address %b worker %b",
+            worker.data(), worker.size(), workerAddr.data(), workerAddr.size(), worker.data(), worker.size());
+
+        redisAppendCommand(rc,
+                           "TS.CREATERULE " COIN_SYMBOL
+                           ":shares:%b "  // source key
+                           COIN_SYMBOL
+                           ":hashrate:%b"  // dest key
+                           " AGGREGATION SUM " xstr(HASHRATE_PERIOD),
+                           worker.data(), worker.size(), worker.data(),
+                           worker.size(), worker.data(), worker.size());
+
         redisAppendCommand(rc,
                            "TS.CREATE " COIN_SYMBOL
                            ":balance:%b"
@@ -63,12 +79,34 @@ class RedisManager
                            workerAddr.data(), workerAddr.size(),
                            workerAddr.data(), workerAddr.size());
 
-        // reply for first TS.CREATE
+        // reply for shares TS.CREATE
         if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
         {
             Logger::Log(LogType::Error, LogField::Redis,
-                        "Failed to add worker (share) timeseries: %s",
+                        "Failed to add worker (shares) timeseries: %s",
                         rc->errstr);
+            return false;
+        }
+        freeReplyObject(reply);
+
+        // reply for hashrate TS.CREATE
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to add worker (hashrate create) timeseries: %s",
+                        rc->errstr);
+            return false;
+        }
+        freeReplyObject(reply);
+
+        // reply for TS.CREATERULE
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        {
+            Logger::Log(
+                LogType::Error, LogField::Redis,
+                "Failed to add worker (hashrate createrule) timeseries: %s",
+                rc->errstr);
+            return false;
         }
         freeReplyObject(reply);
 
@@ -78,10 +116,13 @@ class RedisManager
             Logger::Log(LogType::Error, LogField::Redis,
                         "Failed to add worker (balance) timeseries: %s",
                         rc->errstr);
+            return false;
         }
         freeReplyObject(reply);
+
+        return true;
     }
-    void AddShare(std::string_view worker, std::time_t time, double diff)
+    bool AddShare(std::string_view worker, std::time_t time, double diff)
     {
         redisReply *reply;
         redisAppendCommand(rc, "TS.ADD " COIN_SYMBOL ":shares:%b %lu %f",
@@ -100,18 +141,21 @@ class RedisManager
         if (redisGetReply(rc, (void **)&reply) != REDIS_OK)  // reply for TS.ADD
         {
             std::cerr << "Redis: Failed to append share (stats):" << std::endl;
+            return false;
         }
         freeReplyObject(reply);
 
         auto end = std::chrono::steady_clock::now();
-        if (diff <= 0) return;
+        if (diff <= 0) return true;
 
         // reply for HINCRBYFLOAT
         if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
         {
             std::cerr << "Redis: Failed to append share (round!):" << std::endl;
+            return false;
         }
         freeReplyObject(reply);
+        return true;
     }
 
     void CloseRound(uint32_t reward, uint32_t height)

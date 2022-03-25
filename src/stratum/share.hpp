@@ -26,6 +26,7 @@ enum class ShareCode
 struct ShareResult{
     ShareCode Code;
     const char* Message;
+    double Diff;
 };
 
 #endif

@@ -10,7 +10,7 @@
 class StratumClient
 {
    public:
-    StratumClient(int sock, std::time_t time, double diff)
+    StratumClient(const int sock, const std::time_t time, const double diff)
         : sockfd(sock),
           connect_time(time),
           last_adjusted(time),
@@ -20,9 +20,6 @@ class StratumClient
     {
 #if POOL_COIN == COIN_VRSCTEST
         this->verusHasher = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
-        unsigned char buf1[32] = {0};
-        unsigned char buf2[32] = {0};
-        HashWrapper::VerushashV2b2(buf1, buf2, 32, this->verusHasher);
 #endif
 
         extra_nonce = 10;
@@ -36,9 +33,9 @@ class StratumClient
     double GetDifficulty() { return current_diff; }
     void SetDifficulty(double diff, std::time_t curTime)
     {
-        last_diff = current_diff;
-        current_diff = diff;
-        last_adjusted = curTime;
+        // last_diff = current_diff;
+        // current_diff = diff;
+        // last_adjusted = curTime;
     }
 
     const char* GetExtraNonce() { return extra_nonce_str; }
@@ -51,6 +48,7 @@ class StratumClient
         last_share_time = time;
         share_count++;
 
+        // checks for existance in O(log N), fast duplicate check
         bool inserted = share_set.insert(shareEnd).second;
         return inserted;
     }
@@ -60,8 +58,8 @@ class StratumClient
 #endif
    private:
     int sockfd;
+    const std::time_t connect_time;
     uint32_t extra_nonce;
-    std::time_t connect_time;
     std::time_t last_adjusted;
     std::time_t last_share_time;
     uint32_t share_count = 0;
@@ -75,8 +73,8 @@ class StratumClient
     // absolutely no need to save the entire block header like snomp :)
     std::set<uint32_t> share_set;
 
-    // the keys used in the hash are thread-specific,
-    // so we need to store it in client so we only need to generate keys once
+    // the hasher is thread-specific
+    // so we need to store it in client so we only need to init once
 #if POOL_COIN == COIN_VRSCTEST
     CVerusHashV2* verusHasher;
 #endif

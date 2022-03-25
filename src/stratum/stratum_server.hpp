@@ -1,9 +1,8 @@
 #ifndef STRATUM_SERVER_HPP_
 #define STRATUM_SERVER_HPP_
-#include <rapidjson/document.h>
+#include <simdjson.h>
 #include <sw/redis++/redis++.h>
 #include <sys/socket.h>
-#include <simdjson.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -13,7 +12,6 @@
 #include <thread>
 #include <vector>
 
-#include "./difficulty_manager.hpp"
 #include "../coin_config.hpp"
 #include "../crypto/block.hpp"
 #include "../crypto/block_header.hpp"
@@ -24,18 +22,19 @@
 #include "../crypto/verus_transaction.hpp"
 #include "../crypto/verushash/verus_hash.h"
 #include "../daemon/daemon_rpc.hpp"
+#include "../logger.hpp"
 #include "../sock_addr.hpp"
+#include "./difficulty_manager.hpp"
 #include "byteswap.h"
 #include "job.hpp"
 #include "redis_manager.hpp"
 #include "share.hpp"
-#include "share_result.hpp"
 #include "share_processor.hpp"
+#include "share_result.hpp"
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
-#include "../logger.hpp"
 
-#define REQ_BUFF_SIZE (1024 * 32)
+#define REQ_BUFF_SIZE 4000//(1024 * 32)
 #define SOCK_TIMEOUT 5;
 
 using namespace sw::redis;
@@ -79,7 +78,8 @@ class StratumServer
     void HandleSubmit(StratumClient* cli, int id, ondemand::array& params);
 
     void HandleShare(StratumClient* cli, int id, const Share& share);
-    void RejectShare(StratumClient* cli, int id, ShareResult error);
+    void RejectShare(StratumClient* cli, int id, int error, const char* msg);
+    void AcceptShare(StratumClient* cli, int id);
     bool SubmitBlock(const char* blockHex, int blockHexLen);
 
     void UpdateDifficulty(StratumClient* cli);

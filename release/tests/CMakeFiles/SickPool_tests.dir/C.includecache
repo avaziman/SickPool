@@ -1,0 +1,32 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/sickguy/Documents/Projects/SickPool/server/src/crypto/verushash/haraka.c
+stdio.h
+-
+haraka.h
+/home/sickguy/Documents/Projects/SickPool/server/src/crypto/verushash/haraka.h
+
+/home/sickguy/Documents/Projects/SickPool/server/src/crypto/verushash/haraka.h
+immintrin.h
+/home/sickguy/Documents/Projects/SickPool/server/src/crypto/verushash/immintrin.h
+
+/home/sickguy/Documents/Projects/SickPool/server/src/crypto/verushash/haraka_portable.c
+stdio.h
+-
+string.h
+-
+stdlib.h
+-
+haraka_portable.h
+/home/sickguy/Documents/Projects/SickPool/server/src/crypto/verushash/haraka_portable.h
+
+/home/sickguy/Documents/Projects/SickPool/server/src/crypto/verushash/haraka_portable.h
+immintrin.h
+/home/sickguy/Documents/Projects/SickPool/server/src/crypto/verushash/immintrin.h
+

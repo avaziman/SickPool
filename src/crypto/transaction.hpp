@@ -57,10 +57,11 @@ class Transaction
     std::vector<Output> vout;
     uint32_t lock_time;
 
-    void GetP2PKHScript(const char* toAddress, std::vector<unsigned char> &res)
+    void GetP2PKHScript(std::string_view toAddress, std::vector<unsigned char> &res)
     {
         std::vector<unsigned char> vchRet;
-        bool decRes = DecodeBase58(toAddress, vchRet);
+        // TODO: implement base58 decode for string_view
+        bool decRes = DecodeBase58(std::string(toAddress), vchRet);
 
         res.resize(P2PKH_SCRIPT_SIZE);
         res[0] = OP_DUP;
@@ -106,7 +107,7 @@ class Transaction
     }
 
     // standard p2pkh transaction
-    void AddStdOutput(const char* toAddress, int64_t value)
+    void AddStdOutput(std::string_view toAddress, int64_t value)
     {
         Output output;
         output.value = value;

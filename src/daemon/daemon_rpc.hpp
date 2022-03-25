@@ -1,10 +1,6 @@
 #ifndef DAEMON_API_HPP_
 #define DAEMON_API_HPP_
 
-#include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
-
 #include <sstream>
 #include <string>
 #include <vector>
@@ -22,8 +18,6 @@
 #include <simdjson.h>
 
 #define HTTP_HEADER_SIZE (1024 * 4)
-
-using namespace rapidjson;
 
 class DaemonRpc
 {

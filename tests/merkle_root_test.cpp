@@ -35,6 +35,7 @@ TEST(MerkleRootTest, SHA256MerkleRoot1Tx)
 
     ASSERT_EQ(std::memcmp(resultHex, resVeresed, 64), 0);
 }
+
 TEST(MerkleRootTest, SHA256MerkleRoot2Tx)
 {
     HashWrapper::InitSHA256();
@@ -62,15 +63,14 @@ TEST(MerkleRootTest, SHA256MerkleRoot2Tx)
         "21022ec0fa3cb4d36a646138e02e91570b242469f7ea325bb07205048d40183745a400"
         "000000a4420f000000000000000000000000";
 
-
     unsigned char txBytes1[sizeof(tx1) / 2];
     Unhexlify(txBytes1, tx1, sizeof(tx1));
 
     unsigned char txBytes2[sizeof(tx2) / 2];
     Unhexlify(txBytes2, tx2, sizeof(tx2));
 
-    std::vector<unsigned char> txVec1(txBytes1, txBytes1 + sizeof(tx1) / 2);
-    std::vector<unsigned char> txVec2(txBytes2, txBytes2 + sizeof(tx2) / 2);
+    std::vector<unsigned char> txVec1(txBytes1, txBytes1 + sizeof(txBytes1));
+    std::vector<unsigned char> txVec2(txBytes2, txBytes2 + sizeof(txBytes2));
     std::vector<std::vector<unsigned char>> txs = {txVec1, txVec2};
 
     unsigned char result[32];
@@ -78,7 +78,7 @@ TEST(MerkleRootTest, SHA256MerkleRoot2Tx)
 
     char resultHex[64];
     Hexlify(resultHex, result, 32);
-    
+
     char resVeresed[] =
         "b734860607317db2da7c040d6b94c92a4f0fdbad973a87134b9c4d64249834e8";
 
