@@ -120,14 +120,9 @@ inline void Unhexlify(unsigned char* dest, const char* src, int size)
     }
 }
 
-inline std::string ToHex(uint32_t num)
-{
-    std::stringstream ss;
-    ss << std::hex << std::setfill('0') << std::setw(8) << htobe32(num);
-    return ss.str();
-}
-
-inline void ToHex(char* dest, uint32_t num) { sprintf(dest, "%08x", num); }
+inline void ToHex(char* dest, uint32_t num) { 
+    // don't put nullchar max 8 chars
+    snprintf(dest, sizeof(num) * 2, "%08x", num); }
 
 inline uint32_t FromHex(const char* str)
 {
@@ -136,6 +131,38 @@ inline uint32_t FromHex(const char* str)
     ss << std::hex << str;
     ss >> val;
     return val;
+}
+
+
+// from script.h
+inline std::vector<unsigned char> GetNumScript(const int64_t& value){
+    std::vector<unsigned char> result;
+    const bool neg = value < 0;
+    uint64_t absvalue = neg ? -value : value;
+
+    while (absvalue)
+    {
+        result.push_back(absvalue & 0xff);
+        absvalue >>= 8;
+    }
+
+    //    - If the most significant byte is >= 0x80 and the value is positive,
+    //    push a new zero-byte to make the significant byte < 0x80 again.
+
+    //    - If the most significant byte is >= 0x80 and the value is negative,
+    //    push a new 0x80 byte that will be popped off when converting to an
+    //    integral.
+
+    //    - If the most significant byte is < 0x80 and the value is negative,
+    //    add 0x80 to it, since it will be subtracted and interpreted as a
+    //    negative when converting to an integral.
+
+    if (result.back() & 0x80)
+        result.push_back(neg ? 0x80 : 0);
+    else if (neg)
+        result.back() |= 0x80;
+
+    return result;
 }
 
 // https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
@@ -156,6 +183,13 @@ inline char VarInt(uint64_t& len)
 
     // len = ((uint64_t)0xff << 64) | len;
     return 9;
+}
+
+inline char GetByteAmount(uint32_t num){
+    if (num <= 0xff) return 1;
+    else if (num <= 0xffff) return 2;
+    else if (num <= 0xffffff) return 3;
+    else if (num <= 0xffffffff) return 4;
 }
 
 // inline std::string VarInt(uint64_t len)

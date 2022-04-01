@@ -3,8 +3,9 @@
 
 CVerusHashV2 HashWrapper::cverusHashV2(SOLUTION_VERUSHHASH_V2_2);
 CSHA256 HashWrapper::csha256;
-void HashWrapper::InitVerusHash() { 
+void HashWrapper::InitVerusHash() {
     CVerusHashV2::init();
+    // CVerusHash::init();
     // cverusHashV2 = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 }
 
@@ -23,7 +24,7 @@ void HashWrapper::VerushashV2b2(unsigned char* dest, unsigned char* in,
     hasher->Finalize2b(dest);
     auto end = std::chrono::steady_clock::now();
     hasher->Reset();
-    // CVerusHashV2::Hash(res, in, size);
+    // CVerusHash::Hash(dest, in, size);
 }
 void HashWrapper::SHA256d(unsigned char* dest, unsigned char* in, int size)
 {

@@ -11,6 +11,7 @@
 #include "daemon/daemon_rpc.hpp"
 #include "sock_addr.hpp"
 #include "stratum/stratum_server.hpp"
+#include "logger.hpp"
 
 #define CONFIG_PATH                                                   \
     "//home/sickguy/Documents/Projects/SickPool/server/config/coins/" \
@@ -18,8 +19,7 @@
 // #define CONFIG_PATH_VRSC \
 //     "C:\\projects\\pool\\pool-server\\config\\coins\\VRSC.json"
 
-#include "logger.hpp"
-void ParseCoinConfig(CoinConfig* cnfg, const char* path);
+void ParseCoinConfig(padded_string& json, CoinConfig& cnfg);
 
 // int valid(const char* s)
 // {
@@ -51,11 +51,14 @@ int main(int argc, char** argv)
 
     try
     {
-        ParseCoinConfig(&coinConfig, CONFIG_PATH);
+        padded_string json = padded_string::load(CONFIG_PATH);
+        ParseCoinConfig(json, coinConfig);
 
         Logger::Log(LogType::Info, LogField::Config, "Coin config loaded:");
         Logger::Log(LogType::Info, LogField::Config, "Pool address: %s",
-                    coinConfig.pool_addr);
+                    coinConfig.pool_addr.c_str());
+        Logger::Log(LogType::Info, LogField::Config, "Redis host: %s",
+                    coinConfig.redis_host.c_str());
         Logger::Log(LogType::Info, LogField::Config, "PoW fee: %f%%",
                     coinConfig.pow_fee);
         Logger::Log(LogType::Info, LogField::Config, "PoS fee: %f%%",
@@ -72,11 +75,14 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
 }
 
-void AssignJson(const char* name, std::string_view &obj, ondemand::document& doc)
+void AssignJson(const char* name, std::string& obj,
+                ondemand::document& doc)
 {
     try
     {
-        obj = doc[name].get_string();
+        std::string_view sv = doc[name].get_string();
+
+        obj = std::string(sv);
     }
     catch (...)
     {
@@ -111,23 +117,21 @@ void AssignJson(const char* name, double& obj, ondemand::document& doc)
     }
 }
 
-void ParseCoinConfig(CoinConfig* cnfg, const char* path)
+void ParseCoinConfig(padded_string& json, CoinConfig& cnfg)
 {
-
-    padded_string json = padded_string::load(path);
     ondemand::parser confParser;
     ondemand::document configDoc = confParser.iterate(json);
 
     // AssignJson("name", cnfg->name, configDoc);
     // AssignJson("symbol", cnfg->symbol, configDoc);
     // AssignJson("algo", cnfg->algo, configDoc);
-    AssignJson("stratum_port", cnfg->stratum_port, configDoc);
-    AssignJson("pow_fee", cnfg->pow_fee, configDoc);
-    AssignJson("pos_fee", cnfg->pos_fee, configDoc);
-    AssignJson("default_diff", cnfg->default_diff, configDoc);
-    AssignJson("target_shares_rate", cnfg->target_shares_rate, configDoc);
-    AssignJson("pool_addr", cnfg->pool_addr, configDoc);
-    AssignJson("redis_host", cnfg->redis_host, configDoc);
+    AssignJson("stratum_port", cnfg.stratum_port, configDoc);
+    AssignJson("pow_fee", cnfg.pow_fee, configDoc);
+    AssignJson("pos_fee", cnfg.pos_fee, configDoc);
+    AssignJson("default_diff", cnfg.default_diff, configDoc);
+    AssignJson("target_shares_rate", cnfg.target_shares_rate, configDoc);
+    AssignJson("pool_addr", cnfg.pool_addr, configDoc);
+    AssignJson("redis_host", cnfg.redis_host, configDoc);
 
     try
     {
@@ -137,9 +141,9 @@ void ParseCoinConfig(CoinConfig* cnfg, const char* path)
             RpcConfig rpcConf;
             std::string_view host_sv = rpc["host"].get_string();
             std::string_view auth_sv = rpc["auth"].get_string();
-            rpcConf.host = std::string(host_sv).c_str();
-            rpcConf.auth = std::string(auth_sv).c_str();
-            cnfg->rpcs.push_back(rpcConf);
+            rpcConf.host = std::string(host_sv);
+            rpcConf.auth = std::string(auth_sv);
+            cnfg.rpcs.push_back(rpcConf);
         }
     }
     catch (...)

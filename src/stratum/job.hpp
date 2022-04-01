@@ -11,7 +11,7 @@
 
 #if POOL_COIN == COIN_VRSCTEST
 #define BLOCK_HEADER_SIZE (140 + 3 + 1344)
-#define MAX_NOTIFY_MESSAGE_SIZE 512
+#define MAX_NOTIFY_MESSAGE_SIZE (1024 * 4)
 // with true 444
 #endif
 
@@ -25,7 +25,6 @@ ver, char* prevBlock, char* time, char* bits)*/
         : jobId(jobId), time(time)  //, time(std::time(0))
     {
         ToHex(jobIdStr, jobId);
-        jobIdStr[8] = 0;
 
         uint64_t varIntVal = txs.size();
         int varIntLen = VarInt(varIntVal);
@@ -83,7 +82,7 @@ ver, char* prevBlock, char* time, char* bits)*/
     unsigned char headerData[BLOCK_HEADER_SIZE];
     std::vector<char> txDataHex;
     uint32_t jobId;
-    char jobIdStr[9];
+    char jobIdStr[8];
     uint16_t notifyBuffSize;
     char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
     double targetDiff;

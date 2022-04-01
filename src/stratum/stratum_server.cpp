@@ -7,13 +7,10 @@ StratumServer::StratumServer(CoinConfig cnfg)
       redis_manager(RedisManager(cnfg.redis_host))
 
 {
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < cnfg.rpcs.size(); i++)
     {
-        if (cnfg.rpcs[i].host.size())
-        {
-            this->rpcs.push_back(
-                new DaemonRpc(std::string(cnfg.rpcs[i].host), std::string(cnfg.rpcs[i].auth)));
-        }
+        this->rpcs.push_back(new DaemonRpc(std::string(cnfg.rpcs[i].host),
+                                           std::string(cnfg.rpcs[i].auth)));
     }
 
     job_count = redis_manager.GetJobCount();
@@ -103,33 +100,35 @@ void StratumServer::HandleSocket(int conn_fd)
     this->clients.push_back(client);
     clients_mutex.unlock();
 
-    // simdjson requires some extra bytes
-    char buffer[REQ_BUFF_SIZE + SIMDJSON_PADDING];
+    // simdjson requires some extra bytes, so don't write to the last bytes
+    char buffer[REQ_BUFF_SIZE];
     char *reqEnd = nullptr, *reqStart = nullptr;
-    int total = 0, res = 0, reqLen = 0, nextReqLen = 0;
+    int total = 0, reqLen = 0, nextReqLen = 0, recvRes = 0;
     bool isTooBig = false;
 
     while (true)
     {
         do
         {
-            res = recv(conn_fd, buffer + total, REQ_BUFF_SIZE - total - 1, 0);
+            recvRes =
+                recv(conn_fd, buffer + total, REQ_BUFF_SIZE_REAL - total, 0);
 
-            if (res <= 0) break;
-            total += res;
-            buffer[total] = '\0';  // replaces \n
+            if (recvRes <= 0) break;
+            total += recvRes;
+            buffer[total] = '\0';
             reqEnd = std::strchr(buffer, '\n');
         } while (reqEnd == NULL && total < REQ_BUFF_SIZE - 1);
 
-        if (res <= 0)
+        // exit loop, miner disconnected
+        if (recvRes <= 0)
         {
-            // miner disconnected
-            std::cout << "client disconnected. res: " << res
-                      << ", errno: " << errno << std::endl;
             close(client->GetSock());
             clients_mutex.lock();
             clients.erase(std::find(clients.begin(), clients.end(), client));
             clients_mutex.unlock();
+            Logger::Log(Info, Stratum,
+                        "client disconnected. res: %d, errno: %d", recvRes,
+                        errno);
             break;
         }
         // std::cout << "buff: " << buffer << std::endl;
@@ -147,7 +146,7 @@ void StratumServer::HandleSocket(int conn_fd)
             continue;
         }
 
-        // there can be multiple messages
+        // there can be multiple messages in 1 recv
         while (reqEnd != NULL)
         {
             reqStart = strchr(buffer, '{');
@@ -227,14 +226,16 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     while (resCode != 200)
     {
         resCode = SendRpcReq(resBody, 1, "getblocktemplate", nullptr, 0);
-        std::cerr << "Block update socket error: Failed to get blocktemplate, "
-                     "http code: "
-                  << resCode << ", retrying..." << std::endl;
+        Logger::Log(LogType::Critical, LogField::Stratum,
+                    "Block update socket error: Failed to get blocktemplate, "
+                    "http code: %d, retrying...",
+                    resCode);
 
-        std::this_thread::sleep_for(5ms);
+        std::this_thread::sleep_for(100ms);
     }
     uint32_t curtime;
     Job *job;
+    std::string_view prevBlockHash;
 
     try
     {
@@ -248,10 +249,12 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 
         // this must be in the order they appear in the result for simdjson
         int version = res["version"].get_int64();
-        std::string_view prevBlockHash = res["previousblockhash"].get_string();
+        prevBlockHash = res["previousblockhash"].get_string();
 #if POOL_COIN == COIN_VRSCTEST
         std::string_view finalSRoot = res["finalsaplingroothash"].get_string();
         std::string_view solution = res["solution"].get_string();
+        // char solution[SOLUTION_SIZE] = {0};
+        // solution[1] = 7;
 #endif
         ondemand::array txs = res["transactions"].get_array();
         int value = res["coinbasetxn"]["coinbasevalue"].get_int64();
@@ -267,27 +270,23 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 #if POOL_COIN == COIN_VRSCTEST
 
         // reverse all fields to header encoding
-        char prevBlockRev[64 + 1];
-        char finalSRootRev[64 + 1];
-        char bitsRev[8 + 1];
-        char sol144[144 + 1];
+        char prevBlockRev[64];
+        char finalSRootRev[64];
+        char bitsRev[8];
+        // char sol[SOLUTION_SIZE * 2];
 
         ReverseHex(prevBlockRev, prevBlockHash.data(), 64);
         ReverseHex(finalSRootRev, finalSRoot.data(), 64);
         ReverseHex(bitsRev, bits.data(), 8);
-        memcpy(sol144, solution.data(), 144);
-
-        prevBlockRev[64] = '\0';
-        finalSRootRev[64] = '\0';
-        bitsRev[8] = '\0';
-        sol144[144] = '\0';
+        // memcpy(sol144, solution.data(), SOLUTION_SIZE * 2);
+        // memcpy(sol144, solution, 144);
 
         uint32_t versionRev = bswap_32(version);
         uint32_t curtimeRev = bswap_32(curtime);
 
-        job =
-            new VerusJob(this->job_count, transactions, true, version,
-                         prevBlockRev, curtime, bitsRev, finalSRootRev, sol144);
+        job = new VerusJob(this->job_count, transactions, true, version,
+                           prevBlockRev, curtime, bitsRev, finalSRootRev,
+                           solution.data());
 #endif
 
         std::cout << "Generated job: " << job->GetId() << " in " << std::dec
@@ -328,6 +327,39 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         unsigned char test[32];
         HashWrapper::VerushashV2b2(test, job->GetHeaderData(),
                                    BLOCK_HEADER_SIZE, (*it)->GetHasher());
+    }
+
+    if (block_submission.has_value())
+    {
+        unsigned char prevBlockBin[32];
+        Unhexlify(prevBlockBin, prevBlockHash.data(), prevBlockHash.size());
+
+        bool blockAdded = true;
+        
+        // compare reversed
+        for(int i = 0; i < 32; i++)
+        {
+            if(prevBlockBin[32 - i - 1] != block_submission->HashBytes[i])
+            {
+                blockAdded = false;
+                break;
+            }
+        }
+
+        if (blockAdded)
+        {
+            Logger::Log(LogType::Info, LogField::Stratum,
+                        "Block added to chain! found by: %s, hash: %.*s", block_submission.value().worker.c_str(), prevBlockHash.size(),
+                        prevBlockHash.data());
+        }
+        else
+        {
+            Logger::Log(LogType::Critical, LogField::Stratum,
+                        "Block NOT added to chain %.*s!", prevBlockHash.size(),
+                        prevBlockHash.data());
+        }
+
+        block_submission.reset();
     }
 }
 
@@ -527,11 +559,16 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             // std::cout << (char *)blockData << std::endl;
 
             bool submissionGood = SubmitBlock(blockData, blockSize + 3);
+            Logger::Log(LogType::Debug, LogField::Stratum, "Block hex: %s",
+                        blockData);
             delete[] blockData;
+            BlockSubmission submission;
+            submission.HashBytes = shareRes.HashBytes;
+            submission.worker = std::string(share.worker);
+            block_submission = submission;
             AcceptShare(cli, id);
         }
-            AcceptShare(cli, id);
-            break;
+        break;
         case ShareCode::VALID_SHARE:
             AcceptShare(cli, id);
             break;
@@ -641,8 +678,8 @@ void StratumServer::RejectShare(StratumClient *cli, int id, int err,
 void StratumServer::AcceptShare(StratumClient *cli, int id)
 {
     char buff[512];
-    int len = snprintf(buff, sizeof(buff), "{\"id\":%d,\"result\":true,\"error\":null}\n",
-             id);
+    int len = snprintf(buff, sizeof(buff),
+                       "{\"id\":%d,\"result\":true,\"error\":null}\n", id);
     send(cli->GetSock(), buff, len, 0);
 }
 
@@ -651,37 +688,45 @@ bool StratumServer::SubmitBlock(const char *blockHex, int blockHexLen)
     std::vector<char> resultBody;
     int resCode =
         SendRpcReq(resultBody, 1, "submitblock", blockHex, blockHexLen);
-    resultBody.resize(resultBody.size() + SIMDJSON_PADDING);
 
     if (resCode != 200)
     {
-        std::cerr << "Failed to send block submission, http code: " << resCode
-                  << std::endl;
+        Logger::Log(LogType::Critical, LogField::Stratum,
+                    "Failed to send block submission, http code: %d", resCode);
         return false;
     }
 
     try
     {
-        // ondemand::document doc = parser.iterate(
-        //     resultBody.data(), resultBody.size() - SIMDJSON_PADDING,
-        //     resultBody.size());
+        ondemand::document doc = httpParser.iterate(
+            resultBody.data(), resultBody.size() - SIMDJSON_PADDING,
+            resultBody.size());
 
-        // ondemand::object res = doc.get_object();
-        // ondemand::value errorField = res.find_field("error");
+        ondemand::object res = doc.get_object();
+        ondemand::value resultField = res["result"];
+        ondemand::value errorField = res["error"];
 
-        // if (!errorField.is_null())
-        // {
-        //     std::cerr << "Block submission rejected, http code: " << resCode
-        //               << " rpc error: " << errorField.get_raw_json_string()
-        //               << std::endl;
-        //     return false;
-        // }
+        if (!errorField.is_null())
+        {
+            Logger::Log(LogType::Critical, LogField::Stratum,
+                        "Block submission rejected, rpc error: %s",
+                        errorField.get_raw_json_string());
+            return false;
+        }
+
+        if (!resultField.is_null())
+        {
+            std::string_view result = resultField.get_string();
+            Logger::Log(LogType::Critical, LogField::Stratum,
+                        "Block submission rejected, rpc result: %.*s",
+                        result.size(), result.data());
+            return false;
+        }
     }
     catch (simdjson::simdjson_error &err)
     {
-        std::cerr << "Submit block response parse error: " << err.what()
-                  << std::endl;
-        // std::cerr << "response: " <<
+        Logger::Log(LogType::Critical, LogField::Stratum,
+                    "Submit block response parse error: %s", err.what());
         return false;
     }
 
@@ -711,7 +756,7 @@ void StratumServer::AdjustDifficulty(StratumClient *cli, std::time_t curTime)
 {
     std::time_t period = curTime - cli->GetLastAdjusted();
 
-    if (period < 15) return;
+    if (period < MIN_PERIOD_SECONDS) return;
 
     double minuteRate = ((double)60 / period) * (double)cli->GetShareCount();
 
@@ -726,6 +771,8 @@ void StratumServer::AdjustDifficulty(StratumClient *cli, std::time_t curTime)
         // similar to bitcoin difficulty calculation
         double newDiff =
             (minuteRate / target_shares_rate) * cli->GetDifficulty();
+        if (newDiff == 0) newDiff = cli->GetDifficulty() / 5;
+
         cli->SetDifficulty(newDiff, curTime);
         this->UpdateDifficulty(cli);
         std::cout << "new diff: " << newDiff << std::endl;
@@ -742,11 +789,20 @@ std::vector<unsigned char> StratumServer::GetCoinbaseTx(int64_t value,
                                                         uint32_t curtime,
                                                         uint32_t height)
 {
-    unsigned char prevTxIn[32] = {0};
-    std::vector<unsigned char> signature(1 + 4);
-    signature[0] = 0x03;  // var int
+    // maximum scriptsize = 100
+    unsigned char prevTxIn[32] = {0};  // null last input
+    const char extraData[] = "SickPool is in the building.";
+    const int extraDataLen = sizeof(extraData) - 1;
 
-    memcpy(signature.data() + 1, &height, 4);
+    std::vector<unsigned char> heightScript = GetNumScript(height);
+    const unsigned char heightScriptLen = heightScript.size();
+
+    std::vector<unsigned char> signature(heightScript.size() + extraDataLen);
+
+    memcpy(signature.data(), &heightScriptLen, 1);
+    memcpy(signature.data() + 1, heightScript.data(), heightScript.size());
+    memcpy(signature.data() + 1 + heightScript.size(), &extraData,
+           extraDataLen);
 
     // todo: make txVersionGroup updateable without reset
     uint32_t txVersionGroup = 0x892f2085;

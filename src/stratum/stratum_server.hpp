@@ -34,8 +34,11 @@
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
 
-#define REQ_BUFF_SIZE 4000//(1024 * 32)
+#define REQ_BUFF_SIZE 4000  //(1024 * 32)
+#define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - SIMDJSON_PADDING)
 #define SOCK_TIMEOUT 5;
+#define SOLUTION_SIZE 1344
+#define MIN_PERIOD_SECONDS 20
 
 using namespace sw::redis;
 
@@ -55,6 +58,8 @@ class StratumServer
     sockaddr_in addr;
     uint32_t job_count;
     double target_shares_rate;
+
+    std::optional<BlockSubmission> block_submission;
 
     ondemand::parser reqParser;
     ondemand::parser httpParser;

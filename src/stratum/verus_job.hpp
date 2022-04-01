@@ -11,17 +11,16 @@ class VerusJob : public Job
    public:
     VerusJob(uint32_t jobId, std::vector<std::vector<unsigned char>>& txs,
              bool clean, uint32_t ver, const char* prevBlock, uint32_t time,
-             const char* bits, const char* finalSaplingRoot, const char* sol144)
+             const char* bits, const char* finalSaplingRoot, const char* solution)
         : Job(jobId, txs, time)
     {
         /* we use cstring for "readable" generation of notify message
          and because we need to reverse (copy) the string_views anyway so might
          as well add a null char
-        */
-        char merkleRootHex[65];
-        merkleRootHex[64] = '\0';
+    */
+        char merkleRootHex[64];
 
-        uint32_t bitsUint = bswap_32(FromHex(bits));
+        uint32_t bitsUint = bswap_32(HexToUint(bits, 8));
         this->targetDiff = BitsToDiff(bitsUint);
 
         Write(&ver, 4);
@@ -50,10 +49,10 @@ class VerusJob : public Job
         notifyBuffSize = snprintf(
             notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
             "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
-            "[\"%s\",\"%08x\",\"%s\",\"%s\",\"%s\",\"%08x\",\"%s\",%s,"
-            "\"%s\"]}\n",
+            "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%08x\",\"%.8s\",%s,"
+            "\"%.144s\"]}\n",
             GetId(), bswap_32(ver), prevBlock, merkleRootHex, finalSaplingRoot,
-            bswap_32(time), bits, BoolToCstring(clean), sol144);
+            bswap_32(time), bits, BoolToCstring(clean), solution);
 
         auto end = std::chrono::steady_clock::now();
 

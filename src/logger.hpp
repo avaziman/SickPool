@@ -29,7 +29,8 @@ enum LogField
 {
     Config = 0,
     Stratum = 1,
-    Redis = 2,
+    ShareProcessor = 2,
+    Redis = 3,
 };
 
 inline const char* ToString(LogField v)
@@ -42,6 +43,8 @@ inline const char* ToString(LogField v)
             return "Stratum";
         case Redis:
             return "Redis";
+        case ShareProcessor:
+            return "ShareProcessor";
         default:
             return "Unknown";
     }
