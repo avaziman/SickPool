@@ -83,16 +83,14 @@ class StratumServer
     void HandleSubmit(StratumClient* cli, int id, ondemand::array& params);
 
     void HandleShare(StratumClient* cli, int id, const Share& share);
-    void RejectShare(StratumClient* cli, int id, int error, const char* msg);
-    void AcceptShare(StratumClient* cli, int id);
+    void SendReject(StratumClient* cli, int id, int error, const char* msg);
+    void SendAccept(StratumClient* cli, int id);
     bool SubmitBlock(const char* blockHex, int blockHexLen);
 
     void UpdateDifficulty(StratumClient* cli);
     void AdjustDifficulty(StratumClient* cli, std::time_t curTime);
 
     void BroadcastJob(StratumClient* cli, Job* job);
-
-    void GetNextReq(int sockfd, int received, char* buffer);
 
     Job* GetJobById(std::string_view id);
 

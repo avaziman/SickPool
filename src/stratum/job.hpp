@@ -82,7 +82,7 @@ ver, char* prevBlock, char* time, char* bits)*/
     unsigned char headerData[BLOCK_HEADER_SIZE];
     std::vector<char> txDataHex;
     uint32_t jobId;
-    char jobIdStr[8];
+    char jobIdStr[8 + 1];
     uint16_t notifyBuffSize;
     char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
     double targetDiff;

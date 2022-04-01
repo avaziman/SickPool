@@ -121,8 +121,8 @@ inline void Unhexlify(unsigned char* dest, const char* src, int size)
 }
 
 inline void ToHex(char* dest, uint32_t num) { 
-    // don't put nullchar max 8 chars
-    snprintf(dest, sizeof(num) * 2, "%08x", num); }
+    // always puts nullchar at the end
+    snprintf(dest, sizeof(uint32_t) * 2 + 1, "%08x", num); }
 
 inline uint32_t FromHex(const char* str)
 {

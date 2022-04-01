@@ -27,14 +27,15 @@ class RedisManager
 
         if (rc->err)
         {
-            Logger::Log(LogType::Critical, LogField::Redis, "Failed to connect to redis: %s", rc->errstr);
+            Logger::Log(LogType::Critical, LogField::Redis,
+                        "Failed to connect to redis: %s", rc->errstr);
             exit(EXIT_FAILURE);
         }
         // increase performance by not freeing buffer
         // rc->reader->maxbuf = 0;
     }
 
-    bool AddWorker(std::string_view worker)
+    bool AddWorker(std::string_view address, std::string_view worker_full)
     {
         redisReply *reply;
 
@@ -47,74 +48,57 @@ class RedisManager
             " DUPLICATE_POLICY SUM"  // if two shares received at same ms
                                      // (rare), sum instead of ignoring (BLOCK)
             " LABELS coin " COIN_SYMBOL " type shares server IL worker %b",
-            worker.data(), worker.size(), worker.data(), worker.size());
+            worker_full.data(), worker_full.size(), worker_full.data(), worker_full.size());
 
-        std::string_view workerAddr = worker.substr(0, worker.find('.'));
+        redisAppendCommand(rc,
+                           "TS.CREATE " COIN_SYMBOL
+                           ":hashrate:%b"
+                           " RETENTION " xstr(DB_RETENTION)  // time to live
+                           " ENCODING COMPRESSED"  // very data efficient
+                           " LABELS coin " COIN_SYMBOL
+                           " type hashrate server IL address %b worker %b",
+                           worker_full.data(), worker_full.size(), address.data(),
+                           address.size(), worker_full.data(), worker_full.size());
 
         redisAppendCommand(
             rc,
-            "TS.CREATE " COIN_SYMBOL
-            ":hashrate:%b"
-            " RETENTION " xstr(DB_RETENTION)  // time to live
-            " ENCODING COMPRESSED"            // very data efficient
-            " LABELS coin " COIN_SYMBOL " type hashrate server IL address %b worker %b",
-            worker.data(), worker.size(), workerAddr.data(), workerAddr.size(), worker.data(), worker.size());
+            "TS.CREATERULE " COIN_SYMBOL ":shares:%b "  // source key
+            COIN_SYMBOL
+            ":hashrate:%b"  // dest key
+            " AGGREGATION SUM " xstr(HASHRATE_PERIOD),
+            worker_full.data(), worker_full.size(), worker_full.data(), worker_full.size());
 
-        redisAppendCommand(rc,
-                           "TS.CREATERULE " COIN_SYMBOL
-                           ":shares:%b "  // source key
-                           COIN_SYMBOL
-                           ":hashrate:%b"  // dest key
-                           " AGGREGATION SUM " xstr(HASHRATE_PERIOD),
-                           worker.data(), worker.size(), worker.data(),
-                           worker.size(), worker.data(), worker.size());
+        for (int i = 0; i < 3; i++)
+        {
+            if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+            {
+                Logger::Log(LogType::Error, LogField::Redis,
+                            "Failed to add worker (%d) timeseries: %s", i,
+                            rc->errstr);
+                return false;
+            }
+            freeReplyObject(reply);
+        }
 
+        return true;
+    }
+
+    bool AddAddress(std::string_view addr, std::string_view identity)
+    {
+        redisReply *reply;
         redisAppendCommand(rc,
                            "TS.CREATE " COIN_SYMBOL
                            ":balance:%b"
                            " RETENTION 0"  // never expire balance log
                            " ENCODING COMPRESSED"
                            " LABELS coin " COIN_SYMBOL
-                           " type balance server IL address %b",
-                           workerAddr.data(), workerAddr.size(),
-                           workerAddr.data(), workerAddr.size());
+                           " type balance server IL address %b identity %b",
+                           addr.data(), addr.size(), addr.data(), addr.size(), identity.data(), identity.size());
 
-        // reply for shares TS.CREATE
         if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
         {
             Logger::Log(LogType::Error, LogField::Redis,
-                        "Failed to add worker (shares) timeseries: %s",
-                        rc->errstr);
-            return false;
-        }
-        freeReplyObject(reply);
-
-        // reply for hashrate TS.CREATE
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Error, LogField::Redis,
-                        "Failed to add worker (hashrate create) timeseries: %s",
-                        rc->errstr);
-            return false;
-        }
-        freeReplyObject(reply);
-
-        // reply for TS.CREATERULE
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            Logger::Log(
-                LogType::Error, LogField::Redis,
-                "Failed to add worker (hashrate createrule) timeseries: %s",
-                rc->errstr);
-            return false;
-        }
-        freeReplyObject(reply);
-
-        // reply for second TS.CREATE
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Error, LogField::Redis,
-                        "Failed to add worker (balance) timeseries: %s",
+                        "Failed to add address (balance) timeseries: %s",
                         rc->errstr);
             return false;
         }
@@ -221,6 +205,39 @@ class RedisManager
         //     work"
         //               << std::endl;
         // }
+    }
+
+    bool DoesAddressExist(std::string_view addrOrId,
+                          std::string_view &valid_addr)
+    {
+        redisReply *reply;
+        redisAppendCommand(rc, "TS.QUERYINDEX address=%b", addrOrId.data(),
+                           addrOrId.size());
+
+        redisAppendCommand(rc, "TS.QUERYINDEX identity=%b", addrOrId.data(),
+                           addrOrId.size());
+
+        for (int i = 0; i < 2; i++)
+        {
+            if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+            {
+                Logger::Log(LogType::Error, LogField::Redis,
+                            "Failed to check if address/identity exists: %s",
+                            rc->errstr);
+                return false;
+            }
+
+            bool exists = reply->elements == 1;
+            if (exists)
+            {
+                valid_addr = reply->element[0]->str + sizeof(COIN_SYMBOL":balance:") - 1;
+                freeReplyObject(reply);
+                return true;
+            }
+            freeReplyObject(reply);
+        }
+
+        return false;
     }
 
     uint32_t GetJobCount()

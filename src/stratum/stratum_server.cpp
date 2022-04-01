@@ -335,11 +335,11 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         Unhexlify(prevBlockBin, prevBlockHash.data(), prevBlockHash.size());
 
         bool blockAdded = true;
-        
+
         // compare reversed
-        for(int i = 0; i < 32; i++)
+        for (int i = 0; i < 32; i++)
         {
-            if(prevBlockBin[32 - i - 1] != block_submission->HashBytes[i])
+            if (prevBlockBin[32 - i - 1] != block_submission->HashBytes[i])
             {
                 blockAdded = false;
                 break;
@@ -349,8 +349,9 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         if (blockAdded)
         {
             Logger::Log(LogType::Info, LogField::Stratum,
-                        "Block added to chain! found by: %s, hash: %.*s", block_submission.value().worker.c_str(), prevBlockHash.size(),
-                        prevBlockHash.data());
+                        "Block added to chain! found by: %s, hash: %.*s",
+                        block_submission.value().worker.c_str(),
+                        prevBlockHash.size(), prevBlockHash.data());
         }
         else
         {
@@ -452,52 +453,124 @@ void StratumServer::HandleSubscribe(StratumClient *cli, int id,
 void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                                     ondemand::array &params)
 {
-    char response[1024];
-    int len = 0, split = 0;
-    std::string error = "null", addr, worker;
+    int split = 0, resCode = 0;
+    std::string reqParams;
+    std::string_view given_addr, valid_addr, worker, identity = "null";
+    bool isValid = false, isIdentity = false;
+
+    std::vector<char> resultBody;
+    ondemand::document doc;
+    ondemand::object res;
 
     // worker name format: address.worker_name
-    std::string_view worker_full =
-        (*params.begin()).get_string();  // params.at(0).get_string();
-    // split = worker_full.find('.');
+    std::string_view worker_full = (*params.begin()).get_string();
+    split = worker_full.find('.');
 
-    // if (split == std::string::npos)
-    // {
-    //     error = "wrong worker name format, use: address/id@.worker";
-    // }
-    // else
-    // {
-    //     // addr = worker_full.substr(0, split);
-    //     // worker = worker_full.substr(split + 1, worker_full.size() - 1);
+    if (split == std::string_view::npos)
+    {
+        SendReject(cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
+                   "invalid worker name format, use: address/id@.worker");
+        return;
+    }
+    else if (worker_full.size() > MAX_WORKER_NAME_LEN)
+    {
+        SendReject(
+            cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
+            "Worker name too long! (max " str(MAX_WORKER_NAME_LEN) " chars)");
+        return;
+    }
 
-    //     // std::string params = "\"" + addr + "\"";
-    //     // char *res = SendRpcReq(1, "validateaddress", params);
-    //     // Document doc(kObjectType);
-    //     // doc.Parse(res);
+    given_addr = worker_full.substr(0, split);
+    worker = worker_full.substr(split + 1, worker_full.size() - 1);
 
-    //     // bool isvalid = doc.HasMember("result") && doc["result"].IsObject()
-    //     &&
-    //     //                doc["result"].HasMember("isvalid") &&
-    //     //                doc["result"]["isvalid"].IsBool() &&
-    //     //                doc["result"]["isvalid"] == true;
+    bool oldAddress = redis_manager.DoesAddressExist(given_addr, valid_addr);
 
-    //     // if (!isvalid)
-    //     //     error =
-    //     //         "invalid address or identity, use format:
-    //     //         address/id@.worker";
+    if (!oldAddress)
+    {
+        reqParams = "\"" + std::string(given_addr) + "\"";
 
-    //     // std::cout << "Address: " << addr << ", worker: " << worker
-    //     //           << ", authorized: " << isvalid << std::endl;
-    // }
+        resCode = SendRpcReq(resultBody, 1, "validateaddress",
+                             reqParams.c_str(), reqParams.size());
+        try
+        {
+            doc = httpParser.iterate(resultBody.data(),
+                                     resultBody.size() - SIMDJSON_PADDING,
+                                     resultBody.size());
 
-    redis_manager.AddWorker(worker_full);
-    std::string result = error == "null" ? "true" : "false";
+            res = doc["result"].get_object();
 
-    len = snprintf(response, sizeof(response),
-                   "{\"id\":2,\"result\":true,\"error\":null}\n");
-    //    result.c_str(), error.c_str());
-    // std::cout << response << std::endl;
-    send(cli->GetSock(), response, len, 0);
+            isValid = res["isvalid"].get_bool();
+            if (!isValid)
+            {
+                SendReject(cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
+                           "Invalid address!");
+                return;
+            }
+
+            valid_addr = res["address"].get_string();
+            isIdentity = valid_addr[0] == 'i';
+        }
+        catch (simdjson_error err)
+        {
+            SendReject(cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
+                       "Server error: Failed to validate address!");
+            Logger::Log(LogType::Critical, LogField::Stratum,
+                        "Authorize RPC (validateaddress) failed: %s",
+                        err.what());
+            return;
+        }
+
+        if (isIdentity)
+        {
+            if (given_addr == valid_addr)
+            {
+                // we were given an identity address, get the id@
+                reqParams = "\"" + std::string(valid_addr) + "\"";
+                resCode = SendRpcReq(resultBody, 1, "getidentity",
+                                     valid_addr.data(), valid_addr.size());
+
+                try
+                {
+                    doc = httpParser.iterate(
+                        resultBody.data(), resultBody.size() - SIMDJSON_PADDING,
+                        resultBody.size());
+
+                    res = doc["result"].get_object();
+                    identity = res["name"];
+                }
+                catch (simdjson_error err)
+                {
+                    SendReject(cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
+                               "Server error: Failed to get id!");
+                    Logger::Log(LogType::Critical, LogField::Stratum,
+                                "Authorize RPC (getidentity) failed: %s",
+                                err.what());
+                    return;
+                }
+            }
+            else
+            {
+                // we were given an id@
+                identity = given_addr;
+            }
+        }
+        redis_manager.AddAddress(valid_addr, identity);
+    }
+    
+
+    std::string worker_full_str =
+        std::string(std::string(valid_addr) + "." + std::string(worker));
+    worker_full = worker_full_str;
+
+    cli->SetWorkerFull(worker_full);
+    redis_manager.AddWorker(valid_addr, worker_full);
+
+    Logger::Log(LogType::Info, LogField::Stratum,
+                "Authorized worker: %.*s, address: %.*s, id: %.*s",
+                worker.size(), worker.data(), valid_addr.size(),
+                valid_addr.data(), identity.size(), identity.data());
+
+    SendAccept(cli, id);
     this->UpdateDifficulty(cli);
     this->BroadcastJob(cli, jobs.back());
 }
@@ -564,21 +637,21 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             delete[] blockData;
             BlockSubmission submission;
             submission.HashBytes = shareRes.HashBytes;
-            submission.worker = std::string(share.worker);
+            submission.worker = cli->GetWorkerName();
             block_submission = submission;
-            AcceptShare(cli, id);
+            SendAccept(cli, id);
         }
         break;
         case ShareCode::VALID_SHARE:
-            AcceptShare(cli, id);
+            SendAccept(cli, id);
             break;
         default:
-            RejectShare(cli, id, (int)shareRes.Code, shareRes.Message);
+            SendReject(cli, id, (int)shareRes.Code, shareRes.Message);
             break;
     }
 
     // write invalid shares too for statistics
-    bool dbRes = redis_manager.AddShare(share.worker, time, shareRes.Diff);
+    bool dbRes = redis_manager.AddShare(cli->GetWorkerName(), time, shareRes.Diff);
 
     auto duration = DIFF_US(end, start);
     Logger::Log(LogType::Debug, LogField::Stratum,
@@ -662,8 +735,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     // std::cout << "share accepted" << std::endl;
 }
 
-void StratumServer::RejectShare(StratumClient *cli, int id, int err,
-                                const char *msg)
+void StratumServer::SendReject(StratumClient *cli, int id, int err,
+                               const char *msg)
 {
     char buffer[512];
     int len =
@@ -671,11 +744,9 @@ void StratumServer::RejectShare(StratumClient *cli, int id, int err,
                  "{\"id\":%d,\"result\":null,\"error\":[%d,\"%s\",null]}\n", id,
                  err, msg);
     send(cli->GetSock(), buffer, len, 0);
-
-    Logger::Log(LogType::Warn, LogField::Stratum, "Share rejected: %s", msg);
 }
 
-void StratumServer::AcceptShare(StratumClient *cli, int id)
+void StratumServer::SendAccept(StratumClient *cli, int id)
 {
     char buff[512];
     int len = snprintf(buff, sizeof(buff),

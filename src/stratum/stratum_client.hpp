@@ -40,6 +40,7 @@ class StratumClient
 
     const char* GetExtraNonce() { return extra_nonce_str; }
     uint32_t GetShareCount() { return share_count; }
+    std::string GetWorkerName() { return worker_full; }
     void ResetShareCount() { share_count = 0; }
     std::time_t GetLastAdjusted() { return last_adjusted; }
 
@@ -53,6 +54,8 @@ class StratumClient
         return inserted;
     }
 
+    void SetWorkerFull(std::string_view worker) { worker_full = std::string(worker); }
+
 #if POOL_COIN == COIN_VRSCTEST
     CVerusHashV2* GetHasher() { return verusHasher; }
 #endif
@@ -63,9 +66,11 @@ class StratumClient
     std::time_t last_adjusted;
     std::time_t last_share_time;
     uint32_t share_count = 0;
-    char extra_nonce_str[9];
     double current_diff;
     double last_diff;
+
+    char extra_nonce_str[9];
+    std::string worker_full;
 
     // for O(log N) duplicate search
     // 2^32 (1 in 4B) chance of false duplicate
