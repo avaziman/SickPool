@@ -42,9 +42,7 @@ Job* JobManager::GetNewJob()
     uint32_t versionRev = bswap_32(blockTemplate.version);
     uint32_t mintimeRev = bswap_32(blockTemplate.minTime);
 
-    return new VerusJob(1, blockTemplate.coinbaseValue, blockTemplate.transactions, true, versionRev,
-                          prevBlockRev, mintimeRev, bitsRev, finalSRootRev,
-                          blockTemplate.solution.data());
+    return new VerusJob(1, blockTemplate);
 }
 
 BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
@@ -76,11 +74,11 @@ BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
         Unhexlify(td.data.data(), txDataHex.data(), txDataHex.size());
         Unhexlify(td.hash, txHashHex.data(), txHashHex.size());
 
-        if (!blockRes.transactions.AddTxData(td))
+        if (!blockRes.txList.AddTxData(td))
         {
             Logger::Log(LogType::Warn, LogField::JobManager,
                         "Block template is full! block size is %d bytes",
-                        blockRes.transactions.byteCount);
+                        blockRes.txList.byteCount);
             break;
         }
     }
@@ -98,7 +96,7 @@ BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
     char coinbaseHex[coinbaseTx.data.size() * 2];
     Hexlify(coinbaseHex, coinbaseTx.data.data(), coinbaseTx.data.size());
     coinbaseTx.dataHex = std::string_view(coinbaseHex, sizeof(coinbaseHex));
-    blockRes.transactions.AddCoinbaseTxData(coinbaseTx);
+    blockRes.txList.AddCoinbaseTxData(coinbaseTx);
 
     return blockRes;
 }

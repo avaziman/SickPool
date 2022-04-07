@@ -73,10 +73,7 @@ class Job
     // char* GetPrevBlockhash() { return hashPrevBlock; }
     // char* GetTime() { return nTime; }
     // char* GetBits() { return nBits; }
-    const int GetBlockSize()
-    {
-        return (BLOCK_HEADER_SIZE + txDataLen + txAmountByteLength) * 2;
-    }
+    const int GetBlockSize() { return (BLOCK_HEADER_SIZE * 2) + txsHex.size(); }
     const char* GetId() { return jobIdStr; }
     std::time_t GetMinTime() { return minTime; }
     char* GetNotifyBuff() { return notifyBuff; }
@@ -87,7 +84,6 @@ class Job
     std::vector<unsigned char> txsHex;
     uint64_t txAmountByteValue;
     int txAmountByteLength;
-    int txDataLen;
 
     const uint32_t jobId;
     const std::time_t minTime;

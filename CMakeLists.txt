@@ -26,4 +26,4 @@ add_subdirectory(benchmark)
 add_subdirectory(lib/googletest)
 add_subdirectory(lib/benchmark)
 
-# add_subdirectory(tests)
+add_subdirectory(tests)

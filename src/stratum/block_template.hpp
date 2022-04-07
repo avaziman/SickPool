@@ -51,15 +51,15 @@ struct TransactionDataList
 // in the order they appear in the rpc response
 struct BlockTemplate
 {
-    unsigned int version;
+    int32_t version;
     std::string_view prevBlockHash;
     std::string_view finalSaplingRootHash;
     std::string_view solution;
-    TransactionDataList transactions;
+    TransactionDataList txList;
     int64_t coinbaseValue;
     std::time_t minTime;
     std::string_view bits;
-    unsigned int height;
+    uint32_t height;
 };
 
 #endif
