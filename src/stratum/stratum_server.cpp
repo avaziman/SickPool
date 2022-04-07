@@ -320,7 +320,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 //         return;
 //     }
 
-//     jobs.push_back(job);
+    jobs.push_back(job);
 
 //     for (auto it = clients.begin(); it != clients.end(); it++)
 //     {

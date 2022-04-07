@@ -27,6 +27,7 @@ enum class ShareCode
 
 struct ShareResult
 {
+    ShareResult() : HashBytes(32){}
     ShareCode Code;
     const char* Message;
     double Diff;

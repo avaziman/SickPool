@@ -27,22 +27,8 @@ Job* JobManager::GetNewJob()
         return nullptr;
     }
 
-    // reverse all fields to header encoding
-    char prevBlockRev[64];
-    char finalSRootRev[64];
-    char bitsRev[8];
-    // char sol[SOLUTION_SIZE * 2];
-
-    ReverseHex(prevBlockRev, blockTemplate.prevBlockHash.data(), 64);
-    ReverseHex(finalSRootRev, blockTemplate.finalSaplingRootHash.data(), 64);
-    ReverseHex(bitsRev, blockTemplate.bits.data(), 8);
-    // memcpy(sol144, solution.data(), SOLUTION_SIZE * 2);
-    // memcpy(sol144, solution, 144);
-
-    uint32_t versionRev = bswap_32(blockTemplate.version);
-    uint32_t mintimeRev = bswap_32(blockTemplate.minTime);
-
-    return new VerusJob(1, blockTemplate);
+    Job* job = new VerusJob(1, blockTemplate);
+    return job;
 }
 
 BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
@@ -92,7 +78,7 @@ BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
     TransactionData coinbaseTx =
         GetCoinbaseTxData(blockRes.coinbaseValue, blockRes.height);
     
-    // we need to hexlify here otherwise hex will be garbagep
+    // we need to hexlify here otherwise hex will be garbage
     char coinbaseHex[coinbaseTx.data.size() * 2];
     Hexlify(coinbaseHex, coinbaseTx.data.data(), coinbaseTx.data.size());
     coinbaseTx.dataHex = std::string_view(coinbaseHex, sizeof(coinbaseHex));

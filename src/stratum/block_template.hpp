@@ -4,6 +4,7 @@
 #include <ctime>
 #include <string_view>
 #include <vector>
+#include "../config.hpp"
 
 struct TransactionData
 {
@@ -13,8 +14,7 @@ struct TransactionData
     double fee;
 };
 
-struct TransactionDataList
-{
+struct TransactionDataList{
     std::vector<TransactionData> transactions;
     int byteCount;
 
@@ -30,11 +30,11 @@ struct TransactionDataList
         }
 
         transactions[0] = td;
+        byteCount += txSize;
     }
 
     bool AddTxData(TransactionData& td)
     {
-        transactions.resize(transactions.size() + 1);
         int txSize = td.data.size();
 
         // 2 bytes for tx count (max 65k)
