@@ -13,43 +13,35 @@
 class MerkleTree
 {
    public:
-    static void CalcRoot(std::vector<std::vector<unsigned char>>& txs,
+    static void CalcRoot(std::vector<std::array<unsigned char, 32>>& hashes,
                          unsigned char* res)
     {
-        std::vector<std::array<unsigned char, 32>> txIds(txs.size());
-
-        for (int i = 0; i < txs.size(); i++)
-        {
-#if POOL_COIN == COIN_VRSCTEST
-            HashWrapper::SHA256d(txIds[i].data(), txs[i].data(), txs[i].size());
-#endif
-        }
-
-        while (txIds.size() > 1)
+        while (hashes.size() > 1)
         {
             std::vector<std::array<unsigned char, 32>> temp;
-            for (int i = 0; i < txIds.size(); i += 2)
+            
+            for (int i = 0; i < hashes.size(); i += 2)
             {
                 unsigned char combined[32 * 2];
                 unsigned char combinedHash[32];
 
-                if (i >= txIds.size())
+                if (i >= hashes.size())
                 {
-                    txIds.push_back(txIds.back());
+                    hashes.push_back(hashes.back());
                 }
 
-                memcpy(combined, txIds[i].data(), 32);
-                memcpy(combined + 32, txIds[i + 1].data(), 32);
+                memcpy(combined, hashes[i].data(), 32);
+                memcpy(combined + 32, hashes[i + 1].data(), 32);
 #if POOL_COIN == COIN_VRSCTEST
                 HashWrapper::SHA256d(combinedHash, combined, 64);
 #endif
 
                 temp.push_back(std::experimental::to_array(combinedHash));
             }
-            txIds = temp;
+            hashes = temp;
         }
 
-        memcpy(res, txIds[0].data(), 32);
+        memcpy(res, hashes[0].data(), 32);
     }
 };
 #endif

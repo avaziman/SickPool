@@ -63,12 +63,13 @@ class VerusTransaction : public Transaction
         WriteData(bytes.data(), &lock_time, 4);
         WriteData(bytes.data(), &expiryHeight, 4);
 
+        // empty data for privacy stuff
         memset(bytes.data() + written, 0, 11);
 
-        for (int i = 0; i < bytes.size(); i++)
-            std::cout << std::hex << std::setfill('0') << std::setw(2)
-                      << (int)bytes[i];
-        std::cout << std::endl;
+        // for (int i = 0; i < bytes.size(); i++)
+        //     std::cout << std::hex << std::setfill('0') << std::setw(2)
+        //               << (int)bytes[i];
+        // std::cout << std::endl;
         return bytes;
     }
 

@@ -7,13 +7,15 @@
     "pos_fee": 1.0,
     "default_diff": 1000000.0,
     "target_shares_rate": 120.0,
-    "pool_addr": "RSickPooLhHZ3zRBzhFVsXYiGN18BF1Wh6",
+    "pool_addr1": "RSickPooLhHZ3zRBzhFVsXYiGN18BF1Wh6",
+    "pool_addr": "RBdZopcXxTn4SMCoBvduGnDsDjh5vU51dJ",
     "redis_host": "127.0.0.1:6379",
     "rpcs": [
         {
-            "host1": "127.0.0.1:20658",
-            "host": "127.0.0.1:20656",
-            "auth": "YWRtaW4xOnBhc3MxMjM=" 
+            "host1": "127.0.0.1:27486",
+            "host": "127.0.0.1:27397",
+            "auth": "dXNlcjIwMzc1NTYyODY6cGFzc2Q4ZmMzZmVhMDhhYjFmZDg0NDU2YjZlZWFjZDQ0ODc4Mjc3YWZiOTdhMDY1NGRjODhhZTNlMzBlMTY5ZDYyZGJjNw==",
+            "auth1": "dXNlcjIxNDQwMzMwMDpwYXNzZDg5YmQ3Zjk1NGRhYTMzZjdjNDc5NDllN2QwYTQ5MjBmN2IzNjU0YTU5MjM0ZDllZDhmODBlNGU1ODgzNzMxNjY0"
         }
     ]
 }

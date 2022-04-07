@@ -6,7 +6,6 @@
 #include "../logger.hpp"
 #include "job.hpp"
 #include "share.hpp"
-#include "share_result.hpp"
 #include "stratum_client.hpp"
 
 using namespace std::chrono;
@@ -25,7 +24,7 @@ class ShareProcessor
         uint32_t shareTime = HexToUint(share.time.data(), share.time.size());
         shareTime = bswap_32(shareTime);  // swap to little endian
 
-        uint32_t minTime = job.GetTime();
+        uint32_t minTime = job.GetMinTime();
         uint32_t maxTime = curTime / 1000;
 
         if (shareTime < minTime || shareTime > maxTime)

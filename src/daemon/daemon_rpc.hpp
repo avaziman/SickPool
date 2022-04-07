@@ -5,15 +5,10 @@
 #include <string>
 #include <vector>
 
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>  // inet_ntop, inet_pton
-#else
 #include <arpa/inet.h>  //inet_ntop
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>  //close
-#endif
 
 #include <simdjson.h>
 

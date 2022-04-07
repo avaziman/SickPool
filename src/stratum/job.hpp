@@ -8,9 +8,9 @@
 
 #include "../crypto/merkle_tree.hpp"
 #include "../crypto/utils.hpp"
+#include "block_template.hpp"
 
 #if POOL_COIN == COIN_VRSCTEST
-#define BLOCK_HEADER_SIZE (140 + 3 + 1344)
 #define MAX_NOTIFY_MESSAGE_SIZE (1024 * 4)
 // with true 444
 #endif
@@ -18,33 +18,26 @@
 class Job
 {
    public:
-    Job(uint32_t jobId, std::vector<std::vector<unsigned char>>& txs,
-        uint32_t time)
-        /*, char*
-ver, char* prevBlock, char* time, char* bits)*/
-        : jobId(jobId), time(time)  //, time(std::time(0))
+    Job(uint32_t jobId, int64_t blockReward, TransactionDataList& txs,
+        uint32_t minTime)
+        : jobId(jobId),
+          blockReward(blockReward),
+          minTime(minTime)  //, time(std::time(0))
     {
         ToHex(jobIdStr, jobId);
 
-        uint64_t varIntVal = txs.size();
-        int varIntLen = VarInt(varIntVal);
-        int txDataLen = 0;
+        txAmountByteValue = txs.transactions.size();
+        txAmountByteLength = VarInt(txAmountByteValue);
+        txsHex = std::vector<unsigned char>(txAmountByteLength + txs.byteCount);
+        memcpy(txsHex.data(), &txAmountByteValue, txAmountByteLength);
 
-        for (int i = 0; i < txs.size(); i++) txDataLen += txs[i].size();
-
-        // insert the txdata as hex as we will need to submit it as hex anyway
-        txDataHex.resize((txDataLen + varIntLen) * 2);
-
-        unsigned char varInt[8];
-        memcpy(varInt, &varIntVal, varIntLen);
-        Hexlify(txDataHex.data(), varInt, varIntLen);
-
-        int written = varIntLen * 2;
-
-        for (int i = 0; i < txs.size(); i++)
+        int written = 0;
+        for (int i = 0; i < txs.transactions.size(); i++)
         {
-            Hexlify(txDataHex.data() + written, txs[i].data(), txs[i].size());
-            written += txs[i].size() * 2;
+            memcpy(txsHex.data() + txAmountByteLength + written,
+                   txs.transactions[i].dataHex.data(),
+                   txs.transactions[i].dataHex.size());
+            written += txs.transactions[i].dataHex.size();
         }
     }
 
@@ -58,34 +51,54 @@ ver, char* prevBlock, char* time, char* bits)*/
     void GetBlockHex(char* res)
     {
         Hexlify(res, headerData, BLOCK_HEADER_SIZE);
-        memcpy(res + (BLOCK_HEADER_SIZE * 2), txDataHex.data(),
-               txDataHex.size());
-        // TODO: CHECK WHY BLOCK_HEADER_SIZE * 2 WON"T WORK (SKIPS 72 bytes)
+        Hexlify(res + (BLOCK_HEADER_SIZE * 2),
+                (unsigned char*)txAmountByteValue, txAmountByteLength);
+
+        // for (int i = 0; i < txsBytes.size(); i++)
+        // {
+        //     Hexlify(res + (BLOCK_HEADER_SIZE * 2) + txAmountByteLength +
+        //                 (i * (txsBytes[i].size() * 2)),
+        //             txsBytes[i].data(), txsBytes[i].size());
+        // }
+        // memcpy(res + (BLOCK_HEADER_SIZE * 2), txDataHex.data(),
+        //        txDataHex.size());
     }
 
+    int64_t GetBlockReward()
+    {
+        // return transactions[0]->GetOutputs()->at(0).value;
+        return blockReward;
+    }
     // char* GetVersion() { return version; }
     // char* GetPrevBlockhash() { return hashPrevBlock; }
     // char* GetTime() { return nTime; }
     // char* GetBits() { return nBits; }
     const int GetBlockSize()
     {
-        return (BLOCK_HEADER_SIZE * 2) + txDataHex.size();
+        return (BLOCK_HEADER_SIZE + txDataLen + txAmountByteLength) * 2;
     }
     const char* GetId() { return jobIdStr; }
-    uint32_t GetTime() { return time; }
+    std::time_t GetMinTime() { return minTime; }
     char* GetNotifyBuff() { return notifyBuff; }
-    uint16_t GetNotifyBuffSize() { return notifyBuffSize; }
+    std::size_t GetNotifyBuffSize() { return notifyBuffSize; }
     double GetTargetDiff() { return targetDiff; }
 
    protected:
-    uint32_t time;
-    unsigned char headerData[BLOCK_HEADER_SIZE];
-    std::vector<char> txDataHex;
-    uint32_t jobId;
-    char jobIdStr[8 + 1];
-    uint16_t notifyBuffSize;
-    char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
+    std::vector<unsigned char> txsHex;
+    uint64_t txAmountByteValue;
+    int txAmountByteLength;
+    int txDataLen;
+
+    const uint32_t jobId;
+    const std::time_t minTime;
     double targetDiff;
+    const int64_t blockReward;
+
+    unsigned char headerData[BLOCK_HEADER_SIZE];
+    char jobIdStr[8 + 1];
+
+    char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
+    std::size_t notifyBuffSize;
     // std::time_t created;
     //  char version[4];
     //  char hashPrevBlock[32];

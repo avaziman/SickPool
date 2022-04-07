@@ -12,6 +12,7 @@
 #include <thread>
 #include <vector>
 
+#include "./job_manager.hpp"
 #include "../coin_config.hpp"
 #include "../crypto/block.hpp"
 #include "../crypto/block_header.hpp"
@@ -25,12 +26,13 @@
 #include "../logger.hpp"
 #include "../sock_addr.hpp"
 #include "./difficulty_manager.hpp"
+#include "./job_manager.hpp"
 #include "byteswap.h"
+#include "deque"
 #include "job.hpp"
 #include "redis_manager.hpp"
 #include "share.hpp"
 #include "share_processor.hpp"
-#include "share_result.hpp"
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
 
@@ -48,18 +50,22 @@ using namespace std::chrono;
 class StratumServer
 {
    public:
-    StratumServer(CoinConfig config);
+    StratumServer();
     ~StratumServer();
     void StartListening();
+    static CoinConfig coin_config;
+    static std::vector<DaemonRpc*> rpcs;
+    static int SendRpcReq(std::vector<char>& result, int id, const char* method,
+                          const char* params, int paramsLen);
 
    private:
+
     int sockfd;
-    CoinConfig coin_config;
     sockaddr_in addr;
     uint32_t job_count;
     double target_shares_rate;
 
-    std::optional<BlockSubmission> block_submission;
+    BlockSubmission* block_submission;
 
     ondemand::parser reqParser;
     ondemand::parser httpParser;
@@ -67,8 +73,14 @@ class StratumServer
     RedisManager redis_manager;
     // DifficultyManager* diff_manager;
 
+    std::deque<std::time_t> block_timestamps;
+    std::time_t mature_timestamp = 0;
+    std::time_t last_block_timestamp = 0;
+
     std::mutex clients_mutex;
-    std::vector<DaemonRpc*> rpcs;
+
+    static JobManager job_manager;
+
     std::vector<StratumClient*> clients;
     std::vector<Job*> jobs;
 
@@ -96,8 +108,5 @@ class StratumServer
 
     std::vector<unsigned char> GetCoinbaseTx(int64_t value, uint32_t curtime,
                                              uint32_t height);
-
-    int SendRpcReq(std::vector<char>& result, int id, const char* method,
-                   const char* params, int paramsLen);
 };
 #endif

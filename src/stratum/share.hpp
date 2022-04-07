@@ -2,7 +2,8 @@
 #define SHARE_HPP_
 #include <string_view>
 #include <vector>
-struct Share{
+struct Share
+{
     std::string_view worker;
     std::string_view jobId;
     std::string_view time;
@@ -24,19 +25,26 @@ enum class ShareCode
     VALID_BLOCK = 31,
 };
 
-class ShareResult{
-    public:
-     ShareResult() : Code(ShareCode::UNKNOWN), HashBytes(32) {}
-     ShareCode Code;
-     const char* Message;
-     double Diff;
-     // uint256 takes vector as param
-     std::vector<unsigned char> HashBytes;
+struct ShareResult
+{
+    ShareCode Code;
+    const char* Message;
+    double Diff;
+    // uint256 takes vector as param
+    std::vector<unsigned char> HashBytes;
 };
 
-struct BlockSubmission{
-    std::vector<unsigned char> HashBytes;
-    std::string worker;
+class BlockSubmission
+{
+   public:
+    BlockSubmission(ShareResult shareRes, std::string worker, std::time_t time, Job* job)
+        : shareRes(shareRes), worker(worker), time(time), job(job)
+    {
+    }
+    Job* job;
+    const ShareResult shareRes;
+    const std::string worker;
+    const std::time_t time;
 };
 
 #endif

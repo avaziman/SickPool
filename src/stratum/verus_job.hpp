@@ -3,30 +3,35 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <experimental/array>
 
 #include "job.hpp"
 
 class VerusJob : public Job
 {
    public:
-    VerusJob(uint32_t jobId, std::vector<std::vector<unsigned char>>& txs,
-             bool clean, uint32_t ver, const char* prevBlock, uint32_t time,
-             const char* bits, const char* finalSaplingRoot, const char* solution)
-        : Job(jobId, txs, time)
+    VerusJob(uint32_t jobId, int64_t blockReward, TransactionDataList& txs, bool clean,
+             uint32_t ver, const char* prevBlock, uint32_t time,
+             const char* bits, const char* finalSaplingRoot,
+             const char* solution)
+        : Job(jobId, blockReward, txs, time)
     {
         /* we use cstring for "readable" generation of notify message
          and because we need to reverse (copy) the string_views anyway so might
          as well add a null char
     */
         char merkleRootHex[64];
-
+        
         uint32_t bitsUint = bswap_32(HexToUint(bits, 8));
         this->targetDiff = BitsToDiff(bitsUint);
 
         Write(&ver, 4);
         WriteUnhex(prevBlock, 64);
 
-        MerkleTree::CalcRoot(txs, headerData + written);
+        std::vector<std::array<unsigned char, 32>> hashes(txs.transactions.size());
+        for(int i = 0; i < hashes.size(); i++) hashes[i] = std::experimental::to_array(txs.transactions[i].hash);
+
+        MerkleTree::CalcRoot(hashes, headerData + written);
         // we need the hexlified merkle root for the notification message
         Hexlify(merkleRootHex, headerData + written, 32);
         written += 32;
@@ -49,7 +54,8 @@ class VerusJob : public Job
         notifyBuffSize = snprintf(
             notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
             "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
-            "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%08x\",\"%.8s\",%s,"
+            "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%08x\",\"%."
+            "8s\",%s,"
             "\"%.144s\"]}\n",
             GetId(), bswap_32(ver), prevBlock, merkleRootHex, finalSaplingRoot,
             bswap_32(time), bits, BoolToCstring(clean), solution);
@@ -57,7 +63,9 @@ class VerusJob : public Job
         auto end = std::chrono::steady_clock::now();
 
         std::cout << "sprintf dur: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+                  << std::chrono::duration_cast<std::chrono::microseconds>(
+                         end - start)
+                         .count()
                   << "us" << std::endl;
         ;
         std::cout << notifyBuff << std::endl;

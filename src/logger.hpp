@@ -25,26 +25,29 @@ enum LogType
     Critical = 4,
 };
 
-enum LogField
+enum class LogField
 {
     Config = 0,
     Stratum = 1,
-    ShareProcessor = 2,
-    Redis = 3,
+    JobManager = 2,
+    ShareProcessor = 3,
+    Redis = 4,
 };
 
 inline const char* ToString(LogField v)
 {
     switch (v)
     {
-        case Config:
-            return "Config";
-        case Stratum:
-            return "Stratum";
-        case Redis:
-            return "Redis";
-        case ShareProcessor:
-            return "ShareProcessor";
+        case LogField::Config:
+            return "CONFIG";
+        case LogField::Stratum:
+            return "STRATUM";
+        case LogField::Redis:
+            return "REDIS";
+        case LogField::ShareProcessor:
+            return "SHARES";
+        case LogField::JobManager:
+            return "JOBS";
         default:
             return "Unknown";
     }

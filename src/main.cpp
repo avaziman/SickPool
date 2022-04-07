@@ -9,9 +9,9 @@
 #include "crypto/verushash/arith_uint256.h"
 #include "crypto/verushash/verus_hash.h"
 #include "daemon/daemon_rpc.hpp"
+#include "logger.hpp"
 #include "sock_addr.hpp"
 #include "stratum/stratum_server.hpp"
-#include "logger.hpp"
 
 #define CONFIG_PATH                                                   \
     "//home/sickguy/Documents/Projects/SickPool/server/config/coins/" \
@@ -64,7 +64,14 @@ int main(int argc, char** argv)
         Logger::Log(LogType::Info, LogField::Config, "PoS fee: %f%%",
                     coinConfig.pos_fee);
 
-        StratumServer stratumServer(coinConfig);
+        StratumServer::coin_config = coinConfig;
+        for (int i = 0; i < coinConfig.rpcs.size(); i++)
+        {
+            StratumServer::rpcs.push_back(new DaemonRpc(
+                coinConfig.rpcs[i].host, coinConfig.rpcs[i].auth));
+        }
+
+        StratumServer stratumServer;
         stratumServer.StartListening();
     }
     catch (std::runtime_error e)
@@ -75,8 +82,7 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
 }
 
-void AssignJson(const char* name, std::string& obj,
-                ondemand::document& doc)
+void AssignJson(const char* name, std::string& obj, ondemand::document& doc)
 {
     try
     {

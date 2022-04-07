@@ -84,6 +84,9 @@ class Transaction
         : version(ver), lock_time(locktime)
     {
     }
+    
+    std::vector<Output>* GetOutputs() { return &vout; }
+
     void AddInput(unsigned char* prevTxId, uint32_t prevIndex,
                   std::vector<unsigned char> signature, uint32_t sequence)
     {
@@ -107,7 +110,7 @@ class Transaction
     }
 
     // standard p2pkh transaction
-    void AddStdOutput(std::string_view toAddress, int64_t value)
+    void AddP2PKHOutput(std::string_view toAddress, int64_t value)
     {
         Output output;
         output.value = value;
