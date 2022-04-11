@@ -63,7 +63,7 @@ StratumServer::StratumServer()
 
     // init hash functions if needed
     HashWrapper::InitSHA256();
-#if POOL_COIN == COIN_VRSCTEST
+#if POOL_COIN <= COIN_VRSC
     HashWrapper::InitVerusHash();
 #endif
     // std::vector<char> c;
@@ -261,6 +261,11 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         std::this_thread::sleep_for(250ms);
     }
 
+    for (int i = 0; i < jobs.size(); i++)
+    {
+        delete jobs[i];
+        jobs.erase(jobs.begin() + i);
+    }
     jobs.push_back(job);
 
     for (auto it = clients.begin(); it != clients.end(); it++)
@@ -268,19 +273,6 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         AdjustDifficulty(*it, curtime);
         BroadcastJob(*it, job);
     }
-    
-    Logger::Log(LogType::Info, LogField::JobManager, "Broadcasted new job: #%s",
-                job->GetId());
-    Logger::Log(LogType::Info, LogField::JobManager, "Height: %d",
-                job->GetHeight());
-    Logger::Log(LogType::Info, LogField::JobManager, "Min time: %d",
-                job->GetMinTime());
-    Logger::Log(LogType::Info, LogField::JobManager, "Difficutly: %f",
-                job->GetTargetDiff());
-    Logger::Log(LogType::Info, LogField::JobManager, "Block reward: %d",
-                job->GetBlockReward());
-    Logger::Log(LogType::Info, LogField::JobManager, "Transaction count: %d",
-                job->GetTransactionCount());
 
     if (block_submission != nullptr)
     {
@@ -317,8 +309,6 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         block_submission = nullptr;
     }
 
-    // TODO: delete jobs
-
     redis_manager.AddNetworkHr(curtime, job->GetTargetDiff());
     round_start_timestamp = curtime;
 
@@ -348,6 +338,21 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     // last_block_timestamp = curtime;
     // Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %d",
     //             mature_timestamp);
+
+    Logger::Log(LogType::Info, LogField::JobManager, "Broadcasted new job: #%s",
+                job->GetId());
+    Logger::Log(LogType::Info, LogField::JobManager, "Height: %d",
+                job->GetHeight());
+    Logger::Log(LogType::Info, LogField::JobManager, "Min time: %d",
+                job->GetMinTime());
+    Logger::Log(LogType::Info, LogField::JobManager, "Difficutly: %f",
+                job->GetTargetDiff());
+    Logger::Log(LogType::Info, LogField::JobManager, "Block reward: %d",
+                job->GetBlockReward());
+    Logger::Log(LogType::Info, LogField::JobManager, "Transaction count: %d",
+                job->GetTransactionCount());
+    Logger::Log(LogType::Info, LogField::JobManager, "Block size: %d",
+                job->GetBlockSize());
 }
 
 void StratumServer::HandleWalletNotify(ondemand::array &params)
@@ -472,8 +477,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                              reqParams.c_str(), reqParams.size());
         try
         {
-            doc = httpParser.iterate(resultBody.data(),
-                                     resultBody.size(),
+            doc = httpParser.iterate(resultBody.data(), resultBody.size(),
                                      resultBody.capacity());
 
             res = doc["result"].get_object();
@@ -510,9 +514,9 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
 
                 try
                 {
-                    doc = httpParser.iterate(
-                        resultBody.data(), resultBody.size(),
-                        resultBody.capacity());
+                    doc =
+                        httpParser.iterate(resultBody.data(), resultBody.size(),
+                                           resultBody.capacity());
 
                     res = doc["result"].get_object();
                     idTag = res["name"];
@@ -619,8 +623,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             // std::cout << (char *)blockData << std::endl;
 
             bool submissionGood = SubmitBlock(blockData, blockSize + 3);
-            Logger::Log(LogType::Debug, LogField::Stratum, "Block hex: %s",
-                        blockData);
+            Logger::Log(LogType::Debug, LogField::Stratum, "Block hex: %.*s",
+                        blockSize + 3, blockData);
             delete[] blockData;
             block_submission =
                 new BlockSubmission(shareRes, cli->GetWorkerName(), time, job);
@@ -641,9 +645,9 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 
     auto duration = DIFF_US(end, start);
 
-    // Logger::Log(LogType::Debug, LogField::Stratum,
-    //             "Share processed in %dus, diff: %f.", duration,
-    //             shareRes.Diff);
+    Logger::Log(LogType::Debug, LogField::Stratum,
+                "Share processed in %dus, diff: %f.", duration,
+                shareRes.Diff);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,
@@ -674,15 +678,15 @@ bool StratumServer::SubmitBlock(const char *blockHex, int blockHexLen)
     if (resCode != 200)
     {
         Logger::Log(LogType::Critical, LogField::Stratum,
-                    "Failed to send block submission, http code: %d", resCode);
+                    "Failed to send block submission, http code: %d, res: %.*s",
+                    resCode, resultBody.size(), resultBody.data());
         return false;
     }
 
     try
     {
         ondemand::document doc = httpParser.iterate(
-            resultBody.data(), resultBody.size(),
-            resultBody.capacity());
+            resultBody.data(), resultBody.size(), resultBody.capacity());
 
         ondemand::object res = doc.get_object();
         ondemand::value resultField = res["result"];
@@ -832,4 +836,4 @@ int StratumServer::SendRpcReq(std::vector<char> &result, int id,
 }
 // TODO: fix bug on more than one transaction and add tests
 // TODO: fix bug no job no found
-//TODO: make jobs a set
+// TODO: make jobs a set

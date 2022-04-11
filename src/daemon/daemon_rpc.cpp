@@ -128,6 +128,7 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id,
 
     // sometimes we will get 404 message after the json
     // (its length not included in content-length)
+    contentReceived = std::min(contentReceived, contentLength);
     memcpy(result.data(), endOfHeader, contentReceived);
 
     // receive http body if it wasn't already

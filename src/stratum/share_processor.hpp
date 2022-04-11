@@ -38,12 +38,13 @@ class ShareProcessor
         headerData = job.GetHeaderData(share.time, cli.GetExtraNonce(),
                                        share.nonce2, share.solution);
         
-#if POOL_COIN == COIN_VRSCTEST
+#if POOL_COIN <= COIN_VRSC
         // takes about 6-8 microseconds vs 8-12 on snomp
         HashWrapper::VerushashV2b2(result.HashBytes.data(), headerData,
                                    BLOCK_HEADER_SIZE, cli.GetHasher());
 #endif
         uint256 hash(result.HashBytes);
+        arith_uint256 hashArith = UintToArith256(hash);
         // Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash: %s",
         //             hash.GetHex().c_str());
 
@@ -59,7 +60,8 @@ class ShareProcessor
 
         result.Diff = BitsToDiff(UintToArith256(hash).GetCompact(false));
 
-        if (result.Diff >= job.GetTargetDiff())
+        // if (result.Diff >= job.GetTargetDiff())
+        if (hashArith >= *job.GetTarget())
         {
             result.Code = ShareCode::VALID_BLOCK;
             return result;

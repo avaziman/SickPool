@@ -21,6 +21,7 @@ Job* JobManager::GetNewJob()
     // parsing needs to be done in same function otherwise data will be garbage
     try
     {
+        blockTemplate = BlockTemplate();
         ondemand::document doc =
             jsonParser.iterate(json.data(), json.size(), json.capacity());
 
@@ -33,7 +34,7 @@ Job* JobManager::GetNewJob()
             res["finalsaplingroothash"].get_string();
         blockTemplate.solution = res["solution"].get_string();
         // can't iterate after we get the string_view
-        // ondemand::array txs = res["transactions"].get_array();
+        ondemand::array txs = res["transactions"].get_array();
 
         // for (auto tx : txs)
         // {
@@ -48,8 +49,8 @@ Job* JobManager::GetNewJob()
         //     int txSize = td.dataHex.size() / 2;
         //     td.data = std::vector<unsigned char>(txSize);
         //     Unhexlify(td.data.data(), td.dataHex.data(), td.dataHex.size());
-        //     Unhexlify(td.hash, txHashHex.data(), txHashHex.size()); // hash
-        //     is reversed std::reverse(td.hash, td.hash + 32);
+        //     Unhexlify(td.hash, txHashHex.data(), txHashHex.size()); // hash is reversed
+        //     std::reverse(td.hash, td.hash + 32);
 
         //     if (!blockTemplate.txList.AddTxData(td))
         //     {
@@ -63,6 +64,7 @@ Job* JobManager::GetNewJob()
         blockTemplate.coinbaseValue =
             res["coinbasetxn"]["coinbasevalue"].get_int64();
 
+        blockTemplate.target = res["target"].get_string();
         blockTemplate.minTime = res["mintime"].get_int64();
         blockTemplate.bits = res["bits"].get_string();
         blockTemplate.height = res["height"].get_int64();

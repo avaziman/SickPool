@@ -37,9 +37,7 @@ class MerkleTree
 
                 memcpy(combined, hashes[i].data(), 32);
                 memcpy(combined + 32, hashes[i + 1].data(), 32);
-#if POOL_COIN == COIN_VRSCTEST
                 HashWrapper::SHA256d(combinedHash, combined, 64);
-#endif
 
                 temp.push_back(std::experimental::to_array(combinedHash));
             }

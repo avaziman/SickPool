@@ -58,6 +58,7 @@ struct BlockTemplate
     std::string_view solution;
     TransactionDataList txList;
     int64_t coinbaseValue;
+    std::string_view target;
     std::time_t minTime;
     std::string_view bits;
     uint32_t height;

@@ -18,7 +18,7 @@ class StratumClient
           current_diff(diff),
           last_diff(diff)
     {
-#if POOL_COIN == COIN_VRSCTEST
+#if POOL_COIN <= COIN_VRSC
         this->verusHasher = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 #endif
 
@@ -56,7 +56,7 @@ class StratumClient
 
     void SetWorkerFull(std::string_view worker) { worker_full = std::string(worker); }
 
-#if POOL_COIN == COIN_VRSCTEST
+#if POOL_COIN <= COIN_VRSC
     CVerusHashV2* GetHasher() { return verusHasher; }
 #endif
    private:
@@ -80,7 +80,7 @@ class StratumClient
 
     // the hasher is thread-specific
     // so we need to store it in client so we only need to init once
-#if POOL_COIN == COIN_VRSCTEST
+#if POOL_COIN <= COIN_VRSC
     CVerusHashV2* verusHasher;
 #endif
 };

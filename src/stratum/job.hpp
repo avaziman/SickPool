@@ -10,11 +10,6 @@
 #include "../crypto/utils.hpp"
 #include "block_template.hpp"
 
-#if POOL_COIN == COIN_VRSCTEST
-#define MAX_NOTIFY_MESSAGE_SIZE (1024 * 4)
-// with true 444
-#endif
-
 class Job
 {
    public:
@@ -22,8 +17,10 @@ class Job
         : jobId(jobId),
           blockReward(bTemplate.coinbaseValue),
           minTime(bTemplate.minTime),
-          height(bTemplate.height)
+          height(bTemplate.height),
+          target()
     {
+        target.SetHex(bTemplate.target.data());
         std::cout << bTemplate.txList.transactions[0].dataHex << std::endl;
 
         ToHex(jobIdStr, jobId);
@@ -32,7 +29,8 @@ class Job
         txAmountByteValue = txCount;
 
         txAmountByteLength = VarInt(txAmountByteValue);
-        txsHex = std::vector<char>((txAmountByteLength + bTemplate.txList.byteCount) * 2);
+        txsHex = std::vector<char>(
+            (txAmountByteLength + bTemplate.txList.byteCount) * 2);
         Hexlify(txsHex.data(), (unsigned char*)&txAmountByteValue,
                 txAmountByteLength);
 
@@ -80,8 +78,10 @@ class Job
     char* GetNotifyBuff() { return notifyBuff; }
     std::size_t GetNotifyBuffSize() { return notifyBuffSize; }
     double GetTargetDiff() { return targetDiff; }
+    arith_uint256* GetTarget() { return &target; }
 
    protected:
+    arith_uint256 target;
     std::vector<char> txsHex;
     uint64_t txAmountByteValue;
     int txAmountByteLength;
