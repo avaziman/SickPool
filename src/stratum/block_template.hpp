@@ -22,15 +22,15 @@ struct TransactionDataList{
 
     void AddCoinbaseTxData(TransactionData& td) { 
         int txSize = td.data.size();
+        byteCount += txSize;
 
         // if there is no space for coinbase transaction, remove other txs
         while (byteCount + BLOCK_HEADER_SIZE + 2 > MAX_BLOCK_SIZE){
+            byteCount -= transactions.back().data.size();
             transactions.pop_back();
-            byteCount -= txSize;
         }
 
         transactions[0] = td;
-        byteCount += txSize;
     }
 
     bool AddTxData(TransactionData& td)
@@ -38,7 +38,7 @@ struct TransactionDataList{
         int txSize = td.data.size();
 
         // 2 bytes for tx count (max 65k)
-        if (byteCount + BLOCK_HEADER_SIZE + 2 > MAX_BLOCK_SIZE) return false;
+        if (byteCount + txSize + BLOCK_HEADER_SIZE + 2 > MAX_BLOCK_SIZE) return false;
 
         // keep space for coinbase
         transactions.insert(transactions.begin() + 1, td);

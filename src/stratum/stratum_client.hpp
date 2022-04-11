@@ -33,9 +33,9 @@ class StratumClient
     double GetDifficulty() { return current_diff; }
     void SetDifficulty(double diff, std::time_t curTime)
     {
-        // last_diff = current_diff;
-        // current_diff = diff;
-        // last_adjusted = curTime;
+        last_diff = current_diff;
+        current_diff = diff;
+        last_adjusted = curTime;
     }
 
     const char* GetExtraNonce() { return extra_nonce_str; }

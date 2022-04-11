@@ -25,7 +25,7 @@ class ShareProcessor
         shareTime = bswap_32(shareTime);  // swap to little endian
 
         uint32_t minTime = job.GetMinTime();
-        uint32_t maxTime = curTime / 1000;
+        uint32_t maxTime = curTime / 1000 + MAX_FUTURE_BLOCK_TIME;
 
         if (shareTime < minTime || shareTime > maxTime)
         {
@@ -44,8 +44,8 @@ class ShareProcessor
                                    BLOCK_HEADER_SIZE, cli.GetHasher());
 #endif
         uint256 hash(result.HashBytes);
-        Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash: %s",
-                    hash.GetHex().c_str());
+        // Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash: %s",
+        //             hash.GetHex().c_str());
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)

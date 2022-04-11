@@ -48,7 +48,6 @@ int main(int argc, char** argv)
     Logger::Log(LogType::Info, LogField::Config, "Loading dynamic config...");
 
     CoinConfig coinConfig;
-
     try
     {
         padded_string json = padded_string::load(CONFIG_PATH);
@@ -79,7 +78,7 @@ int main(int argc, char** argv)
         std::cerr << "START-UP ERROR: " << e.what() << "." << std::endl;
         return EXIT_FAILURE;
     }
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE; // should never finish!
 }
 
 void AssignJson(const char* name, std::string& obj, ondemand::document& doc)
@@ -179,3 +178,4 @@ void ParseCoinConfig(padded_string& json, CoinConfig& cnfg)
 //     printf("%s: %s\n", s[i], status ? "Ok" : "NO OK");
 // }
 // return 0;
+//TODO: make difficulty adjustment based on average hashrate

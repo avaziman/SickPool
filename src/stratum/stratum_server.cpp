@@ -5,13 +5,31 @@ std::vector<DaemonRpc *> StratumServer::rpcs;
 JobManager StratumServer::job_manager;
 
 StratumServer::StratumServer()
-    : 
-      reqParser(REQ_BUFF_SIZE),
+    : reqParser(REQ_BUFF_SIZE),
+      httpParser(MAX_HTTP_REQ_SIZE),
       target_shares_rate(coin_config.target_shares_rate),
-      redis_manager(RedisManager(coin_config.redis_host)),
+      redis_manager(coin_config.redis_host),
       block_submission(nullptr)
-
 {
+    simdjson::error_code error =
+        reqParser.allocate(REQ_BUFF_SIZE, MAX_HTTP_JSON_DEPTH);
+
+    if (error != simdjson::SUCCESS)
+    {
+        Logger::Log(LogType::Critical, LogField::Stratum,
+                    "Failed to allocate request parser buffer: %d -> %s", error,
+                    simdjson::error_message(error));
+        exit(EXIT_FAILURE);
+    }
+
+    error = httpParser.allocate(MAX_HTTP_REQ_SIZE, MAX_HTTP_JSON_DEPTH);
+    if (error != simdjson::SUCCESS)
+    {
+        Logger::Log(LogType::Critical, LogField::Stratum,
+                    "Failed to allocate http parser buffer: %d -> %s", error,
+                    simdjson::error_message(error));
+        exit(EXIT_FAILURE);
+    }
     // coin_config = cnfg;
     // for (int i = 0; i < cnfg.rpcs.size(); i++)
     // {
@@ -48,6 +66,8 @@ StratumServer::StratumServer()
 #if POOL_COIN == COIN_VRSCTEST
     HashWrapper::InitVerusHash();
 #endif
+    // std::vector<char> c;
+    // SendRpcReq(c, 1, "getblockcount", nullptr, 0);
 }
 
 StratumServer::~StratumServer()
@@ -77,10 +97,10 @@ void StratumServer::Listen()
 
     while (true)
     {
-        int addr_len;
         int conn_fd;
-        sockaddr_in conn_addr;
-        conn_fd = accept(sockfd, (sockaddr *)&addr, (socklen_t *)&addr_len);
+        struct sockaddr_in conn_addr;
+        socklen_t addr_len = sizeof(conn_addr);
+        conn_fd = accept(sockfd, (sockaddr *)&conn_addr, &addr_len);
 
         std::cout << "tcp client connected, starting new thread..."
                   << std::endl;
@@ -123,7 +143,7 @@ void StratumServer::HandleSocket(int conn_fd)
             total += recvRes;
             buffer[total] = '\0';
             reqEnd = std::strchr(buffer, '\n');
-        } while (reqEnd == NULL && total < REQ_BUFF_SIZE - 1);
+        } while (reqEnd == NULL && total < REQ_BUFF_SIZE_REAL - 1);
 
         // exit loop, miner disconnected
         if (recvRes <= 0)
@@ -182,7 +202,7 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[], int reqSize)
     auto start = std::chrono::steady_clock::now();
 
     ondemand::document doc =
-        reqParser.iterate(buffer, reqSize, REQ_BUFF_SIZE + SIMDJSON_PADDING);
+        reqParser.iterate(buffer, reqSize, reqSize + SIMDJSON_PADDING);
     // std::cout << "last char -> " << (int)buffer[]
     try
     {
@@ -195,6 +215,7 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[], int reqSize)
     {
         Logger::Log(LogType::Error, LogField::Stratum,
                     "JSON parse error: %s\nRequest: %s\n", err.what(), buffer);
+        return;
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -214,172 +235,103 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[], int reqSize)
     else if (method == "mining.wallet_notify")
         HandleWalletNotify(params);
     else
-        std::cerr << "Unknown request method: " << method << std::endl;
+        Logger::Log(LogType::Warn, LogField::Stratum,
+                    "Unknown request method: %.*s", method.size(),
+                    method.data());
 }
 
 void StratumServer::HandleBlockNotify(ondemand::array &params)
 {
     // TODO: verify the notification
     //  first of all clear jobs to insure we are not paying for stale shares
-    jobs.clear();
+    std::time_t curtime = std::time(nullptr);
 
     auto start = std::chrono::steady_clock::now();
 
-    Job* job = nullptr;
-
-    job = job_manager.GetNewJob();
+    Job *job = job_manager.GetNewJob();
 
     while (job == nullptr)
     {
         job = job_manager.GetNewJob();
 
-        Logger::Log(LogType::Critical, LogField::Stratum,
-                    "Block update error: Failed to generate new job! retrying...");
+        Logger::Log(
+            LogType::Critical, LogField::Stratum,
+            "Block update error: Failed to generate new job! retrying...");
 
         std::this_thread::sleep_for(250ms);
     }
 
-//     try
-//     {
-//         // std::cout << resBody.data() << std::endl;
-
-//         ondemand::document doc = httpParser.iterate(
-//             resBody.data(), resBody.size() - SIMDJSON_PADDING,
-//             resBody.size() + 1);
-
-//         ondemand::object res = doc["result"].get_object();
-
-//         // this must be in the order they appear in the result for simdjson
-//         int version = res["version"].get_int64();
-//         prevBlockHash = res["previousblockhash"].get_string();
-// #if POOL_COIN == COIN_VRSCTEST
-//         std::string_view finalSRoot = res["finalsaplingroothash"].get_string();
-//         std::string_view solution = res["solution"].get_string();
-//         // char solution[SOLUTION_SIZE] = {0};
-//         // solution[1] = 7;
-// #endif
-//         ondemand::array txs = res["transactions"].get_array();
-//         int value = res["coinbasetxn"]["coinbasevalue"].get_int64();
-//         curtime = res["curtime"].get_int64(); //TODO: check order
-//         mintime = res["mintime"].get_int64();
-//         std::string_view bits = res["bits"].get_string();
-//         newHeight = res["height"].get_int64();
-
-//         std::vector<std::vector<unsigned char>> transactions(1);
-//         transactions[0] = GetCoinbaseTx(value, mintime, newHeight);
-
-//         auto end = std::chrono::steady_clock::now();
-
-// #if POOL_COIN == COIN_VRSCTEST
-
-//         // reverse all fields to header encoding
-//         char prevBlockRev[64];
-//         char finalSRootRev[64];
-//         char bitsRev[8];
-//         // char sol[SOLUTION_SIZE * 2];
-
-//         ReverseHex(prevBlockRev, prevBlockHash.data(), 64);
-//         ReverseHex(finalSRootRev, finalSRoot.data(), 64);
-//         ReverseHex(bitsRev, bits.data(), 8);
-//         // memcpy(sol144, solution.data(), SOLUTION_SIZE * 2);
-//         // memcpy(sol144, solution, 144);
-
-//         uint32_t versionRev = bswap_32(version);
-//         uint32_t mintimeRev = bswap_32(mintime);
-
-//         job = new VerusJob(this->job_count, transactions, true, version,
-//                            prevBlockRev, mintime, bitsRev, finalSRootRev,
-//                            solution.data());
-// #endif
-
-//         std::cout << "Generated job: " << job->GetId() << " in " << std::dec
-//                   << std::chrono::duration_cast<std::chrono::microseconds>(
-//                          end - start)
-//                          .count()
-//                   << "us" << std::endl;
-//         // block->AddTransaction(coinbaseTx);
-//         // for (ondemand::array::Constondemand::arrayIterator itr =
-//         // txs.begin();
-//         // itr
-//         // !=
-//         // txs.end();
-//         // itr++)
-//         //     block->AddTransaction((*itr)["data"].GetString());
-
-//         this->redis_manager.SetJobCount(++this->job_count);
-
-//         // std::cout << "Block update: " << height << std::endl;
-//         std::cout << "Difficulty target: " << std::fixed << job->GetTargetDiff()
-//                   << std::endl;
-//         std::cout << "Broadcasted job: " << job->GetId() << std::endl;
-//     }
-//     catch (simdjson::simdjson_error &err)
-//     {
-//         std::cerr << "getblocktemplate json parse error: " << err.what()
-//                   << std::endl;
-//         return;
-//     }
-
     jobs.push_back(job);
 
-//     for (auto it = clients.begin(); it != clients.end(); it++)
-//     {
-//         AdjustDifficulty(*it, mintime);
-//         BroadcastJob(*it, job);
+    for (auto it = clients.begin(); it != clients.end(); it++)
+    {
+        AdjustDifficulty(*it, curtime);
+        BroadcastJob(*it, job);
+    }
+    
+    Logger::Log(LogType::Info, LogField::JobManager, "Broadcasted new job: #%s",
+                job->GetId());
+    Logger::Log(LogType::Info, LogField::JobManager, "Height: %d",
+                job->GetHeight());
+    Logger::Log(LogType::Info, LogField::JobManager, "Min time: %d",
+                job->GetMinTime());
+    Logger::Log(LogType::Info, LogField::JobManager, "Difficutly: %f",
+                job->GetTargetDiff());
+    Logger::Log(LogType::Info, LogField::JobManager, "Block reward: %d",
+                job->GetBlockReward());
+    Logger::Log(LogType::Info, LogField::JobManager, "Transaction count: %d",
+                job->GetTransactionCount());
 
-//         unsigned char test[32];
-//         HashWrapper::VerushashV2b2(test, job->GetHeaderData(),
-//                                    BLOCK_HEADER_SIZE, (*it)->GetHasher());
-//     }
+    if (block_submission != nullptr)
+    {
+        unsigned char *prevBlockBin = job->GetPrevBlockHash();
 
-    // if (block_submission != nullptr)
-    // {
-    //     unsigned char prevBlockBin[32];
-    //     Unhexlify(prevBlockBin, prevBlockHash.data(), prevBlockHash.size());
+        // compare reversed
+        bool blockAdded =
+            !memcmp(prevBlockBin, block_submission->shareRes.HashBytes.data(),
+                    HASH_SIZE);
 
-    //     bool blockAdded = true;
+        // double totalEffort = redis_manager.GetTotalEffort();
 
-    //     // compare reversed
-    //     for (int i = 0; i < 32; i++)
-    //     {
-    //         if (prevBlockBin[32 - i - 1] !=
-    //             block_submission->shareRes.HashBytes[i])
-    //         {
-    //             blockAdded = false;
-    //             break;
-    //         }
-    //     }
+        if (blockAdded)
+        {
+            // redis_manager.CloseRound(job->GetBlockReward(), job->GetHeight(),
+            // totalEffort);
+            Logger::Log(LogType::Info, LogField::Stratum,
+                        "Block added to chain! found by: %s, hash: %.*s",
+                        block_submission->worker.c_str(), HASH_SIZE * 2,
+                        block_submission->hashHex);
+        }
+        else
+        {
+            Logger::Log(LogType::Critical, LogField::Stratum,
+                        "Block NOT added to chain %.*s!", HASH_SIZE * 2,
+                        block_submission->hashHex);
+        }
 
-    //     if (blockAdded)
-    //     {
-    //         redis_manager.CloseRound(12, newHeight);
-    //         Logger::Log(LogType::Info, LogField::Stratum,
-    //                     "Block added to chain! found by: %s, hash: %.*s",
-    //                     block_submission->worker.c_str(), prevBlockHash.size(),
-    //                     prevBlockHash.data());
-    //     }
-    //     else
-    //     {
-    //         Logger::Log(LogType::Critical, LogField::Stratum,
-    //                     "Block NOT added to chain %.*s!", prevBlockHash.size(),
-    //                     prevBlockHash.data());
-    //     }
+        // redis_manager.AddBlockSubmission(*block_submission, job->GetHeight(),
+        //                                  blockAdded,
+        //                                  totalEffort);
 
-    //     redis_manager.AddBlockSubmission(*block_submission, newHeight - 1,
-    //                                      blockAdded, redis_manager.GetTotalEffort());
+        delete block_submission;
+        block_submission = nullptr;
+    }
 
-    //     delete block_submission;
-    //     block_submission = nullptr;
-    // }
+    // TODO: delete jobs
+
+    redis_manager.AddNetworkHr(curtime, job->GetTargetDiff());
+    round_start_timestamp = curtime;
 
     // std::vector<char> resBody;
     // // if (block_timestamps.size() < BLOCK_MATURITY)
     // if (mature_timestamp == 0)
     // {
-    //     std::string params = "\""+ std::to_string(newHeight - 100 - 1) + "\"";
+    //     std::string params =
+    //         "\"" + std::to_string(job->GetHeight() - BLOCK_MATURITY - 1) +
+    //         "\"";
     //     int resCode =
-    //         SendRpcReq(resBody, 1, "getblock", params.c_str(), params.size());
-
+    //         SendRpcReq(resBody, 1, "getblock", params.c_str(),
+    //         params.size());
     //     ondemand::document doc = httpParser.iterate(
     //         resBody.data(), resBody.size() - SIMDJSON_PADDING,
     //         resBody.size());
@@ -390,7 +342,8 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     // }
     // else
     // {
-    //     mature_timestamp = mature_timestamp + (curtime - last_block_timestamp);
+    //     mature_timestamp = mature_timestamp + (curtime -
+    //     last_block_timestamp);
     // }
     // last_block_timestamp = curtime;
     // Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %d",
@@ -481,7 +434,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
 {
     int split = 0, resCode = 0;
     std::string reqParams;
-    std::string_view given_addr, valid_addr, worker, identity = "null";
+    std::string_view given_addr, valid_addr, worker, idTag = "null";
     bool isValid = false, isIdentity = false;
 
     std::vector<char> resultBody;
@@ -520,8 +473,8 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
         try
         {
             doc = httpParser.iterate(resultBody.data(),
-                                     resultBody.size() - SIMDJSON_PADDING,
-                                     resultBody.size());
+                                     resultBody.size(),
+                                     resultBody.capacity());
 
             res = doc["result"].get_object();
 
@@ -558,11 +511,11 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                 try
                 {
                     doc = httpParser.iterate(
-                        resultBody.data(), resultBody.size() - SIMDJSON_PADDING,
-                        resultBody.size());
+                        resultBody.data(), resultBody.size(),
+                        resultBody.capacity());
 
                     res = doc["result"].get_object();
-                    identity = res["name"];
+                    idTag = res["name"];
                 }
                 catch (simdjson_error err)
                 {
@@ -577,10 +530,10 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
             else
             {
                 // we were given an id@
-                identity = given_addr;
+                idTag = given_addr;
             }
         }
-        redis_manager.AddAddress(valid_addr, identity);
+        redis_manager.AddAddress(valid_addr, idTag);
     }
 
     std::string worker_full_str =
@@ -593,7 +546,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     Logger::Log(LogType::Info, LogField::Stratum,
                 "Authorized worker: %.*s, address: %.*s, id: %.*s",
                 worker.size(), worker.data(), valid_addr.size(),
-                valid_addr.data(), identity.size(), identity.data());
+                valid_addr.data(), idTag.size(), idTag.data());
 
     SendAccept(cli, id);
     this->UpdateDifficulty(cli);
@@ -642,7 +595,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
         shareRes.Code = ShareCode::JOB_NOT_FOUND;
         shareRes.Message = "Job not found";
         Logger::Log(LogType::Warn, LogField::Stratum,
-                    "Received share for unknown job id: %s", share.jobId);
+                    "Received share for unknown job id: %.*s",
+                    share.jobId.size(), share.jobId.data());
     }
     else
     {
@@ -682,89 +636,14 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     }
 
     // write invalid shares too for statistics
-    bool dbRes =
-        redis_manager.AddShare(cli->GetWorkerName(), time, shareRes.Diff);
+    bool dbRes = redis_manager.AddShare(cli->GetWorkerName(), time,
+                                        round_start_timestamp, shareRes.Diff);
 
     auto duration = DIFF_US(end, start);
-    Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in %dus, diff: %f.", duration, shareRes.Diff);
-    return;
 
-    // cli->SetLastShare(time);
-
-    // if (job == nullptr)
-    // {
-    //     redis_manager.AddShare(share.worker, STALE_SHARE_DIFF, time);
-    //     return RejectShare(cli, id, ShareCode::JOB_NOT_FOUND);
-    // }
-
-    // TODO: check duplicate
-
-    // unsigned char *headerData = job->GetHeaderData(
-    //     share.time, cli->GetExtraNonce(), share.nonce2, share.solution);
-
-    // unsigned char hashBuff[32];
-
-    // std::cout << "header: ";
-    // for (int i = 0; i < BLOCK_HEADER_SIZE; i++)
-    //     std::cout << std::hex << std::setfill('0') << std::setw(2)
-    //               << (int)headerData[i];
-    // std::cout << std::endl;
-    // auto start = std::chrono::steady_clock::now();
-    // HashWrapper::VerushashV2b2(hashBuff, headerData, BLOCK_HEADER_SIZE,
-    //                            cli->GetHasher());
-
-    // auto end = std::chrono::steady_clock::now();
-    // auto duration =
-    //     std::chrono::duration_cast<microseconds>(end - start).count();
-    // std::cout << "hash dur: " << duration << "microseconds." << std::endl;
-    /* code */
-
-    // std::vector<unsigned char> v(hashBuff, hashBuff + 32);
-    // uint256 hash256(v);
-
-    // double shareDiff = BitsToDiff(UintToArith256(hash256).GetCompact(false));
-
-    // Logger::Log(Debug, Stratum, "block hash      :%s ", hash256.GetHex());
-    // std::cout << "block difficulty: " << job->GetTargetDiff() << std::endl;
-    // std::cout << "share difficulty: " << shareDiff << std::endl;
-    // std::cout << "client target   : " << cli->GetDifficulty() << std::endl;
-    // if (shareDiff >= job->GetTargetDiff())
-    // {
-    //     std::cout << "Found block solution!" << std::endl;
-    //     int blockSize = job->GetBlockSize();
-    //     char *blockData = new char[blockSize + 3];
-    //     blockData[0] = '\"';
-    //     job->GetBlockHex(blockData + 1);
-    //     blockData[blockSize + 1] = '\"';
-    //     blockData[blockSize + 2] = 0;
-    //     // std::cout << (char *)blockData << std::endl;
-
-    //     bool submissionGood = SubmitBlock(blockData, blockSize + 3);
-    //     delete[] blockData;
-    //     if (submissionGood)
-    //     {
-    //         std::cout << "Submit block successful." << std::endl;
-    //         // redis_manager->InsertPendingBlock(hash_str);
-    //     }
-    //     else
-    //     {
-    //         std::cerr << "Error submitting block, retrying..." << std::endl;
-    //         // submissionGood = SubmitBlock(blockHex);
-    //     }
-    // }
-    // else if (shareDiff < cli->GetDifficulty())
-    // {
-    //     redis_manager.AddShare(share.worker, INVALID_SHARE_DIFF, time);
-    //     return RejectShare(cli, id, ShareResult::LOW_DIFFICULTY_SHARE);
-    // }
-
-    // char buffer[1024];
-    // int len = snprintf(resBuff, sizeof(resBuff),
-    //                    "{\"id\":%d,\"result\":true,\"error\":null}\n", id);
-    // send(cli->GetSock(), buffer, len, 0);
-    // redis_manager.AddShare(share.worker, shareDiff, time);
-    // std::cout << "share accepted" << std::endl;
+    // Logger::Log(LogType::Debug, LogField::Stratum,
+    //             "Share processed in %dus, diff: %f.", duration,
+    //             shareRes.Diff);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,
@@ -802,8 +681,8 @@ bool StratumServer::SubmitBlock(const char *blockHex, int blockHexLen)
     try
     {
         ondemand::document doc = httpParser.iterate(
-            resultBody.data(), resultBody.size() - SIMDJSON_PADDING,
-            resultBody.size());
+            resultBody.data(), resultBody.size(),
+            resultBody.capacity());
 
         ondemand::object res = doc.get_object();
         ondemand::value resultField = res["result"];
@@ -920,7 +799,7 @@ std::vector<unsigned char> StratumServer::GetCoinbaseTx(int64_t value,
     VerusTransaction coinbaseTx(4, curtime, true, txVersionGroup);
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
     coinbaseTx.AddP2PKHOutput(this->coin_config.pool_addr,
-                            value);  // TODO: add i address check
+                              value);  // TODO: add i address check
     coinbaseTx.AddTestnetCoinbaseOutput();
     return coinbaseTx.GetBytes();
 }
@@ -930,7 +809,7 @@ Job *StratumServer::GetJobById(std::string_view id)
 {
     for (auto it = jobs.begin(), end = jobs.end(); it != end; it++)
     {
-        if (std::strncmp((*it)->GetId(), id.data(), id.size()) == 0)
+        if (std::strncmp((*it)->GetId(), id.data(), 8) == 0)
         {
             return (*it);
         }
@@ -938,8 +817,7 @@ Job *StratumServer::GetJobById(std::string_view id)
     return nullptr;
 }
 
-
-//TODO: make this like printf for readability
+// TODO: make this like printf for readability
 int StratumServer::SendRpcReq(std::vector<char> &result, int id,
                               const char *method, const char *params,
                               int paramsLen)
@@ -952,3 +830,6 @@ int StratumServer::SendRpcReq(std::vector<char> &result, int id,
 
     return -2;
 }
+// TODO: fix bug on more than one transaction and add tests
+// TODO: fix bug no job no found
+//TODO: make jobs a set

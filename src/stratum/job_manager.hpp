@@ -17,9 +17,10 @@ using namespace simdjson;
 class JobManager
 {
    public:
-    JobManager() {}
+    JobManager() : jobCount(0) {}
 
     Job* GetNewJob();
+    int64_t jobCount;
 
     BlockTemplate ParseBlockTemplateJson(std::vector<char>& json);
 
@@ -27,11 +28,11 @@ class JobManager
     // multiple jobs can use the same block template, (append transactions only)
     BlockTemplate blockTemplate;
     ondemand::parser jsonParser;
-    std::string_view coinbaseExtra = "SickPool is in the building.";
+    std::string coinbaseExtra = "SickPool is in the building.";
 
-    VerusTransaction GetCoinbaseTx(int64_t value, uint32_t height);
+    VerusTransaction GetCoinbaseTx(int64_t value, uint32_t height, std::time_t);
 
-    TransactionData GetCoinbaseTxData(int64_t value, uint32_t height);
+    TransactionData GetCoinbaseTxData(int64_t value, uint32_t height, std::time_t);
 };
 
 #endif

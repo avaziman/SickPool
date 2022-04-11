@@ -10,7 +10,7 @@ class VerusJob : public Job
 {
    public:
     VerusJob(uint32_t jobId, BlockTemplate& bTemplate, bool clean = true)
-        : Job(jobId, bTemplate.coinbaseValue, bTemplate.txList,
+        : Job(jobId, bTemplate.coinbaseValue, bTemplate.height, bTemplate.txList,
               bTemplate.minTime)
     {
         char merkleRootHex[64];
@@ -35,7 +35,7 @@ class VerusJob : public Job
         // hashes are given in LE, no need to reverse
 
         MerkleTree::CalcRoot(bTemplate.txList.transactions,
-                             headerData + written);
+                            headerData + written);
 
         // we need the hexlified merkle root for the notification message
         Hexlify(merkleRootHex, headerData + written, 32);
@@ -60,14 +60,14 @@ class VerusJob : public Job
         bTemplate.version = bswap_32(bTemplate.version);
         bTemplate.minTime = bswap_32(bTemplate.minTime);
         bitsUint = bswap_32(bitsUint);
-
+        
         notifyBuffSize =
             snprintf(notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
                      "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
                      "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%"
                      "08x\",\"%08x\",%s,\"%.144s\"]}\n",
                      GetId(), bTemplate.version, prevBlockRev, merkleRootHex,
-                     finalSRootRev, bTemplate.minTime, bitsUint,
+                     finalSRootRev, (uint32_t)bTemplate.minTime, bitsUint,
                      BoolToCstring(clean), bTemplate.solution.data());
 
         auto end = std::chrono::steady_clock::now();

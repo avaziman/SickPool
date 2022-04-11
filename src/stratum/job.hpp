@@ -18,27 +18,32 @@
 class Job
 {
    public:
-    Job(uint32_t jobId, int64_t blockReward, TransactionDataList& txs,
+    Job(uint32_t jobId, int64_t blockReward, uint32_t height, TransactionDataList& txs,
         uint32_t minTime)
         : jobId(jobId),
           blockReward(blockReward),
-          minTime(minTime)  //, time(std::time(0))
+          minTime(minTime),  //, time(std::time(0))
+          height(height)
     {
         ToHex(jobIdStr, jobId);
 
-        txAmountByteValue = txs.transactions.size();
+        txAmountByteValue = txCount = txs.transactions.size();
         txAmountByteLength = VarInt(txAmountByteValue);
-        txsHex = std::vector<unsigned char>(txAmountByteLength + txs.byteCount);
-        memcpy(txsHex.data(), &txAmountByteValue, txAmountByteLength);
+        txsHex = std::vector<char>((txAmountByteLength + txs.byteCount) * 2);
+        Hexlify(txsHex.data(), (unsigned char*)&txAmountByteValue, txAmountByteLength);
 
-        int written = 0;
+        int written = txAmountByteLength * 2;
         for (int i = 0; i < txs.transactions.size(); i++)
         {
-            memcpy(txsHex.data() + txAmountByteLength + written,
+            int txSize = txs.transactions[i].dataHex.size();
+            std::cout << "f: " << txs.transactions[i].dataHex << std::endl;
+            memcpy(txsHex.data() + written,
                    txs.transactions[i].dataHex.data(),
                    txs.transactions[i].dataHex.size());
             written += txs.transactions[i].dataHex.size();
         }
+
+        std::cout << "tx hex: " << txsHex.data() << std::endl;
     }
 
     virtual unsigned char* GetHeaderData(std::string_view time,
@@ -51,17 +56,7 @@ class Job
     void GetBlockHex(char* res)
     {
         Hexlify(res, headerData, BLOCK_HEADER_SIZE);
-        Hexlify(res + (BLOCK_HEADER_SIZE * 2),
-                (unsigned char*)txAmountByteValue, txAmountByteLength);
-
-        // for (int i = 0; i < txsBytes.size(); i++)
-        // {
-        //     Hexlify(res + (BLOCK_HEADER_SIZE * 2) + txAmountByteLength +
-        //                 (i * (txsBytes[i].size() * 2)),
-        //             txsBytes[i].data(), txsBytes[i].size());
-        // }
-        // memcpy(res + (BLOCK_HEADER_SIZE * 2), txDataHex.data(),
-        //        txDataHex.size());
+        memcpy(res + (BLOCK_HEADER_SIZE * 2), txsHex.data(), txsHex.size());
     }
 
     int64_t GetBlockReward()
@@ -73,7 +68,10 @@ class Job
     // char* GetPrevBlockhash() { return hashPrevBlock; }
     // char* GetTime() { return nTime; }
     // char* GetBits() { return nBits; }
-    const int GetBlockSize() { return (BLOCK_HEADER_SIZE * 2) + txsHex.size(); }
+    unsigned char* GetPrevBlockHash() { return headerData + 4; }
+    uint32_t GetHeight() { return height; }
+    int GetTransactionCount() { return txCount; }
+    int GetBlockSize() { return (BLOCK_HEADER_SIZE * 2) + txsHex.size(); }
     const char* GetId() { return jobIdStr; }
     std::time_t GetMinTime() { return minTime; }
     char* GetNotifyBuff() { return notifyBuff; }
@@ -81,14 +79,16 @@ class Job
     double GetTargetDiff() { return targetDiff; }
 
    protected:
-    std::vector<unsigned char> txsHex;
+    std::vector<char> txsHex;
     uint64_t txAmountByteValue;
     int txAmountByteLength;
+    int txCount;
 
     const uint32_t jobId;
     const std::time_t minTime;
     double targetDiff;
     const int64_t blockReward;
+    const uint32_t height;
 
     unsigned char headerData[BLOCK_HEADER_SIZE];
     char jobIdStr[8 + 1];

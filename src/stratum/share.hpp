@@ -41,11 +41,13 @@ class BlockSubmission
     BlockSubmission(ShareResult shareRes, std::string worker, std::time_t time, Job* job)
         : shareRes(shareRes), worker(worker), time(time), job(job)
     {
+        Hexlify(hashHex, shareRes.HashBytes.data(), shareRes.HashBytes.size());
     }
     Job* job;
     const ShareResult shareRes;
     const std::string worker;
-    const std::time_t time;
+    const std::time_t time; //ms percision
+    char hashHex[64];
 };
 
 #endif

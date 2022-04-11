@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <chrono>
 #include <ctime>
+#include <cstring>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -36,9 +37,12 @@
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
 
-#define REQ_BUFF_SIZE 4000  //(1024 * 32)
 #define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - SIMDJSON_PADDING)
-#define SOCK_TIMEOUT 5;
+#define MAX_HTTP_REQ_SIZE (MAX_BLOCK_SIZE * 2)
+#define MAX_HTTP_JSON_DEPTH 3
+
+#define REQ_BUFF_SIZE (1024 * 32)
+#define SOCK_TIMEOUT 5
 #define SOLUTION_SIZE 1344
 #define MIN_PERIOD_SECONDS 20
 
@@ -61,7 +65,7 @@ class StratumServer
    private:
 
     int sockfd;
-    sockaddr_in addr;
+    struct sockaddr_in addr;
     uint32_t job_count;
     double target_shares_rate;
 
@@ -73,7 +77,8 @@ class StratumServer
     RedisManager redis_manager;
     // DifficultyManager* diff_manager;
 
-    std::deque<std::time_t> block_timestamps;
+   //  std::deque<std::time_t> block_timestamps;
+    std::time_t round_start_timestamp;
     std::time_t mature_timestamp = 0;
     std::time_t last_block_timestamp = 0;
 

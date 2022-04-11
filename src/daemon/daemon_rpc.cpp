@@ -112,8 +112,9 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id,
     resCode = std::atoi(headerBuff + std::strlen("HTTP/1.1 "));
 
     contentLength = std::atoi(std::strstr(headerBuff, "Content-Length: ") +
-                              std::strlen("Content-Length: "));
+                              sizeof("Content-Length: ") - 1);
     contentReceived = std::strlen(endOfHeader);
+    // contentReceived = headerRecv - (endOfHeader - headerBuff);
 
     // std::cout << "HEADER: " << headerBuff << std::endl;
     // std::cout << "HTTP CODE: " << resCode << std::endl;
@@ -122,10 +123,11 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id,
     // std::cout << "TOTAL RECEIVED: " << totalRecv << std::endl;
 
     // simd json parser requires some extra bytes
-    result.resize(contentLength + simdjson::SIMDJSON_PADDING - 1);
+    result.reserve(contentLength + simdjson::SIMDJSON_PADDING - 1);
+    result.resize(contentLength - 1);
+
     // sometimes we will get 404 message after the json
     // (its length not included in content-length)
-    // contentReceived = std::min(contentReceived, contentLength);
     memcpy(result.data(), endOfHeader, contentReceived);
 
     // receive http body if it wasn't already
@@ -142,7 +144,7 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id,
         contentReceived += recvRes;
     }
 
-    result[contentReceived - 1] = '\0';
+    // result[contentReceived - 1] = '\0';
 
     close(sockfd);
     return resCode;
