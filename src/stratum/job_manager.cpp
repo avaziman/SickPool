@@ -4,22 +4,79 @@
 
 Job* JobManager::GetNewJob()
 {
-    std::vector<char> resBody;
+    Job* job = nullptr;
+    std::vector<char> json;
     int resCode =
-        StratumServer::SendRpcReq(resBody, 1, "getblocktemplate", nullptr, 0);
+        StratumServer::SendRpcReq(json, 1, "getblocktemplate", nullptr, 0);
 
     if (resCode != 200)
     {
         Logger::Log(
             LogType::Critical, LogField::JobManager,
             "Failed to get block template, http code: %d, response: %*.s",
-            resCode, resBody.size(), resBody.data());
+            resCode, json.size(), json.data());
         return nullptr;
     }
 
+    // parsing needs to be done in same function otherwise data will be garbage
     try
     {
-        blockTemplate = ParseBlockTemplateJson(resBody);
+        ondemand::document doc =
+            jsonParser.iterate(json.data(), json.size(), json.capacity());
+
+        ondemand::object res = doc["result"].get_object();
+
+        // this must be in the order they appear in the result for simdjson
+        blockTemplate.version = res["version"].get_int64();
+        blockTemplate.prevBlockHash = res["previousblockhash"].get_string();
+        blockTemplate.finalSaplingRootHash =
+            res["finalsaplingroothash"].get_string();
+        blockTemplate.solution = res["solution"].get_string();
+        // can't iterate after we get the string_view
+        // ondemand::array txs = res["transactions"].get_array();
+
+        // for (auto tx : txs)
+        // {
+        //     TransactionData td;
+        //     std::string_view txHashHex;
+        //     td.dataHex = tx["data"].get_string();
+        //     txHashHex = tx["hash"].get_string();
+        //     td.fee = tx["fee"].get_double();
+
+        //     std::cout << "tx data: " << td.dataHex << std::endl;
+
+        //     int txSize = td.dataHex.size() / 2;
+        //     td.data = std::vector<unsigned char>(txSize);
+        //     Unhexlify(td.data.data(), td.dataHex.data(), td.dataHex.size());
+        //     Unhexlify(td.hash, txHashHex.data(), txHashHex.size()); // hash
+        //     is reversed std::reverse(td.hash, td.hash + 32);
+
+        //     if (!blockTemplate.txList.AddTxData(td))
+        //     {
+        //         Logger::Log(LogType::Warn, LogField::JobManager,
+        //                     "Block template is full! block size is %d bytes",
+        //                     blockTemplate.txList.byteCount);
+        //         break;
+        //     }
+        // }
+
+        blockTemplate.coinbaseValue =
+            res["coinbasetxn"]["coinbasevalue"].get_int64();
+
+        blockTemplate.minTime = res["mintime"].get_int64();
+        blockTemplate.bits = res["bits"].get_string();
+        blockTemplate.height = res["height"].get_int64();
+
+        TransactionData coinbaseTx = GetCoinbaseTxData(
+            blockTemplate.coinbaseValue, blockTemplate.height, blockTemplate.minTime);
+
+        // we need to hexlify here otherwise hex will be garbage
+        char coinbaseHex[coinbaseTx.data.size() * 2];
+        Hexlify(coinbaseHex, coinbaseTx.data.data(), coinbaseTx.data.size());
+        coinbaseTx.dataHex = std::string_view(coinbaseHex, sizeof(coinbaseHex));
+        blockTemplate.txList.AddCoinbaseTxData(coinbaseTx);
+
+        job = new VerusJob(jobCount, blockTemplate);
     }
     catch (const simdjson_error& err)
     {
@@ -27,8 +84,6 @@ Job* JobManager::GetNewJob()
                     "Failed to parse block template: %s", err.what());
         return nullptr;
     }
-
-    Job* job = new VerusJob(jobCount, blockTemplate);
     jobCount++;
 
     return job;
@@ -36,66 +91,12 @@ Job* JobManager::GetNewJob()
 
 BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
 {
-    BlockTemplate blockRes;
-    ondemand::document doc = jsonParser.iterate(
-        json.data(), json.size(), json.capacity());
-
-    ondemand::object res = doc["result"].get_object();
-
-    // this must be in the order they appear in the result for simdjson
-    blockRes.version = res["version"].get_int64();
-    blockRes.prevBlockHash = res["previousblockhash"].get_string();
-    blockRes.finalSaplingRootHash = res["finalsaplingroothash"].get_string();
-    blockRes.solution = res["solution"].get_string();
-    // can't iterate after we get the string_view
-    // ondemand::array txs = res["transactions"].get_array();
-
-    // for (auto tx : txs)
-    // {
-    //     TransactionData td;
-    //     std::string_view txHashHex;
-    //     td.dataHex = tx["data"].get_string();
-    //     txHashHex = tx["hash"].get_string();
-    //     td.fee = tx["fee"].get_double();
-        
-    //     std::cout << "tx data: " << td.dataHex << std::endl;
-
-    //     int txSize = td.dataHex.size() / 2;
-    //     td.data = std::vector<unsigned char>(txSize);
-    //     Unhexlify(td.data.data(), td.dataHex.data(), td.dataHex.size());
-    //     Unhexlify(td.hash, txHashHex.data(), txHashHex.size()); // hash is reversed
-    //     std::reverse(td.hash, td.hash + 32);
-
-
-    //     if (!blockRes.txList.AddTxData(td))
-    //     {
-    //         Logger::Log(LogType::Warn, LogField::JobManager,
-    //                     "Block template is full! block size is %d bytes",
-    //                     blockRes.txList.byteCount);
-    //         break;
-    //     }
-    // }
-
-    blockRes.coinbaseValue = res["coinbasetxn"]["coinbasevalue"].get_int64();
-
-    blockRes.minTime = res["mintime"].get_int64();
-    blockRes.bits = res["bits"].get_string();
-    blockRes.height = res["height"].get_int64();
-
-    TransactionData coinbaseTx =
-        GetCoinbaseTxData(blockRes.coinbaseValue, blockRes.height, blockRes.minTime);
-
-    // we need to hexlify here otherwise hex will be garbage
-    char coinbaseHex[coinbaseTx.data.size() * 2];
-    Hexlify(coinbaseHex, coinbaseTx.data.data(), coinbaseTx.data.size());
-    coinbaseTx.dataHex = std::string_view(coinbaseHex, sizeof(coinbaseHex));
-    blockRes.txList.AddCoinbaseTxData(coinbaseTx);
-
-    return blockRes;
+    return blockTemplate;
 }
 
 // doesnt include dataHex
-TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height, std::time_t locktime)
+TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
+                                              std::time_t locktime)
 {
     TransactionData res;
     VerusTransaction coinbaseTx = GetCoinbaseTx(value, height, locktime);
@@ -129,6 +130,6 @@ VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
 
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
     coinbaseTx.AddP2PKHOutput(StratumServer::coin_config.pool_addr, value);
-    coinbaseTx.AddTestnetCoinbaseOutput(); // without this gives bad-blk-fees
+    coinbaseTx.AddTestnetCoinbaseOutput();  // without this gives bad-blk-fees
     return coinbaseTx;
 }

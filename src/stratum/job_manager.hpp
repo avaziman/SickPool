@@ -17,7 +17,7 @@ using namespace simdjson;
 class JobManager
 {
    public:
-    JobManager() : jobCount(0) {}
+    JobManager() : jobCount(0), blockTemplate() {}
 
     Job* GetNewJob();
     int64_t jobCount;

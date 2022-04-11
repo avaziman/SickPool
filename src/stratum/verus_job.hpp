@@ -10,8 +10,7 @@ class VerusJob : public Job
 {
    public:
     VerusJob(uint32_t jobId, BlockTemplate& bTemplate, bool clean = true)
-        : Job(jobId, bTemplate.coinbaseValue, bTemplate.height, bTemplate.txList,
-              bTemplate.minTime)
+        : Job(jobId, bTemplate)
     {
         char merkleRootHex[64];
 

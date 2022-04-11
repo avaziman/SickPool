@@ -16,7 +16,7 @@ struct TransactionData
 
 struct TransactionDataList{
     std::vector<TransactionData> transactions;
-    int byteCount;
+    unsigned int byteCount;
 
     TransactionDataList() : byteCount(0), transactions(1) {}
 
@@ -51,6 +51,7 @@ struct TransactionDataList{
 // in the order they appear in the rpc response
 struct BlockTemplate
 {
+    BlockTemplate() : txList(){}
     int32_t version;
     std::string_view prevBlockHash;
     std::string_view finalSaplingRootHash;

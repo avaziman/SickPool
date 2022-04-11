@@ -18,32 +18,35 @@
 class Job
 {
    public:
-    Job(uint32_t jobId, int64_t blockReward, uint32_t height, TransactionDataList& txs,
-        uint32_t minTime)
+    Job(uint32_t jobId, const BlockTemplate& bTemplate)
         : jobId(jobId),
-          blockReward(blockReward),
-          minTime(minTime),  //, time(std::time(0))
-          height(height)
+          blockReward(bTemplate.coinbaseValue),
+          minTime(bTemplate.minTime),
+          height(bTemplate.height)
     {
+        std::cout << bTemplate.txList.transactions[0].dataHex << std::endl;
+
         ToHex(jobIdStr, jobId);
 
-        txAmountByteValue = txCount = txs.transactions.size();
+        txCount = bTemplate.txList.transactions.size();
+        txAmountByteValue = txCount;
+
         txAmountByteLength = VarInt(txAmountByteValue);
-        txsHex = std::vector<char>((txAmountByteLength + txs.byteCount) * 2);
-        Hexlify(txsHex.data(), (unsigned char*)&txAmountByteValue, txAmountByteLength);
+        txsHex = std::vector<char>((txAmountByteLength + bTemplate.txList.byteCount) * 2);
+        Hexlify(txsHex.data(), (unsigned char*)&txAmountByteValue,
+                txAmountByteLength);
 
         int written = txAmountByteLength * 2;
-        for (int i = 0; i < txs.transactions.size(); i++)
+        for (int i = 0; i < bTemplate.txList.transactions.size(); i++)
         {
-            int txSize = txs.transactions[i].dataHex.size();
-            std::cout << "f: " << txs.transactions[i].dataHex << std::endl;
             memcpy(txsHex.data() + written,
-                   txs.transactions[i].dataHex.data(),
-                   txs.transactions[i].dataHex.size());
-            written += txs.transactions[i].dataHex.size();
+                   bTemplate.txList.transactions[i].dataHex.data(),
+                   bTemplate.txList.transactions[i].dataHex.size());
+            written += bTemplate.txList.transactions[i].dataHex.size();
         }
 
-        std::cout << "tx hex: " << txsHex.data() << std::endl;
+        Logger::Log(LogType::Debug, LogField::JobManager, "tx hex: %.*s",
+                    txsHex.size(), txsHex.data());
     }
 
     virtual unsigned char* GetHeaderData(std::string_view time,
