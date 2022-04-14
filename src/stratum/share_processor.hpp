@@ -50,7 +50,8 @@ class ShareProcessor
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
-        uint32_t shareEnd = hash.GetCheapHash() & 0xFFFFFFFF;
+        uint32_t shareEnd = hash.GetCheapHash();
+        // std::cout << std::hex << shareEnd << std::endl;
         if (!cli.SetLastShare(shareEnd, curTime))
         {
             result.Code = ShareCode::DUPLICATE_SHARE;
@@ -60,8 +61,8 @@ class ShareProcessor
 
         result.Diff = BitsToDiff(UintToArith256(hash).GetCompact(false));
 
-        // if (result.Diff >= job.GetTargetDiff())
-        if (hashArith >= *job.GetTarget())
+        // if (hashArith >= *job.GetTarget())
+        if (result.Diff >= job.GetTargetDiff())
         {
             result.Code = ShareCode::VALID_BLOCK;
             return result;

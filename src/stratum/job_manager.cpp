@@ -132,6 +132,8 @@ VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
 
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
     coinbaseTx.AddP2PKHOutput(StratumServer::coin_config.pool_addr, value);
-    coinbaseTx.AddTestnetCoinbaseOutput();  // without this gives bad-blk-fees
+    #if POOL_COIN == COIN_VRSCTEST
+    coinbaseTx.AddFeePoolOutput();  // without this gives bad-blk-fees
+    #endif
     return coinbaseTx;
 }

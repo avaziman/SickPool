@@ -9,7 +9,7 @@
 
 #define MAX_WORKER_NAME_LEN 128
 
-#define POOL_COIN COIN_VRSC//TEST
+#define POOL_COIN COIN_VRSCTEST
 
 /**
  * Maximum amount of time that a block timestamp is allowed to exceed the

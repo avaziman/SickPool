@@ -18,10 +18,6 @@ class StratumClient
           current_diff(diff),
           last_diff(diff)
     {
-#if POOL_COIN <= COIN_VRSC
-        this->verusHasher = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
-#endif
-
         extra_nonce = 10;
         ToHex(extra_nonce_str, extra_nonce);
         extra_nonce_str[8] = 0;
@@ -54,7 +50,14 @@ class StratumClient
         return inserted;
     }
 
-    void SetWorkerFull(std::string_view worker) { worker_full = std::string(worker); }
+    void SetWorkerFull(std::string_view worker)
+    {
+        // add the hasher on authorization
+        worker_full = std::string(worker);
+#if POOL_COIN <= COIN_VRSC
+        this->verusHasher = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
+#endif
+    }
 
 #if POOL_COIN <= COIN_VRSC
     CVerusHashV2* GetHasher() { return verusHasher; }

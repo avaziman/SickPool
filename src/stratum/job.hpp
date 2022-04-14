@@ -17,11 +17,10 @@ class Job
         : jobId(jobId),
           blockReward(bTemplate.coinbaseValue),
           minTime(bTemplate.minTime),
-          height(bTemplate.height),
-          target()
+          height(bTemplate.height)
+        //   target()
     {
-        target.SetHex(bTemplate.target.data());
-        std::cout << bTemplate.txList.transactions[0].dataHex << std::endl;
+        // target.SetHex(std::string(bTemplate.target));
 
         ToHex(jobIdStr, jobId);
 
@@ -78,10 +77,10 @@ class Job
     char* GetNotifyBuff() { return notifyBuff; }
     std::size_t GetNotifyBuffSize() { return notifyBuffSize; }
     double GetTargetDiff() { return targetDiff; }
-    arith_uint256* GetTarget() { return &target; }
+    // arith_uint256* GetTarget() { return &target; }
 
    protected:
-    arith_uint256 target;
+    // arith_uint256 target;
     std::vector<char> txsHex;
     uint64_t txAmountByteValue;
     int txAmountByteLength;

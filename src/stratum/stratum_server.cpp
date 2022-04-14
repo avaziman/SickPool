@@ -30,6 +30,15 @@ StratumServer::StratumServer()
                     simdjson::error_message(error));
         exit(EXIT_FAILURE);
     }
+
+    // reload last round start
+    round_start_timestamp = redis_manager.GetLastRoundTime();
+    // (db was empty)
+    if (round_start_timestamp == 0) round_start_timestamp = std::time(nullptr) * 1000;
+
+    Logger::Log(LogType::Info, LogField::Stratum, "Last round start: %lu",
+                round_start_timestamp);
+
     // coin_config = cnfg;
     // for (int i = 0; i < cnfg.rpcs.size(); i++)
     // {
@@ -243,8 +252,7 @@ void StratumServer::HandleReq(StratumClient *cli, char buffer[], int reqSize)
 void StratumServer::HandleBlockNotify(ondemand::array &params)
 {
     // TODO: verify the notification
-    //  first of all clear jobs to insure we are not paying for stale shares
-    std::time_t curtime = std::time(nullptr);
+    std::time_t curtimeSec = std::time(nullptr);
 
     auto start = std::chrono::steady_clock::now();
 
@@ -261,29 +269,27 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         std::this_thread::sleep_for(250ms);
     }
 
-    for (int i = 0; i < jobs.size(); i++)
-    {
-        delete jobs[i];
-        jobs.erase(jobs.begin() + i);
-    }
     jobs.push_back(job);
 
     for (auto it = clients.begin(); it != clients.end(); it++)
     {
-        AdjustDifficulty(*it, curtime);
         BroadcastJob(*it, job);
     }
+
+    // for (auto it = clients.begin(); it != clients.end(); it++)
+    // {
+    //     AdjustDifficulty(*it, curtime);
+    // }
 
     if (block_submission != nullptr)
     {
         unsigned char *prevBlockBin = job->GetPrevBlockHash();
 
-        // compare reversed
         bool blockAdded =
             !memcmp(prevBlockBin, block_submission->shareRes.HashBytes.data(),
                     HASH_SIZE);
 
-        // double totalEffort = redis_manager.GetTotalEffort();
+        double totalEffort = redis_manager.GetTotalEffort();
 
         if (blockAdded)
         {
@@ -301,16 +307,23 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
                         block_submission->hashHex);
         }
 
-        // redis_manager.AddBlockSubmission(*block_submission, job->GetHeight(),
-        //                                  blockAdded,
-        //                                  totalEffort);
+        redis_manager.AddBlockSubmission(*block_submission, job->GetHeight(),
+                                         blockAdded, totalEffort);
 
         delete block_submission;
         block_submission = nullptr;
+
+        // reset round start tiemstamp
+        round_start_timestamp = curtimeSec * 1000;
     }
 
-    redis_manager.AddNetworkHr(curtime, job->GetTargetDiff());
-    round_start_timestamp = curtime;
+    while (jobs.size() > 1)
+    {
+        delete jobs[0];
+        jobs.pop_front();
+    }
+
+    redis_manager.AddNetworkHr(curtimeSec, job->GetTargetDiff());
 
     // std::vector<char> resBody;
     // // if (block_timestamps.size() < BLOCK_MATURITY)
@@ -347,6 +360,8 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
                 job->GetMinTime());
     Logger::Log(LogType::Info, LogField::JobManager, "Difficutly: %f",
                 job->GetTargetDiff());
+    // Logger::Log(LogType::Info, LogField::JobManager, "Target: %s",
+    //             job->GetTarget()->GetHex().c_str());
     Logger::Log(LogType::Info, LogField::JobManager, "Block reward: %d",
                 job->GetBlockReward());
     Logger::Log(LogType::Info, LogField::JobManager, "Transaction count: %d",
@@ -545,7 +560,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     worker_full = worker_full_str;
 
     cli->SetWorkerFull(worker_full);
-    redis_manager.AddWorker(valid_addr, worker_full);
+    redis_manager.AddWorker(valid_addr, worker_full, GetDailyTimestamp());
 
     Logger::Log(LogType::Info, LogField::Stratum,
                 "Authorized worker: %.*s, address: %.*s, id: %.*s",
@@ -605,9 +620,9 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     else
     {
         shareRes = ShareProcessor::Process(time, *cli, *job, share);
+        shareRes.Code = ShareCode::VALID_BLOCK;
     }
     auto end = TIME_NOW();
-
     switch (shareRes.Code)
     {
         case ShareCode::VALID_BLOCK:
@@ -628,6 +643,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             delete[] blockData;
             block_submission =
                 new BlockSubmission(shareRes, cli->GetWorkerName(), time, job);
+            HandleBlockNotify(*new ondemand::array());
+
             SendAccept(cli, id);
         }
         break;
@@ -646,8 +663,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     auto duration = DIFF_US(end, start);
 
     Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in %dus, diff: %f.", duration,
-                shareRes.Diff);
+                "Share processed in %dus, diff: %f.", duration, shareRes.Diff);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,
@@ -776,36 +792,8 @@ void StratumServer::AdjustDifficulty(StratumClient *cli, std::time_t curTime)
 
 void StratumServer::BroadcastJob(StratumClient *cli, Job *job)
 {
-    send(cli->GetSock(), job->GetNotifyBuff(), job->GetNotifyBuffSize(), 0);
-}
-
-std::vector<unsigned char> StratumServer::GetCoinbaseTx(int64_t value,
-                                                        uint32_t curtime,
-                                                        uint32_t height)
-{
-    // maximum scriptsize = 100
-    unsigned char prevTxIn[32] = {0};  // null last input
-    const char extraData[] = "SickPool is in the building.";
-    const int extraDataLen = sizeof(extraData) - 1;
-
-    std::vector<unsigned char> heightScript = GetNumScript(height);
-    const unsigned char heightScriptLen = heightScript.size();
-
-    std::vector<unsigned char> signature(heightScript.size() + extraDataLen);
-
-    memcpy(signature.data(), &heightScriptLen, 1);
-    memcpy(signature.data() + 1, heightScript.data(), heightScript.size());
-    memcpy(signature.data() + 1 + heightScript.size(), &extraData,
-           extraDataLen);
-
-    // todo: make txVersionGroup updateable without reset
-    uint32_t txVersionGroup = 0x892f2085;
-    VerusTransaction coinbaseTx(4, curtime, true, txVersionGroup);
-    coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
-    coinbaseTx.AddP2PKHOutput(this->coin_config.pool_addr,
-                              value);  // TODO: add i address check
-    coinbaseTx.AddTestnetCoinbaseOutput();
-    return coinbaseTx.GetBytes();
+    int res =
+        send(cli->GetSock(), job->GetNotifyBuff(), job->GetNotifyBuffSize(), 0);
 }
 
 // TODO: add a lock jobs

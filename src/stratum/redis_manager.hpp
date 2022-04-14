@@ -57,12 +57,32 @@ class RedisManager
             " DUPLICATE_POLICY SUM"  // sum to get total round effort
         );
 
-        for (int i = 0; i < 2; i++)
+        redisAppendCommand(
+            rc,
+            "TS.CREATE " COIN_SYMBOL
+            ":worker_count"
+            " RETENTION "
+            "0"                      // time to live
+            " ENCODING COMPRESSED"   // very data efficient
+            " DUPLICATE_POLICY SUM"  // sum to get total round effort
+        );
+
+        redisAppendCommand(
+            rc,
+            "TS.CREATE " COIN_SYMBOL
+            ":miner_count"
+            " RETENTION "
+            "0"                      // time to live
+            " ENCODING COMPRESSED"   // very data efficient
+            " DUPLICATE_POLICY SUM"  // sum to get total round effort
+        );
+
+        for (int i = 0; i < 4; i++)
         {
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
             {
                 Logger::Log(LogType::Error, LogField::Redis,
-                            "Failed to create (%d) startup timeseries: %s", i,
+                            "Failed to create (%d) startup keys: %s", i,
                             rc->errstr);
                 exit(EXIT_FAILURE);
             }
@@ -70,7 +90,8 @@ class RedisManager
         }
     }
 
-    bool AddWorker(std::string_view address, std::string_view worker_full)
+    bool AddWorker(std::string_view address, std::string_view worker_full,
+                   std::time_t curtime)
     {
         redisReply *reply;
 
@@ -163,7 +184,7 @@ class RedisManager
 
             // this will incrby as we have sum duplicate policy
             redisAppendCommand(rc, "TS.ADD " COIN_SYMBOL ":round_effort %lu %f",
-                               roundStart * 1000, diff);
+                               roundStart, diff);
         }
 
         if (redisGetReply(rc, (void **)&reply) != REDIS_OK)  // reply for TS.ADD
@@ -198,18 +219,21 @@ class RedisManager
     bool AddBlockSubmission(BlockSubmission submission, uint32_t height,
                             bool accepted, double totalDiff)
     {
-        // KEY: TIME, VAL: WORKER:STATUS:HEIGHT:DIFF:HASH
         const double effortPercent =
             (totalDiff / submission.job->GetTargetDiff()) * 100;
-        const double blockReward = submission.job->GetBlockReward();
+        const long long blockReward =
+            (long long)submission.job->GetBlockReward();
 
         redisReply *reply;
 
-        redisAppendCommand(
-            rc, "ZADD " COIN_SYMBOL ":block_submissions %f %s:%u:%u:%f:%b",
-            (double)submission.time, submission.worker.c_str(), (int)accepted,
-            submission.shareRes.Diff, height, submission.hashHex,
-            sizeof(submission.hashHex));
+        redisAppendCommand(rc,
+                           "JSON.SET " COIN_SYMBOL
+                           ":block:%d $ "
+                           "{\"height\":%d,\"accepted\":%s,\"time\":%lu,\"reward\":{\"" COIN_SYMBOL "\":%lld},\"effort_percent\":%f,\"hash\":\"%b\"}",
+                           // \"difficulty\": %f,"
+                           //    "\"effort_percent\": %f, \"hash\": \"%b\"}",
+                           height, height, BoolToCstring(accepted),
+                           submission.time, blockReward, effortPercent, submission.hashHex, HASH_SIZE * 2);
 
         redisAppendCommand(rc,
                            "TS.ADD " COIN_SYMBOL ":round_effort_percent %lu %f",
@@ -349,11 +373,44 @@ class RedisManager
                         "Failed to get current round effort: %s", rc->errstr);
             return 0;
         }
-
+        else if (reply->elements != 2)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to get current round effort (wrong response)");
+            freeReplyObject(reply);
+            return 0;
+        }
         double totalEffort = std::stod(reply->element[1]->str);
         freeReplyObject(reply);
 
         return totalEffort;
+    }
+
+    std::time_t GetLastRoundTime()
+    {
+        redisReply *reply;
+        redisAppendCommand(rc, "TS.GET " COIN_SYMBOL ":round_effort");
+
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to get current round time stamp: %s",
+                        rc->errstr);
+            return 0;
+        }
+        else if (reply->elements != 2)
+        {
+            Logger::Log(
+                LogType::Error, LogField::Redis,
+                "Failed to get current round time stamp (wrong response)");
+            freeReplyObject(reply);
+            return 0;
+        }
+
+        std::time_t roundStart = reply->element[0]->integer;
+        freeReplyObject(reply);
+
+        return roundStart;
     }
 
     uint32_t GetJobCount()
@@ -381,7 +438,7 @@ class RedisManager
         if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
         {
             Logger::Log(LogType::Error, LogField::Redis,
-                        "Failed to get current round effort: %s", rc->errstr);
+                        "Failed to add network difficulty: %s", rc->errstr);
             return;
         }
 

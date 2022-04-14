@@ -12,6 +12,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <deque>
 
 #include "./job_manager.hpp"
 #include "../coin_config.hpp"
@@ -78,7 +79,9 @@ class StratumServer
     // DifficultyManager* diff_manager;
 
    //  std::deque<std::time_t> block_timestamps;
-    std::time_t round_start_timestamp;
+   // in ms
+    std::time_t round_start_timestamp = 0;
+    
     std::time_t mature_timestamp = 0;
     std::time_t last_block_timestamp = 0;
 
@@ -87,7 +90,7 @@ class StratumServer
     static JobManager job_manager;
 
     std::vector<StratumClient*> clients;
-    std::vector<Job*> jobs;
+    std::deque<Job*> jobs;
 
     void Listen();
     void HandleSocket(int sockfd);
@@ -110,8 +113,5 @@ class StratumServer
     void BroadcastJob(StratumClient* cli, Job* job);
 
     Job* GetJobById(std::string_view id);
-
-    std::vector<unsigned char> GetCoinbaseTx(int64_t value, uint32_t curtime,
-                                             uint32_t height);
 };
 #endif

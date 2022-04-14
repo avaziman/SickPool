@@ -8,10 +8,10 @@
 #include <thread>
 #include <vector>
 
+#include "../config.hpp"
 #include "verushash/arith_uint256.h"
 #include "verushash/endian.h"
 #include "verushash/uint256.h"
-#include "../config.hpp"
 
 #define DIFF_US(end, start) duration_cast<microseconds>(end - start).count()
 #define TIME_NOW() std::chrono::steady_clock::now()
@@ -120,9 +120,11 @@ inline void Unhexlify(unsigned char* dest, const char* src, int size)
     }
 }
 
-inline void ToHex(char* dest, uint32_t num) { 
+inline void ToHex(char* dest, uint32_t num)
+{
     // always puts nullchar at the end
-    snprintf(dest, sizeof(uint32_t) * 2 + 1, "%08x", num); }
+    snprintf(dest, sizeof(uint32_t) * 2 + 1, "%08x", num);
+}
 
 inline uint32_t FromHex(const char* str)
 {
@@ -133,9 +135,9 @@ inline uint32_t FromHex(const char* str)
     return val;
 }
 
-
 // from script.h
-inline std::vector<unsigned char> GetNumScript(const int64_t& value){
+inline std::vector<unsigned char> GetNumScript(const int64_t& value)
+{
     std::vector<unsigned char> result;
     const bool neg = value < 0;
     uint64_t absvalue = neg ? -value : value;
@@ -185,11 +187,16 @@ inline char VarInt(uint64_t& len)
     return 9;
 }
 
-inline char GetByteAmount(uint32_t num){
-    if (num <= 0xff) return 1;
-    else if (num <= 0xffff) return 2;
-    else if (num <= 0xffffff) return 3;
-    else if (num <= 0xffffffff) return 4;
+inline char GetByteAmount(uint32_t num)
+{
+    if (num <= 0xff)
+        return 1;
+    else if (num <= 0xffff)
+        return 2;
+    else if (num <= 0xffffff)
+        return 3;
+    else if (num <= 0xffffffff)
+        return 4;
 }
 
 // inline std::string VarInt(uint64_t len)
@@ -227,6 +234,14 @@ inline double difficulty(const unsigned bits)
     const unsigned exponent_diff = 8 * (0x20 - ((bits >> 24) & 0xFF));
     const double significand = bits & 0xFFFFFF;
     return std::ldexp(0x0f0f0f / significand, exponent_diff);
+}
+
+// ms
+inline std::time_t GetDailyTimestamp()
+{
+    std::time_t time = std::time(nullptr);
+    time = time - (time % 86400);
+    return time * 1000;
 }
 
 static double BitsToDiff(int64_t nBits)

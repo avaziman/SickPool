@@ -73,7 +73,8 @@ class VerusTransaction : public Transaction
         return bytes;
     }
 
-    void AddTestnetCoinbaseOutput()
+    // since PBAAS_ACTIVATE
+    void AddFeePoolOutput()
     {
         unsigned char coinbaseOutputScript[] =
             "1a040300010114a23f82866c21819f55a1668ba7b9932e6d326b1ecc3204031401"
