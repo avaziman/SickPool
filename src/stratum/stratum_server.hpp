@@ -12,6 +12,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <queue>
 #include <deque>
 
 #include "./job_manager.hpp"
@@ -38,11 +39,11 @@
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
 
-#define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - SIMDJSON_PADDING)
 #define MAX_HTTP_REQ_SIZE (MAX_BLOCK_SIZE * 2)
 #define MAX_HTTP_JSON_DEPTH 3
 
 #define REQ_BUFF_SIZE (1024 * 32)
+#define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - SIMDJSON_PADDING)
 #define SOCK_TIMEOUT 5
 #define SOLUTION_SIZE 1344
 #define MIN_PERIOD_SECONDS 20
@@ -67,10 +68,12 @@ class StratumServer
 
     int sockfd;
     struct sockaddr_in addr;
+    
     uint32_t job_count;
     double target_shares_rate;
+    double total_effort_pow = 0;
 
-    BlockSubmission* block_submission;
+    std::deque<BlockSubmission*> block_submissions;
 
     ondemand::parser reqParser;
     ondemand::parser httpParser;
@@ -78,14 +81,17 @@ class StratumServer
     RedisManager redis_manager;
     // DifficultyManager* diff_manager;
 
-   //  std::deque<std::time_t> block_timestamps;
-   // in ms
-    std::time_t round_start_timestamp = 0;
-    
-    std::time_t mature_timestamp = 0;
-    std::time_t last_block_timestamp = 0;
+    // in ms
+    int64_t round_start_pow = 0;
+    int64_t round_start_pos = 0;
+    bool written = false;
 
+    int64_t mature_timestamp = 0;
+    int64_t last_block_timestamp = 0;
+
+    std::mutex jobs_mutex;
     std::mutex clients_mutex;
+    static std::mutex rpc_mutex;
 
     static JobManager job_manager;
 
@@ -108,10 +114,11 @@ class StratumServer
     bool SubmitBlock(const char* blockHex, int blockHexLen);
 
     void UpdateDifficulty(StratumClient* cli);
-    void AdjustDifficulty(StratumClient* cli, std::time_t curTime);
+    void AdjustDifficulty(StratumClient* cli, int64_t curTime);
 
     void BroadcastJob(StratumClient* cli, Job* job);
 
     Job* GetJobById(std::string_view id);
+    int SendRaw(int sock, char* data, int len);
 };
 #endif

@@ -98,7 +98,7 @@ BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
 
 // doesnt include dataHex
 TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
-                                              std::time_t locktime)
+                                              int64_t locktime)
 {
     TransactionData res;
     VerusTransaction coinbaseTx = GetCoinbaseTx(value, height, locktime);
@@ -110,7 +110,7 @@ TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
 }
 
 VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
-                                           std::time_t locktime)
+                                           int64_t locktime)
 {
     unsigned char prevTxIn[32] = {0};  // null last input
     // unsigned int locktime = 0;         // null locktime (no locktime)

@@ -1,12 +1,14 @@
 #ifndef UTILS_HPP_
 #define UTILS_HPP_
 #include <cmath>
+#include <ctime>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
+#include <sys/time.h>
 
 #include "../config.hpp"
 #include "verushash/arith_uint256.h"
@@ -21,6 +23,13 @@
 
 //     // if(!DecodeBase58(addr, bytes) return false;
 // }
+
+inline int64_t GetCurrentTimeMs() { struct timeval tv;
+    struct timeval time_now;
+    gettimeofday(&time_now, nullptr);
+    return (time_now.tv_sec * 1000) + (time_now.tv_usec / 1000);
+}
+
 inline int fast_atoi(const char* str, int size)
 {
     int val = 0;
@@ -237,9 +246,9 @@ inline double difficulty(const unsigned bits)
 }
 
 // ms
-inline std::time_t GetDailyTimestamp()
+inline int64_t GetDailyTimestamp()
 {
-    std::time_t time = std::time(nullptr);
+    int64_t time = std::time(nullptr);
     time = time - (time % 86400);
     return time * 1000;
 }

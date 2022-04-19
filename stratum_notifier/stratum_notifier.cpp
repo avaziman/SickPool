@@ -7,8 +7,8 @@
 
 #define PORT 4444
 
-// mining.block_notify
-// mining.wallet_notify
+// stratum.block_notify
+// stratum.wallet_notify
 int main(int argc, char* argv[])
 {
     sockaddr_in addr;
@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
     char message[128];
     // no need id
     int len = snprintf(message, sizeof(message),
-                       "{\"id\":-1,\"method\":\"mining.%s\","
+                       "{\"id\":0,\"method\":\"stratum.%s\","
                        "\"params\":[\"%s\"]}\n",
                        method, param);
 

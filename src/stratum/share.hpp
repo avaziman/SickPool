@@ -38,15 +38,16 @@ struct ShareResult
 class BlockSubmission
 {
    public:
-    BlockSubmission(ShareResult shareRes, std::string worker, std::time_t time, Job* job)
-        : shareRes(shareRes), worker(worker), time(time), job(job)
+    BlockSubmission(ShareResult shareRes, std::string worker, int64_t time, Job* job)
+        : shareRes(shareRes), worker(worker), timeMs(time), job(job), height(job->GetHeight())
     {
         Hexlify(hashHex, shareRes.HashBytes.data(), shareRes.HashBytes.size());
     }
     Job* job;
+    uint32_t height;
     const ShareResult shareRes;
     const std::string worker;
-    const std::time_t time; //ms percision
+    const int64_t timeMs; //ms percision
     char hashHex[64];
 };
 

@@ -10,7 +10,7 @@
 class StratumClient
 {
    public:
-    StratumClient(const int sock, const std::time_t time, const double diff)
+    StratumClient(const int sock, const int64_t time, const double diff)
         : sockfd(sock),
           connect_time(time),
           last_adjusted(time),
@@ -27,7 +27,7 @@ class StratumClient
 
     int GetSock() { return sockfd; }
     double GetDifficulty() { return current_diff; }
-    void SetDifficulty(double diff, std::time_t curTime)
+    void SetDifficulty(double diff, int64_t curTime)
     {
         last_diff = current_diff;
         current_diff = diff;
@@ -38,9 +38,9 @@ class StratumClient
     uint32_t GetShareCount() { return share_count; }
     std::string GetWorkerName() { return worker_full; }
     void ResetShareCount() { share_count = 0; }
-    std::time_t GetLastAdjusted() { return last_adjusted; }
+    int64_t GetLastAdjusted() { return last_adjusted; }
 
-    bool SetLastShare(uint32_t shareEnd, std::time_t time)
+    bool SetLastShare(uint32_t shareEnd, int64_t time)
     {
         last_share_time = time;
         share_count++;
@@ -64,10 +64,10 @@ class StratumClient
 #endif
    private:
     int sockfd;
-    const std::time_t connect_time;
+    const int64_t connect_time;
     uint32_t extra_nonce;
-    std::time_t last_adjusted;
-    std::time_t last_share_time;
+    int64_t last_adjusted;
+    int64_t last_share_time;
     uint32_t share_count = 0;
     double current_diff;
     double last_diff;

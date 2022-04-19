@@ -18,8 +18,9 @@ class DaemonRpc
 {
    public:
     DaemonRpc(std::string host_header, std::string auth_header);
-    int SendRequest(std::vector<char>& result, int id, const char* method,
-                    const char* params, int len);
+    int SendRequest(std::vector<char> &result, int id,
+                              const char *method, const char *params,
+                              int paramsLen);
 
    private:
     int sockfd;

@@ -13,7 +13,7 @@ using namespace std::chrono;
 class ShareProcessor
 {
    public:
-    static ShareResult Process(std::time_t curTime, StratumClient& cli,
+    static ShareResult Process(int64_t curTime, StratumClient& cli,
                                Job& job, const Share& share)
     {
         ShareResult result;
@@ -67,10 +67,16 @@ class ShareProcessor
             result.Code = ShareCode::VALID_BLOCK;
             return result;
         }
-        else if (result.Diff / cli.GetDifficulty() < 0.95)  // allow 5% below
+        else if (result.Diff / cli.GetDifficulty() < 1)  // allow 5% below
         {
             result.Code = ShareCode::LOW_DIFFICULTY_SHARE;
             result.Message = "Low difficulty share";
+            Logger::Log(LogType::Debug, LogField::ShareProcessor,
+                        "Low difficulty share diff: %f, hash: %s", result.Diff, hash.GetHex().c_str());
+            char blockHeaderHex[BLOCK_HEADER_SIZE * 2];
+            Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
+            Logger::Log(LogType::Debug, LogField::ShareProcessor,
+                        "Block header: %.*s", BLOCK_HEADER_SIZE *2 , blockHeaderHex);
             return result;
         }
 

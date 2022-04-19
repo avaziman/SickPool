@@ -30,9 +30,9 @@ class JobManager
     ondemand::parser jsonParser;
     std::string coinbaseExtra = "SickPool is in the building.";
 
-    VerusTransaction GetCoinbaseTx(int64_t value, uint32_t height, std::time_t);
+    VerusTransaction GetCoinbaseTx(int64_t value, uint32_t height, int64_t);
 
-    TransactionData GetCoinbaseTxData(int64_t value, uint32_t height, std::time_t);
+    TransactionData GetCoinbaseTxData(int64_t value, uint32_t height, int64_t);
 };
 
 #endif

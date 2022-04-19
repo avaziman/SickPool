@@ -42,8 +42,8 @@ class Job
             written += bTemplate.txList.transactions[i].dataHex.size();
         }
 
-        Logger::Log(LogType::Debug, LogField::JobManager, "tx hex: %.*s",
-                    txsHex.size(), txsHex.data());
+        // Logger::Log(LogType::Debug, LogField::JobManager, "tx hex: %.*s",
+        //             txsHex.size(), txsHex.data());
     }
 
     virtual unsigned char* GetHeaderData(std::string_view time,
@@ -73,7 +73,7 @@ class Job
     int GetTransactionCount() { return txCount; }
     int GetBlockSize() { return (BLOCK_HEADER_SIZE * 2) + txsHex.size(); }
     const char* GetId() { return jobIdStr; }
-    std::time_t GetMinTime() { return minTime; }
+    int64_t GetMinTime() { return minTime; }
     char* GetNotifyBuff() { return notifyBuff; }
     std::size_t GetNotifyBuffSize() { return notifyBuffSize; }
     double GetTargetDiff() { return targetDiff; }
@@ -87,7 +87,7 @@ class Job
     int txCount;
 
     const uint32_t jobId;
-    const std::time_t minTime;
+    const int64_t minTime;
     double targetDiff;
     const int64_t blockReward;
     const uint32_t height;
@@ -97,7 +97,6 @@ class Job
 
     char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
     std::size_t notifyBuffSize;
-    // std::time_t created;
     //  char version[4];
     //  char hashPrevBlock[32];
     //  char hashMerkleRoot[32];

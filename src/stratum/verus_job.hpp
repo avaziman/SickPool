@@ -84,8 +84,6 @@ class VerusJob : public Job
                                  std::string_view nonce2,
                                  std::string_view sol) override
     {
-        // here we don't mutate the parameters so we use string_views as
-        // received by the json parser
         Unhexlify(this->headerData + 4 + 32 * 3, time.data(), time.size());
         Unhexlify(this->headerData + 4 * 3 + 32 * 3, nonce1.data(),
                   nonce1.size());

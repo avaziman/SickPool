@@ -22,9 +22,9 @@ include_directories(lib/simdjson)
 
 add_subdirectory(src)
 add_subdirectory(stratum_notifier)
-add_subdirectory(benchmark)
+# add_subdirectory(benchmark)
 
-add_subdirectory(lib/googletest)
-add_subdirectory(lib/benchmark)
+# add_subdirectory(lib/googletest)
+# add_subdirectory(lib/benchmark)
 
-add_subdirectory(tests)
+# add_subdirectory(tests)
