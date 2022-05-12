@@ -8,7 +8,6 @@ JobManager StratumServer::job_manager;
 StratumServer::StratumServer()
     : reqParser(REQ_BUFF_SIZE),
       httpParser(MAX_HTTP_REQ_SIZE),
-      target_shares_rate(coin_config.target_shares_rate),
       redis_manager(coin_config.redis_host),
       block_submissions()
 {
@@ -49,9 +48,6 @@ StratumServer::StratumServer()
     //                                        std::string(cnfg.rpcs[i].auth)));
     // }
 
-    job_count = redis_manager.GetJobCount();
-
-    std::cout << "Job count: " << job_count << std::endl;
 
     int optval = 1;
 
@@ -80,6 +76,7 @@ StratumServer::StratumServer()
 #endif
     // std::vector<char> c;
     // SendRpcReq(c, 1, "getblockcount", nullptr, 0);
+    redis_manager.UpdatePoS(0, GetCurrentTimeMs());
 }
 
 StratumServer::~StratumServer()
@@ -292,14 +289,14 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     jobs.push_back(newJob);
 
     // save it to process round
-    int64_t last_round_start = round_start_pow;
-    int64_t last_total_effort = total_effort_pow;
+    int64_t last_round_start_pow;
+    int64_t last_total_effort_pow;
 
     // round ended
     if (block_submissions.size())
     {
-        last_round_start = round_start_pow;
-        last_total_effort = total_effort_pow;
+        last_round_start_pow = round_start_pow;
+        last_total_effort_pow = total_effort_pow;
 
         round_start_pow = curtimeMs;
         total_effort_pow = 0;
@@ -339,8 +336,8 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         // only one block submission can be accepted
         if (blockAdded) validSubmission = submission;
 
-        redis_manager.AddBlockSubmission(*submission,
-                                         blockAdded, last_total_effort);
+        redis_manager.AddBlockSubmission(*submission, blockAdded,
+                                         last_total_effort_pow);
     }
 
     start = TIME_NOW();
@@ -349,22 +346,23 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         redis_manager.RenameCurrentRound(newJob->GetHeight() - 1);
         if (validSubmission != nullptr)
         {
-            redis_manager.ClosePoWRound(validSubmission->timeMs,
-                                        newJob->GetBlockReward(),
-                                        newJob->GetHeight() - 1,
-                                        last_total_effort, coin_config.pow_fee);
+            redis_manager.ClosePoWRound(
+                last_round_start_pow, validSubmission->timeMs,
+                newJob->GetBlockReward(), newJob->GetHeight() - 1,
+                last_total_effort_pow, coin_config.pow_fee);
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block added to chain! found by: %s, hash: %.*s",
-                        validSubmission->worker.c_str(), HASH_SIZE * 2,
+                        validSubmission->worker.c_str(), HASH_SIZE_HEX,
                         validSubmission->hashHex);
         }
         else
         {
             // 0 reward for invalid blocks
-            redis_manager.ClosePoWRound(curtimeMs, 0, newJob->GetHeight() - 1,
-                                        last_total_effort, coin_config.pow_fee);
+            redis_manager.ClosePoWRound(
+                last_round_start_pow, curtimeMs, 0, newJob->GetHeight() - 1,
+                last_total_effort_pow, coin_config.pow_fee);
             Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Block NOT added to chain %.*s!", HASH_SIZE * 2,
+                        "Block NOT added to chain %.*s!", HASH_SIZE_HEX,
                         validSubmission->hashHex);
         }
 
@@ -391,33 +389,40 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 
     redis_manager.AddNetworkHr(curtimeMs, newJob->GetTargetDiff());
 
-    // std::vector<char> resBody;
-    // // if (block_timestamps.size() < BLOCK_MATURITY)
-    // if (mature_timestamp == 0)
-    // {
-    //     std::string params =
-    //         "\"" + std::to_string(job->GetHeight() - BLOCK_MATURITY - 1)
-    //         +
-    //         "\"";
-    //     int resCode =
-    //         SendRpcReq(resBody, 1, "getblock", params.c_str(),
-    //         params.size());
-    //     ondemand::document doc = httpParser.iterate(
-    //         resBody.data(), resBody.size() - SIMDJSON_PADDING,
-    //         resBody.size());
+    std::vector<char> resBody;
+    // if (block_timestamps.size() < BLOCK_MATURITY)
+    if (mature_timestamp_ms == 0)
+    {
+        try
+        {
+            std::string params =
+                "\"" +
+                std::to_string(newJob->GetHeight() - BLOCK_MATURITY - 1) + "\"";
+            int resCode = SendRpcReq(resBody, 1, "getblock", params.c_str(),
+                                     params.size());
+            ondemand::document doc = httpParser.iterate(
+                resBody.data(), resBody.size(), resBody.capacity());
 
-    //     ondemand::object res = doc["result"].get_object();
-    //     mature_timestamp = res["time"].get_uint64();
-    //     redis_manager.SetMatureTimestamp(mature_timestamp);
-    // }
-    // else
-    // {
-    //     mature_timestamp = mature_timestamp + (curtime -
-    //     last_block_timestamp);
-    // }
-    // last_block_timestamp = curtime;
-    // Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %d",
-    //             mature_timestamp);
+            ondemand::object res = doc["result"].get_object();
+            mature_timestamp_ms = res["time"].get_uint64();
+            mature_timestamp_ms *= 1000; // ms accuracy
+        }
+        catch (simdjson_error &err)
+        {
+            Logger::Log(LogType::Error, LogField::Stratum,
+                        "Failed to get mature timestamp error: %s", err.what());
+        }
+    }
+    else
+    {
+        mature_timestamp_ms =
+            mature_timestamp_ms + (curtimeMs - last_block_timestamp_ms);
+    }
+    redis_manager.SetMatureTimestamp(mature_timestamp_ms);
+    last_block_timestamp_ms = curtimeMs;
+
+    Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %" PRId64,
+                mature_timestamp_ms);
 
     Logger::Log(LogType::Info, LogField::JobManager, "Broadcasted new job: #%s",
                 newJob->GetId());
@@ -516,7 +521,8 @@ void StratumServer::HandleWalletNotify(ondemand::array &params)
         std::string_view validationType = res["validationtype"];
         if (validationType == "stake")
         {
-            Logger::Log(LogType::Info, LogField::Stratum, "Found PoS Block! hash: %.*s", blockHash.size(),
+            Logger::Log(LogType::Info, LogField::Stratum,
+                        "Found PoS Block! hash: %.*s", blockHash.size(),
                         blockHash.data());
         }
 
@@ -534,8 +540,6 @@ void StratumServer::HandleWalletNotify(ondemand::array &params)
     // parse the (first) coinbase transaction of the block
     // and check if it outputs to our pool address
 }
-
-// TODO: VERIFY EQUIHASH ON SHARE
 // TODO: check if rpc response contains error
 
 void StratumServer::HandleSubscribe(StratumClient *cli, int id,
@@ -678,7 +682,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
         std::string(std::string(valid_addr) + "." + std::string(worker));
     worker_full = worker_full_str;
 
-    cli->SetWorkerFull(worker_full);
+    cli->HandleAuthorized(worker_full);
     redis_manager.AddWorker(valid_addr, worker_full, GetDailyTimestamp());
 
     Logger::Log(LogType::Info, LogField::Stratum,
@@ -706,9 +710,9 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
     // parsing takes 0-1 us
     auto start = steady_clock::now();
     Share share;
-    auto it = params.begin();
     try
     {
+        auto it = params.begin();
         share.worker = (*it).get_string();
         share.jobId = (*++it).get_string();
         share.time = (*++it).get_string();
@@ -727,6 +731,8 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
     HandleShare(cli, id, share);
     // auto duration = duration_cast<microseconds>(end - start).count();
 }
+
+
 
 void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 {
@@ -781,24 +787,22 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             total_effort_pow += shareRes.Diff;
             break;
         default:
-            SendReject(cli, id, (int)shareRes.Code, shareRes.Message);
+            SendReject(cli, id, (int)shareRes.Code, shareRes.Message.c_str());
             break;
     }
 
     // write invalid shares too for statistics
     bool dbRes = redis_manager.AddShare(cli->GetWorkerName(), time,
                                         round_start_pow, shareRes.Diff);
-    written = true;
-
     // TODO: there may be bug if handle notify runs before add share, total
     // effort wont include block share HandleBlockNotify(*new
     // ondemand::array());
 
     auto duration = DIFF_US(end, start);
 
-    // Logger::Log(LogType::Debug, LogField::Stratum,
-    //             "Share processed in %dus, diff: %f.", duration,
-    //             shareRes.Diff);
+    Logger::Log(LogType::Debug, LogField::Stratum,
+                "Share processed in %dus, diff: %f.", duration,
+                shareRes.Diff);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,
@@ -908,14 +912,14 @@ void StratumServer::AdjustDifficulty(StratumClient *cli, int64_t curTime)
     std::cout << "share minute rate: " << minuteRate << std::endl;
 
     // we allow 20% difference from target
-    if (minuteRate > target_shares_rate * 1.2 ||
-        minuteRate < target_shares_rate * 0.8)
+    if (minuteRate > coin_config.target_shares_rate * 1.2 ||
+        minuteRate < coin_config.target_shares_rate * 0.8)
     {
         std::cout << "old diff: " << cli->GetDifficulty() << std::endl;
 
         // similar to bitcoin difficulty calculation
         double newDiff =
-            (minuteRate / target_shares_rate) * cli->GetDifficulty();
+            (minuteRate / coin_config.target_shares_rate) * cli->GetDifficulty();
         if (newDiff == 0) newDiff = cli->GetDifficulty() / 5;
 
         cli->SetDifficulty(newDiff, curTime);

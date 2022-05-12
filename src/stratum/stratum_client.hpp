@@ -2,6 +2,7 @@
 #define STRATUM_CLIENT_HPP_
 #include <cstring>
 #include <set>
+#include <unordered_set>
 
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/utils.hpp"
@@ -27,18 +28,18 @@ class StratumClient
 
     int GetSock() { return sockfd; }
     double GetDifficulty() { return current_diff; }
+    const char* GetExtraNonce() { return extra_nonce_str; }
+    uint32_t GetShareCount() { return share_count; }
+    std::string GetWorkerName() { return worker_full; }
+    int64_t GetLastAdjusted() { return last_adjusted; }
+    void ResetShareCount() { share_count = 0; }
+
     void SetDifficulty(double diff, int64_t curTime)
     {
         last_diff = current_diff;
         current_diff = diff;
         last_adjusted = curTime;
     }
-
-    const char* GetExtraNonce() { return extra_nonce_str; }
-    uint32_t GetShareCount() { return share_count; }
-    std::string GetWorkerName() { return worker_full; }
-    void ResetShareCount() { share_count = 0; }
-    int64_t GetLastAdjusted() { return last_adjusted; }
 
     bool SetLastShare(uint32_t shareEnd, int64_t time)
     {
@@ -50,9 +51,12 @@ class StratumClient
         return inserted;
     }
 
-    void SetWorkerFull(std::string_view worker)
+    // called after auth
+    void HandleAuthorized(std::string_view worker)
     {
         // add the hasher on authorization
+        // copy the worker name (it will be destroyed)
+        share_set = std::unordered_set<uint32_t>();
         worker_full = std::string(worker);
 #if POOL_COIN <= COIN_VRSC
         this->verusHasher = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
@@ -75,11 +79,18 @@ class StratumClient
     char extra_nonce_str[9];
     std::string worker_full;
 
+    // needs to be thread-specific to allow simultanious processing
+    uint8_t block_header[BLOCK_HEADER_SIZE];
+
     // for O(log N) duplicate search
     // 2^32 (1 in 4B) chance of false duplicate
     // no need to save the entire hash
     // absolutely no need to save the entire block header like snomp :)
-    std::set<uint32_t> share_set;
+    // std::set<uint32_t> share_set;
+
+    // for O(1) duplicate search
+    // at the cost of a bit of memory, but much faster
+    std::unordered_set<uint32_t> share_set;
 
     // the hasher is thread-specific
     // so we need to store it in client so we only need to init once

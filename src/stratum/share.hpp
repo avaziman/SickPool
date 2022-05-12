@@ -29,7 +29,7 @@ struct ShareResult
 {
     ShareResult() : HashBytes(32){}
     ShareCode Code;
-    const char* Message;
+    std::string Message;
     double Diff;
     // uint256 takes vector as param
     std::vector<unsigned char> HashBytes;

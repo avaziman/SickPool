@@ -80,7 +80,14 @@ class Logger
                 break;
         }
 
-        printf(message, args...);
+        if constexpr (sizeof...(args))
+        {
+            printf(message, args...);
+        }
+        else
+        {
+            printf("%s", message);
+        }
         printf("\n");
     }
 };

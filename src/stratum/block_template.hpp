@@ -54,7 +54,7 @@ struct BlockTemplate
     BlockTemplate() : txList(){}
     int32_t version;
     std::string_view prevBlockHash;
-    std::string_view finalSaplingRootHash;
+    std::string_view finalsRootHash;
     std::string_view solution;
     TransactionDataList txList;
     int64_t coinbaseValue;

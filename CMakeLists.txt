@@ -5,8 +5,8 @@ project("SickPool" CXX C)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-# set(CMAKE_BUILD_TYPE "Release")
-set(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_BUILD_TYPE "Release")
+# set(CMAKE_BUILD_TYPE "Debug")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     #-g3 maximum debugging information
@@ -17,8 +17,8 @@ else()
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3 -Ofast")
 endif()
 
-include_directories(lib/rapidjson/include)
-include_directories(lib/simdjson)
+# include_directories(lib/rapidjson/include)
+add_subdirectory(lib/simdjson)
 
 add_subdirectory(src)
 add_subdirectory(stratum_notifier)

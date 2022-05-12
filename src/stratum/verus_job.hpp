@@ -6,13 +6,33 @@
 #include <string>
 
 #include "job.hpp"
+
+#define EXTRANONCE_SIZE 4
+#define VERSION_SIZE 4
+#define TIME_SIZE 4
+#define BITS_SIZE 4
+#define PREVHASH_SIZE HASH_SIZE
+#define MERKLE_ROOT_SIZE HASH_SIZE
+#define FINALSROOT_SIZE HASH_SIZE
+#define NONCE_SIZE HASH_SIZE
+#define SOLUTION_SIZE 1344
+#define SOLUTION_LENGTH_SIZE 3
+
+#define BLOCK_HEADER_STATIC_SIZE                                  \
+    VERSION_SIZE           /* version */                          \
+        + PREVHASH_SIZE    /* prevhash */                         \
+        + MERKLE_ROOT_SIZE /* merkle_root */                      \
+        + FINALSROOT_SIZE  /* final sapling root */               \
+        + TIME_SIZE        /* time, not static but we override */ \
+        + BITS_SIZE        /* bits */
+
 class VerusJob : public Job
 {
    public:
     VerusJob(uint32_t jobId, BlockTemplate& bTemplate, bool clean = true)
         : Job(jobId, bTemplate)
     {
-        char merkleRootHex[64];
+        char merkleRootHex[MERKLE_ROOT_SIZE * 2];
 
         // difficulty is calculated from opposite byte encoding than in block
         uint32_t bitsUint = HexToUint(bTemplate.bits.data(), 8);
@@ -20,30 +40,31 @@ class VerusJob : public Job
 
         // reverse all numbers for block encoding
 
-        char prevBlockRev[64];
-        char finalSRootRev[64];
+        char prevBlockRev[PREVHASH_SIZE];
+        char finalSRootRev[FINALSROOT_SIZE];
 
-        ReverseHex(prevBlockRev, bTemplate.prevBlockHash.data(), 64);
-        ReverseHex(finalSRootRev, bTemplate.finalSaplingRootHash.data(), 64);
+        ReverseHex(prevBlockRev, bTemplate.prevBlockHash.data(), PREVHASH_SIZE * 2);
+        ReverseHex(finalSRootRev, bTemplate.finalsRootHash.data(),
+                   FINALSROOT_SIZE * 2);
 
         // write header
 
-        Write(&bTemplate.version, 4);  // no need to reverse here
-        WriteUnhex(prevBlockRev, 64);
+        Write(&bTemplate.version, VERSION_SIZE);  // no need to reverse here
+        WriteUnhex(prevBlockRev, PREVHASH_SIZE * 2);
 
         // hashes are given in LE, no need to reverse
 
         MerkleTree::CalcRoot(bTemplate.txList.transactions,
-                            headerData + written);
+                             staticHeaderData + written);
 
         // we need the hexlified merkle root for the notification message
-        Hexlify(merkleRootHex, headerData + written, 32);
-        written += 32;
+        Hexlify(merkleRootHex, staticHeaderData + written, MERKLE_ROOT_SIZE);
+        written += MERKLE_ROOT_SIZE;
 
-        WriteUnhex(finalSRootRev, 64);
+        WriteUnhex(finalSRootRev, FINALSROOT_SIZE * 2);
 
-        Write(&bTemplate.minTime, 4);  // we overwrite time later
-        Write(&bitsUint, 4);
+        Write(&bTemplate.minTime, TIME_SIZE);  // we overwrite time later
+        Write(&bitsUint, BITS_SIZE);
 
         // only write the sol size and 72 first bytes of sol
         // the rest is changed by the miner
@@ -59,7 +80,7 @@ class VerusJob : public Job
         bTemplate.version = bswap_32(bTemplate.version);
         bTemplate.minTime = bswap_32(bTemplate.minTime);
         bitsUint = bswap_32(bitsUint);
-        
+
         notifyBuffSize =
             snprintf(notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
                      "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
@@ -80,31 +101,48 @@ class VerusJob : public Job
         std::cout << notifyBuff << std::endl;
     }
 
-    unsigned char* GetHeaderData(std::string_view time, std::string_view nonce1,
-                                 std::string_view nonce2,
-                                 std::string_view sol) override
+    uint8_t* GetHeaderData(uint8_t* buff, std::string_view time,
+                           std::string_view nonce1, std::string_view nonce2,
+                           std::string_view sol) override
     {
-        Unhexlify(this->headerData + 4 + 32 * 3, time.data(), time.size());
-        Unhexlify(this->headerData + 4 * 3 + 32 * 3, nonce1.data(),
-                  nonce1.size());
-        Unhexlify(this->headerData + 4 * 4 + 32 * 3, nonce2.data(),
-                  64 - nonce1.size());
-        Unhexlify(this->headerData + 4 * 3 + 32 * 4, sol.data(), sol.size());
+        memcpy(buff, this->staticHeaderData, BLOCK_HEADER_STATIC_SIZE);
 
-        return this->headerData;
+        // time pos
+        int pos =
+            VERSION_SIZE + PREVHASH_SIZE + MERKLE_ROOT_SIZE + FINALSROOT_SIZE;
+
+        Unhexlify(buff + pos, time.data(), TIME_SIZE * 2);
+
+        // nonce1 pos
+        pos += TIME_SIZE + BITS_SIZE;  // bits are already written from static
+
+        Unhexlify(buff + pos, nonce1.data(), EXTRANONCE_SIZE * 2);
+
+        // nonce2 pos
+        pos += EXTRANONCE_SIZE;
+        Unhexlify(buff + pos, nonce2.data(),
+                  (NONCE_SIZE - EXTRANONCE_SIZE) * 2);
+
+        // solution pos
+        pos += (NONCE_SIZE - EXTRANONCE_SIZE);
+        Unhexlify(buff + pos, sol.data(),
+                  (SOLUTION_LENGTH_SIZE + SOLUTION_SIZE) * 2);
+
+        return this->staticHeaderData;
     }
 
    private:
+    uint8_t staticHeaderData[BLOCK_HEADER_STATIC_SIZE];
     inline void WriteUnhex(const char* data, int size)
     {
-        Unhexlify(headerData + written, data, size);
+        Unhexlify(staticHeaderData + written, data, size);
         written += size / 2;
     }
 
     template <class T>
     inline void Write(T* data, int size)
     {
-        memcpy(headerData + written, data, size);
+        memcpy(staticHeaderData + written, data, size);
         written += size;
     }
 

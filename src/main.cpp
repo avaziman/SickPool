@@ -58,9 +58,9 @@ int main(int argc, char** argv)
                     coinConfig.pool_addr.c_str());
         Logger::Log(LogType::Info, LogField::Config, "Redis host: %s",
                     coinConfig.redis_host.c_str());
-        Logger::Log(LogType::Info, LogField::Config, "PoW fee: %f%%",
+        Logger::Log(LogType::Info, LogField::Config, "PoW fee: %f",
                     coinConfig.pow_fee);
-        Logger::Log(LogType::Info, LogField::Config, "PoS fee: %f%%",
+        Logger::Log(LogType::Info, LogField::Config, "PoS fee: %f",
                     coinConfig.pos_fee);
 
         StratumServer::coin_config = coinConfig;
@@ -75,10 +75,10 @@ int main(int argc, char** argv)
     }
     catch (std::runtime_error e)
     {
-        std::cerr << "START-UP ERROR: " << e.what() << "." << std::endl;
+        Logger::Log(LogType::Critical, LogField::Config, "START-UP ERROR: %s.", e.what());
         return EXIT_FAILURE;
     }
-    return EXIT_FAILURE; // should never finish!
+    return EXIT_FAILURE;  // should never finish!
 }
 
 void AssignJson(const char* name, std::string& obj, ondemand::document& doc)
@@ -178,4 +178,4 @@ void ParseCoinConfig(padded_string& json, CoinConfig& cnfg)
 //     printf("%s: %s\n", s[i], status ? "Ok" : "NO OK");
 // }
 // return 0;
-//TODO: make difficulty adjustment based on average hashrate
+// TODO: make difficulty adjustment based on average hashrate

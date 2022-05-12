@@ -17,7 +17,7 @@ class ShareProcessor
                                Job& job, const Share& share)
     {
         ShareResult result;
-        unsigned char* headerData;
+        unsigned char headerData[BLOCK_HEADER_SIZE];
 
         // veirfy params before even hashing
         // convert share time to uint32 (fast)
@@ -30,12 +30,15 @@ class ShareProcessor
         if (shareTime < minTime || shareTime > maxTime)
         {
             result.Code = ShareCode::UNKNOWN;
-            result.Message = "Invalid nTime";
+            result.Message = "Invalid nTime "
+                             "(min: " + std::to_string(minTime) +
+                             ", max: " + std::to_string(maxTime) +
+                             ", given: " + std::to_string(shareTime) + ")";
             return result;
         }
         // TODO: verify solution
 
-        headerData = job.GetHeaderData(share.time, cli.GetExtraNonce(),
+        job.GetHeaderData(headerData, share.time, cli.GetExtraNonce(),
                                        share.nonce2, share.solution);
         
 #if POOL_COIN <= COIN_VRSC

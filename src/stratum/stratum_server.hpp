@@ -1,7 +1,6 @@
 #ifndef STRATUM_SERVER_HPP_
 #define STRATUM_SERVER_HPP_
 #include <simdjson.h>
-#include <sw/redis++/redis++.h>
 #include <sys/socket.h>
 
 #include <algorithm>
@@ -11,6 +10,7 @@
 #include <cstring>
 #include <iostream>
 #include <thread>
+#include <mutex>
 #include <vector>
 #include <queue>
 #include <deque>
@@ -45,10 +45,7 @@
 #define REQ_BUFF_SIZE (1024 * 32)
 #define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - SIMDJSON_PADDING)
 #define SOCK_TIMEOUT 5
-#define SOLUTION_SIZE 1344
 #define MIN_PERIOD_SECONDS 20
-
-using namespace sw::redis;
 
 using namespace simdjson;
 using namespace std::chrono;
@@ -69,8 +66,6 @@ class StratumServer
     int sockfd;
     struct sockaddr_in addr;
     
-    uint32_t job_count;
-    double target_shares_rate;
     double total_effort_pow = 0;
 
     std::deque<BlockSubmission*> block_submissions;
@@ -84,15 +79,15 @@ class StratumServer
     // in ms
     int64_t round_start_pow = 0;
     int64_t round_start_pos = 0;
-    bool written = false;
 
-    int64_t mature_timestamp = 0;
-    int64_t last_block_timestamp = 0;
+    int64_t mature_timestamp_ms = 0;
+    int64_t last_block_timestamp_ms = 0;
 
     std::mutex jobs_mutex;
     std::mutex clients_mutex;
-    static std::mutex rpc_mutex;
+    std::mutex db_mutex;
 
+    static std::mutex rpc_mutex;
     static JobManager job_manager;
 
     std::vector<StratumClient*> clients;

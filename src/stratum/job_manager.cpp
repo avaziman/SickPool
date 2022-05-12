@@ -30,7 +30,7 @@ Job* JobManager::GetNewJob()
         // this must be in the order they appear in the result for simdjson
         blockTemplate.version = res["version"].get_int64();
         blockTemplate.prevBlockHash = res["previousblockhash"].get_string();
-        blockTemplate.finalSaplingRootHash =
+        blockTemplate.finalsRootHash =
             res["finalsaplingroothash"].get_string();
         blockTemplate.solution = res["solution"].get_string();
         // can't iterate after we get the string_view

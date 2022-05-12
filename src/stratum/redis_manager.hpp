@@ -82,7 +82,7 @@ class RedisManager
             rc,
             "FT.CREATE " COIN_SYMBOL
             ":block_index ON HASH PREFIX 1 " COIN_SYMBOL
-            ":block:* SCHEMA worker TAG SORTABLE height "
+            ":block: SCHEMA worker TAG SORTABLE height "
             "NUMERIC SORTABLE difficulty NUMERIC SORTABLE reward" COIN_SYMBOL
             " NUMERIC SORTABLE");
 
@@ -178,6 +178,7 @@ class RedisManager
     bool AddShare(std::string_view worker, int64_t shareTime,
                   int64_t roundStart, double diff)
     {
+        // TODO: MAKE THIS MADD TO save 1 req
         redisReply *reply;
         redisAppendCommand(rc,
                            "TS.ADD " COIN_SYMBOL ":shares:%b %" PRId64 " %f",
@@ -192,10 +193,14 @@ class RedisManager
                 rc, "HINCRBYFLOAT " COIN_SYMBOL ":current_round %b %f",
                 address.data(), address.size(), diff);
 
-            // this will incrby as we have sum duplicate policy
             redisAppendCommand(
-                rc, "TS.ADD " COIN_SYMBOL ":round_effort %" PRId64 " %f",
-                roundStart, diff);
+                rc, "HINCRBYFLOAT " COIN_SYMBOL ":current_round $total %f",
+                diff);
+
+            // // this will incrby as we have sum duplicate policy
+            // redisAppendCommand(
+            //     rc, "TS.ADD " COIN_SYMBOL ":round_effort %" PRId64 " %f",
+            //     roundStart, diff);
         }
 
         if (redisGetReply(rc, (void **)&reply) != REDIS_OK)  // reply for TS.ADD
@@ -308,15 +313,16 @@ class RedisManager
         return true;
     }
 
-    void ClosePoWRound(int64_t timeMs, int64_t reward, uint32_t height,
-                       const double totalEffort, const double fee)
+    void ClosePoWRound(int64_t roundStart, int64_t foundTimeMs, int64_t reward,
+                       uint32_t height, const double totalEffort,
+                       const double fee)
     {
         redisReply *hashReply, *balReply;
 
         if (totalEffort == 0)
         {
             Logger::Log(LogType::Critical, LogField::Redis,
-                        "Total effort is 0, cannot close round!");
+                        "Total effort is 0, cannot close PoW round!");
             return;
         }
 
@@ -333,6 +339,89 @@ class RedisManager
         Logger::Log(LogType::Info, LogField::Redis,
                     "Closing round with %d workers", hashReply->elements / 2);
 
+        // save in db as float, as that's the native ts type
+        double rewardF = reward / 1e8;  // satoshis to coins
+        // separate append and get to pipeline (1 send, 1 recv!)
+        for (int i = 0; i < hashReply->elements; i += 2)
+        {
+            char *miner = hashReply->element[i]->str;
+            double minerEffort = std::stod(hashReply->element[i + 1]->str);
+
+            double minerShare = minerEffort / totalEffort;
+            double minerReward = rewardF * minerShare;
+            minerReward -= minerReward * fee;  // substract fee
+
+            redisAppendCommand(rc,
+                               "TS.INCRBY " COIN_SYMBOL
+                               ":balance:%s %f"
+                               " TIMESTAMP %" PRId64,
+                               miner, minerReward, foundTimeMs);
+
+            // round format: height:effort_percent:reward
+            // NX = only new
+            redisAppendCommand(
+                rc, "ZADD " COIN_SYMBOL ":rounds:%s NX %" PRId64 " %u:%f:%f",
+                miner, foundTimeMs, height, minerShare, minerReward);
+
+            Logger::Log(LogType::Debug, LogField::Redis,
+                        "Round: %d, miner: %s, effort: %f, share: %f, reward: "
+                        "%f, total effort: %f",
+                        height, miner, minerEffort, minerShare, minerReward,
+                        totalEffort);
+        }
+
+        for (int i = 0; i < hashReply->elements; i += 2)
+        {
+            // reply for TS.INCRBY
+            if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
+            {
+                Logger::Log(LogType::Critical, LogField::Redis,
+                            "Failed to increase balance: %s", rc->errstr);
+            }
+            freeReplyObject(balReply);
+
+            if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
+            {
+                Logger::Log(LogType::Critical, LogField::Redis,
+                            "Failed to set round earning stats: %s",
+                            rc->errstr);
+            }
+
+            freeReplyObject(balReply);
+        }
+        freeReplyObject(hashReply);  // free HGETALL reply
+    }
+
+    void ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
+                       int64_t reward, uint32_t height,
+                       const double totalEffort, const double fee)
+    {
+        redisReply *hashReply, *balReply;
+
+        if (totalEffort == 0)
+        {
+            Logger::Log(LogType::Critical, LogField::Redis,
+                        "Total effort is 0, cannot close PoS round!");
+            return;
+        }
+
+        redisAppendCommand(rc,
+                           "TS.MRANGE %" PRId64 " %" PRId64
+                           " FILTER type=balance coin=" COIN_SYMBOL,
+                           roundStartMs, foundTimeMs);
+
+        // reply for TS.MRANGE
+        if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Critical, LogField::Redis,
+                        "Failed to get balances: %s", rc->errstr);
+            return;
+        }
+
+        Logger::Log(LogType::Info, LogField::Redis,
+                    "Closing round with %d balance changes",
+                    hashReply->elements / 2);
+
         // separate append and get to pipeline (1 send, 1 recv!)
         for (int i = 0; i < hashReply->elements; i += 2)
         {
@@ -346,14 +435,14 @@ class RedisManager
             redisAppendCommand(rc,
                                "TS.INCRBY " COIN_SYMBOL ":balance:%s %" PRId64
                                " TIMESTAMP %" PRId64,
-                               miner, minerReward, timeMs);
+                               miner, minerReward, foundTimeMs);
 
             // round format: height:effort_percent:reward
             // NX = only new
-            redisAppendCommand(rc,
-                               "ZADD " COIN_SYMBOL ":rounds:%s NX %" PRId64
-                               " %u:%f:%" PRId64,
-                               miner, timeMs, height, minerShare, minerReward);
+            redisAppendCommand(
+                rc,
+                "ZADD " COIN_SYMBOL ":rounds:%s NX %" PRId64 " %u:%f:%" PRId64,
+                miner, foundTimeMs, height, minerShare, minerReward);
 
             Logger::Log(LogType::Debug, LogField::Redis,
                         "Round: %d, miner: %s, effort: %f, share: %f, reward: "
@@ -394,7 +483,7 @@ class RedisManager
         {
             // if this is not fixed, more money than needed will be paid
             Logger::Log(LogType::Critical, LogField::Redis,
-                        "Failed to get remove current round!", rc->errstr);
+                        "Failed to rename current round!", rc->errstr);
             return false;
         }
         freeReplyObject(reply);
@@ -520,8 +609,43 @@ class RedisManager
                         "Failed to add network difficulty: %s", rc->errstr);
             return;
         }
-
         freeReplyObject(reply);
+    }
+
+    void UpdatePoS(uint64_t from, uint64_t maturity)
+    {
+        redisReply *reply;
+        redisAppendCommand(rc,
+                           "TS.MRANGE %" PRId64 " %" PRId64
+                           " FILTER type=balance coin=" COIN_SYMBOL,
+                           from, maturity);
+
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to get balances: %s", rc->errstr);
+            return;
+        }
+
+        // assert type = arr (2)
+        for (int i = 0; i < reply->elements; i++)
+        {
+            // key is 2d array of the following arrays: key name, (empty array labels), values (array of tuples)
+            redisReply* key = reply->element[i];
+            char *keyName = key[0].element[0]->str;
+
+            // skip key name + null value
+            redisReply *values = key[0].element[2];
+
+            for (int j = 0; j < values->elements; j++)
+            {
+                int64_t timestamp = values->element[j]->element[0]->integer;
+                char* value_str =      values->element[j]->element[1]->str;
+                int64_t value = std::stoll(value_str);
+                std::cout << "timestamp: " << timestamp
+                          << " value: " << value << " " << value_str << std::endl;
+            }
+        }
     }
 
    private:

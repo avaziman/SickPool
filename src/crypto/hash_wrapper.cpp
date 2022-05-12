@@ -19,12 +19,14 @@ void HashWrapper::VerushashV2b2(unsigned char* dest, unsigned char* in,
                                 int size, CVerusHashV2* hasher)
 
 {
-    
-    hasher->Write(in, size);
     // auto start = std::chrono::steady_clock::now();
+
+    hasher->Write(in, size);
     hasher->Finalize2b(dest);
-    // auto end = std::chrono::steady_clock::now();
     hasher->Reset();
+
+    // auto end = std::chrono::steady_clock::now();
+    // std::cout << "VerusHashV2b2: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " microseconds" << std::endl;
     // CVerusHash::Hash(dest, in, size);
 }
 void HashWrapper::SHA256d(unsigned char* dest, unsigned char* in, int size)

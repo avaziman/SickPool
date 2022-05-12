@@ -10,7 +10,7 @@
 #include "verushash/verus_hash.h"
 #include "verushash/verus_clhash.h"
 
-#define VERUS_HASH_SIZE 32
+#define VERUS_HASH_SIZE 32 
 
 class HashWrapper
 {
