@@ -33,6 +33,7 @@ class StratumClient
     std::string GetWorkerName() { return worker_full; }
     int64_t GetLastAdjusted() { return last_adjusted; }
     void ResetShareCount() { share_count = 0; }
+    uint8_t* GetBlockheaderBuff() { return block_header; }
 
     void SetDifficulty(double diff, int64_t curTime)
     {
@@ -46,8 +47,10 @@ class StratumClient
         last_share_time = time;
         share_count++;
 
-        // checks for existance in O(log N), fast duplicate check
+        // checks for existance in O(1), fast duplicate check
+        // sub 1 us!!!
         bool inserted = share_set.insert(shareEnd).second;
+
         return inserted;
     }
 

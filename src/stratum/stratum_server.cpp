@@ -48,7 +48,6 @@ StratumServer::StratumServer()
     //                                        std::string(cnfg.rpcs[i].auth)));
     // }
 
-
     int optval = 1;
 
     sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -350,6 +349,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
                 last_round_start_pow, validSubmission->timeMs,
                 newJob->GetBlockReward(), newJob->GetHeight() - 1,
                 last_total_effort_pow, coin_config.pow_fee);
+            // TODO: fix
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block added to chain! found by: %s, hash: %.*s",
                         validSubmission->worker.c_str(), HASH_SIZE_HEX,
@@ -361,6 +361,8 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
             redis_manager.ClosePoWRound(
                 last_round_start_pow, curtimeMs, 0, newJob->GetHeight() - 1,
                 last_total_effort_pow, coin_config.pow_fee);
+            // TODO: fix
+
             Logger::Log(LogType::Critical, LogField::Stratum,
                         "Block NOT added to chain %.*s!", HASH_SIZE_HEX,
                         validSubmission->hashHex);
@@ -405,10 +407,11 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 
             ondemand::object res = doc["result"].get_object();
             mature_timestamp_ms = res["time"].get_uint64();
-            mature_timestamp_ms *= 1000; // ms accuracy
+            mature_timestamp_ms *= 1000;  // ms accuracy
         }
         catch (simdjson_error &err)
         {
+            // it remains zero
             Logger::Log(LogType::Error, LogField::Stratum,
                         "Failed to get mature timestamp error: %s", err.what());
         }
@@ -732,8 +735,6 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
     // auto duration = duration_cast<microseconds>(end - start).count();
 }
 
-
-
 void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 {
     int64_t time = GetCurrentTimeMs();
@@ -766,7 +767,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             int blockSize = job->GetBlockSize();
             char *blockData = new char[blockSize + 3];
             blockData[0] = '\"';
-            job->GetBlockHex(blockData + 1);
+            job->GetBlockHex(cli->GetBlockheaderBuff(), blockData + 1);
             blockData[blockSize + 1] = '\"';
             blockData[blockSize + 2] = 0;
             // std::cout << (char *)blockData << std::endl;
@@ -792,8 +793,11 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     }
 
     // write invalid shares too for statistics
-    bool dbRes = redis_manager.AddShare(cli->GetWorkerName(), time,
-                                        round_start_pow, shareRes.Diff);
+    {
+        std::lock_guard lock_db(db_mutex);
+        bool dbRes = redis_manager.AddShare(cli->GetWorkerName(), time,
+                                            round_start_pow, shareRes.Diff);
+    }
     // TODO: there may be bug if handle notify runs before add share, total
     // effort wont include block share HandleBlockNotify(*new
     // ondemand::array());
@@ -801,8 +805,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     auto duration = DIFF_US(end, start);
 
     Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in %dus, diff: %f.", duration,
-                shareRes.Diff);
+                "Share processed in %dus, diff: %f.", duration, shareRes.Diff);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,
@@ -918,8 +921,8 @@ void StratumServer::AdjustDifficulty(StratumClient *cli, int64_t curTime)
         std::cout << "old diff: " << cli->GetDifficulty() << std::endl;
 
         // similar to bitcoin difficulty calculation
-        double newDiff =
-            (minuteRate / coin_config.target_shares_rate) * cli->GetDifficulty();
+        double newDiff = (minuteRate / coin_config.target_shares_rate) *
+                         cli->GetDifficulty();
         if (newDiff == 0) newDiff = cli->GetDifficulty() / 5;
 
         cli->SetDifficulty(newDiff, curTime);

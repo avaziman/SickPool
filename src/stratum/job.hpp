@@ -53,9 +53,9 @@ class Job
 
     uint8_t* GetStaticHeaderData() { return this->staticHeaderData; }
 
-    void GetBlockHex(char* res)
+    void GetBlockHex(uint8_t* header,char* res)
     {
-        Hexlify(res, staticHeaderData, BLOCK_HEADER_SIZE);
+        Hexlify(res, header, BLOCK_HEADER_SIZE);
         memcpy(res + (BLOCK_HEADER_SIZE * 2), txsHex.data(), txsHex.size());
     }
 

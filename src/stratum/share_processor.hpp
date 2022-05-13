@@ -17,7 +17,7 @@ class ShareProcessor
                                Job& job, const Share& share)
     {
         ShareResult result;
-        unsigned char headerData[BLOCK_HEADER_SIZE];
+        unsigned char* headerData = cli.GetBlockheaderBuff();
 
         // veirfy params before even hashing
         // convert share time to uint32 (fast)
@@ -48,8 +48,8 @@ class ShareProcessor
 #endif
         uint256 hash(result.HashBytes);
         arith_uint256 hashArith = UintToArith256(hash);
-        // Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash: %s",
-        //             hash.GetHex().c_str());
+        Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash: %s",
+                    hash.GetHex().c_str());
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
