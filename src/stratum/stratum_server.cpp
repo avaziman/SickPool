@@ -32,14 +32,14 @@ StratumServer::StratumServer()
     }
 
     // reload last round start
-    round_start_pow = redis_manager.GetLastRoundTimePow();
+    // round_start_pow = redis_manager.GetLastRoundTimePow();
     // (db was empty)
-    if (!round_start_pow) round_start_pow = GetCurrentTimeMs();
+    // if (!round_start_pow) round_start_pow = GetCurrentTimeMs();
 
     // round_start_pos = redis_manager.GetLastRoundTimePos();
 
-    Logger::Log(LogType::Info, LogField::Stratum,
-                "Last PoW round start: %" PRId64, round_start_pow);
+    // Logger::Log(LogType::Info, LogField::Stratum,
+    //             "Last PoW round start: %" PRId64, round_start_pow);
 
     // coin_config = cnfg;
     // for (int i = 0; i < cnfg.rpcs.size(); i++)
@@ -73,6 +73,8 @@ StratumServer::StratumServer()
 #if POOL_COIN <= COIN_VRSC
     HashWrapper::InitVerusHash();
 #endif
+
+    redis_manager.ResetWorkerCount();
     // std::vector<char> c;
     // SendRpcReq(c, 1, "getblockcount", nullptr, 0);
     redis_manager.UpdatePoS(0, GetCurrentTimeMs());
@@ -163,6 +165,8 @@ void StratumServer::HandleSocket(int conn_fd)
             Logger::Log(LogType::Info, LogField::Stratum,
                         "client disconnected. res: %d, errno: %d", recvRes,
                         errno);
+            redis_manager.DecreaseWorker(client->GetAddress());
+            delete client;
             break;
         }
         // std::cout << "buff: " << buffer << std::endl;
@@ -285,7 +289,9 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         std::this_thread::sleep_for(250ms);
     }
 
-    jobs.push_back(newJob);
+    std::string idHex = std::string(newJob->GetId());
+    jobs.insert({idHex, newJob});
+    last_job_id_hex = idHex;
 
     // save it to process round
     int64_t last_round_start_pow;
@@ -294,11 +300,11 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     // round ended
     if (block_submissions.size())
     {
-        last_round_start_pow = round_start_pow;
-        last_total_effort_pow = total_effort_pow;
+        // last_round_start_pow = round_start_pow;
+        // last_total_effort_pow = total_effort_pow;
 
-        round_start_pow = curtimeMs;
-        total_effort_pow = 0;
+        // round_start_pow = curtimeMs;
+        // total_effort_pow = 0;
 
         redis_manager.RenameCurrentRound(newJob->GetHeight() - 1);
     }
@@ -319,7 +325,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     // }
 
     // in case of a crash without shares, we need to update round start time
-    redis_manager.SetNewRoundTime(round_start_pow);
+    // redis_manager.SetNewRoundTime(round_start_pow);
 
     // double totalEffort = redis_manager.GetTotalEffort(last_round_start);
 
@@ -336,7 +342,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         if (blockAdded) validSubmission = submission;
 
         redis_manager.AddBlockSubmission(*submission, blockAdded,
-                                         last_total_effort_pow);
+                                         last_total_effort_pow, 0);
     }
 
     start = TIME_NOW();
@@ -379,14 +385,15 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
             block_submissions.pop_front();
         }
 
-        Logger::Log(LogType::Debug, LogField::Stratum,
-                    "New round start time: %" PRId64, round_start_pow);
+        // Logger::Log(LogType::Debug, LogField::Stratum,
+        //             "New round start time: %" PRId64, round_start_pow);
     }
 
     while (jobs.size() > 1)
     {
-        delete jobs[0];
-        jobs.pop_front();
+        // TODO: fix
+        //  delete jobs[0];
+        //  jobs.erase();
     }
 
     redis_manager.AddNetworkHr(curtimeMs, newJob->GetTargetDiff());
@@ -685,7 +692,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
         std::string(std::string(valid_addr) + "." + std::string(worker));
     worker_full = worker_full_str;
 
-    cli->HandleAuthorized(worker_full);
+    cli->HandleAuthorized(worker_full, valid_addr);
     redis_manager.AddWorker(valid_addr, worker_full, GetDailyTimestamp());
 
     Logger::Log(LogType::Info, LogField::Stratum,
@@ -703,7 +710,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
         return;
     }
 
-    this->BroadcastJob(cli, jobs.back());
+    this->BroadcastJob(cli, jobs[last_job_id_hex]);
 }
 
 // https://zips.z.cash/zip-0301#mining-submit
@@ -742,7 +749,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     ShareResult shareRes;
 
     auto start = TIME_NOW();
-    Job *job = GetJobById(share.jobId);
+    Job *job = jobs[std::string(share.jobId)];
 
     if (job == nullptr)
     {
@@ -780,12 +787,12 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
                 new BlockSubmission(shareRes, cli->GetWorkerName(), time, job));
 
             SendAccept(cli, id);
-            total_effort_pow += shareRes.Diff;
+            // total_effort_pow += shareRes.Diff;
         }
         break;
         case ShareCode::VALID_SHARE:
             SendAccept(cli, id);
-            total_effort_pow += shareRes.Diff;
+            // total_effort_pow += shareRes.Diff;
             break;
         default:
             SendReject(cli, id, (int)shareRes.Code, shareRes.Message.c_str());
@@ -795,8 +802,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     // write invalid shares too for statistics
     {
         std::lock_guard lock_db(db_mutex);
-        bool dbRes = redis_manager.AddShare(cli->GetWorkerName(), time,
-                                            round_start_pow, shareRes.Diff);
+        bool dbRes =
+            redis_manager.AddShare(cli->GetWorkerName(), time, shareRes.Diff);
     }
     // TODO: there may be bug if handle notify runs before add share, total
     // effort wont include block share HandleBlockNotify(*new
@@ -938,19 +945,7 @@ void StratumServer::BroadcastJob(StratumClient *cli, Job *job)
         SendRaw(cli->GetSock(), job->GetNotifyBuff(), job->GetNotifyBuffSize());
 }
 
-// TODO: add a lock jobs
-Job *StratumServer::GetJobById(std::string_view id)
-{
-    std::lock_guard jobs_lock(jobs_mutex);
-    for (auto it = jobs.begin(), end = jobs.end(); it != end; it++)
-    {
-        if (std::strncmp((*it)->GetId(), id.data(), 8) == 0)
-        {
-            return (*it);
-        }
-    }
-    return nullptr;
-}
+// TODO: add a lock job
 
 int StratumServer::SendRaw(int sock, char *data, int len)
 {

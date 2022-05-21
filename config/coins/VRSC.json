@@ -1,12 +1,10 @@
 {
-    "name": "verus",
-    "symbol": "VRSC",
-    "algo": "verushash",
+    "control_port": 1111,
     "stratum_port": 4444,
     "pow_fee": 0.01,
     "pos_fee": 0.01,
     "default_diff": 100000.1,
-    "target_shares_rate": 120.0,
+    "target_shares_rate": 100.0,
     "pool_addr1": "RSickPooLhHZ3zRBzhFVsXYiGN18BF1Wh6",
     "pool_addr2": "RBdZopcXxTn4SMCoBvduGnDsDjh5vU51dJ",
     "pool_addr": "RDy9mBtf8C3Qwzquot6t3aQ8SApZbT4tVa",
@@ -18,7 +16,7 @@
             "host1": "127.0.0.1:27397",
             "auth1": "dXNlcjIwMzc1NTYyODY6cGFzc2Q4ZmMzZmVhMDhhYjFmZDg0NDU2YjZlZWFjZDQ0ODc4Mjc3YWZiOTdhMDY1NGRjODhhZTNlMzBlMTY5ZDYyZGJjNw==",
             "auth": "YWRtaW4xOnBhc3MxMjM=",
-            "host": "127.0.0.1:6002"
+            "host": "127.0.0.1:6004"
         }
     ]
 }

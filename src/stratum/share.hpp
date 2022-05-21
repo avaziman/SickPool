@@ -44,7 +44,7 @@ class BlockSubmission
         Hexlify(hashHex, shareRes.HashBytes.data(), shareRes.HashBytes.size());
     }
     Job* job;
-    uint32_t height;
+    const uint32_t height;
     const ShareResult shareRes;
     const std::string worker;
     const int64_t timeMs; //ms percision

@@ -14,7 +14,9 @@
 #include <vector>
 #include <queue>
 #include <deque>
+#include <unordered_map>
 
+#include "./round.hpp"
 #include "./job_manager.hpp"
 #include "../coin_config.hpp"
 #include "../crypto/block.hpp"
@@ -65,20 +67,24 @@ class StratumServer
 
     int sockfd;
     struct sockaddr_in addr;
-    
-    double total_effort_pow = 0;
-
-    std::deque<BlockSubmission*> block_submissions;
+    std::string last_job_id_hex;
 
     ondemand::parser reqParser;
     ondemand::parser httpParser;
 
     RedisManager redis_manager;
+    static JobManager job_manager;
     // DifficultyManager* diff_manager;
 
-    // in ms
-    int64_t round_start_pow = 0;
-    int64_t round_start_pos = 0;
+    std::vector<StratumClient*> clients;
+
+    std::deque<BlockSubmission*> block_submissions;
+
+    // job id hex str -> job, O(1) job lookup
+    std::unordered_map<std::string, Job*> jobs;
+    // chain name str -> chain round
+    std::unordered_map<std::string, Round> pow_rounds;
+    std::unordered_map<std::string, Round> pos_rounds;
 
     int64_t mature_timestamp_ms = 0;
     int64_t last_block_timestamp_ms = 0;
@@ -88,10 +94,6 @@ class StratumServer
     std::mutex db_mutex;
 
     static std::mutex rpc_mutex;
-    static JobManager job_manager;
-
-    std::vector<StratumClient*> clients;
-    std::deque<Job*> jobs;
 
     void Listen();
     void HandleSocket(int sockfd);
@@ -113,7 +115,6 @@ class StratumServer
 
     void BroadcastJob(StratumClient* cli, Job* job);
 
-    Job* GetJobById(std::string_view id);
     int SendRaw(int sock, char* data, int len);
 };
 #endif

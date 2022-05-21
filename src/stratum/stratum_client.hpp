@@ -31,6 +31,7 @@ class StratumClient
     const char* GetExtraNonce() { return extra_nonce_str; }
     uint32_t GetShareCount() { return share_count; }
     std::string GetWorkerName() { return worker_full; }
+    std::string GetAddress() { return address; }
     int64_t GetLastAdjusted() { return last_adjusted; }
     void ResetShareCount() { share_count = 0; }
     uint8_t* GetBlockheaderBuff() { return block_header; }
@@ -55,12 +56,13 @@ class StratumClient
     }
 
     // called after auth
-    void HandleAuthorized(std::string_view worker)
+    void HandleAuthorized(std::string_view worker, std::string_view addr)
     {
         // add the hasher on authorization
         // copy the worker name (it will be destroyed)
         share_set = std::unordered_set<uint32_t>();
         worker_full = std::string(worker);
+        address = std::string(addr);
 #if POOL_COIN <= COIN_VRSC
         this->verusHasher = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 #endif
@@ -72,15 +74,16 @@ class StratumClient
    private:
     int sockfd;
     const int64_t connect_time;
-    uint32_t extra_nonce;
     int64_t last_adjusted;
     int64_t last_share_time;
+    uint32_t extra_nonce;
     uint32_t share_count = 0;
     double current_diff;
     double last_diff;
 
     char extra_nonce_str[9];
     std::string worker_full;
+    std::string address;
 
     // needs to be thread-specific to allow simultanious processing
     uint8_t block_header[BLOCK_HEADER_SIZE];

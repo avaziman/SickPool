@@ -86,7 +86,12 @@ class RedisManager
             "NUMERIC SORTABLE difficulty NUMERIC SORTABLE reward" COIN_SYMBOL
             " NUMERIC SORTABLE");
 
-        for (int i = 0; i < 5; i++)
+        redisAppendCommand(rc, "FT.CREATE " COIN_SYMBOL
+                               ":round_index ON HASH PREFIX 1 " COIN_SYMBOL
+                               ":round_entry: SCHEMA miner TAG SORTABLE effort "
+                               "NUMERIC SORTABLE");
+
+        for (int i = 0; i < 6; i++)
         {
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
             {
@@ -103,6 +108,10 @@ class RedisManager
                    std::time_t curtime)
     {
         redisReply *reply;
+        auto chainName = std::string_view{"VRSCTEST"};
+
+        redisAppendCommand(rc, "ZINCRBY " COIN_SYMBOL ":worker_count 1 %b",
+                           address.data(), address.size());
 
         redisAppendCommand(
             rc,
@@ -136,13 +145,12 @@ class RedisManager
                            worker_full.data(), worker_full.size(),
                            worker_full.data(), worker_full.size());
 
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 4; i++)
         {
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
             {
                 Logger::Log(LogType::Error, LogField::Redis,
-                            "Failed to add worker (%d) timeseries: %s", i,
-                            rc->errstr);
+                            "Failed to add worker (%d): %s", i, rc->errstr);
                 return false;
             }
             freeReplyObject(reply);
@@ -151,9 +159,48 @@ class RedisManager
         return true;
     }
 
+    bool DecreaseWorker(std::string_view address)
+    {
+        redisReply *reply;
+        auto chainName = std::string_view{"VRSCTEST"};
+
+        redisAppendCommand(rc, "ZINCRBY " COIN_SYMBOL ":worker_count -1 %b",
+                           address.data(), address.size());
+
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to decrease worker: %s", rc->errstr);
+            return false;
+        }
+        freeReplyObject(reply);
+
+        return true;
+    }
+
+    bool ResetWorkerCount()
+    {
+        redisReply *reply;
+        auto chainName = std::string_view{"VRSCTEST"};
+
+        redisAppendCommand(rc,
+                           "ZREMRANGEBYRANK " COIN_SYMBOL ":worker_count 0 -1");
+
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to reset worker count: %s", rc->errstr);
+            return false;
+        }
+        freeReplyObject(reply);
+        return true;
+    }
+
     bool AddAddress(std::string_view addr, std::string_view identity)
     {
         redisReply *reply;
+        auto chainName = std::string_view{"VRSCTEST"};
+
         redisAppendCommand(rc,
                            "TS.CREATE " COIN_SYMBOL
                            ":balance:%b"
@@ -175,9 +222,12 @@ class RedisManager
 
         return true;
     }
-    bool AddShare(std::string_view worker, int64_t shareTime,
-                  int64_t roundStart, double diff)
+    bool AddShare(  // std::vector<std::string_view> &chainNames,
+        std::string_view worker, int64_t shareTime,
+        double diff)
     {
+        auto chainName = std::string_view{"VRSCTEST"};
+
         // TODO: MAKE THIS MADD TO save 1 req
         redisReply *reply;
         redisAppendCommand(rc,
@@ -188,15 +238,16 @@ class RedisManager
         if (diff > 0)
         {
             // shares
+            // for (std::string_view chainName : chainNames)
+            // {
             std::string_view address = worker.substr(0, worker.find('.'));
-            redisAppendCommand(
-                rc, "HINCRBYFLOAT " COIN_SYMBOL ":current_round %b %f",
-                address.data(), address.size(), diff);
+            redisAppendCommand(rc, "HINCRBYFLOAT %b:current_round %b %f",
+                               chainName.data(), chainName.size(),
+                               address.data(), address.size(), diff);
 
-            redisAppendCommand(
-                rc, "HINCRBYFLOAT " COIN_SYMBOL ":current_round $total %f",
-                diff);
-
+            redisAppendCommand(rc, "HINCRBYFLOAT %b:current_round $total %f",
+                               chainName.data(), chainName.size(), diff);
+            // }
             // // this will incrby as we have sum duplicate policy
             // redisAppendCommand(
             //     rc, "TS.ADD " COIN_SYMBOL ":round_effort %" PRId64 " %f",
@@ -216,6 +267,8 @@ class RedisManager
         if (diff > 0)
         {
             // reply for HINCRBYFLOAT
+            // for (std::string_view chainName : chainNames)
+            // {
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
             {
                 Logger::Log(LogType::Critical, LogField::Redis,
@@ -234,6 +287,7 @@ class RedisManager
                 return false;
             }
             freeReplyObject(reply);
+            // }
         }
         return true;
     }
@@ -255,18 +309,18 @@ class RedisManager
     }
 
     bool AddBlockSubmission(BlockSubmission submission, bool accepted,
-                            double totalDiff)
+                            double totalDiff, int64_t roundStartMs)
     {
         const double effortPercent =
-            (totalDiff / submission.job->GetTargetDiff()) * 100;
+            (totalDiff / submission.job->GetTargetDiff()) * (double)100;
 
         redisReply *reply;
 
         redisAppendCommand(
             rc,
-            "HSET " COIN_SYMBOL ":block:%d height %d accepted %s time %" PRId64
+            "HSET " COIN_SYMBOL ":block:%d  %d accepted %s time %" PRId64
             " worker %b "
-            "reward" COIN_SYMBOL " %" PRId64
+            "reward %" PRId64
             " difficulty %f total_effort %f effort_percent %f hash %b",
             submission.height, submission.height, BoolToCstring(accepted),
             submission.timeMs, submission.worker.data(),
@@ -630,8 +684,9 @@ class RedisManager
         // assert type = arr (2)
         for (int i = 0; i < reply->elements; i++)
         {
-            // key is 2d array of the following arrays: key name, (empty array labels), values (array of tuples)
-            redisReply* key = reply->element[i];
+            // key is 2d array of the following arrays: key name, (empty array
+            // labels), values (array of tuples)
+            redisReply *key = reply->element[i];
             char *keyName = key[0].element[0]->str;
 
             // skip key name + null value
@@ -640,10 +695,10 @@ class RedisManager
             for (int j = 0; j < values->elements; j++)
             {
                 int64_t timestamp = values->element[j]->element[0]->integer;
-                char* value_str =      values->element[j]->element[1]->str;
+                char *value_str = values->element[j]->element[1]->str;
                 int64_t value = std::stoll(value_str);
-                std::cout << "timestamp: " << timestamp
-                          << " value: " << value << " " << value_str << std::endl;
+                std::cout << "timestamp: " << timestamp << " value: " << value
+                          << " " << value_str << std::endl;
             }
         }
     }
