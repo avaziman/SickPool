@@ -40,17 +40,17 @@ class VerusJob : public Job
 
         // reverse all numbers for block encoding
 
-        char prevBlockRev[PREVHASH_SIZE];
-        char finalSRootRev[FINALSROOT_SIZE];
+        char prevBlockRevHex[PREVHASH_SIZE * 2];
+        char finalSRootRevHex[FINALSROOT_SIZE * 2];
 
-        ReverseHex(prevBlockRev, bTemplate.prevBlockHash.data(), PREVHASH_SIZE * 2);
-        ReverseHex(finalSRootRev, bTemplate.finalsRootHash.data(),
+        ReverseHex(prevBlockRevHex, bTemplate.prevBlockHash.data(), PREVHASH_SIZE * 2);
+        ReverseHex(finalSRootRevHex, bTemplate.finalsRootHash.data(),
                    FINALSROOT_SIZE * 2);
 
         // write header
 
         Write(&bTemplate.version, VERSION_SIZE);  // no need to reverse here
-        WriteUnhex(prevBlockRev, PREVHASH_SIZE * 2);
+        WriteUnhex(prevBlockRevHex, PREVHASH_SIZE * 2);
 
         // hashes are given in LE, no need to reverse
 
@@ -61,7 +61,7 @@ class VerusJob : public Job
         Hexlify(merkleRootHex, staticHeaderData + written, MERKLE_ROOT_SIZE);
         written += MERKLE_ROOT_SIZE;
 
-        WriteUnhex(finalSRootRev, FINALSROOT_SIZE * 2);
+        WriteUnhex(finalSRootRevHex, FINALSROOT_SIZE * 2);
 
         Write(&bTemplate.minTime, TIME_SIZE);  // we overwrite time later
         Write(&bitsUint, BITS_SIZE);
@@ -86,8 +86,8 @@ class VerusJob : public Job
                      "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
                      "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%"
                      "08x\",\"%08x\",%s,\"%.144s\"]}\n",
-                     GetId(), bTemplate.version, prevBlockRev, merkleRootHex,
-                     finalSRootRev, (uint32_t)bTemplate.minTime, bitsUint,
+                     GetId(), bTemplate.version, prevBlockRevHex, merkleRootHex,
+                     finalSRootRevHex, (uint32_t)bTemplate.minTime, bitsUint,
                      BoolToCstring(clean), bTemplate.solution.data());
 
         auto end = std::chrono::steady_clock::now();

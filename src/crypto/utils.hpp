@@ -52,7 +52,7 @@ inline void SetHighPriorityThread(std::thread& thr)
                   << std::endl;
 }
 
-inline void ReverseHex(char* dest, const char* input, uint16_t size)
+inline void ReverseHex(char* dest, const char* input, uint32_t size)
 {
     for (int i = 0; i < size / 2; i += 2)
     {

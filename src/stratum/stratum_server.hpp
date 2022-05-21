@@ -86,6 +86,7 @@ class StratumServer
     std::unordered_map<std::string, Round> pow_rounds;
     std::unordered_map<std::string, Round> pos_rounds;
 
+    uint32_t block_number = 0;
     int64_t mature_timestamp_ms = 0;
     int64_t last_block_timestamp_ms = 0;
 

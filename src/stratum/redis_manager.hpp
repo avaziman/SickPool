@@ -223,8 +223,7 @@ class RedisManager
         return true;
     }
     bool AddShare(  // std::vector<std::string_view> &chainNames,
-        std::string_view worker, int64_t shareTime,
-        double diff)
+        std::string_view worker, int64_t shareTime, double diff)
     {
         auto chainName = std::string_view{"VRSCTEST"};
 
@@ -309,7 +308,8 @@ class RedisManager
     }
 
     bool AddBlockSubmission(BlockSubmission submission, bool accepted,
-                            double totalDiff, int64_t roundStartMs)
+                            double totalDiff, int64_t roundStartMs,
+                            uint32_t number)
     {
         const double effortPercent =
             (totalDiff / submission.job->GetTargetDiff()) * (double)100;
@@ -321,12 +321,13 @@ class RedisManager
             "HSET " COIN_SYMBOL ":block:%d  %d accepted %s time %" PRId64
             " worker %b "
             "reward %" PRId64
+            " number %d"
             " difficulty %f total_effort %f effort_percent %f hash %b",
             submission.height, submission.height, BoolToCstring(accepted),
             submission.timeMs, submission.worker.data(),
-            submission.worker.size(), submission.job->GetBlockReward(),
+            submission.worker.size(), submission.job->GetBlockReward(), number,
             submission.shareRes.Diff, totalDiff, effortPercent,
-            submission.hashHex, HASH_SIZE * 2);
+            submission.hashHex, HASH_SIZE_HEX);
 
         redisAppendCommand(
             rc, "TS.ADD " COIN_SYMBOL ":round_effort_percent %" PRId64 " %f",
@@ -632,6 +633,47 @@ class RedisManager
         freeReplyObject(reply);
 
         return roundStart;
+    }
+
+    uint32_t GetBlockCount()
+    {
+        redisReply *reply =
+            (redisReply *)redisCommand(rc, "GET " COIN_SYMBOL ":block_count");
+
+        if (reply != REDIS_OK)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to get block count: %s", rc->errstr);
+            return 0;
+        }
+        else if (reply->type != REDIS_REPLY_INTEGER)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to get block count (wrong response)");
+            freeReplyObject(reply);
+            return 0;
+        }
+
+        uint32_t res = reply->integer;
+        freeReplyObject(reply);
+
+        return res;
+    }
+
+    bool IncrBlockCount()
+    {
+        redisReply *reply =
+            (redisReply *)redisCommand(rc, "INCR " COIN_SYMBOL ":block_count");
+
+        if (reply != REDIS_OK)
+        {
+            Logger::Log(LogType::Error, LogField::Redis,
+                        "Failed to increment block count: %s", rc->errstr);
+            return false;
+        }
+
+        freeReplyObject(reply);
+        return true;
     }
 
     uint32_t GetJobCount()

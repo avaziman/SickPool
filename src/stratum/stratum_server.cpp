@@ -342,8 +342,10 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         if (blockAdded) validSubmission = submission;
 
         redis_manager.AddBlockSubmission(*submission, blockAdded,
-                                         last_total_effort_pow, 0);
+                                         last_total_effort_pow, 0, block_number);
     }
+
+    block_number++;
 
     start = TIME_NOW();
     if (block_submissions.size())
@@ -351,10 +353,10 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         redis_manager.RenameCurrentRound(newJob->GetHeight() - 1);
         if (validSubmission != nullptr)
         {
-            redis_manager.ClosePoWRound(
-                last_round_start_pow, validSubmission->timeMs,
-                newJob->GetBlockReward(), newJob->GetHeight() - 1,
-                last_total_effort_pow, coin_config.pow_fee);
+            // redis_manager.ClosePoWRound(
+            //     last_round_start_pow, validSubmission->timeMs,
+            //     newJob->GetBlockReward(), newJob->GetHeight() - 1,
+            //     last_total_effort_pow, coin_config.pow_fee);
             // TODO: fix
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block added to chain! found by: %s, hash: %.*s",
@@ -364,9 +366,9 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         else
         {
             // 0 reward for invalid blocks
-            redis_manager.ClosePoWRound(
-                last_round_start_pow, curtimeMs, 0, newJob->GetHeight() - 1,
-                last_total_effort_pow, coin_config.pow_fee);
+            // redis_manager.ClosePoWRound(
+            //     last_round_start_pow, curtimeMs, 0, newJob->GetHeight() - 1,
+            //     last_total_effort_pow, coin_config.pow_fee);
             // TODO: fix
 
             Logger::Log(LogType::Critical, LogField::Stratum,
@@ -459,6 +461,7 @@ void StratumServer::HandleWalletNotify(ondemand::array &params)
     Logger::Log(LogType::Info, LogField::Stratum, "Received TxId: %.*s",
                 txId.size(), txId.data());
     // redis_manager.CloseRound(12, 1);
+    return;
     std::vector<char> resBody;
     char rpcParams[64];
     int len = sprintf(rpcParams, "\"%.*s\",1", (int)txId.size(), txId.data());
@@ -749,7 +752,9 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     ShareResult shareRes;
 
     auto start = TIME_NOW();
-    Job *job = jobs[std::string(share.jobId)];
+    auto jobIt = jobs.find(std::string(share.jobId));
+    Job *job = jobIt == jobs.end() ? nullptr : jobIt->second;
+    // Job *job = jobs[std::string(share.jobId)];
 
     if (job == nullptr)
     {

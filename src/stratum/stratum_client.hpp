@@ -33,8 +33,8 @@ class StratumClient
     std::string GetWorkerName() { return worker_full; }
     std::string GetAddress() { return address; }
     int64_t GetLastAdjusted() { return last_adjusted; }
-    void ResetShareCount() { share_count = 0; }
     uint8_t* GetBlockheaderBuff() { return block_header; }
+    void ResetShareCount() { share_count = 0; }
 
     void SetDifficulty(double diff, int64_t curTime)
     {
@@ -95,7 +95,7 @@ class StratumClient
     // std::set<uint32_t> share_set;
 
     // for O(1) duplicate search
-    // at the cost of a bit of memory, but much faster
+    // at the cost of a bit of memory, but much faster!
     std::unordered_set<uint32_t> share_set;
 
     // the hasher is thread-specific
