@@ -10,6 +10,26 @@
 #include "../crypto/utils.hpp"
 #include "block_template.hpp"
 
+#define EXTRANONCE_SIZE 4
+#define VERSION_SIZE 4
+#define TIME_SIZE 4
+#define BITS_SIZE 4
+#define PREVHASH_SIZE HASH_SIZE
+#define MERKLE_ROOT_SIZE HASH_SIZE
+#define FINALSROOT_SIZE HASH_SIZE
+#define NONCE_SIZE HASH_SIZE
+#define SOLUTION_SIZE 1344
+#define SOLUTION_LENGTH_SIZE 3
+
+#define BLOCK_HEADER_STATIC_SIZE                                  \
+    VERSION_SIZE           /* version */                          \
+        + PREVHASH_SIZE    /* prevhash */                         \
+        + MERKLE_ROOT_SIZE /* merkle_root */                      \
+        + FINALSROOT_SIZE  /* final sapling root */               \
+        + TIME_SIZE        /* time, not static but we override */ \
+        + BITS_SIZE        /* bits */
+
+
 class Job
 {
    public:
@@ -46,10 +66,10 @@ class Job
         //             txsHex.size(), txsHex.data());
     }
 
-    virtual uint8_t* GetHeaderData(uint8_t* buff, std::string_view time,
-                                         std::string_view nonce1,
-                                         std::string_view nonce2,
-                                         std::string_view additional) = 0;
+    // virtual uint8_t* GetHeaderData(uint8_t* buff, std::string_view time,
+    //                                      std::string_view nonce1,
+    //                                      std::string_view nonce2,
+    //                                      std::string_view additional) = 0;
 
     uint8_t* GetStaticHeaderData() { return this->staticHeaderData; }
 
@@ -93,7 +113,7 @@ class Job
     const uint32_t height;
 
     // unsigned char headerData[BLOCK_HEADER_SIZE];
-    uint8_t staticHeaderData[BLOCK_HEADER_SIZE];
+    uint8_t staticHeaderData[BLOCK_HEADER_STATIC_SIZE];
     char jobIdStr[8 + 1];
 
     char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];

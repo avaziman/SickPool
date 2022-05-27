@@ -81,7 +81,7 @@ class StratumServer
     std::deque<BlockSubmission*> block_submissions;
 
     // job id hex str -> job, O(1) job lookup
-    std::unordered_map<std::string, Job*> jobs;
+    std::unordered_map<std::string, job_t*> jobs;
     // chain name str -> chain round
     std::unordered_map<std::string, Round> pow_rounds;
     std::unordered_map<std::string, Round> pos_rounds;
@@ -95,6 +95,8 @@ class StratumServer
     std::mutex db_mutex;
 
     static std::mutex rpc_mutex;
+
+    void ListenControl();
 
     void Listen();
     void HandleSocket(int sockfd);

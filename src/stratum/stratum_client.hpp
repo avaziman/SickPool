@@ -50,7 +50,7 @@ class StratumClient
 
         // checks for existance in O(1), fast duplicate check
         // sub 1 us!!!
-        bool inserted = share_set.insert(shareEnd).second;
+        bool inserted = share_uset.insert(shareEnd).second;
 
         return inserted;
     }
@@ -60,7 +60,7 @@ class StratumClient
     {
         // add the hasher on authorization
         // copy the worker name (it will be destroyed)
-        share_set = std::unordered_set<uint32_t>();
+        share_uset = std::unordered_set<uint32_t>();
         worker_full = std::string(worker);
         address = std::string(addr);
 #if POOL_COIN <= COIN_VRSC
@@ -96,7 +96,7 @@ class StratumClient
 
     // for O(1) duplicate search
     // at the cost of a bit of memory, but much faster!
-    std::unordered_set<uint32_t> share_set;
+    std::unordered_set<uint32_t> share_uset;
 
     // the hasher is thread-specific
     // so we need to store it in client so we only need to init once

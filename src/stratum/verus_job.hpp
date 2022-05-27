@@ -4,28 +4,28 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <byteswap.h>
 
 #include "job.hpp"
 
-#define EXTRANONCE_SIZE 4
-#define VERSION_SIZE 4
-#define TIME_SIZE 4
-#define BITS_SIZE 4
-#define PREVHASH_SIZE HASH_SIZE
-#define MERKLE_ROOT_SIZE HASH_SIZE
-#define FINALSROOT_SIZE HASH_SIZE
-#define NONCE_SIZE HASH_SIZE
-#define SOLUTION_SIZE 1344
-#define SOLUTION_LENGTH_SIZE 3
+// #define EXTRANONCE_SIZE 4
+// #define VERSION_SIZE 4
+// #define TIME_SIZE 4
+// #define BITS_SIZE 4
+// #define PREVHASH_SIZE HASH_SIZE
+// #define MERKLE_ROOT_SIZE HASH_SIZE
+// #define FINALSROOT_SIZE HASH_SIZE
+// #define NONCE_SIZE HASH_SIZE
+// #define SOLUTION_SIZE 1344
+// #define SOLUTION_LENGTH_SIZE 3
 
-#define BLOCK_HEADER_STATIC_SIZE                                  \
-    VERSION_SIZE           /* version */                          \
-        + PREVHASH_SIZE    /* prevhash */                         \
-        + MERKLE_ROOT_SIZE /* merkle_root */                      \
-        + FINALSROOT_SIZE  /* final sapling root */               \
-        + TIME_SIZE        /* time, not static but we override */ \
-        + BITS_SIZE        /* bits */
-
+// #define BLOCK_HEADER_STATIC_SIZE                                  \
+//     VERSION_SIZE           /* version */                          \
+//         + PREVHASH_SIZE    /* prevhash */                         \
+//         + MERKLE_ROOT_SIZE /* merkle_root */                      \
+//         + FINALSROOT_SIZE  /* final sapling root */               \
+//         + TIME_SIZE        /* time, not static but we override */ \
+//         + BITS_SIZE        /* bits */
 class VerusJob : public Job
 {
    public:
@@ -103,7 +103,7 @@ class VerusJob : public Job
 
     uint8_t* GetHeaderData(uint8_t* buff, std::string_view time,
                            std::string_view nonce1, std::string_view nonce2,
-                           std::string_view sol) override
+                           std::string_view sol) /* override */
     {
         memcpy(buff, this->staticHeaderData, BLOCK_HEADER_STATIC_SIZE);
 
@@ -132,7 +132,7 @@ class VerusJob : public Job
     }
 
    private:
-    uint8_t staticHeaderData[BLOCK_HEADER_STATIC_SIZE];
+    // uint8_t staticHeaderData[BLOCK_HEADER_STATIC_SIZE];
     inline void WriteUnhex(const char* data, int size)
     {
         Unhexlify(staticHeaderData + written, data, size);
@@ -154,4 +154,7 @@ class VerusJob : public Job
    protected:
     int written = 0;
 };
+
+typedef VerusJob job_t;
+
 #endif

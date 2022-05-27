@@ -3,7 +3,7 @@
     "stratum_port": 4444,
     "pow_fee": 0.01,
     "pos_fee": 0.01,
-    "default_diff": 100000.1,
+    "default_diff": 10000,
     "target_shares_rate": 100.0,
     "pool_addr1": "RSickPooLhHZ3zRBzhFVsXYiGN18BF1Wh6",
     "pool_addr2": "RBdZopcXxTn4SMCoBvduGnDsDjh5vU51dJ",

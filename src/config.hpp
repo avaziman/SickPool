@@ -1,5 +1,6 @@
 #ifndef CONFIG_HPP_
 #define CONFIG_HPP_
+
 // These properties need to be defined in compile time for efficiency!
 #define COIN_VRSCTEST 1
 #define COIN_VRSC 2

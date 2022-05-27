@@ -32,7 +32,7 @@ struct ShareResult
     std::string Message;
     double Diff;
     // uint256 takes vector as param
-    std::vector<unsigned char> HashBytes;
+    std::vector<uint8_t> HashBytes;
 };
 
 class BlockSubmission
@@ -44,7 +44,7 @@ class BlockSubmission
         Hexlify(hashHex, shareRes.HashBytes.data(), shareRes.HashBytes.size());
     }
     Job* job;
-    const uint32_t height;
+    /*const*/ uint32_t height;
     const ShareResult shareRes;
     const std::string worker;
     const int64_t timeMs; //ms percision

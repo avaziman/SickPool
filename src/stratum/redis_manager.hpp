@@ -78,18 +78,19 @@ class RedisManager
             " DUPLICATE_POLICY SUM"  // sum to get total round effort
         );
 
-        redisAppendCommand(
-            rc,
-            "FT.CREATE " COIN_SYMBOL
-            ":block_index ON HASH PREFIX 1 " COIN_SYMBOL
-            ":block: SCHEMA worker TAG SORTABLE height "
-            "NUMERIC SORTABLE difficulty NUMERIC SORTABLE reward" COIN_SYMBOL
-            " NUMERIC SORTABLE");
+        redisAppendCommand(rc,
+                           "FT.CREATE " COIN_SYMBOL
+                           ":block_index ON HASH PREFIX 1 " COIN_SYMBOL
+                           ":block: SCHEMA worker TAG SORTABLE height "
+                           "NUMERIC SORTABLE difficulty NUMERIC SORTABLE reward"
+                           " NUMERIC SORTABLE chain TAG SORTABLE number "
+                           "NUMERIC SORTABLE effort_percent NUMERIC SORTABLE");
 
-        redisAppendCommand(rc, "FT.CREATE " COIN_SYMBOL
-                               ":round_index ON HASH PREFIX 1 " COIN_SYMBOL
-                               ":round_entry: SCHEMA miner TAG SORTABLE effort "
-                               "NUMERIC SORTABLE");
+        redisAppendCommand(
+            rc, "FT.CREATE " COIN_SYMBOL
+                ":round_index ON HASH PREFIX 1 " COIN_SYMBOL
+                ":round_entry: NOHL NOFREQS SCHEMA miner TAG SORTABLE effort "
+                "NUMERIC SORTABLE");
 
         for (int i = 0; i < 6; i++)
         {
@@ -308,26 +309,41 @@ class RedisManager
     }
 
     bool AddBlockSubmission(BlockSubmission submission, bool accepted,
-                            double totalDiff, int64_t roundStartMs,
-                            uint32_t number)
+                            double totalEffort, int64_t roundStartMs,
+                            uint32_t number, int64_t durationMs)
     {
+        totalEffort = submission.job->GetTargetDiff();  // todo rem
+        if (totalEffort == 0)
+        {
+            Logger::Log(LogType::Critical, LogField::Redis,
+                        "Failed to add block submission: totalEffort is 0!!");
+            return false;
+        }
+
         const double effortPercent =
-            (totalDiff / submission.job->GetTargetDiff()) * (double)100;
+            (totalEffort / submission.job->GetTargetDiff()) * (double)100;
 
         redisReply *reply;
 
+        // g for shortest representation, save space
         redisAppendCommand(
             rc,
-            "HSET " COIN_SYMBOL ":block:%d  %d accepted %s time %" PRId64
-            " worker %b "
-            "reward %" PRId64
-            " number %d"
-            " difficulty %f total_effort %f effort_percent %f hash %b",
-            submission.height, submission.height, BoolToCstring(accepted),
-            submission.timeMs, submission.worker.data(),
-            submission.worker.size(), submission.job->GetBlockReward(), number,
-            submission.shareRes.Diff, totalDiff, effortPercent,
-            submission.hashHex, HASH_SIZE_HEX);
+            "HSET " COIN_SYMBOL
+            ":block:%d"
+            " chain VRSCTEST"
+            " accepted %d"
+            " height %d"
+            " time %" PRId64 " duration %" PRId64
+            " solver %b"
+            " reward %" PRId64 " number %" PRIu32
+            " difficulty %g"
+            " total_effort %g"
+            " effort_percent %g"
+            " hash %b type PoW",
+            submission.height, accepted, submission.height, submission.timeMs,
+            durationMs, submission.worker.data(), submission.worker.size(),
+            submission.job->GetBlockReward(), number, submission.shareRes.Diff,
+            totalEffort, effortPercent, submission.hashHex, HASH_SIZE_HEX);
 
         redisAppendCommand(
             rc, "TS.ADD " COIN_SYMBOL ":round_effort_percent %" PRId64 " %f",
@@ -637,8 +653,9 @@ class RedisManager
 
     uint32_t GetBlockCount()
     {
+        // fix
         redisReply *reply =
-            (redisReply *)redisCommand(rc, "GET " COIN_SYMBOL ":block_count");
+            (redisReply *)redisCommand(rc, "GET " COIN_SYMBOL ":block_number");
 
         if (reply != REDIS_OK)
         {
@@ -662,10 +679,10 @@ class RedisManager
 
     bool IncrBlockCount()
     {
-        redisReply *reply =
-            (redisReply *)redisCommand(rc, "INCR " COIN_SYMBOL ":block_count");
+        redisReply *reply;
+        redisAppendCommand(rc, "INCR " COIN_SYMBOL ":block_number");
 
-        if (reply != REDIS_OK)
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
         {
             Logger::Log(LogType::Error, LogField::Redis,
                         "Failed to increment block count: %s", rc->errstr);
@@ -751,3 +768,5 @@ class RedisManager
 };
 
 #endif
+// TODO: onwalletnotify check if its pending block submission maybe check
+// coinbase too and add it to block submission

@@ -166,7 +166,7 @@ void StratumServer::HandleSocket(int conn_fd)
                         "client disconnected. res: %d, errno: %d", recvRes,
                         errno);
             redis_manager.DecreaseWorker(client->GetAddress());
-            delete client;
+            // delete client;
             break;
         }
         // std::cout << "buff: " << buffer << std::endl;
@@ -276,7 +276,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 
     auto start = TIME_NOW();
 
-    Job *newJob = job_manager.GetNewJob();
+    job_t *newJob = job_manager.GetNewJob();
 
     while (newJob == nullptr)
     {
@@ -333,24 +333,30 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 
     for (BlockSubmission *submission : block_submissions)
     {
-        unsigned char *prevBlockBin = newJob->GetPrevBlockHash();
+        int64_t durationMs = submission->timeMs - last_block_timestamp_ms;
+        uint8_t *prevBlockBin = newJob->GetPrevBlockHash();
 
         bool blockAdded = !memcmp(
             prevBlockBin, submission->shareRes.HashBytes.data(), HASH_SIZE);
 
         // only one block submission can be accepted
         if (blockAdded) validSubmission = submission;
-
-        redis_manager.AddBlockSubmission(*submission, blockAdded,
-                                         last_total_effort_pow, 0, block_number);
+        for (int i = 0; i < 100000;i++){
+            redis_manager.AddBlockSubmission(*submission, blockAdded,
+                                             last_total_effort_pow, 0,
+                                             block_number, durationMs);
+            submission->height++;
+            block_number++;
+        }
     }
-
-    block_number++;
 
     start = TIME_NOW();
     if (block_submissions.size())
     {
         redis_manager.RenameCurrentRound(newJob->GetHeight() - 1);
+        redis_manager.IncrBlockCount();
+        block_number++;
+
         if (validSubmission != nullptr)
         {
             // redis_manager.ClosePoWRound(
@@ -391,12 +397,12 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         //             "New round start time: %" PRId64, round_start_pow);
     }
 
-    while (jobs.size() > 1)
-    {
-        // TODO: fix
-        //  delete jobs[0];
-        //  jobs.erase();
-    }
+    // while (jobs.size() > 1)
+    // {
+    //     // TODO: fix
+    //     //  delete jobs[0];
+    //     //  jobs.erase();
+    // }
 
     redis_manager.AddNetworkHr(curtimeMs, newJob->GetTargetDiff());
 
@@ -421,7 +427,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         catch (simdjson_error &err)
         {
             // it remains zero
-            Logger::Log(LogType::Error, LogField::Stratum,
+            Logger::Log(LogType::Warn, LogField::Stratum,
                         "Failed to get mature timestamp error: %s", err.what());
         }
     }
@@ -753,7 +759,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 
     auto start = TIME_NOW();
     auto jobIt = jobs.find(std::string(share.jobId));
-    Job *job = jobIt == jobs.end() ? nullptr : jobIt->second;
+    job_t* job = jobIt == jobs.end() ? nullptr : jobIt->second;
     // Job *job = jobs[std::string(share.jobId)];
 
     if (job == nullptr)
@@ -770,6 +776,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
         // shareRes.Code = ShareCode::VALID_BLOCK;
     }
     auto end = TIME_NOW();
+
     switch (shareRes.Code)
     {
         case ShareCode::VALID_BLOCK:
@@ -803,6 +810,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             SendReject(cli, id, (int)shareRes.Code, shareRes.Message.c_str());
             break;
     }
+    // auto end = TIME_NOW();
 
     // write invalid shares too for statistics
     {
@@ -817,7 +825,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     auto duration = DIFF_US(end, start);
 
     Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in %dus, diff: %f.", duration, shareRes.Diff);
+                "Share processed in %dus, diff: %f, res: %d", duration, shareRes.Diff, (int)shareRes.Code);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,

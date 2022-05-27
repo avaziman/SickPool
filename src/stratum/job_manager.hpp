@@ -8,6 +8,7 @@
 #include "./job.hpp"
 #include "block_template.hpp"
 #include "../daemon/daemon_rpc.hpp"
+#include "./verus_job.hpp"
 
 using namespace simdjson;
 
@@ -19,7 +20,7 @@ class JobManager
    public:
     JobManager() : jobCount(0), blockTemplate() {}
 
-    Job* GetNewJob();
+    job_t* GetNewJob();
     int64_t jobCount;
 
     BlockTemplate ParseBlockTemplateJson(std::vector<char>& json);
