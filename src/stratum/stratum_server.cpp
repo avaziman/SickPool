@@ -9,6 +9,7 @@ StratumServer::StratumServer()
     : reqParser(REQ_BUFF_SIZE),
       httpParser(MAX_HTTP_REQ_SIZE),
       redis_manager(coin_config.redis_host),
+      stats_manager(redis_manager.rc, &redis_mutex),
       block_submissions()
 {
     simdjson::error_code error =
@@ -79,8 +80,8 @@ StratumServer::StratumServer()
     // SendRpcReq(c, 1, "getblockcount", nullptr, 0);
     redis_manager.UpdatePoS(0, GetCurrentTimeMs());
 
-    StatsManger stats_manager;
-    stats_manager.Start(redis_manager.rc);
+    std::thread stats_thread(&StatsManager::Start, &stats_manager);
+    stats_thread.detach();
 }
 
 StratumServer::~StratumServer()
@@ -297,8 +298,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     last_job_id_hex = idHex;
 
     // save it to process round
-    int64_t last_round_start_pow;
-    int64_t last_total_effort_pow;
+    int64_t last_round_start_pow = 0;
 
     // round ended
     if (block_submissions.size())
@@ -332,25 +332,27 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 
     // double totalEffort = redis_manager.GetTotalEffort(last_round_start);
 
-    BlockSubmission *validSubmission = nullptr;
+    BlockSubmission *valid_submission = nullptr;
 
     for (BlockSubmission *submission : block_submissions)
     {
-        int64_t durationMs = submission->timeMs - last_block_timestamp_ms;
+        int64_t durationMs = submission->timeMs - last_block_timestamp_map;
         uint8_t *prevBlockBin = newJob->GetPrevBlockHash();
 
         bool blockAdded = !memcmp(
             prevBlockBin, submission->shareRes.HashBytes.data(), HASH_SIZE);
 
         // only one block submission can be accepted
-        if (blockAdded) validSubmission = submission;
-        for (int i = 0; i < 100000;i++){
-            redis_manager.AddBlockSubmission(*submission, blockAdded,
-                                             last_total_effort_pow, 0,
-                                             block_number, durationMs);
-            submission->height++;
-            block_number++;
+        if (blockAdded)
+        {
+            valid_submission = submission;
         }
+
+        double totalEffort = stats_manager.GetTotalEffort(COIN_SYMBOL);
+    // TODO: make map of block submissions too
+        redis_manager.AddBlockSubmission(*submission, blockAdded,
+                                         totalEffort, block_number,
+                                         durationMs);
     }
 
     start = TIME_NOW();
@@ -360,29 +362,25 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         redis_manager.IncrBlockCount();
         block_number++;
 
-        if (validSubmission != nullptr)
+        if (valid_submission != nullptr)
         {
-            // redis_manager.ClosePoWRound(
-            //     last_round_start_pow, validSubmission->timeMs,
-            //     newJob->GetBlockReward(), newJob->GetHeight() - 1,
-            //     last_total_effort_pow, coin_config.pow_fee);
+            stats_manager.ClosePoWRound(COIN_SYMBOL, *valid_submission, true,
+                                        coin_config.pow_fee);
             // TODO: fix
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block added to chain! found by: %s, hash: %.*s",
-                        validSubmission->worker.c_str(), HASH_SIZE_HEX,
-                        validSubmission->hashHex);
+                        valid_submission->worker.c_str(), HASH_SIZE_HEX,
+                        valid_submission->hashHex);
         }
         else
         {
             // 0 reward for invalid blocks
-            // redis_manager.ClosePoWRound(
-            //     last_round_start_pow, curtimeMs, 0, newJob->GetHeight() - 1,
-            //     last_total_effort_pow, coin_config.pow_fee);
-            // TODO: fix
-
+            stats_manager.ClosePoWRound(COIN_SYMBOL, *valid_submission, false,
+                                        coin_config.pow_fee);
+                                        
             Logger::Log(LogType::Critical, LogField::Stratum,
                         "Block NOT added to chain %.*s!", HASH_SIZE_HEX,
-                        validSubmission->hashHex);
+                        valid_submission->hashHex);
         }
 
         auto end = TIME_NOW();
@@ -437,10 +435,10 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     else
     {
         mature_timestamp_ms =
-            mature_timestamp_ms + (curtimeMs - last_block_timestamp_ms);
+            mature_timestamp_ms + (curtimeMs - last_block_timestamp_map);
     }
     redis_manager.SetMatureTimestamp(mature_timestamp_ms);
-    last_block_timestamp_ms = curtimeMs;
+    last_block_timestamp_map = curtimeMs;
 
     Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %" PRId64,
                 mature_timestamp_ms);
@@ -762,7 +760,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 
     auto start = TIME_NOW();
     auto jobIt = jobs.find(std::string(share.jobId));
-    job_t* job = jobIt == jobs.end() ? nullptr : jobIt->second;
+    job_t *job = jobIt == jobs.end() ? nullptr : jobIt->second;
     // Job *job = jobs[std::string(share.jobId)];
 
     if (job == nullptr)
@@ -798,8 +796,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             // Logger::Log(LogType::Debug, LogField::Stratum, "Block hex: %.*s",
             //             blockSize + 3, blockData);
             delete[] blockData;
-            block_submissions.push_back(
-                new BlockSubmission(shareRes, cli->GetWorkerName(), time, job));
+            block_submissions.push_back(new BlockSubmission(
+                shareRes, cli->GetFullWorkerName(), time, job));
 
             SendAccept(cli, id);
             // total_effort_pow += shareRes.Diff;
@@ -816,19 +814,19 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
     // auto end = TIME_NOW();
 
     // write invalid shares too for statistics
-    {
-        std::lock_guard lock_db(db_mutex);
-        bool dbRes =
-            redis_manager.AddShare(cli->GetWorkerName(), time, shareRes.Diff);
-    }
+    stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
+                           shareRes.Diff);
+    // bool dbRes =
+    //     redis_manager.AddShare(cli->GetWorkerName(), time, shareRes.Diff);
     // TODO: there may be bug if handle notify runs before add share, total
     // effort wont include block share HandleBlockNotify(*new
     // ondemand::array());
 
     auto duration = DIFF_US(end, start);
 
-    Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in %dus, diff: %f, res: %d", duration, shareRes.Diff, (int)shareRes.Code);
+    // Logger::Log(LogType::Debug, LogField::Stratum,
+    //             "Share processed in %dus, diff: %f, res: %d", duration,
+    //             shareRes.Diff, (int)shareRes.Code);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,

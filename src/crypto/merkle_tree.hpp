@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <experimental/array>
+#include "./hash_wrapper.hpp"
 #include "../stratum/block_template.hpp"
 
 #include "utils.hpp"

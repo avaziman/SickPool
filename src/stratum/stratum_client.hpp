@@ -30,7 +30,7 @@ class StratumClient
     double GetDifficulty() { return current_diff; }
     const char* GetExtraNonce() { return extra_nonce_str; }
     uint32_t GetShareCount() { return share_count; }
-    std::string GetWorkerName() { return worker_full; }
+    std::string GetFullWorkerName() { return worker_full; }
     std::string GetAddress() { return address; }
     int64_t GetLastAdjusted() { return last_adjusted; }
     uint8_t* GetBlockheaderBuff() { return block_header; }

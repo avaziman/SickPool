@@ -1,7 +1,10 @@
 #ifndef SHARE_HPP_
 #define SHARE_HPP_
-#include <string_view>
 #include <vector>
+#include <string_view>
+
+#include "job.hpp"
+
 struct Share
 {
     std::string_view worker;
@@ -27,7 +30,7 @@ enum class ShareCode
 
 struct ShareResult
 {
-    ShareResult() : HashBytes(32){}
+    ShareResult() : HashBytes(32) {}
     ShareCode Code;
     std::string Message;
     double Diff;
@@ -38,16 +41,23 @@ struct ShareResult
 class BlockSubmission
 {
    public:
-    BlockSubmission(ShareResult shareRes, std::string worker, int64_t time, Job* job)
-        : shareRes(shareRes), worker(worker), timeMs(time), job(job), height(job->GetHeight())
+    BlockSubmission(ShareResult shareRes, std::string workerFull, int64_t time,
+                    Job* job)
+        : shareRes(shareRes),
+          timeMs(time),
+          job(job),
+          height(job->GetHeight()),
+          miner(workerFull.substr(0, workerFull.find('.'))),
+          worker(workerFull.substr(workerFull.find('.') + 1, workerFull.size()))
     {
         Hexlify(hashHex, shareRes.HashBytes.data(), shareRes.HashBytes.size());
     }
     Job* job;
-    /*const*/ uint32_t height;
+    const uint32_t height;
     const ShareResult shareRes;
-    const std::string worker;
-    const int64_t timeMs; //ms percision
+    const std::string miner;
+    const std::string worker;  // separated
+    const int64_t timeMs;      // ms percision
     char hashHex[64];
 };
 

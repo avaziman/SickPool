@@ -73,6 +73,7 @@ class StratumServer
     ondemand::parser httpParser;
 
     RedisManager redis_manager;
+    StatsManager stats_manager;
     static JobManager job_manager;
     // DifficultyManager* diff_manager;
 
@@ -90,11 +91,11 @@ class StratumServer
 
     uint32_t block_number = 0;
     int64_t mature_timestamp_ms = 0;
-    int64_t last_block_timestamp_ms = 0;
+    int64_t last_block_timestamp_map = 0;//TODO: make map
 
     std::mutex jobs_mutex;
     std::mutex clients_mutex;
-    std::mutex db_mutex;
+    std::mutex redis_mutex;
 
     static std::mutex rpc_mutex;
 
