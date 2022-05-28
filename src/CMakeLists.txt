@@ -1,5 +1,6 @@
 include_directories(daemon)
 include_directories(stratum)
+include_directories(.)
 
 # optimized hash function
 add_subdirectory(crypto/verushash)
@@ -9,6 +10,7 @@ file(GLOB SRC_FILES
      "daemon/*.cpp"
      "stratum/*.cpp"
      "crypto/*.cpp"
+     "stats_manager.cpp"
      )
 
 add_executable(${PROJECT_NAME} ${SRC_FILES})

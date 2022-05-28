@@ -78,6 +78,9 @@ StratumServer::StratumServer()
     // std::vector<char> c;
     // SendRpcReq(c, 1, "getblockcount", nullptr, 0);
     redis_manager.UpdatePoS(0, GetCurrentTimeMs());
+
+    StatsManger stats_manager;
+    stats_manager.Start(redis_manager.rc);
 }
 
 StratumServer::~StratumServer()

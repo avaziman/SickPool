@@ -17,8 +17,6 @@
 #define str(s) #s
 
 // how we store stale and invalid shares in database
-#define STALE_SHARE_DIFF -1
-#define INVALID_SHARE_DIFF -2
 
 class RedisManager
 {
@@ -761,9 +759,9 @@ class RedisManager
             }
         }
     }
-
-   private:
     redisContext *rc;
+   private:
+    // redisContext *rc;
     std::string coin_symbol;
 };
 

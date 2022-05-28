@@ -16,6 +16,7 @@
 #include <deque>
 #include <unordered_map>
 
+#include "../stats_manager.hpp"
 #include "./round.hpp"
 #include "./job_manager.hpp"
 #include "../coin_config.hpp"
@@ -30,7 +31,6 @@
 #include "../daemon/daemon_rpc.hpp"
 #include "../logger.hpp"
 #include "../sock_addr.hpp"
-#include "./difficulty_manager.hpp"
 #include "./job_manager.hpp"
 #include "byteswap.h"
 #include "deque"
@@ -85,6 +85,8 @@ class StratumServer
     // chain name str -> chain round
     std::unordered_map<std::string, Round> pow_rounds;
     std::unordered_map<std::string, Round> pos_rounds;
+    // worker name -> effort
+    std::unordered_map<std::string, double> worker_effort;
 
     uint32_t block_number = 0;
     int64_t mature_timestamp_ms = 0;
