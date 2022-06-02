@@ -1,5 +1,7 @@
 #ifndef UTILS_HPP_
 #define UTILS_HPP_
+#include <sys/time.h>
+
 #include <cmath>
 #include <ctime>
 #include <iomanip>
@@ -8,7 +10,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <sys/time.h>
 
 #include "../config.hpp"
 #include "verushash/arith_uint256.h"
@@ -24,7 +25,9 @@
 //     // if(!DecodeBase58(addr, bytes) return false;
 // }
 
-inline int64_t GetCurrentTimeMs() { struct timeval tv;
+inline int64_t GetCurrentTimeMs()
+{
+    struct timeval tv;
     struct timeval time_now;
     gettimeofday(&time_now, nullptr);
     return (time_now.tv_sec * 1000) + (time_now.tv_usec / 1000);
@@ -243,6 +246,11 @@ inline double difficulty(const unsigned bits)
     const unsigned exponent_diff = 8 * (0x20 - ((bits >> 24) & 0xFF));
     const double significand = bits & 0xFFFFFF;
     return std::ldexp(0x0f0f0f / significand, exponent_diff);
+}
+
+inline double GetExpectedHashes(const double diff)
+{
+    return std::ldexp(diff / 0x0f0f0f, 24);
 }
 
 // ms

@@ -26,8 +26,8 @@ void StatsManager::Start()
         std::this_thread::sleep_until(system_clock::from_time_t(to + 1));
         auto startChrono = system_clock::now();
 
-        // bool should_update_interval = from % STATS_INTERVAL_SECONDS == 0;
-        bool should_update_interval = true;
+        bool should_update_interval = from % STATS_INTERVAL_SECONDS == 0;
+        // bool should_update_interval = true;
         int command_count = 0;
         uint64_t toMs = to * 1000;
 
@@ -87,6 +87,12 @@ void StatsManager::Start()
                 command_count += 3;
             }
         }
+
+        //TODO: make for each side chain every 5 mins
+        redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pow total %f",
+                           total_round_effort[COIN_SYMBOL]);
+        command_count++;
+
         stats_map_mutex.unlock();
 
         for (int i = 0; i < command_count; i++)
@@ -155,6 +161,13 @@ bool StatsManager::ClosePoWRound(std::string chain, BlockSubmission& submission,
     uint32_t height = submission.height;
     int command_amount = 0;
 
+    // reset for next round
+    total_round_effort[COIN_SYMBOL] = 0;
+
+    redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pow total 0");
+    command_amount++;
+
+
     if(!accepted){
         block_reward = 0;
     }
@@ -167,6 +180,12 @@ bool StatsManager::ClosePoWRound(std::string chain, BlockSubmission& submission,
 
         double miner_share = miner_effort / total_effort;
         double miner_reward = block_reward * miner_share * (1 - fee);
+
+        // reset for next round
+        redisAppendCommand(rc, "LPUSH round_entries:%s {\"effort\":0}",
+                           miner_addr->c_str());
+
+        command_amount++;
 
         redisAppendCommand(rc,
                            "LSET round_entries:%s 0 {\"height\":%d,\"effort\":%f,"
@@ -181,10 +200,6 @@ bool StatsManager::ClosePoWRound(std::string chain, BlockSubmission& submission,
                            " TIMESTAMP %" PRId64,
                            chain.c_str(), miner_addr->c_str(), miner_reward,
                            submission.timeMs);
-        command_amount++;
-
-        // reset for next round
-        redisAppendCommand(rc, "LPUSH round_entries:%s {\"effort\":0}", miner_addr->c_str());
         command_amount++;
 
         miner_stats->round_effort[COIN_SYMBOL] = 0;
@@ -207,7 +222,7 @@ bool StatsManager::ClosePoWRound(std::string chain, BlockSubmission& submission,
         }
         freeReplyObject(reply);
     }
-    total_round_effort[COIN_SYMBOL] = 0;
+    return true;
 }
 
 double StatsManager::GetTotalEffort(std::string chain)

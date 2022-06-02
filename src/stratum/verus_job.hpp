@@ -37,6 +37,8 @@ class VerusJob : public Job
         // difficulty is calculated from opposite byte encoding than in block
         uint32_t bitsUint = HexToUint(bTemplate.bits.data(), 8);
         this->targetDiff = BitsToDiff(bitsUint);
+        this->expectedShares = GetExpectedHashes(this->targetDiff);
+
 
         // reverse all numbers for block encoding
 

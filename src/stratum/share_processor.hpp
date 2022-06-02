@@ -61,6 +61,7 @@ class ShareProcessor
         {
             result.Code = ShareCode::DUPLICATE_SHARE;
             result.Message = "Duplicate share";
+            result.Diff = INVALID_SHARE_DIFF;
             return result;
         }
         

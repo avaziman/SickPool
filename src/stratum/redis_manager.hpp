@@ -302,7 +302,6 @@ class RedisManager
                             double totalEffort, uint32_t number,
                             int64_t durationMs)
     {
-        totalEffort = submission.job->GetTargetDiff();  // todo rem
         if (totalEffort == 0)
         {
             Logger::Log(LogType::Critical, LogField::Redis,
@@ -310,8 +309,9 @@ class RedisManager
             return false;
         }
 
-        const double effortPercent =
-            (totalEffort / submission.job->GetTargetDiff()) * (double)100;
+        // const double effortPercent =
+        //     (totalEffort / estimatedNeededEffort) * 100;
+        const double effortPercent = (totalEffort / submission.job->GetEstimatedShares()) * (double)100;
 
         redisReply *reply;
 
@@ -375,7 +375,26 @@ class RedisManager
         return true;
     }
 
-    // void ClosePoWRound(int64_t roundStart, int64_t foundTimeMs, int64_t reward,
+
+    bool SetEstimatedNeededEffort(double effort)
+    {
+        redisReply *reply;
+        redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pow estimated %f",
+                           effort);
+
+        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Critical, LogField::Redis,
+                        "Failed to set estimated needed effort: %s", rc->errstr);
+            return false;
+        }
+
+        freeReplyObject(reply);
+        return true;
+    }
+
+    // void ClosePoWRound(int64_t roundStart, int64_t foundTimeMs, int64_t
+    // reward,
     //                    uint32_t height, const double totalEffort,
     //                    const double fee)
     // {
@@ -399,7 +418,8 @@ class RedisManager
     //     }
 
     //     Logger::Log(LogType::Info, LogField::Redis,
-    //                 "Closing round with %d workers", hashReply->elements / 2);
+    //                 "Closing round with %d workers", hashReply->elements /
+    //                 2);
 
     //     // save in db as float, as that's the native ts type
     //     double rewardF = reward / 1e8;  // satoshis to coins
@@ -426,7 +446,8 @@ class RedisManager
     //             miner, foundTimeMs, height, minerShare, minerReward);
 
     //         Logger::Log(LogType::Debug, LogField::Redis,
-    //                     "Round: %d, miner: %s, effort: %f, share: %f, reward: "
+    //                     "Round: %d, miner: %s, effort: %f, share: %f, reward:
+    //                     "
     //                     "%f, total effort: %f",
     //                     height, miner, minerEffort, minerShare, minerReward,
     //                     totalEffort);

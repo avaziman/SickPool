@@ -97,6 +97,7 @@ class Job
     char* GetNotifyBuff() { return notifyBuff; }
     std::size_t GetNotifyBuffSize() { return notifyBuffSize; }
     double GetTargetDiff() { return targetDiff; }
+    double GetEstimatedShares() { return expectedShares; }
     // arith_uint256* GetTarget() { return &target; }
 
    protected:
@@ -109,6 +110,7 @@ class Job
     const uint32_t jobId;
     const int64_t minTime;
     double targetDiff;
+    double expectedShares;
     const int64_t blockReward;
     const uint32_t height;
 

@@ -440,6 +440,8 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     redis_manager.SetMatureTimestamp(mature_timestamp_ms);
     last_block_timestamp_map = curtimeMs;
 
+    redis_manager.SetEstimatedNeededEffort(newJob->GetEstimatedShares());
+    //TODO: combine all redis functions one new block to one pipelined
     Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %" PRId64,
                 mature_timestamp_ms);
 
@@ -824,9 +826,9 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
 
     auto duration = DIFF_US(end, start);
 
-    // Logger::Log(LogType::Debug, LogField::Stratum,
-    //             "Share processed in %dus, diff: %f, res: %d", duration,
-    //             shareRes.Diff, (int)shareRes.Code);
+    Logger::Log(LogType::Debug, LogField::Stratum,
+                "Share processed in %dus, diff: %f, res: %d", duration,
+                shareRes.Diff, (int)shareRes.Code);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,

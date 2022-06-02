@@ -26,7 +26,7 @@
 #define BLOCK_MATURITY 100
 #define HASH_SIZE 32
 #define HASH_SIZE_HEX (HASH_SIZE * 2)
-
+#define POW_BLOCK_TIME 60
 #define MAX_NOTIFY_MESSAGE_SIZE (1024 * 4)
 
 #endif
