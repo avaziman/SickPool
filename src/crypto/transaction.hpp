@@ -23,7 +23,7 @@
 // index)
 struct OutPoint
 {
-    unsigned char hash[32];  // txid
+    unsigned char txid_hash[32];  // txid
     uint32_t index;
 };
 
@@ -57,7 +57,7 @@ class Transaction
     std::vector<Output> vout;
     uint32_t lock_time;
 
-    void GetP2PKHScript(std::string_view toAddress, std::vector<unsigned char> &res)
+    void GetP2PKHScript(std::string_view toAddress, std::vector<unsigned char> &res) const
     {
         std::vector<unsigned char> vchRet;
         // TODO: implement base58 decode for string_view
@@ -92,7 +92,7 @@ class Transaction
     {
         Input input;
         OutPoint point;
-        memcpy(point.hash, prevTxId, 32);
+        memcpy(point.txid_hash, prevTxId, 32);
         point.index = prevIndex;
 
         input.previous_output = point;

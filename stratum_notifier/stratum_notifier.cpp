@@ -5,7 +5,7 @@
 
 #include <cstdio>
 
-#define PORT 4444
+#define PORT 1111
 
 // stratum.block_notify
 // stratum.wallet_notify
@@ -22,9 +22,8 @@ int main(int argc, char* argv[])
     char message[128];
     // no need id
     int len = snprintf(message, sizeof(message),
-                       "{\"id\":0,\"method\":\"stratum.%s\","
-                       "\"params\":[\"%s\"]}\n",
-                       method, param);
+                       "%c %s",
+                       method[0], param);
 
     int sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     connect(sockfd, (struct sockaddr*)&addr, sizeof(addr));

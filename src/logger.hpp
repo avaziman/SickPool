@@ -33,6 +33,7 @@ enum class LogField
     ShareProcessor = 3,
     Redis = 4,
     StatsManager = 5,
+    ControlServer = 6,
 };
 
 inline const char* ToString(LogField v)
@@ -51,6 +52,8 @@ inline const char* ToString(LogField v)
             return "JOBS";
         case LogField::StatsManager:
             return "STATS";
+        case LogField::ControlServer:
+            return "CONTROL";
         default:
             return "Unknown";
     }

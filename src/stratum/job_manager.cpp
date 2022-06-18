@@ -1,7 +1,5 @@
 #include "job_manager.hpp"
 
-#include "stratum_server.hpp"
-
 job_t* JobManager::GetNewJob()
 {
     job_t* job = nullptr;
@@ -30,8 +28,7 @@ job_t* JobManager::GetNewJob()
         // this must be in the order they appear in the result for simdjson
         blockTemplate.version = res["version"].get_int64();
         blockTemplate.prevBlockHash = res["previousblockhash"].get_string();
-        blockTemplate.finalsRootHash =
-            res["finalsaplingroothash"].get_string();
+        blockTemplate.finalsRootHash = res["finalsaplingroothash"].get_string();
         blockTemplate.solution = res["solution"].get_string();
         // can't iterate after we get the string_view
         ondemand::array txs = res["transactions"].get_array();
@@ -49,8 +46,8 @@ job_t* JobManager::GetNewJob()
         //     int txSize = td.dataHex.size() / 2;
         //     td.data = std::vector<unsigned char>(txSize);
         //     Unhexlify(td.data.data(), td.dataHex.data(), td.dataHex.size());
-        //     Unhexlify(td.hash, txHashHex.data(), txHashHex.size()); // hash is reversed
-        //     std::reverse(td.hash, td.hash + 32);
+        //     Unhexlify(td.hash, txHashHex.data(), txHashHex.size()); // hash
+        //     is reversed std::reverse(td.hash, td.hash + 32);
 
         //     if (!blockTemplate.txList.AddTxData(td))
         //     {
@@ -61,6 +58,7 @@ job_t* JobManager::GetNewJob()
         //     }
         // }
 
+        blockTemplate.coinbase_hex = res["coinbasetxn"]["data"].get_string();
         blockTemplate.coinbaseValue =
             res["coinbasetxn"]["coinbasevalue"].get_int64();
 
@@ -69,8 +67,9 @@ job_t* JobManager::GetNewJob()
         blockTemplate.bits = res["bits"].get_string();
         blockTemplate.height = res["height"].get_int64();
 
-        TransactionData coinbaseTx = GetCoinbaseTxData(
-            blockTemplate.coinbaseValue, blockTemplate.height, blockTemplate.minTime);
+        TransactionData coinbaseTx =
+            GetCoinbaseTxData(blockTemplate.coinbaseValue, blockTemplate.height,
+                              blockTemplate.minTime, blockTemplate.coinbase_hex);
 
         // we need to hexlify here otherwise hex will be garbage
         char coinbaseHex[coinbaseTx.data.size() * 2];
@@ -98,10 +97,11 @@ BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
 
 // doesnt include dataHex
 TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
-                                              int64_t locktime)
+                                              int64_t locktime,
+                                              std::string_view rpc_coinbase)
 {
     TransactionData res;
-    VerusTransaction coinbaseTx = GetCoinbaseTx(value, height, locktime);
+    VerusTransaction coinbaseTx = GetCoinbaseTx(value, height, locktime, rpc_coinbase);
 
     res.data = coinbaseTx.GetBytes();
     HashWrapper::SHA256d(res.hash, res.data.data(), res.data.size());
@@ -110,7 +110,8 @@ TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
 }
 
 VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
-                                           int64_t locktime)
+                                           int64_t locktime,
+                                           std::string_view rpc_coinbase)
 {
     unsigned char prevTxIn[32] = {0};  // null last input
     // unsigned int locktime = 0;         // null locktime (no locktime)
@@ -119,7 +120,7 @@ VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
         VerusTransaction(TXVERSION, locktime, true, TXVERSION_GROUP);
     // add signature with height script and extra data
 
-    std::vector<unsigned char> heightScript = GetNumScript(height);
+    std::vector<unsigned char> heightScript = GenNumScript(height);
     const unsigned char heightScriptLen = heightScript.size();
 
     std::vector<unsigned char> signature(1 + heightScriptLen +
@@ -132,8 +133,8 @@ VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
 
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
     coinbaseTx.AddP2PKHOutput(StratumServer::coin_config.pool_addr, value);
-    #if POOL_COIN == COIN_VRSCTEST
-    coinbaseTx.AddFeePoolOutput();  // without this gives bad-blk-fees
-    #endif
+#if POOL_COIN == COIN_VRSCTEST
+    coinbaseTx.AddFeePoolOutput(rpc_coinbase);  // without this gives bad-blk-fees
+#endif
     return coinbaseTx;
 }

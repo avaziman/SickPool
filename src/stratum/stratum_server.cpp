@@ -9,8 +9,9 @@ StratumServer::StratumServer()
     : reqParser(REQ_BUFF_SIZE),
       httpParser(MAX_HTTP_REQ_SIZE),
       redis_manager(coin_config.redis_host),
-      stats_manager(redis_manager.rc, &redis_mutex),
-      block_submissions()
+      stats_manager(redis_manager.rc, &redis_mutex,
+                    coin_config.hashrate_interval_seconds,
+                    coin_config.effort_interval_seconds)
 {
     simdjson::error_code error =
         reqParser.allocate(REQ_BUFF_SIZE, MAX_HTTP_JSON_DEPTH);
@@ -65,7 +66,7 @@ StratumServer::StratumServer()
 
     if (bind(sockfd, (const sockaddr *)&addr, sizeof(addr)) != 0)
     {
-        throw std::runtime_error("Failed to bind to port " +
+        throw std::runtime_error("Stratum server failed to bind to port " +
                                  std::to_string(coin_config.stratum_port));
     }
 
@@ -82,13 +83,33 @@ StratumServer::StratumServer()
 
     std::thread stats_thread(&StatsManager::Start, &stats_manager);
     stats_thread.detach();
+
+    control_server.Start(1111);
+    std::thread control_thread(&StratumServer::HandleControlCommands, this);
+    control_thread.detach();
 }
 
 StratumServer::~StratumServer()
 {
-    for (StratumClient *cli : this->clients) close(cli->GetSock());
+    for (const StratumClient *cli : this->clients) close(cli->GetSock());
     close(this->sockfd);
     for (DaemonRpc *rpc : this->rpcs) delete rpc;
+}
+
+void StratumServer::HandleControlCommands(){
+    while (true) {
+        ControlCommands cmd = control_server.GetNextCommand();
+        HandleControlCommand(cmd);
+    }
+}
+
+void StratumServer::HandleControlCommand(ControlCommands cmd){
+    switch (cmd){
+        case ControlCommands::UPDATE_BLOCK:
+            auto val = ondemand::array();
+            HandleBlockNotify(val);
+            break;
+    }
 }
 
 void StratumServer::StartListening()
@@ -135,7 +156,7 @@ void StratumServer::Listen()
 void StratumServer::HandleSocket(int conn_fd)
 {
     StratumClient *client =
-        new StratumClient(conn_fd, time(0), this->coin_config.default_diff);
+        new StratumClient(conn_fd, time(nullptr), coin_config.default_diff);
     clients_mutex.lock();
     this->clients.push_back(client);
     clients_mutex.unlock();
@@ -143,7 +164,8 @@ void StratumServer::HandleSocket(int conn_fd)
     // simdjson requires some extra bytes, so don't write to the last bytes
     char buffer[REQ_BUFF_SIZE];
     char *reqEnd = nullptr, *reqStart = nullptr;
-    int total = 0, reqLen = 0, nextReqLen = 0, recvRes = 0;
+    int total = 0, reqLen = 0, nextReqLen = 0;
+    std::size_t recvRes = 0;
     bool isTooBig = false;
 
     while (true)
@@ -157,7 +179,7 @@ void StratumServer::HandleSocket(int conn_fd)
             total += recvRes;
             buffer[total] = '\0';  // for strchr
             reqEnd = std::strchr(buffer, '}');
-        } while (reqEnd == NULL && total < REQ_BUFF_SIZE_REAL);
+        } while (reqEnd == nullptr && total < REQ_BUFF_SIZE_REAL);
 
         // exit loop, miner disconnected
         if (recvRes <= 0)
@@ -259,21 +281,15 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer, int reqSize)
     {
         HandleSubmit(cli, id, params);
     }
-    else if (method == "stratum.block_notify")
-    {
-        HandleBlockNotify(params);
-    }
-    else if (method == "stratum.wallet_notify")
-    {
-        HandleWalletNotify(params);
-    }
     else
+    {
         Logger::Log(LogType::Warn, LogField::Stratum,
                     "Unknown request method: %.*s", method.size(),
                     method.data());
+    }
 }
 
-void StratumServer::HandleBlockNotify(ondemand::array &params)
+void StratumServer::HandleBlockNotify(const ondemand::array &params)
 {
     // TODO: verify the notification
     int64_t curtimeMs = GetCurrentTimeMs();
@@ -336,11 +352,12 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
 
     for (BlockSubmission *submission : block_submissions)
     {
-        int64_t durationMs = submission->timeMs - last_block_timestamp_map;
-        uint8_t *prevBlockBin = newJob->GetPrevBlockHash();
+        const uint8_t *prevBlockBin = newJob->GetPrevBlockHash();
 
-        bool blockAdded = !memcmp(
-            prevBlockBin, submission->shareRes.HashBytes.data(), HASH_SIZE);
+        unsigned char submissionHashBin[HASH_SIZE];
+        Unhexlify(submissionHashBin, submission->hashHex, HASH_SIZE_HEX);
+
+        bool blockAdded = !memcmp(prevBlockBin, submissionHashBin, HASH_SIZE);
 
         // only one block submission can be accepted
         if (blockAdded)
@@ -349,10 +366,8 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         }
 
         double totalEffort = stats_manager.GetTotalEffort(COIN_SYMBOL);
-    // TODO: make map of block submissions too
-        redis_manager.AddBlockSubmission(*submission, blockAdded,
-                                         totalEffort, block_number,
-                                         durationMs);
+        // TODO: make map of block submissions too
+        redis_manager.AddBlockSubmission(*submission, blockAdded);
     }
 
     start = TIME_NOW();
@@ -366,18 +381,20 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
         {
             stats_manager.ClosePoWRound(COIN_SYMBOL, *valid_submission, true,
                                         coin_config.pow_fee);
-            // TODO: fix
             Logger::Log(LogType::Info, LogField::Stratum,
-                        "Block added to chain! found by: %s, hash: %.*s",
-                        valid_submission->worker.c_str(), HASH_SIZE_HEX,
+                        "Block added to chain! found by: %.*s, hash: %.*s",
+                        sizeof(valid_submission->worker),
+                        valid_submission->worker, HASH_SIZE_HEX,
                         valid_submission->hashHex);
         }
         else
         {
             // 0 reward for invalid blocks
-            stats_manager.ClosePoWRound(COIN_SYMBOL, *valid_submission, false,
-                                        coin_config.pow_fee);
-                                        
+            // dont close the round if the block wasn't accepted
+            // stats_manager.ClosePoWRound(COIN_SYMBOL, block_submissions,
+            // false,
+            //                             coin_config.pow_fee);
+
             Logger::Log(LogType::Critical, LogField::Stratum,
                         "Block NOT added to chain %.*s!", HASH_SIZE_HEX,
                         valid_submission->hashHex);
@@ -441,7 +458,7 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
     last_block_timestamp_map = curtimeMs;
 
     redis_manager.SetEstimatedNeededEffort(newJob->GetEstimatedShares());
-    //TODO: combine all redis functions one new block to one pipelined
+    // TODO: combine all redis functions one new block to one pipelined
     Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %" PRId64,
                 mature_timestamp_ms);
 
@@ -453,6 +470,8 @@ void StratumServer::HandleBlockNotify(ondemand::array &params)
                 newJob->GetMinTime());
     Logger::Log(LogType::Info, LogField::JobManager, "Difficutly: %f",
                 newJob->GetTargetDiff());
+    Logger::Log(LogType::Info, LogField::JobManager, "Est. shares: %f",
+                newJob->GetEstimatedShares());
     // Logger::Log(LogType::Info, LogField::JobManager, "Target: %s",
     //             job->GetTarget()->GetHex().c_str());
     Logger::Log(LogType::Info, LogField::JobManager, "Block reward: %d",
@@ -616,7 +635,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                    "invalid worker name format, use: address/id@.worker");
         return;
     }
-    else if (worker_full.size() > MAX_WORKER_NAME_LEN)
+    else if (worker_full.size() > MAX_WORKER_NAME_LEN + ADDRESS_LEN)
     {
         SendReject(
             cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
@@ -705,7 +724,8 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     worker_full = worker_full_str;
 
     cli->HandleAuthorized(worker_full, valid_addr);
-    redis_manager.AddWorker(valid_addr, worker_full, GetDailyTimestamp());
+    redis_manager.AddWorker(valid_addr, worker_full, idTag,
+                            GetDailyTimestamp());
 
     Logger::Log(LogType::Info, LogField::Stratum,
                 "Authorized worker: %.*s, address: %.*s, id: %.*s",
@@ -715,7 +735,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     SendAccept(cli, id);
     this->UpdateDifficulty(cli);
 
-    if (jobs.size() == 0)
+    if (jobs.empty())
     {
         Logger::Log(LogType::Critical, LogField::Stratum,
                     "no job to broadcast to connected client!");
@@ -754,7 +774,7 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
     // auto duration = duration_cast<microseconds>(end - start).count();
 }
 
-void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
+void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 {
     int64_t time = GetCurrentTimeMs();
 
@@ -798,8 +818,12 @@ void StratumServer::HandleShare(StratumClient *cli, int id, const Share &share)
             // Logger::Log(LogType::Debug, LogField::Stratum, "Block hex: %.*s",
             //             blockSize + 3, blockData);
             delete[] blockData;
+            auto chain = std::string_view{"VRSCTEST"};
+            int64_t duration = 0;  // TODO: fix
+            //TODO:: append block number to db
             block_submissions.push_back(new BlockSubmission(
-                shareRes, cli->GetFullWorkerName(), time, job));
+                chain, job, shareRes, cli->GetFullWorkerName(), time, duration,
+                block_number, stats_manager.GetTotalEffort(chain)));
 
             SendAccept(cli, id);
             // total_effort_pow += shareRes.Diff;
@@ -963,7 +987,7 @@ void StratumServer::BroadcastJob(StratumClient *cli, Job *job)
 
 // TODO: add a lock job
 
-int StratumServer::SendRaw(int sock, char *data, int len)
+std::size_t StratumServer::SendRaw(int sock, const char *data, int len) const
 {
     // dont send sigpipe
     return send(sock, data, len, MSG_NOSIGNAL);

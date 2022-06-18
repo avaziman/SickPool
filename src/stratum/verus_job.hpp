@@ -29,7 +29,7 @@
 class VerusJob : public Job
 {
    public:
-    VerusJob(uint32_t jobId, BlockTemplate& bTemplate, bool clean = true)
+    VerusJob(uint32_t jobId, const BlockTemplate& bTemplate, bool clean = true)
         : Job(jobId, bTemplate)
     {
         char merkleRootHex[MERKLE_ROOT_SIZE * 2];
@@ -79,8 +79,8 @@ class VerusJob : public Job
         auto start = std::chrono::steady_clock::now();
 
         // reverse all numbers for notify, they are written in correct order
-        bTemplate.version = bswap_32(bTemplate.version);
-        bTemplate.minTime = bswap_32(bTemplate.minTime);
+        int32_t revVer = bswap_32(bTemplate.version);
+        int64_t revMinTime = bswap_32(bTemplate.minTime);
         bitsUint = bswap_32(bitsUint);
 
         notifyBuffSize =
@@ -88,8 +88,8 @@ class VerusJob : public Job
                      "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
                      "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%"
                      "08x\",\"%08x\",%s,\"%.144s\"]}\n",
-                     GetId(), bTemplate.version, prevBlockRevHex, merkleRootHex,
-                     finalSRootRevHex, (uint32_t)bTemplate.minTime, bitsUint,
+                     GetId(), revVer, prevBlockRevHex, merkleRootHex,
+                     finalSRootRevHex, (uint32_t)revMinTime, bitsUint,
                      BoolToCstring(clean), bTemplate.solution.data());
 
         auto end = std::chrono::steady_clock::now();
@@ -153,10 +153,10 @@ class VerusJob : public Job
     // char* GetTime() { return nTime; }
     // char* GetBits() { return nBits; }
 
-   protected:
+   private:
     int written = 0;
 };
 
-typedef VerusJob job_t;
+using job_t = VerusJob;
 
 #endif

@@ -15,7 +15,7 @@
 class MerkleTree
 {
    public:
-    static void CalcRoot(std::vector<TransactionData>& txsData, unsigned char* res)
+    static void CalcRoot(const std::vector<TransactionData>& txsData, unsigned char* res)
     {
         std::vector<std::array<unsigned char, 32>> hashes(txsData.size());
         for (int i = 0; i < hashes.size(); i++){

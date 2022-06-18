@@ -57,6 +57,7 @@ struct BlockTemplate
     std::string_view finalsRootHash;
     std::string_view solution;
     TransactionDataList txList;
+    std::string_view coinbase_hex;
     int64_t coinbaseValue;
     std::string_view target;
     int64_t minTime;

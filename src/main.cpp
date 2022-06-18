@@ -21,22 +21,9 @@
 
 void ParseCoinConfig(padded_string& json, CoinConfig& cnfg);
 
-// int valid(const char* s)
-// {
-//     unsigned char dec[32], d1[SHA256_DIGEST_LENGTH],
-//     d2[SHA256_DIGEST_LENGTH];
-
-//     coin_err = "";
-//     if (!unbase58(s, dec)) return 0;
-
-//     SHA256(SHA256(dec, 21, d1), SHA256_DIGEST_LENGTH, d2);
-
-//     if (memcmp(dec + 21, d2, 4)) return 0;
-
-//     return 1;
-// }
 int main(int argc, char** argv)
 {
+    std::cout << sizeof(BlockSubmission);
     Logger::Log(LogType::Info, LogField::Config, "Starting SickPool!");
 
     Logger::Log(LogType::Info, LogField::Config, "Static config:");
@@ -69,7 +56,7 @@ int main(int argc, char** argv)
             StratumServer::rpcs.push_back(new DaemonRpc(
                 coinConfig.rpcs[i].host, coinConfig.rpcs[i].auth));
         }
-
+    
         StratumServer stratumServer;
         stratumServer.StartListening();
     }
@@ -96,29 +83,17 @@ void AssignJson(const char* name, std::string& obj, ondemand::document& doc)
     }
 }
 
-void AssignJson(const char* name, ushort& obj, ondemand::document& doc)
+template <typename T>
+void AssignJson(const char* name, T& obj, ondemand::document& doc)
 {
     try
     {
-        obj = doc[name].get_uint64();
+        obj = doc[name].get<T>();
     }
     catch (...)
     {
         throw std::runtime_error(std::string("Invalid or no \"") + name +
-                                 "\" (uint) variable in config file");
-    }
-}
-
-void AssignJson(const char* name, double& obj, ondemand::document& doc)
-{
-    try
-    {
-        obj = doc[name].get_double();
-    }
-    catch (...)
-    {
-        throw std::runtime_error(std::string("Invalid or no \"") + name +
-                                 "\" (double) variable in config file");
+                                 "\" () variable in config file");
     }
 }
 
@@ -131,6 +106,8 @@ void ParseCoinConfig(padded_string& json, CoinConfig& cnfg)
     // AssignJson("symbol", cnfg->symbol, configDoc);
     // AssignJson("algo", cnfg->algo, configDoc);
     AssignJson("stratum_port", cnfg.stratum_port, configDoc);
+    AssignJson("hashrate_interval_seconds", cnfg.hashrate_interval_seconds, configDoc);
+    AssignJson("effort_interval_seconds", cnfg.effort_interval_seconds, configDoc);
     AssignJson("pow_fee", cnfg.pow_fee, configDoc);
     AssignJson("pos_fee", cnfg.pos_fee, configDoc);
     AssignJson("default_diff", cnfg.default_diff, configDoc);
@@ -158,24 +135,3 @@ void ParseCoinConfig(padded_string& json, CoinConfig& cnfg)
             "\"; ([string host, string auth]) variable in config file");
     }
 }
-
-// make tests
-// std::cout << std::hex << std::setfill('0') << std::setw(8)
-//           << DiffToBits(32768) << std::endl;
-// std::cout << BitsToDiff(DiffToBits(32768)) << std::endl;
-// std::cout << BitsToDiff(DiffToBits(4096)) << std::endl;
-
-// std::cout << BitsToDiff(DiffToTarget(1));
-
-// const char* s[] = {"1Q1pE5vPGEEMqRcVRMbtBK842Y6Pzo6nK9",
-//                    "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62i",
-//                    "1Q1pE5vPGEEMqRcVRMbtBK842Y6Pzo6nJ9",
-//                    "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62I", 0};
-// int i;
-// for (i = 0; s[i]; i++)
-// {
-//     int status = valid(s[i]);
-//     printf("%s: %s\n", s[i], status ? "Ok" : "NO OK");
-// }
-// return 0;
-// TODO: make difficulty adjustment based on average hashrate

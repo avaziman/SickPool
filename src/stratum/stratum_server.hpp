@@ -6,22 +6,17 @@
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
-#include <ctime>
 #include <cstring>
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <vector>
-#include <queue>
+#include <ctime>
 #include <deque>
+#include <iostream>
+#include <mutex>
+#include <queue>
+#include <thread>
 #include <unordered_map>
+#include <vector>
 
-#include "../stats_manager.hpp"
-#include "./round.hpp"
-#include "./job_manager.hpp"
 #include "../coin_config.hpp"
-#include "../crypto/block.hpp"
-#include "../crypto/block_header.hpp"
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/merkle_tree.hpp"
 #include "../crypto/transaction.hpp"
@@ -31,11 +26,13 @@
 #include "../daemon/daemon_rpc.hpp"
 #include "../logger.hpp"
 #include "../sock_addr.hpp"
-#include "./job_manager.hpp"
+#include "../stats_manager.hpp"
 #include "byteswap.h"
-#include "deque"
+#include "job_manager.hpp"
+#include "control_server.hpp"
 #include "job.hpp"
 #include "redis_manager.hpp"
+#include "round.hpp"
 #include "share.hpp"
 #include "share_processor.hpp"
 #include "stratum_client.hpp"
@@ -64,7 +61,6 @@ class StratumServer
                           const char* params, int paramsLen);
 
    private:
-
     int sockfd;
     struct sockaddr_in addr;
     std::string last_job_id_hex;
@@ -72,6 +68,7 @@ class StratumServer
     ondemand::parser reqParser;
     ondemand::parser httpParser;
 
+    ControlServer control_server;
     RedisManager redis_manager;
     StatsManager stats_manager;
     static JobManager job_manager;
@@ -84,14 +81,10 @@ class StratumServer
     // job id hex str -> job, O(1) job lookup
     std::unordered_map<std::string, job_t*> jobs;
     // chain name str -> chain round
-    std::unordered_map<std::string, Round> pow_rounds;
-    std::unordered_map<std::string, Round> pos_rounds;
-    // worker name -> effort
-    std::unordered_map<std::string, double> worker_effort;
 
     uint32_t block_number = 0;
     int64_t mature_timestamp_ms = 0;
-    int64_t last_block_timestamp_map = 0;//TODO: make map
+    int64_t last_block_timestamp_map = 0;  // TODO: make map
 
     std::mutex jobs_mutex;
     std::mutex clients_mutex;
@@ -99,19 +92,20 @@ class StratumServer
 
     static std::mutex rpc_mutex;
 
-    void ListenControl();
+    void HandleControlCommands();
+    void HandleControlCommand(ControlCommands cmd);
 
     void Listen();
     void HandleSocket(int sockfd);
     void HandleReq(StratumClient* cli, char buffer[], int reqSize);
-    void HandleBlockNotify(ondemand::array& params);
+    void HandleBlockNotify(const ondemand::array& params);
     void HandleWalletNotify(ondemand::array& params);
 
     void HandleSubscribe(StratumClient* cli, int id, ondemand::array& params);
     void HandleAuthorize(StratumClient* cli, int id, ondemand::array& params);
     void HandleSubmit(StratumClient* cli, int id, ondemand::array& params);
 
-    void HandleShare(StratumClient* cli, int id, const Share& share);
+    void HandleShare(StratumClient* cli, int id, Share& share);
     void SendReject(StratumClient* cli, int id, int error, const char* msg);
     void SendAccept(StratumClient* cli, int id);
     bool SubmitBlock(const char* blockHex, int blockHexLen);
@@ -121,6 +115,6 @@ class StratumServer
 
     void BroadcastJob(StratumClient* cli, Job* job);
 
-    int SendRaw(int sock, char* data, int len);
+    inline std::size_t SendRaw(int sock, const char* data, int len) const;
 };
 #endif

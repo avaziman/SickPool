@@ -19,12 +19,6 @@
 #define DIFF_US(end, start) duration_cast<microseconds>(end - start).count()
 #define TIME_NOW() std::chrono::steady_clock::now()
 
-// bool IsAddressValid(std::string addr){
-//     std::vector<unsigned char> bytes;
-
-//     // if(!DecodeBase58(addr, bytes) return false;
-// }
-
 inline int64_t GetCurrentTimeMs()
 {
     struct timeval tv;
@@ -98,7 +92,7 @@ inline uint32_t HexToUint(const char* hex, int size)
     return val;
 }
 
-inline void Hexlify(char* dest, unsigned char* src, int srcSize)
+inline void Hexlify(char* dest, const unsigned char* src, size_t srcSize)
 {
     const char hex[] = "0123456789abcdef";
 
@@ -121,7 +115,7 @@ inline void Hexlify(char* dest, unsigned char* src, int srcSize)
     }
 }
 
-inline void Unhexlify(unsigned char* dest, const char* src, int size)
+inline void Unhexlify(unsigned char* dest, const char* src, size_t size)
 {
     // each byte is 2 characters in hex
     for (int i = 0; i < size / 2; i++)
@@ -148,7 +142,7 @@ inline uint32_t FromHex(const char* str)
 }
 
 // from script.h
-inline std::vector<unsigned char> GetNumScript(const int64_t& value)
+inline std::vector<unsigned char> GenNumScript(const int64_t& value)
 {
     std::vector<unsigned char> result;
     const bool neg = value < 0;
@@ -177,6 +171,27 @@ inline std::vector<unsigned char> GetNumScript(const int64_t& value)
         result.back() |= 0x80;
 
     return result;
+}
+
+inline std::pair<uint64_t, uint8_t> ReadNumScript(uint8_t* script){
+    uint8_t type = script[0];
+    if(type < 0xFD)
+    {
+        return std::make_pair(type, 1);
+    }
+    else if(type == 0xFD)
+    {
+        return std::make_pair(*reinterpret_cast<uint16_t*>(script + 1), 3);
+    }
+    else if(type == 0xFE)
+    {
+        return std::make_pair(*reinterpret_cast<uint32_t*>(script + 1), 5);
+    }
+    else if(type == 0xFF)
+    {
+        return std::make_pair(*reinterpret_cast<uint64_t*>(script + 1), 9);
+    }
+    return std::make_pair(0, 0);
 }
 
 // https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
@@ -250,7 +265,8 @@ inline double difficulty(const unsigned bits)
 
 inline double GetExpectedHashes(const double diff)
 {
-    return std::ldexp(diff / 0x0f0f0f, 24);
+    // return std::ldexp(diff / 0x0f0f0f, 24);
+    return diff * (17.00000101327902);  // 2^ 24 / 0x0f0f0f = 17...
 }
 
 // ms

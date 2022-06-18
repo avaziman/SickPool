@@ -3,6 +3,7 @@
 #include <cstring>
 #include <set>
 #include <unordered_set>
+#include <memory>
 
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/utils.hpp"
@@ -24,15 +25,16 @@ class StratumClient
         extra_nonce_str[8] = 0;
     }
 
-    ~StratumClient() { delete verusHasher; }
-
-    int GetSock() { return sockfd; }
-    double GetDifficulty() { return current_diff; }
-    const char* GetExtraNonce() { return extra_nonce_str; }
-    uint32_t GetShareCount() { return share_count; }
-    std::string GetFullWorkerName() { return worker_full; }
-    std::string GetAddress() { return address; }
-    int64_t GetLastAdjusted() { return last_adjusted; }
+    int GetSock() const { return sockfd; }
+    double GetDifficulty() const { return current_diff; }
+    const char* GetExtraNonce() const { return extra_nonce_str; }
+    uint32_t GetShareCount() const { return share_count; }
+    std::string_view GetFullWorkerName() const
+    {
+        return std::string_view(worker_full);
+    }
+    std::string_view GetAddress() const { return std::string_view(address); }
+    int64_t GetLastAdjusted() const { return last_adjusted; }
     uint8_t* GetBlockheaderBuff() { return block_header; }
     void ResetShareCount() { share_count = 0; }
 
@@ -64,12 +66,12 @@ class StratumClient
         worker_full = std::string(worker);
         address = std::string(addr);
 #if POOL_COIN <= COIN_VRSC
-        this->verusHasher = new CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
+        this->verusHasher = std::make_unique<CVerusHashV2>(CVerusHashV2(SOLUTION_VERUSHHASH_V2_2));
 #endif
     }
 
 #if POOL_COIN <= COIN_VRSC
-    CVerusHashV2* GetHasher() { return verusHasher; }
+    CVerusHashV2* GetHasher() { return verusHasher.get(); }
 #endif
    private:
     int sockfd;
@@ -101,7 +103,7 @@ class StratumClient
     // the hasher is thread-specific
     // so we need to store it in client so we only need to init once
 #if POOL_COIN <= COIN_VRSC
-    CVerusHashV2* verusHasher;
+    std::unique_ptr<CVerusHashV2> verusHasher;
 #endif
 };
 

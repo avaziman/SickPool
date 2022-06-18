@@ -16,8 +16,11 @@ struct CoinConfig
     double pos_fee;
     double default_diff;
     double target_shares_rate;
-    ushort stratum_port;
+    int64_t stratum_port;
     std::string redis_host;
     std::vector<RpcConfig> rpcs;
+
+    int64_t hashrate_interval_seconds;
+    int64_t effort_interval_seconds;
 };
 #endif

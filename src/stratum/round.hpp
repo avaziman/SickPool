@@ -1,9 +1,10 @@
 #ifndef ROUND_HPP_
 #define ROUND_HPP_
 
-class Round {
+struct ChainEffort {
     // ms
-    uint64_t start_time;
+    double pow = 0;
+    double pos = 0;
 };
 
 #endif

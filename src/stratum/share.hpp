@@ -1,10 +1,10 @@
 #ifndef SHARE_HPP_
 #define SHARE_HPP_
-#include <vector>
 #include <string_view>
+#include <vector>
 
 #include "job.hpp"
-
+#include "verus_job.hpp"
 struct Share
 {
     std::string_view worker;
@@ -38,27 +38,64 @@ struct ShareResult
     std::vector<uint8_t> HashBytes;
 };
 
-class BlockSubmission
+// size 176 bytes
+struct BlockSubmission
 {
    public:
-    BlockSubmission(ShareResult shareRes, std::string workerFull, int64_t time,
-                    Job* job)
-        : shareRes(shareRes),
+    BlockSubmission(std::string_view chainsv, const job_t* job,
+                    const ShareResult& shareRes, std::string_view workerFull,
+                    int64_t time, int64_t durMs,
+                    int32_t number, double totalEffort)
+        : blockReward(job->GetBlockReward()),
           timeMs(time),
-          job(job),
+          durationMs(durMs),
           height(job->GetHeight()),
-          miner(workerFull.substr(0, workerFull.find('.'))),
-          worker(workerFull.substr(workerFull.find('.') + 1, workerFull.size()))
+          number(number),
+          difficulty(shareRes.Diff),
+          estimatedShares(job->GetEstimatedShares()),
+          effortPercent(totalEffort / estimatedShares * 100.f)
     {
-        Hexlify(hashHex, shareRes.HashBytes.data(), shareRes.HashBytes.size());
+        memset(this, 0, sizeof(BlockSubmission));
+        
+        std::size_t dotPos = workerFull.find('.');
+        memcpy(miner, workerFull.data(), dotPos);
+        memcpy(worker, workerFull.data() + dotPos + 1,
+               workerFull.size() - dotPos - 1);
+        memcpy(chain, chainsv.data(), chainsv.size());
+
+        Hexlify(hashHex, shareRes.HashBytes.data(),
+                shareRes.HashBytes.size());
     }
-    Job* job;
-    const uint32_t height;
-    const ShareResult shareRes;
-    const std::string miner;
-    const std::string worker;  // separated
+
+    const int64_t blockReward;
     const int64_t timeMs;      // ms percision
-    char hashHex[64];
-};
+    const int64_t durationMs;  // ms percision
+    const uint32_t height;
+    const uint32_t number;
+    const double difficulty;
+    const double estimatedShares;
+    const double effortPercent;
+    char chain[8];
+    char miner[ADDRESS_LEN];
+    char worker[MAX_WORKER_NAME_LEN];  // separated
+    char hashHex[HASH_SIZE_HEX];
+} __attribute__((packed));
+
+/* block submission attributes are
+    sortable:
+    time/number
+    reward
+    difficulty
+    effort
+    duration
+    (no need height because it will always be grouped by chains, so you can just
+   filter by chain and sort by time/number).
+
+   non-sortable (filterable):
+
+    chain
+    type (pow/pos)
+    solver address
+*/
 
 #endif
