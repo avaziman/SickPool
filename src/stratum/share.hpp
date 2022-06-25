@@ -44,42 +44,43 @@ struct BlockSubmission
    public:
     BlockSubmission(std::string_view chainsv, const job_t* job,
                     const ShareResult& shareRes, std::string_view workerFull,
-                    int64_t time, int64_t durMs,
-                    int32_t number, double totalEffort)
+                    int64_t time, int64_t durMs, int32_t number,
+                    double totalEffort)
         : blockReward(job->GetBlockReward()),
           timeMs(time),
           durationMs(durMs),
           height(job->GetHeight()),
           number(number),
           difficulty(shareRes.Diff),
-          estimatedShares(job->GetEstimatedShares()),
-          effortPercent(totalEffort / estimatedShares * 100.f)
+          effortPercent(totalEffort / job->GetEstimatedShares() * 100.f)
     {
-        memset(this, 0, sizeof(BlockSubmission));
-        
+        memset(miner, 0, sizeof(miner));
+        memset(worker, 0, sizeof(worker));
+        memset(chain, 0, sizeof(chain));
+
         std::size_t dotPos = workerFull.find('.');
         memcpy(miner, workerFull.data(), dotPos);
         memcpy(worker, workerFull.data() + dotPos + 1,
                workerFull.size() - dotPos - 1);
         memcpy(chain, chainsv.data(), chainsv.size());
 
-        Hexlify(hashHex, shareRes.HashBytes.data(),
+        Hexlify((char*)hashHex, shareRes.HashBytes.data(),
                 shareRes.HashBytes.size());
     }
 
-    const int64_t blockReward;
+    int64_t blockReward;
     const int64_t timeMs;      // ms percision
     const int64_t durationMs;  // ms percision
     const uint32_t height;
     const uint32_t number;
     const double difficulty;
-    const double estimatedShares;
     const double effortPercent;
-    char chain[8];
-    char miner[ADDRESS_LEN];
-    char worker[MAX_WORKER_NAME_LEN];  // separated
-    char hashHex[HASH_SIZE_HEX];
-} __attribute__((packed));
+    unsigned char chain[8];
+    unsigned char miner[ADDRESS_LEN];
+    unsigned char worker[MAX_WORKER_NAME_LEN];  // separated
+    unsigned char hashHex[HASH_SIZE_HEX];
+};
+// don't pack for speed
 
 /* block submission attributes are
     sortable:

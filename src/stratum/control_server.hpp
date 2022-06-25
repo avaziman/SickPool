@@ -22,16 +22,24 @@ class ControlServer
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(port);
 
+        int optval = 1;
+
+        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval,
+                       sizeof(optval)) != 0)
+        {
+            throw std::runtime_error("Failed to set control server options");
+        }
+        
         if (bind(sockfd, (const sockaddr*)&addr, sizeof(addr)) != 0)
         {
-            throw std::runtime_error("Manage server failed to bind to port " +
+            throw std::runtime_error("Control server failed to bind to port " +
                                      std::to_string(port));
         }
 
         if (listen(sockfd, 4) != 0)
         {
             throw std::runtime_error(
-                "Manage server failed to enter listenning state.");
+                "Control server failed to enter listenning state.");
         }
     }
 
@@ -50,14 +58,16 @@ class ControlServer
         }
 
         auto cmd = static_cast<ControlCommands>(buf[0] - '0');
+        close(connfd);
 
         Logger::Log(LogType::Info, LogField::ControlServer,
                     "Received command: %d", cmd);
 
         return cmd;
     }
-    private:
-     int sockfd;
+
+   private:
+    int sockfd;
 };
 
 #endif

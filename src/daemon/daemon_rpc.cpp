@@ -150,3 +150,4 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id,
     close(sockfd);
     return resCode;
 }
+//TODO: add timeout or it can block entire pool

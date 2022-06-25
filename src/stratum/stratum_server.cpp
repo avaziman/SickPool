@@ -6,13 +6,15 @@ std::vector<DaemonRpc *> StratumServer::rpcs;
 JobManager StratumServer::job_manager;
 
 StratumServer::StratumServer()
-    : reqParser(REQ_BUFF_SIZE),
-      httpParser(MAX_HTTP_REQ_SIZE),
-      redis_manager(coin_config.redis_host),
+    : 
       stats_manager(redis_manager.rc, &redis_mutex,
-                    coin_config.hashrate_interval_seconds,
-                    coin_config.effort_interval_seconds)
+                    (int)coin_config.hashrate_interval_seconds,
+                    (int)coin_config.effort_interval_seconds,
+                    (int)coin_config.average_hashrate_interval_seconds),
+                    reqParser(REQ_BUFF_SIZE),
+                    httpParser(MAX_HTTP_REQ_SIZE)
 {
+    // never grow beyond this size
     simdjson::error_code error =
         reqParser.allocate(REQ_BUFF_SIZE, MAX_HTTP_JSON_DEPTH);
 
@@ -91,20 +93,26 @@ StratumServer::StratumServer()
 
 StratumServer::~StratumServer()
 {
-    for (const StratumClient *cli : this->clients) close(cli->GetSock());
+    // for (std::unique_ptr<StratumClient> cli : this->clients){
+    //     close(cli.get()->GetSock());
+    // } 
     close(this->sockfd);
     for (DaemonRpc *rpc : this->rpcs) delete rpc;
 }
 
-void StratumServer::HandleControlCommands(){
-    while (true) {
+void StratumServer::HandleControlCommands()
+{
+    while (true)
+    {
         ControlCommands cmd = control_server.GetNextCommand();
         HandleControlCommand(cmd);
     }
 }
 
-void StratumServer::HandleControlCommand(ControlCommands cmd){
-    switch (cmd){
+void StratumServer::HandleControlCommand(ControlCommands cmd)
+{
+    switch (cmd)
+    {
         case ControlCommands::UPDATE_BLOCK:
             auto val = ondemand::array();
             HandleBlockNotify(val);
@@ -155,11 +163,16 @@ void StratumServer::Listen()
 
 void StratumServer::HandleSocket(int conn_fd)
 {
-    StratumClient *client =
-        new StratumClient(conn_fd, time(nullptr), coin_config.default_diff);
-    clients_mutex.lock();
-    this->clients.push_back(client);
-    clients_mutex.unlock();
+    auto client =
+        std::make_unique<StratumClient>(conn_fd, time(nullptr), coin_config.default_diff);
+    auto cli_ptr = client.get();
+    
+    {
+        std::scoped_lock cli_lock(clients_mutex);
+        // client will be null after move, so assign the new ref to it
+        this->clients.push_back(std::move(client));
+        // client is moved, do not use
+    }
 
     // simdjson requires some extra bytes, so don't write to the last bytes
     char buffer[REQ_BUFF_SIZE];
@@ -184,15 +197,19 @@ void StratumServer::HandleSocket(int conn_fd)
         // exit loop, miner disconnected
         if (recvRes <= 0)
         {
-            close(client->GetSock());
-            clients_mutex.lock();
-            clients.erase(std::find(clients.begin(), clients.end(), client));
-            clients_mutex.unlock();
+            stats_manager.PopWorker(cli_ptr->GetFullWorkerName(), cli_ptr->GetAddress());
+            close(cli_ptr->GetSock());
+
+            {
+                std::scoped_lock cli_lock(clients_mutex);
+                //TODO: clean up clients
+                // clients.erase(
+                //     std::find(clients.begin(), clients.end(), cli_ptr));
+            }
+
             Logger::Log(LogType::Info, LogField::Stratum,
                         "client disconnected. res: %d, errno: %d", recvRes,
                         errno);
-            redis_manager.DecreaseWorker(client->GetAddress());
-            // delete client;
             break;
         }
         // std::cout << "buff: " << buffer << std::endl;
@@ -216,7 +233,7 @@ void StratumServer::HandleSocket(int conn_fd)
         {
             reqStart = strchr(buffer, '{');
             reqLen = reqEnd - reqStart + 1;
-            HandleReq(client, reqStart, reqLen);
+            HandleReq(cli_ptr, reqStart, reqLen);
 
             char *newReqEnd = strchr(reqEnd + 1, '}');
             if (newReqEnd == NULL)
@@ -301,7 +318,7 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
     while (newJob == nullptr)
     {
         newJob = job_manager.GetNewJob();
-
+        
         Logger::Log(
             LogType::Critical, LogField::Stratum,
             "Block update error: Failed to generate new job! retrying...");
@@ -309,34 +326,21 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
         std::this_thread::sleep_for(250ms);
     }
 
-    std::string idHex = std::string(newJob->GetId());
-    jobs.insert({idHex, newJob});
+    auto idHex = std::string(newJob->GetId());
+    jobs.try_emplace(idHex, newJob);
     last_job_id_hex = idHex;
 
     // save it to process round
-    int64_t last_round_start_pow = 0;
-
-    // round ended
-    if (block_submissions.size())
     {
-        // last_round_start_pow = round_start_pow;
-        // last_total_effort_pow = total_effort_pow;
-
-        // round_start_pow = curtimeMs;
-        // total_effort_pow = 0;
-
-        redis_manager.RenameCurrentRound(newJob->GetHeight() - 1);
+        std::scoped_lock clients_lock(clients_mutex);
+        for (auto it = clients.begin(); it != clients.end(); it++)
+        {
+            // (*it)->SetDifficulty(1000000, curtimeMs);
+            // (*it)->SetDifficulty(job->GetTargetDiff(), curtimeMs);
+            // UpdateDifficulty(*it);
+            BroadcastJob((*it).get(), newJob);
+        }
     }
-
-    clients_mutex.lock();
-    for (auto it = clients.begin(); it != clients.end(); it++)
-    {
-        // (*it)->SetDifficulty(1000000, curtimeMs);
-        // (*it)->SetDifficulty(job->GetTargetDiff(), curtimeMs);
-        // UpdateDifficulty(*it);
-        BroadcastJob(*it, newJob);
-    }
-    clients_mutex.unlock();
 
     // for (auto it = clients.begin(); it != clients.end(); it++)
     // {
@@ -346,28 +350,28 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
     // in case of a crash without shares, we need to update round start time
     // redis_manager.SetNewRoundTime(round_start_pow);
 
-    // double totalEffort = redis_manager.GetTotalEffort(last_round_start);
-
+    std::scoped_lock lock(redis_mutex);
     BlockSubmission *valid_submission = nullptr;
 
-    for (BlockSubmission *submission : block_submissions)
+    for (int i = 0; i < block_submissions.size(); i++)
     {
+        BlockSubmission &submission = block_submissions[i];
         const uint8_t *prevBlockBin = newJob->GetPrevBlockHash();
 
         unsigned char submissionHashBin[HASH_SIZE];
-        Unhexlify(submissionHashBin, submission->hashHex, HASH_SIZE_HEX);
+        Unhexlify(submissionHashBin, (const char *)submission.hashHex,
+                  HASH_SIZE_HEX);
 
         bool blockAdded = !memcmp(prevBlockBin, submissionHashBin, HASH_SIZE);
 
         // only one block submission can be accepted
         if (blockAdded)
         {
-            valid_submission = submission;
+            valid_submission = &submission;
         }
 
-        double totalEffort = stats_manager.GetTotalEffort(COIN_SYMBOL);
         // TODO: make map of block submissions too
-        redis_manager.AddBlockSubmission(*submission, blockAdded);
+        redis_manager.AddBlockSubmission(submission, blockAdded, i);
     }
 
     start = TIME_NOW();
@@ -379,7 +383,7 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
 
         if (valid_submission != nullptr)
         {
-            stats_manager.ClosePoWRound(COIN_SYMBOL, *valid_submission, true,
+            stats_manager.ClosePoWRound(COIN_SYMBOL, *valid_submission,
                                         coin_config.pow_fee);
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block added to chain! found by: %.*s, hash: %.*s",
@@ -391,13 +395,10 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
         {
             // 0 reward for invalid blocks
             // dont close the round if the block wasn't accepted
-            // stats_manager.ClosePoWRound(COIN_SYMBOL, block_submissions,
-            // false,
-            //                             coin_config.pow_fee);
 
             Logger::Log(LogType::Critical, LogField::Stratum,
                         "Block NOT added to chain %.*s!", HASH_SIZE_HEX,
-                        valid_submission->hashHex);
+                        block_submissions[0].hashHex);
         }
 
         auto end = TIME_NOW();
@@ -405,9 +406,8 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
         Logger::Log(LogType::Debug, LogField::Stratum, "Closed round in %d us",
                     elapsed);
 
-        while (block_submissions.size() > 0)
+        while (block_submissions.empty())
         {
-            delete block_submissions[0];
             block_submissions.pop_front();
         }
 
@@ -716,6 +716,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                 idTag = given_addr;
             }
         }
+        // TODO: lock
         redis_manager.AddAddress(valid_addr, idTag);
     }
 
@@ -724,8 +725,8 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     worker_full = worker_full_str;
 
     cli->HandleAuthorized(worker_full, valid_addr);
-    redis_manager.AddWorker(valid_addr, worker_full, idTag,
-                            GetDailyTimestamp());
+    stats_manager.AddWorker(valid_addr, cli->GetFullWorkerName(), idTag,
+                            std::time(nullptr));
 
     Logger::Log(LogType::Info, LogField::Stratum,
                 "Authorized worker: %.*s, address: %.*s, id: %.*s",
@@ -786,7 +787,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     // Job *job = jobs[std::string(share.jobId)];
 
     if (job == nullptr)
-    {
+    { 
         shareRes.Code = ShareCode::JOB_NOT_FOUND;
         shareRes.Message = "Job not found";
         Logger::Log(LogType::Warn, LogField::Stratum,
@@ -804,34 +805,28 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     {
         case ShareCode::VALID_BLOCK:
         {
-            Logger::Log(LogType::Info, LogField::Stratum,
-                        "Found block solution!");
             int blockSize = job->GetBlockSize();
-            char *blockData = new char[blockSize + 3];
+            auto blockData = std::make_unique<char[]>(blockSize + 3);
+
             blockData[0] = '\"';
-            job->GetBlockHex(cli->GetBlockheaderBuff(), blockData + 1);
+            job->GetBlockHex(cli->GetBlockheaderBuff(), blockData.get() + 1);
             blockData[blockSize + 1] = '\"';
             blockData[blockSize + 2] = 0;
             // std::cout << (char *)blockData << std::endl;
 
-            bool submissionGood = SubmitBlock(blockData, blockSize + 3);
-            // Logger::Log(LogType::Debug, LogField::Stratum, "Block hex: %.*s",
-            //             blockSize + 3, blockData);
-            delete[] blockData;
+            bool submissionGood = SubmitBlock(blockData.get(), blockSize + 3);
             auto chain = std::string_view{"VRSCTEST"};
             int64_t duration = 0;  // TODO: fix
-            //TODO:: append block number to db
-            block_submissions.push_back(new BlockSubmission(
+            // TODO:: append block number to db
+            block_submissions.emplace_back(
                 chain, job, shareRes, cli->GetFullWorkerName(), time, duration,
-                block_number, stats_manager.GetTotalEffort(chain)));
+                block_number, stats_manager.GetTotalEffort(chain));
 
             SendAccept(cli, id);
-            // total_effort_pow += shareRes.Diff;
         }
         break;
         case ShareCode::VALID_SHARE:
             SendAccept(cli, id);
-            // total_effort_pow += shareRes.Diff;
             break;
         default:
             SendReject(cli, id, (int)shareRes.Code, shareRes.Message.c_str());
@@ -850,9 +845,9 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 
     auto duration = DIFF_US(end, start);
 
-    Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in %dus, diff: %f, res: %d", duration,
-                shareRes.Diff, (int)shareRes.Code);
+    // Logger::Log(LogType::Debug, LogField::Stratum,
+    //             "Share processed in %dus, diff: %f, res: %d", duration,
+    //             shareRes.Diff, (int)shareRes.Code);
 }
 
 void StratumServer::SendReject(StratumClient *cli, int id, int err,

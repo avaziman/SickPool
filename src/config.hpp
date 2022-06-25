@@ -5,7 +5,7 @@
 #define COIN_VRSCTEST 1
 #define COIN_VRSC 2
 
-#define DB_RETENTION 86400000  // 1 day, (1000 * 60 * 60 * 24)
+#define HASHRATE_RETENTION 86400000  // 1 day, (1000 * 60 * 60 * 24)
 #define HASHRATE_PERIOD 300000    // 5 minutes, (1000 * 60 * 5)
 
 #define MAX_WORKER_NAME_LEN 16

@@ -21,7 +21,7 @@
 class RedisManager
 {
    public:
-    RedisManager(std::string_view host)
+    RedisManager()
     {
         rc = redisConnect("127.0.0.1", 6379);
 
@@ -31,22 +31,9 @@ class RedisManager
                         "Failed to connect to redis: %s", rc->errstr);
             exit(EXIT_FAILURE);
         }
-        // increase performance by not freeing buffer
-        // rc->reader->maxbuf = 0;
 
         redisReply *reply;
         int command_count = 0;
-
-        redisAppendCommand(
-            rc,
-            "TS.CREATE " COIN_SYMBOL
-            ":round_effort"
-            " RETENTION "
-            "0"                      // time to live
-            " ENCODING COMPRESSED"   // very data efficient
-            " DUPLICATE_POLICY SUM"  // sum to get total round effort
-        );
-        command_count++;
 
         redisAppendCommand(
             rc,
@@ -55,7 +42,7 @@ class RedisManager
             " RETENTION "
             "0"                      // time to live
             " ENCODING COMPRESSED"   // very data efficient
-            " DUPLICATE_POLICY SUM"  // sum to get total round effort
+            " DUPLICATE_POLICY MIN"  // min round 
         );
         command_count++;
 
@@ -72,12 +59,12 @@ class RedisManager
 
         redisAppendCommand(
             rc,
-            "TS.CREATE " COIN_SYMBOL
-            ":miner_count"
+            "TS.CREATE "
+            "miner_count"
             " RETENTION "
             "0"                      // time to live
             " ENCODING COMPRESSED"   // very data efficient
-            " DUPLICATE_POLICY SUM"  // sum to get total round effort
+            " DUPLICATE_POLICY ,om"  
         );
         command_count++;
 
@@ -92,75 +79,6 @@ class RedisManager
             }
             freeReplyObject(reply);
         }
-    }
-
-    bool AddWorker(std::string_view address, std::string_view worker_full,
-                   std::string_view identity, std::time_t curtime)
-    {
-        redisReply *reply;
-        int command_count = 0;
-
-        redisAppendCommand(rc, "ZINCRBY " COIN_SYMBOL ":worker_count 1 %b",
-                           address.data(), address.size());
-        command_count++;
-
-        redisAppendCommand(
-            rc,
-            "TS.CREATE " COIN_SYMBOL
-            ":shares:%b"
-            " RETENTION " xstr(DB_RETENTION)  // time to live
-            " ENCODING COMPRESSED"            // very data efficient
-            " DUPLICATE_POLICY SUM"  // if two shares received at same ms
-                                     // (rare), sum instead of ignoring
-            " LABELS coin " COIN_SYMBOL " type shares server IL worker %b",
-            worker_full.data(), worker_full.size(), worker_full.data(),
-            worker_full.size());
-        command_count++;
-
-        redisAppendCommand(
-            rc,
-            "TS.CREATE " COIN_SYMBOL
-            ":hashrate:%b"
-            " RETENTION " xstr(DB_RETENTION)  // time to live
-            " ENCODING COMPRESSED"            // very data efficient
-            " LABELS coin " COIN_SYMBOL
-            " type hashrate server IL address %b worker %b identity %b",
-            worker_full.data(), worker_full.size(), address.data(),
-            address.size(), worker_full.data(), worker_full.size(),
-            identity.data(), identity.size());
-        command_count++;
-
-        for (int i = 0; i < command_count; i++)
-        {
-            if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-            {
-                Logger::Log(LogType::Error, LogField::Redis,
-                            "Failed to add worker (%d): %s", i, rc->errstr);
-                return false;
-            }
-            freeReplyObject(reply);
-        }
-
-        return true;
-    }
-
-    bool DecreaseWorker(std::string_view address)
-    {
-        redisReply *reply;
-        auto chainName = std::string_view{"VRSCTEST"};
-
-        redisAppendCommand(rc, "ZINCRBY " COIN_SYMBOL ":worker_count -1 %b",
-                           address.data(), address.size());
-
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Error, LogField::Redis,
-                        "Failed to decrease worker: %s", rc->errstr);
-            return false;
-        }
-        freeReplyObject(reply);
-
-        return true;
     }
 
     bool ResetWorkerCount()
@@ -198,12 +116,12 @@ class RedisManager
 
         redisAppendCommand(
             rc,
-            "TS.CREATE " COIN_SYMBOL
-            ":hashrate:%b"
-            " RETENTION " xstr(DB_RETENTION)  // never expire balance log
+            "TS.CREATE"
+            " hashrate:miner:%b"
+            " RETENTION " xstr(HASHRATE_RETENTION)
             " ENCODING COMPRESSED"
             " LABELS coin " COIN_SYMBOL
-            " type hashrate server IL address %b identity %b",
+            " type miner-hashrate server IL address %b identity %b",
             addr.data(), addr.size(), addr.data(), addr.size(), identity.data(),
             identity.size());
 
@@ -237,64 +155,80 @@ class RedisManager
         return true;
     }
 
-    bool AddBlockSubmission(const BlockSubmission &submission, bool accepted)
+    bool AddBlockSubmission(BlockSubmission &submission, bool accepted, int id)
     {
         redisReply *reply;
         int command_count = 0;
 
         std::string block_id_str =
-            std::string(
-                std::string_view(submission.chain, sizeof(submission.chain))) +
-            ":" + std::to_string(submission.height);
+            std::string(std::string_view((char *)submission.chain,
+                                         sizeof(submission.chain))) +
+            ":" + std::to_string(submission.height) + ":" + std::to_string(id);
         const char *block_id = block_id_str.c_str();
+
+        if (!accepted)
+        {
+            submission.blockReward = 0;
+        }
+
+        redisAppendCommand(rc, "MULTI");
+        command_count++;
 
         // serialize the block submission to save space and net
         // bandwidth, as the indexes are added manually anyway no need for hash
-        redisAppendCommand(rc, "SET block:%s %b", block_id,
-                           (unsigned char *)&submission, sizeof(submission));
+        redisAppendCommand(rc, "SET block:%s %b", block_id, &submission,
+                           sizeof(submission));
         command_count++;
 
         /* sortable indexes */
         // block no. and block time will always be same order
         // so only one index is required to sort by either of them
         // (block num value is smaller)
-        redisAppendCommand(rc, "ZADD block:number %" PRIi64 " %s",
-                           submission.number, block_id);
+        redisAppendCommand(rc, "ZADD block-index:number %f %s",
+                           (double)submission.number, block_id);
 
-        redisAppendCommand(rc, "ZADD block:reward %" PRIi64 " %s",
-                           submission.blockReward, block_id);
+        redisAppendCommand(rc, "ZADD block-index:reward %f %s",
+                           (double)submission.blockReward, block_id);
 
-        redisAppendCommand(rc, "ZADD block:difficulty %f %s",
+        redisAppendCommand(rc, "ZADD block-index:difficulty %f %s",
                            submission.difficulty, block_id);
 
-        redisAppendCommand(rc, "ZADD block:effort %f %s",
+        redisAppendCommand(rc, "ZADD block-index:effort %f %s",
                            submission.effortPercent, block_id);
 
-        redisAppendCommand(rc, "ZADD block:duration %" PRIi64 " %s",
-                           submission.durationMs, block_id);
-
+        redisAppendCommand(rc, "ZADD block-index:duration %f %s",
+                           (double)submission.durationMs, block_id);
+        command_count += 5;
         /* non-sortable indexes */
-        redisAppendCommand(rc, "SADD block:chain %b %s", submission.chain,
+        redisAppendCommand(rc, "SADD block-index:chain:%b %s", submission.chain,
                            sizeof(submission.chain), block_id);
 
-        redisAppendCommand(rc, "SADD block:type PoW %s", block_id);
+        redisAppendCommand(rc, "SADD block-index:type:PoW %s", block_id);
 
-        redisAppendCommand(rc, "SADD block:solver %.*s %s",
-                           sizeof(submission.miner), submission.miner,
+        redisAppendCommand(rc, "SADD block-index:solver:%b %s",
+                           submission.miner, sizeof(submission.miner),
                            block_id);
+        command_count += 3;
 
         redisAppendCommand(rc, "TS.ADD %b:round_effort_percent %" PRId64 " %f",
                            submission.chain, sizeof(submission.chain),
                            submission.timeMs, submission.effortPercent);
-        command_count += 9;
+        command_count++;
 
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        redisAppendCommand(rc, "EXEC");
+        command_count++;
+
+        for (int i = 0; i < command_count; i++)
         {
-            Logger::Log(LogType::Critical, LogField::Redis,
-                        "Failed to add block submission: %s", rc->errstr);
-            return false;
+            if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+            {
+                Logger::Log(LogType::Critical, LogField::Redis,
+                            "Failed to add block submission and indexes: %s",
+                            rc->errstr);
+                return false;
+            }
+            freeReplyObject(reply);
         }
-        freeReplyObject(reply);
         return true;
     }
 

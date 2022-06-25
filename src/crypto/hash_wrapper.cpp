@@ -1,13 +1,10 @@
 #include "hash_wrapper.hpp"
 #include <chrono>
 
-CVerusHashV2 HashWrapper::cverusHashV2(SOLUTION_VERUSHHASH_V2_2);
 CSHA256 HashWrapper::csha256;
 
 void HashWrapper::InitVerusHash() {
     CVerusHashV2::init();
-    // CVerusHash::init();
-    // cverusHashV2 = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 }
 
 void HashWrapper::InitSHA256()

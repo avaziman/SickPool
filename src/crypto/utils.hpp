@@ -81,7 +81,7 @@ inline char GetHex(char c)
     return 0;
 }
 
-inline uint32_t HexToUint(const char* hex, int size)
+inline uint32_t HexToUint(const char* hex, std::size_t size)
 {
     uint32_t val = 0;
     for (int i = 0; i < size; i++)

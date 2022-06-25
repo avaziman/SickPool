@@ -3,41 +3,34 @@
 
 #include <hiredis/hiredis.h>
 
-#include <string_view>
 #include <cinttypes>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 
-#include "round.hpp"
 #include "config.hpp"
 #include "logger.hpp"
+#include "round.hpp"
 #include "share.hpp"
 
 #define STALE_SHARE_DIFF -1
 #define INVALID_SHARE_DIFF -2
 
+#define xstr(s) str(s)
+#define str(s) #s
+
 // #define STATS_INTERVAL_SECONDS (60 * 5)
 
 struct WorkerStats
 {
-    WorkerStats()
-        : interval_effort(0),
-          interval_valid_shares(0),
-          interval_invalid_shares(0),
-          interval_stale_shares(0)
-    {
-    }
-
-    // double round_effort;
-    // chain -> effort
-    // std::unordered_map<std::string, double> round_effort_pow;
-
-    double interval_effort;
-    uint32_t interval_valid_shares;
-    uint32_t interval_invalid_shares;
-    uint32_t interval_stale_shares;
+    double average_hashrate_sum = 0.f;
+    double interval_effort = 0.f;
+    uint32_t interval_valid_shares = 0;
+    uint32_t interval_invalid_shares = 0;
+    uint32_t interval_stale_shares = 0;
+    uint32_t connection_count = 0;
 
     inline void ResetInterval()
     {
@@ -50,7 +43,6 @@ struct WorkerStats
 
 struct MinerStats : public WorkerStats
 {
-    MinerStats() : WorkerStats(), round_effort() {}
     std::unordered_map<std::string_view, ChainEffort> round_effort;
 };
 
@@ -59,7 +51,7 @@ class StatsManager
 {
    public:
     StatsManager(redisContext* rc, std::mutex* rc_mutex, int hr_interval,
-                 int effort_interval);
+                 int effort_interval, int avg_hr_interval);
 
     // Every hashrate_interval_seconds we need to write:
     // ) worker hashrate
@@ -68,22 +60,28 @@ class StatsManager
     // ) staker points
     void Start();
     void LoadCurrentRound();
-    void AddShare(std::string_view worker_full, std::string_view miner_addr, double diff);
-    bool ClosePoWRound(std::string_view chain, const BlockSubmission& submission,
-                       bool accepted, double fee);
+    void AddShare(std::string_view worker_full, std::string_view miner_addr,
+                  double diff);
+    bool AddWorker(std::string_view address, std::string_view worker_full,
+                   std::string_view identity, std::time_t curtime);
+    void PopWorker(std::string_view worker, std::string_view address);
 
-    bool AppendPoSBalances(std::string_view chain, int64_t from_ms);\
+    bool ClosePoWRound(std::string_view chain,
+                       const BlockSubmission& submission, double fee);
+
+    bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
     std::unordered_map<std::string_view, MinerStats>::iterator LoadMinerStats(
         std::string_view miner_addr);
 
     double GetTotalEffort(std::string_view chain);
 
    private:
-    const int hashrate_interval_seconds;
-    const int effort_interval_seconds;
-
     redisContext* rc;
     std::mutex* rc_mutex;
+
+    const int hashrate_interval_seconds;
+    const int effort_interval_seconds;
+    const int average_hashrate_interval_seconds;
 
     std::mutex stats_map_mutex;
     // worker -> stats

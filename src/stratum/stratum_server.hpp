@@ -30,7 +30,6 @@
 #include "byteswap.h"
 #include "job_manager.hpp"
 #include "control_server.hpp"
-#include "job.hpp"
 #include "redis_manager.hpp"
 #include "round.hpp"
 #include "share.hpp"
@@ -74,9 +73,9 @@ class StratumServer
     static JobManager job_manager;
     // DifficultyManager* diff_manager;
 
-    std::vector<StratumClient*> clients;
+    std::vector<std::unique_ptr<StratumClient>> clients;
 
-    std::deque<BlockSubmission*> block_submissions;
+    std::deque<BlockSubmission> block_submissions;
 
     // job id hex str -> job, O(1) job lookup
     std::unordered_map<std::string, job_t*> jobs;

@@ -1,12 +1,15 @@
 #include "./stats_manager.hpp"
 
 StatsManager::StatsManager(redisContext* rc, std::mutex* rc_mutex,
-                           int hr_interval, int effort_interval)
+                           int hr_interval, int effort_interval,
+                           int avg_hr_interval)
     : rc(rc),
       rc_mutex(rc_mutex),
       hashrate_interval_seconds(hr_interval),
-      effort_interval_seconds(effort_interval)
+      effort_interval_seconds(effort_interval),
+      average_hashrate_interval_seconds(avg_hr_interval)
 {
+    LoadCurrentRound();
 }
 
 void StatsManager::Start()
@@ -23,7 +26,7 @@ void StatsManager::Start()
         now - (now % effort_interval_seconds) + effort_interval_seconds;
 
     std::time_t next_hr_update =
-        now - (now % hashrate_interval_seconds) + next_hr_update;
+        now - (now % hashrate_interval_seconds) + hashrate_interval_seconds;
 
     while (true)
     {
@@ -32,10 +35,46 @@ void StatsManager::Start()
 
         std::time_t next_update = std::min(next_hr_update, next_effort_update);
 
-        bool should_update_hr = false, should_update_effort = false;
+        bool should_update_hr = false;
+        bool should_update_effort = false;
+        redisReply* remove_avg_reply;
+
         if (next_update == next_hr_update)
         {
+            std::scoped_lock lock(*rc_mutex, stats_map_mutex);
             should_update_hr = true;
+
+            std::time_t remove_hr_time =
+                (next_hr_update - average_hashrate_interval_seconds) * 1000;
+            remove_avg_reply = (redisReply*)redisCommand(
+                rc,
+                "TS.MRANGE %" PRIi64 " %" PRIi64 " FILTER type=miner-hashrate",
+                remove_hr_time, remove_hr_time);
+
+            for (int i = 0; i < remove_avg_reply->elements; i++)
+            {
+                const redisReply* address_rep =
+                    remove_avg_reply->element[i]->element[0];
+                std::string_view address_sv(address_rep->str, address_rep->len);
+                address_sv = address_sv.substr(address_sv.size() - ADDRESS_LEN,
+                                               address_sv.size());
+
+                if (remove_avg_reply->element[i]->element[2]->elements == 0)
+                {
+                    continue;
+                }
+
+                const double remove_hr =
+                    std::strtod(remove_avg_reply->element[i]
+                                    ->element[2]
+                                    ->element[0]
+                                    ->element[1]
+                                    ->str,
+                                nullptr);
+                miner_stats_map[address_sv].average_hashrate_sum -= remove_hr;
+            }
+            freeReplyObject(remove_avg_reply);
+
             next_hr_update += hashrate_interval_seconds;
         }
 
@@ -49,89 +88,116 @@ void StatsManager::Start()
         std::this_thread::sleep_until(system_clock::from_time_t(next_update));
         auto startChrono = system_clock::now();
 
+        double pool_hr = 0;
         int command_count = 0;
         uint64_t toMs = next_update * 1000;
+
+        // either update everyone or no one
+        redisAppendCommand(rc, "MULTI");
+        command_count++;
 
         Logger::Log(LogType::Info, LogField::StatsManager,
                     "Updating stats for %d workers, is_interval: %d.",
                     worker_stats_map.size(), should_update_hr);
 
-        rc_mutex->lock();
-        stats_map_mutex.lock();
-        for (const auto& [worker, ws] : worker_stats_map)
         {
-            // std::string_view minerAddr = worker.substr(0, worker.find('.'));
-
-            if (should_update_hr)
+            std::scoped_lock lock(*rc_mutex, stats_map_mutex);
+            for (auto& [worker, ws] : worker_stats_map)
             {
-                double interval_hashrate =
-                    ws.interval_effort / (double)effort_interval_seconds;
+                if (should_update_hr)
+                {
+                    const double interval_hashrate =
+                        ws.interval_effort / (double)effort_interval_seconds;
 
-                // worker hashrate update
-                redisAppendCommand(rc, "TS.ADD hashrate:%b %" PRIu64 " %f",
-                                   worker.data(), worker.length(), toMs,
-                                   interval_hashrate);
+                    ws.ResetInterval();
 
-                command_count++;
+                    // worker hashrate update
+                    redisAppendCommand(
+                        rc, "TS.ADD hashrate:worker:%b %" PRIu64 " %f",
+                        worker.data(), worker.length(), toMs,
+                        interval_hashrate);
+
+                    // ws.average_hashrate_sum += interval_hashrate;
+                    command_count++;
+                }
             }
-        }
-        for (auto& [miner_addr, miner_ws] : miner_stats_map)
-        {
-            // miner round entry
+            for (auto& [miner_addr, miner_ws] : miner_stats_map)
+            {
+                // miner round entry
+                if (should_update_effort)
+                {
+                    redisAppendCommand(
+                        rc, "LSET round_entries_pow:%b 0 {\"effort\":%f}",
+                        miner_addr.data(), miner_addr.length(),
+                        miner_ws.round_effort[COIN_SYMBOL].pow);
+                    command_count++;
+                }
+
+                if (should_update_hr)
+                {
+                    const double interval_hashrate =
+                        miner_ws.interval_effort / hashrate_interval_seconds;
+
+                    miner_ws.ResetInterval();
+
+                    // interval stats update
+                    // miner hashrate
+                    redisAppendCommand(
+                        rc, "TS.ADD hashrate:miner:%b %" PRIu64 " %f",
+                        miner_addr.data(), miner_addr.length(), toMs,
+                        interval_hashrate);
+
+                    // sorted miner hashrate set
+                    redisAppendCommand(rc, "ZADD solver-index:hashrate %f %b",
+                                       interval_hashrate, miner_addr.data(),
+                                       miner_addr.length());
+                    // pool hashrate
+                    pool_hr += interval_hashrate;
+
+                    // miner average hashrate
+                    miner_ws.average_hashrate_sum += interval_hashrate;
+                    const double avg_hr = miner_ws.average_hashrate_sum /
+                                          (average_hashrate_interval_seconds /
+                                           hashrate_interval_seconds);
+                    redisAppendCommand(
+                        rc, "TS.ADD hashrate:miner-average:%b %" PRIi64 " %f",
+                        miner_addr.data(), miner_addr.size(), toMs, avg_hr);
+
+                    command_count += 3;
+                }
+            }
+
             if (should_update_effort)
             {
+                // TODO: make for each side chain every 5 mins
                 redisAppendCommand(
-                    rc, "LSET round_entries_pow:%b 0 {\"effort\":%f}",
-                    miner_addr.data(), miner_addr.length(),
-                    miner_ws.round_effort[COIN_SYMBOL].pow);
+                    rc, "HSET " COIN_SYMBOL ":round_effort_pow total %f",
+                    total_round_effort[COIN_SYMBOL].pow);
                 command_count++;
             }
 
             if (should_update_hr)
             {
-                double interval_hashrate =
-                    miner_ws.interval_effort / hashrate_interval_seconds;
-
-                // interval stats update
-                // miner hashrate
-                redisAppendCommand(rc, "TS.ADD hashrate:%b %" PRIu64 " %f",
-                                   miner_addr.data(), miner_addr.length(), toMs,
-                                   interval_hashrate);
-
-                // sorted miner hashrate set
-                redisAppendCommand(rc, "ZADD hashrate_set %f %b",
-                                   interval_hashrate, miner_addr.data(),
-                                   miner_addr.length());
-                // pool hashrate
                 redisAppendCommand(rc, "TS.ADD pool_hashrate %" PRIu64 " %f",
-                                   toMs, interval_hashrate);
-
-                command_count += 3;
+                                   toMs, pool_hr);
+                command_count++;
             }
-        }
 
-        if (should_update_effort)
-        {
-            // TODO: make for each side chain every 5 mins
-            redisAppendCommand(rc,
-                               "HSET " COIN_SYMBOL ":round_effort_pow total %f",
-                               total_round_effort[COIN_SYMBOL].pow);
+            redisAppendCommand(rc, "EXEC");
             command_count++;
-        }
-        stats_map_mutex.unlock();
 
-        for (int i = 0; i < command_count; i++)
-        {
-            redisReply* reply;
-            if (redisGetReply(rc, (void**)&reply) != REDIS_OK)
+            for (int i = 0; i < command_count; i++)
             {
-                Logger::Log(LogType::Critical, LogField::StatsManager,
-                            "Failed to update stats: %s\n", rc->errstr);
-                break;
+                redisReply* reply;
+                if (redisGetReply(rc, (void**)&reply) != REDIS_OK)
+                {
+                    Logger::Log(LogType::Critical, LogField::StatsManager,
+                                "Failed to update stats: %s\n", rc->errstr);
+                    break;
+                }
+                freeReplyObject(reply);
             }
-            freeReplyObject(reply);
         }
-        rc_mutex->unlock();
 
         auto endChrono = system_clock::now();
         auto duration = duration_cast<microseconds>(endChrono - startChrono);
@@ -144,15 +210,83 @@ void StatsManager::Start()
 
 void StatsManager::LoadCurrentRound()
 {
-    // TODO
+    auto reply = (redisReply*)redisCommand(rc, "HGET " COIN_SYMBOL
+                                               ":round_effort_pow "
+                                               "total");
+
+    if (reply->type == REDIS_REPLY_r)
+    {
+        // if the key doesn't exist, don't create a key and so it will be 0
+        total_round_effort[COIN_SYMBOL].pow =
+            std::stod(std::string(reply->str, reply->len));
+    }
+    freeReplyObject(reply);
+    Logger::Log(LogType::Info, LogField::StatsManager,
+                "Loaded pow round effort of %f",
+                total_round_effort[COIN_SYMBOL].pow);
+
+    auto miners_reply =
+        (redisReply*)redisCommand(rc, "ZRANGE solver-index:join-time 0 -1");
+
+    // either load everyone or no one
+    redisAppendCommand(rc, "MULTI");
+
+    size_t miner_count = miners_reply->elements;
+    for (int i = 0; i < miner_count; i++)
+    {
+        std::string_view miner_addr(miners_reply->element[i]->str,
+                                    miners_reply->element[i]->len);
+        redisAppendCommand(rc, "LINDEX round_entries_pow:%b 0",
+                           miner_addr.data(), miner_addr.size());
+
+        // reset worker count
+        redisAppendCommand(rc, "ZADD solver-index:worker-count 0 %b",
+                           miner_addr.data(), miner_addr.size());
+    }
+
+    redisAppendCommand(rc, "EXEC");
+
+    for (int i = 0; i < (miner_count * 2) + 2; i++)
+    {
+        if (redisGetReply(rc, (void**)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Critical, LogField::StatsManager,
+                        "Failed to queue round_entries_pow get");
+            exit(EXIT_FAILURE);
+        }
+
+        // we need to read the last response
+        if (i != (miner_count * 2) + 1)
+        {
+            freeReplyObject(reply);
+        }
+    }
+
+    for (int i = 0; i < miner_count; i++)
+    {
+        auto miner = std::string_view(miners_reply->element[i]->str,
+                                      miners_reply->element[i]->len);
+        const double minerEffort = std::strtod(
+            reply->element[i]->str + sizeof("{\"effort\":") - 1, nullptr);
+        miner_stats_map[miner].round_effort[COIN_SYMBOL].pow = minerEffort;
+
+        Logger::Log(LogType::Debug, LogField::StatsManager,
+                    "Loaded %.*s effort of %f", miner.size(), miner.data(),
+                    minerEffort);
+    }
+
+    freeReplyObject(reply);
+    // don't free the miners_reply as it will invalidate the string_views
+    // freeReplyObject(miners_reply);
+    // TODO: load each miner
 }
 
 // load the stats for the current round, and create entries if they don't exist
 std::unordered_map<std::string_view, MinerStats>::iterator
 StatsManager::LoadMinerStats(std::string_view miner_addr)
 {
-    std::scoped_lock lock(stats_map_mutex, *rc_mutex);
-    auto it = miner_stats_map.insert({miner_addr, MinerStats()}).first;
+    std::scoped_lock lock(*rc_mutex);
+    auto it = miner_stats_map.try_emplace(miner_addr).first;
 
     // if no pow or pos round entry list exists, create it
     redisReply* reply;
@@ -213,15 +347,14 @@ StatsManager::LoadMinerStats(std::string_view miner_addr)
 void StatsManager::AddShare(std::string_view worker_full,
                             std::string_view miner_addr, double diff)
 {
-    stats_map_mutex.lock();
+    std::scoped_lock lock(stats_map_mutex);
     WorkerStats* worker_stats = &worker_stats_map[worker_full];
     auto miner_stats_it = miner_stats_map.find(miner_addr);
 
     if (miner_stats_it == miner_stats_map.end())
     {
-        stats_map_mutex.unlock();
+        // stats_map_mutex already locked
         LoadMinerStats(miner_addr);
-        stats_map_mutex.lock();
 
         miner_stats_it = miner_stats_map.find(miner_addr);
     }
@@ -246,37 +379,119 @@ void StatsManager::AddShare(std::string_view worker_full,
         // no need the interval shares, as its easy (fast) to calculate from
         // workers on frontend (for miner)
         miner_stats->round_effort[COIN_SYMBOL].pow += diff;
+        miner_stats->interval_effort += diff;
     }
-    stats_map_mutex.unlock();
+}
+
+bool StatsManager::AddWorker(std::string_view address,
+                             std::string_view worker_full,
+                             std::string_view identity, std::time_t curtime)
+{
+    std::scoped_lock stats_db_lock(stats_map_mutex, *rc_mutex);
+
+    // (will be true on restart too, as we don't reload worker stats)
+    bool newWorker =
+        worker_stats_map.find(worker_full) == worker_stats_map.end();
+    bool newMiner = miner_stats_map.find(address) == miner_stats_map.end();
+    int command_count = 0;
+
+    // 100% new, as we loaded all existing miners
+    if (newMiner)
+    {
+        redisAppendCommand(rc, "ZADD solver-index:join-time %f %b",
+                           (double)curtime, address.data(), address.size());
+        // reset all other stats
+        redisAppendCommand(rc, "ZADD solver-index:worker-count 0 %b",
+                           address.data(), address.size());
+        redisAppendCommand(rc, "ZADD solver-index:hashrate 0 %b",
+                           address.data(), address.size());
+        redisAppendCommand(rc, "ZADD solver-index:balance 0 %b", address.data(),
+                           address.size());
+        command_count += 4;
+    }
+
+    // worker has been disconnected and came back, add him again
+    if (newWorker || worker_stats_map[worker_full].connection_count == 0)
+    {
+        redisAppendCommand(
+            rc,
+            "TS.CREATE " COIN_SYMBOL
+            ":hashrate:worker:%b"
+            " RETENTION " xstr(HASHRATE_RETENTION)  // time to live
+            " ENCODING COMPRESSED"                  // very data efficient
+            " LABELS coin " COIN_SYMBOL
+            " type worker_hashrate server IL address %b worker %b identity %b",
+            worker_full.data(), worker_full.size(), address.data(),
+            address.size(), worker_full.data(), worker_full.size(),
+            identity.data(), identity.size());
+        command_count++;
+
+        redisAppendCommand(rc, "ZINCRBY solver-index:worker-count 1 %b",
+                           address.data(), address.size());
+        command_count++;
+    }
+    worker_stats_map[worker_full].connection_count++;
+
+    redisReply* reply;
+    for (int i = 0; i < command_count; i++)
+    {
+        if (redisGetReply(rc, (void**)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Critical, LogField::StatsManager,
+                        "Failed to add worker: %s\n", rc->errstr);
+            return false;
+        }
+        freeReplyObject(reply);
+    }
+    return true;
+}
+
+void StatsManager::PopWorker(std::string_view worker_full,
+                             std::string_view address)
+{
+    std::scoped_lock stats_lock(stats_map_mutex);
+
+    int con_count = (--worker_stats_map[worker_full].connection_count);
+    // dont remove from the umap in case they join back, so their progress is
+    // saved
+    if (con_count == 0)
+    {
+        std::scoped_lock redis_lock(*rc_mutex);
+
+        auto reply = redisCommand(rc, "ZINCRBY solver-index:worker-count -1 %b",
+                                  address.data(), address.size());
+        freeReplyObject(reply);
+    }
 }
 
 bool StatsManager::ClosePoWRound(std::string_view chain,
-                                 const BlockSubmission& submission,
-                                 bool accepted, double fee)
+                                 const BlockSubmission& submission, double fee)
 {
-    std::scoped_lock stats_lock(stats_map_mutex, *rc_mutex);
+    // redis mutex already locked
+    std::scoped_lock stats_lock(stats_map_mutex);
 
     double total_effort = total_round_effort[COIN_SYMBOL].pow;
     double block_reward = (double)submission.blockReward / 1e8;
     uint32_t height = submission.height;
-    int command_amount = 0;
+    int command_count = 0;
+
+    // reset for next round
+    total_round_effort[COIN_SYMBOL].pow = 0;
 
     // time needs to be same as the time the balance is appended to,
     // so no staking time will be missed
     AppendPoSBalances(chain, submission.timeMs);
 
-    redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pow total 0");    command_amount++;
+    // redis transaction, so either all balances are added or none
+    redisAppendCommand(rc, "MULTI");
+    command_count++;
 
-    if (!accepted)
-    {
-        block_reward = 0;
-    }
+    redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pow total 0");
+    command_count++;
 
-    for (std::pair<std::string_view, MinerStats> miner_entry : miner_stats_map)
+    for (auto& [miner_addr, miner_stats] : miner_stats_map)
     {
-        std::string_view miner_addr = miner_entry.first;
-        MinerStats* miner_stats = &miner_entry.second;
-        double miner_effort = miner_stats->round_effort[COIN_SYMBOL].pow;
+        double miner_effort = miner_stats.round_effort[chain].pow;
 
         double miner_share = miner_effort / total_effort;
         double miner_reward = block_reward * miner_share * (1 - fee);
@@ -286,15 +501,14 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
             "LSET round_entries_pow:%b 0 {\"height\":%d,\"effort\":%f,"
             "\"share\":%f,\"reward\":%f}",
             miner_addr.data(), miner_addr.length(), height,
-            miner_stats->round_effort[COIN_SYMBOL].pow, miner_share,
+            miner_stats.round_effort[COIN_SYMBOL].pow, miner_share,
             miner_reward);
-        command_amount++;
+        command_count++;
 
         // reset for next round
         redisAppendCommand(rc, "LPUSH round_entries_pow:%b {\"effort\":0}",
                            miner_addr.data(), miner_addr.length());
-
-        command_amount++;
+        command_count++;
 
         redisAppendCommand(rc,
                            "TS.INCRBY "
@@ -303,9 +517,14 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
                            chain.data(), chain.length(), miner_addr.data(),
                            miner_addr.length(), miner_reward,
                            submission.timeMs);
-        command_amount++;
+        command_count++;
 
-        miner_stats->round_effort[COIN_SYMBOL].pow = 0;
+        redisAppendCommand(rc, "ZINCRBY solver-index:balance %f %b",
+                           miner_reward, miner_addr.data(),
+                           miner_addr.length());
+        command_count++;
+
+        miner_stats.round_effort[chain].pow = 0;
 
         Logger::Log(LogType::Debug, LogField::Redis,
                     "Round: %d, miner: %.*s, effort: %f, share: %f, reward: "
@@ -314,20 +533,20 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
                     miner_effort, miner_share, miner_reward, total_effort);
     }
 
-    for (int i = 0; i < command_amount; i++)
+    redisAppendCommand(rc, "EXEC");
+    command_count++;
+
+    redisReply* reply;
+    for (int i = 0; i < command_count; i++)
     {
-        redisReply* reply;
         if (redisGetReply(rc, (void**)&reply) != REDIS_OK)
         {
             Logger::Log(LogType::Critical, LogField::StatsManager,
-                        "Failed to close round: %s\n", rc->errstr);
+                        "Failed to close PoW round: %s\n", rc->errstr);
             return false;
         }
         freeReplyObject(reply);
     }
-
-    // reset for next round
-    total_round_effort[COIN_SYMBOL].pow = 0;
 
     return true;
 }
@@ -350,17 +569,17 @@ bool StatsManager::AppendPoSBalances(std::string_view chain, int64_t from_ms)
     for (int i = 0; i < reply->elements; i++)
     {
         // key is 2d array of the following arrays: key name, (empty array -
-        // labels), values (ar ray of tuples)
-        redisReply* key = reply->element[i];
+        // labels), values (array of tuples)
+        const redisReply* key = reply->element[i];
         auto keyName = std::string(key[0].element[0]->str);
         std::string minerAddr =
             keyName.substr(keyName.find_last_of(':') + 1, keyName.size());
 
-        // skip key name + null value
-        redisReply* values = key[0].element[2];
+        // skip key name + null value of labels
+        const redisReply* values = key[0].element[2];
 
         int64_t timestamp = values->element[0]->integer;
-        char* value_str = values->element[1]->str;
+        const char* value_str = values->element[1]->str;
         int64_t value = std::stoll(value_str);
 
         // time staked * value staked
@@ -381,8 +600,8 @@ bool StatsManager::AppendPoSBalances(std::string_view chain, int64_t from_ms)
                   << value_str << std::endl;
     }
 
-    redisAppendCommand(rc, "SET %.*s:round_effort_pos %" PRIi64, chain.length(),
-                       chain.data(), total_round_effort[chain].pos);
+    redisAppendCommand(rc, "SET %b:round_effort_pos %" PRIi64, chain.data(),
+                       chain.length(), total_round_effort[chain].pos);
     command_count++;
     // redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pos total 0");
 
@@ -391,7 +610,6 @@ bool StatsManager::AppendPoSBalances(std::string_view chain, int64_t from_ms)
 
     for (int i = 0; i < command_count; i++)
     {
-        redisReply* reply;
         if (redisGetReply(rc, (void**)&reply) != REDIS_OK)
         {
             Logger::Log(LogType::Critical, LogField::StatsManager,
@@ -407,8 +625,10 @@ bool StatsManager::AppendPoSBalances(std::string_view chain, int64_t from_ms)
 double StatsManager::GetTotalEffort(std::string_view chain)
 {
     std::lock_guard stats_lock(stats_map_mutex);
-    return total_round_effort[COIN_SYMBOL].pow;
+    return total_round_effort[chain].pow;
 }
 
 // TODO: idea: since writing all shares on all pbaas is expensive every 10 sec,
 // just write to primary and to side chains write every 5 mins
+// TODO: on restart, restart all worker counts 0, remove worker index
+// TODO: make sure address ts is created before ts.adding to it

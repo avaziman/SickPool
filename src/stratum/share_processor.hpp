@@ -24,8 +24,8 @@ class ShareProcessor
         uint32_t shareTime = HexToUint(share.time.data(), share.time.size());
         shareTime = bswap_32(shareTime);  // swap to little endian
 
-        uint32_t minTime = job.GetMinTime();
-        uint32_t maxTime = curTime / 1000 + MAX_FUTURE_BLOCK_TIME;
+        int64_t minTime = job.GetMinTime();
+        int64_t maxTime = curTime / 1000 + MAX_FUTURE_BLOCK_TIME;
 
         if (shareTime < minTime || shareTime > maxTime)
         {
@@ -48,14 +48,14 @@ class ShareProcessor
                                    BLOCK_HEADER_SIZE, cli.GetHasher());
 #endif
         uint256 hash(result.HashBytes);
-        arith_uint256 hashArith = UintToArith256(hash);
+        // arith_uint256 hashArith = UintToArith256(hash);
         // Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash:
         // %s",
         //             hash.GetHex().c_str());
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
-        uint32_t shareEnd = hash.GetCheapHash();
+        uint32_t shareEnd = (uint32_t)hash.GetCheapHash();
         // std::cout << std::hex << shareEnd << std::endl;
         if (!cli.SetLastShare(shareEnd, curTime))
         {

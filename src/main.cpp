@@ -30,7 +30,7 @@ int main(int argc, char** argv)
     Logger::Log(LogType::Info, LogField::Config, "Coin symbol: %s",
                 COIN_SYMBOL);
     Logger::Log(LogType::Info, LogField::Config, "DB retention: %dms",
-                DB_RETENTION);
+                HASHRATE_RETENTION);
 
     Logger::Log(LogType::Info, LogField::Config, "Loading dynamic config...");
 
@@ -108,6 +108,8 @@ void ParseCoinConfig(padded_string& json, CoinConfig& cnfg)
     AssignJson("stratum_port", cnfg.stratum_port, configDoc);
     AssignJson("hashrate_interval_seconds", cnfg.hashrate_interval_seconds, configDoc);
     AssignJson("effort_interval_seconds", cnfg.effort_interval_seconds, configDoc);
+    AssignJson("average_hashrate_interval_seconds",
+               cnfg.average_hashrate_interval_seconds, configDoc);
     AssignJson("pow_fee", cnfg.pow_fee, configDoc);
     AssignJson("pos_fee", cnfg.pos_fee, configDoc);
     AssignJson("default_diff", cnfg.default_diff, configDoc);

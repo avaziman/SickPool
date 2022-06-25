@@ -66,12 +66,12 @@ class StratumClient
         worker_full = std::string(worker);
         address = std::string(addr);
 #if POOL_COIN <= COIN_VRSC
-        this->verusHasher = std::make_unique<CVerusHashV2>(CVerusHashV2(SOLUTION_VERUSHHASH_V2_2));
+        this->verusHasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 #endif
     }
 
 #if POOL_COIN <= COIN_VRSC
-    CVerusHashV2* GetHasher() { return verusHasher.get(); }
+    CVerusHashV2* GetHasher() { return &verusHasher; }
 #endif
    private:
     int sockfd;
@@ -103,7 +103,7 @@ class StratumClient
     // the hasher is thread-specific
     // so we need to store it in client so we only need to init once
 #if POOL_COIN <= COIN_VRSC
-    std::unique_ptr<CVerusHashV2> verusHasher;
+    CVerusHashV2 verusHasher;
 #endif
 };
 
