@@ -6,13 +6,12 @@ std::vector<DaemonRpc *> StratumServer::rpcs;
 JobManager StratumServer::job_manager;
 
 StratumServer::StratumServer()
-    : 
-      stats_manager(redis_manager.rc, &redis_mutex,
+    : stats_manager(redis_manager.rc, &redis_mutex,
                     (int)coin_config.hashrate_interval_seconds,
                     (int)coin_config.effort_interval_seconds,
                     (int)coin_config.average_hashrate_interval_seconds),
-                    reqParser(REQ_BUFF_SIZE),
-                    httpParser(MAX_HTTP_REQ_SIZE)
+      reqParser(REQ_BUFF_SIZE),
+      httpParser(MAX_HTTP_REQ_SIZE)
 {
     // never grow beyond this size
     simdjson::error_code error =
@@ -95,7 +94,7 @@ StratumServer::~StratumServer()
 {
     // for (std::unique_ptr<StratumClient> cli : this->clients){
     //     close(cli.get()->GetSock());
-    // } 
+    // }
     close(this->sockfd);
     for (DaemonRpc *rpc : this->rpcs) delete rpc;
 }
@@ -163,10 +162,10 @@ void StratumServer::Listen()
 
 void StratumServer::HandleSocket(int conn_fd)
 {
-    auto client =
-        std::make_unique<StratumClient>(conn_fd, time(nullptr), coin_config.default_diff);
+    auto client = std::make_unique<StratumClient>(conn_fd, time(nullptr),
+                                                  coin_config.default_diff);
     auto cli_ptr = client.get();
-    
+
     {
         std::scoped_lock cli_lock(clients_mutex);
         // client will be null after move, so assign the new ref to it
@@ -197,14 +196,15 @@ void StratumServer::HandleSocket(int conn_fd)
         // exit loop, miner disconnected
         if (recvRes <= 0)
         {
-            stats_manager.PopWorker(cli_ptr->GetFullWorkerName(), cli_ptr->GetAddress());
+            stats_manager.PopWorker(cli_ptr->GetFullWorkerName(),
+                                    cli_ptr->GetAddress());
             close(cli_ptr->GetSock());
 
             {
                 std::scoped_lock cli_lock(clients_mutex);
-                //TODO: clean up clients
-                // clients.erase(
-                //     std::find(clients.begin(), clients.end(), cli_ptr));
+                // TODO: clean up clients
+                //  clients.erase(
+                //      std::find(clients.begin(), clients.end(), cli_ptr));
             }
 
             Logger::Log(LogType::Info, LogField::Stratum,
@@ -318,7 +318,7 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
     while (newJob == nullptr)
     {
         newJob = job_manager.GetNewJob();
-        
+
         Logger::Log(
             LogType::Critical, LogField::Stratum,
             "Block update error: Failed to generate new job! retrying...");
@@ -700,7 +700,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                     res = doc["result"].get_object();
                     idTag = res["name"];
                 }
-                catch (simdjson_error err)
+                catch (const simdjson_error& err)
                 {
                     SendReject(cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
                                "Server error: Failed to get id!");
@@ -787,7 +787,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     // Job *job = jobs[std::string(share.jobId)];
 
     if (job == nullptr)
-    { 
+    {
         shareRes.Code = ShareCode::JOB_NOT_FOUND;
         shareRes.Message = "Job not found";
         Logger::Log(LogType::Warn, LogField::Stratum,
@@ -835,8 +835,12 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     // auto end = TIME_NOW();
 
     // write invalid shares too for statistics
-    stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
-                           shareRes.Diff);
+    // possible that a timeseries wasn't created yet, so don't add shares
+    if (shareRes.Code != ShareCode::UNAUTHORIZED_WORKER)
+    {
+        stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
+                               shareRes.Diff);
+    }
     // bool dbRes =
     //     redis_manager.AddShare(cli->GetWorkerName(), time, shareRes.Diff);
     // TODO: there may be bug if handle notify runs before add share, total

@@ -1,9 +1,10 @@
 #ifndef STRATUM_CLIENT_HPP_
 #define STRATUM_CLIENT_HPP_
 #include <cstring>
+#include <memory>
 #include <set>
 #include <unordered_set>
-#include <memory>
+#include <format>
 
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/utils.hpp"
@@ -12,30 +13,21 @@
 class StratumClient
 {
    public:
-    StratumClient(const int sock, const int64_t time, const double diff)
-        : sockfd(sock),
-          connect_time(time),
-          last_adjusted(time),
-          last_share_time(time),
-          current_diff(diff),
-          last_diff(diff)
-    {
-        extra_nonce = 10;
-        ToHex(extra_nonce_str, extra_nonce);
-        extra_nonce_str[8] = 0;
-    }
+    StratumClient(const int sock, const int64_t time, const double diff);
 
     int GetSock() const { return sockfd; }
     double GetDifficulty() const { return current_diff; }
-    const char* GetExtraNonce() const { return extra_nonce_str; }
+    std::string_view GetExtraNonce() const { return std::string_view(extra_nonce_str); }
     uint32_t GetShareCount() const { return share_count; }
+    bool GetIsAuthorized() const { return is_authorized; }
+    std::string_view GetAddress() const { return std::string_view(address); }
+    int64_t GetLastAdjusted() const { return last_adjusted; }
+    uint8_t* GetBlockheaderBuff() { return block_header; }
     std::string_view GetFullWorkerName() const
     {
         return std::string_view(worker_full);
     }
-    std::string_view GetAddress() const { return std::string_view(address); }
-    int64_t GetLastAdjusted() const { return last_adjusted; }
-    uint8_t* GetBlockheaderBuff() { return block_header; }
+    
     void ResetShareCount() { share_count = 0; }
 
     void SetDifficulty(double diff, int64_t curTime)
@@ -65,6 +57,7 @@ class StratumClient
         share_uset = std::unordered_set<uint32_t>();
         worker_full = std::string(worker);
         address = std::string(addr);
+        is_authorized = true;
 #if POOL_COIN <= COIN_VRSC
         this->verusHasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 #endif
@@ -74,6 +67,8 @@ class StratumClient
     CVerusHashV2* GetHasher() { return &verusHasher; }
 #endif
    private:
+    static uint32_t extra_nonce_counter;
+
     int sockfd;
     const int64_t connect_time;
     int64_t last_adjusted;
@@ -82,19 +77,14 @@ class StratumClient
     uint32_t share_count = 0;
     double current_diff;
     double last_diff;
+    bool is_authorized;
 
-    char extra_nonce_str[9];
+    std::string extra_nonce_str;
     std::string worker_full;
     std::string address;
 
     // needs to be thread-specific to allow simultanious processing
     uint8_t block_header[BLOCK_HEADER_SIZE];
-
-    // for O(log N) duplicate search
-    // 2^32 (1 in 4B) chance of false duplicate
-    // no need to save the entire hash
-    // absolutely no need to save the entire block header like snomp :)
-    // std::set<uint32_t> share_set;
 
     // for O(1) duplicate search
     // at the cost of a bit of memory, but much faster!

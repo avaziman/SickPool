@@ -19,6 +19,12 @@ class ShareProcessor
         ShareResult result;
         unsigned char* headerData = cli.GetBlockheaderBuff();
 
+        if(!cli.GetIsAuthorized()){
+            result.Code = ShareCode::UNAUTHORIZED_WORKER;
+            result.Message = "Unauthorized worker";
+            return result;
+        }
+
         // veirfy params before even hashing
         // convert share time to uint32 (fast)
         uint32_t shareTime = HexToUint(share.time.data(), share.time.size());

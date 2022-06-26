@@ -11,7 +11,7 @@
     "hashrate_interval_seconds": 10,
     "effort_interval_seconds": 10,
     "average_hashrate_interval_seconds1": 21600,
-    "average_hashrate_interval_seconds": 10,
+    "average_hashrate_interval_seconds": 20,
     "rpcs": [
         {
             "hostf": "127.0.0.1:27486",
