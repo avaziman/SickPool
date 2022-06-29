@@ -22,7 +22,6 @@
 #include "../crypto/transaction.hpp"
 #include "../crypto/verus_header.hpp"
 #include "../crypto/verus_transaction.hpp"
-#include "../crypto/verushash/verus_hash.h"
 #include "../daemon/daemon_rpc.hpp"
 #include "../logger.hpp"
 #include "../sock_addr.hpp"
@@ -36,6 +35,7 @@
 #include "share_processor.hpp"
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
+#include "block_submission.hpp"
 
 #define MAX_HTTP_REQ_SIZE (MAX_BLOCK_SIZE * 2)
 #define MAX_HTTP_JSON_DEPTH 3
@@ -56,13 +56,13 @@ class StratumServer
     void StartListening();
     static CoinConfig coin_config;
     static std::vector<DaemonRpc*> rpcs;
-    static int SendRpcReq(std::vector<char>& result, int id, const char* method,
-                          const char* params, int paramsLen);
+    static int SendRpcReq(std::string& result, int id, const char* method,
+                          const char* params, std::size_t paramsLen);
 
    private:
     int sockfd;
     struct sockaddr_in addr;
-    std::string last_job_id_hex;
+    std::string_view last_job_id_hex;
 
     ondemand::parser reqParser;
     ondemand::parser httpParser;
@@ -76,9 +76,11 @@ class StratumServer
     std::vector<std::unique_ptr<StratumClient>> clients;
 
     std::deque<BlockSubmission> block_submissions;
+    // hash + block id
+    std::vector<ImmatureSubmission> immature_block_submissions;
 
     // job id hex str -> job, O(1) job lookup
-    std::unordered_map<std::string, job_t*> jobs;
+    std::unordered_map<std::string_view, job_t*> jobs;
     // chain name str -> chain round
 
     uint32_t block_number = 0;
@@ -112,8 +114,8 @@ class StratumServer
     void UpdateDifficulty(StratumClient* cli);
     void AdjustDifficulty(StratumClient* cli, int64_t curTime);
 
-    void BroadcastJob(StratumClient* cli, Job* job);
+    void BroadcastJob(const StratumClient* cli, Job* job);
 
-    inline std::size_t SendRaw(int sock, const char* data, int len) const;
+    inline std::size_t SendRaw(int sock, const char* data, std::size_t len) const;
 };
 #endif

@@ -23,9 +23,9 @@ DaemonRpc::DaemonRpc(std::string hostHeader, std::string authHeader)
     rpc_addr.sin_port = sock_addr.port;
 }
 
-int DaemonRpc::SendRequest(std::vector<char>& result, int id,
+int DaemonRpc::SendRequest(std::string& result, int id,
                            const char* method, const char* params,
-                           int paramsLen)
+                           std::size_t paramsLen)
 {
     int bodySize, sendSize, recvSize, errCode, resCode;
     int sent, contentLength, contentReceived, headerLength;
@@ -123,7 +123,7 @@ int DaemonRpc::SendRequest(std::vector<char>& result, int id,
     // std::cout << "TOTAL RECEIVED: " << totalRecv << std::endl;
 
     // simd json parser requires some extra bytes
-    result.reserve(contentLength + simdjson::SIMDJSON_PADDING - 1);
+    result.reserve(contentLength + simdjson::SIMDJSON_PADDING);
     result.resize(contentLength - 1);
 
     // sometimes we will get 404 message after the json

@@ -3,7 +3,7 @@
 job_t* JobManager::GetNewJob()
 {
     job_t* job = nullptr;
-    std::vector<char> json;
+    std::string json;
     int resCode =
         StratumServer::SendRpcReq(json, 1, "getblocktemplate", nullptr, 0);
 

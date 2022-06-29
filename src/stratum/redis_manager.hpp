@@ -12,6 +12,7 @@
 #include "../config.hpp"
 #include "../logger.hpp"
 #include "./share.hpp"
+#include "block_submission.hpp"
 #include "payment_manager.hpp"
 #define xstr(s) str(s)
 #define str(s) #s
@@ -37,10 +38,10 @@ class RedisManager
 
         redisAppendCommand(
             rc,
-            "TS.CREATE " COIN_SYMBOL
-            ":round_effort_percent"
-            " RETENTION "
-            "0"                      // time to live
+            "TS.CREATE"
+            " round_effort_percent"
+            " RETENTION"
+            " 0"                      // time to live
             " ENCODING COMPRESSED"   // very data efficient
             " DUPLICATE_POLICY MIN"  // min round 
         );
@@ -48,10 +49,10 @@ class RedisManager
 
         redisAppendCommand(
             rc,
-            "TS.CREATE " COIN_SYMBOL
-            ":worker_count"
-            " RETENTION "
-            "0"                      // time to live
+            "TS.CREATE" 
+            " worker_count"
+            " RETENTION"
+            " 0"                      // time to live
             " ENCODING COMPRESSED"   // very data efficient
             " DUPLICATE_POLICY SUM"  // sum to get total round effort
         );
@@ -61,8 +62,8 @@ class RedisManager
             rc,
             "TS.CREATE "
             "miner_count"
-            " RETENTION "
-            "0"                      // time to live
+            " RETENTION"
+            " 0"                      // time to live
             " ENCODING COMPRESSED"   // very data efficient
             " DUPLICATE_POLICY ,om"  
         );
@@ -79,6 +80,13 @@ class RedisManager
             }
             freeReplyObject(reply);
         }
+    }
+
+    bool UpdateBlockConfirmations(std::string_view block_id, int32_t confirmations){
+        // redis bitfield uses be so gotta swap em
+        return redisCommand(rc, "BITFIELD block:%b SET i32 0 %d",
+                            block_id.data(), block_id.size(),
+                            bswap_32(confirmations)) == nullptr;
     }
 
     bool ResetWorkerCount()
@@ -99,46 +107,6 @@ class RedisManager
         return true;
     }
 
-    bool AddAddress(std::string_view addr, std::string_view identity)
-    {
-        redisReply *reply;
-        auto chainName = std::string_view{"VRSCTEST"};
-
-        redisAppendCommand(rc,
-                           "TS.CREATE " COIN_SYMBOL
-                           ":balance:%b"
-                           " RETENTION 0"  // never expire balance log
-                           " ENCODING COMPRESSED"
-                           " LABELS coin " COIN_SYMBOL
-                           " type balance server IL address %b identity %b",
-                           addr.data(), addr.size(), addr.data(), addr.size(),
-                           identity.data(), identity.size());
-
-        redisAppendCommand(
-            rc,
-            "TS.CREATE"
-            " hashrate:miner:%b"
-            " RETENTION " xstr(HASHRATE_RETENTION)
-            " ENCODING COMPRESSED"
-            " LABELS coin " COIN_SYMBOL
-            " type miner-hashrate server IL address %b identity %b",
-            addr.data(), addr.size(), addr.data(), addr.size(), identity.data(),
-            identity.size());
-
-        for (int i = 0; i < 2; i++)
-        {
-            if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-            {
-                Logger::Log(LogType::Error, LogField::Redis,
-                            "Failed to add address (%d): %s", i, rc->errstr);
-                return false;
-            }
-            freeReplyObject(reply);
-        }
-
-        return true;
-    }
-
     bool SetNewRoundTime(int64_t roundStart)
     {
         redisReply *reply;
@@ -155,16 +123,9 @@ class RedisManager
         return true;
     }
 
-    bool AddBlockSubmission(BlockSubmission &submission, bool accepted, int id)
+    bool AddBlockSubmission(BlockSubmission &submission, bool accepted, const char* block_id)
     {
-        redisReply *reply;
         int command_count = 0;
-
-        std::string block_id_str =
-            std::string(std::string_view((char *)submission.chain,
-                                         sizeof(submission.chain))) +
-            ":" + std::to_string(submission.height) + ":" + std::to_string(id);
-        const char *block_id = block_id_str.c_str();
 
         if (!accepted)
         {
@@ -218,6 +179,7 @@ class RedisManager
         redisAppendCommand(rc, "EXEC");
         command_count++;
 
+        redisReply *reply;
         for (int i = 0; i < command_count; i++)
         {
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
@@ -308,7 +270,7 @@ class RedisManager
             minerReward -= minerReward * fee;  // substract fee
 
             redisAppendCommand(rc,
-                               "TS.INCRBY " COIN_SYMBOL ":balance:%s %" PRId64
+                               "TS.INCRBY " COIN_SYMBOL ":immature-balance:%s %" PRId64
                                " TIMESTAMP %" PRId64,
                                miner, minerReward, foundTimeMs);
 
@@ -348,23 +310,7 @@ class RedisManager
         freeReplyObject(hashReply);  // free HGETALL reply
     }
 
-    bool RenameCurrentRound(uint32_t height)
-    {
-        redisReply *reply;
-        redisAppendCommand(
-            rc, "RENAME " COIN_SYMBOL ":current_round " COIN_SYMBOL ":round:%d",
-            height);
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            // if this is not fixed, more money than needed will be paid
-            Logger::Log(LogType::Critical, LogField::Redis,
-                        "Failed to rename current round!", rc->errstr);
-            return false;
-        }
-        freeReplyObject(reply);
-        return true;
-    }
-
+    // TODO: review this
     bool DoesAddressExist(std::string_view addrOrId,
                           std::string_view &valid_addr)
     {
@@ -429,10 +375,10 @@ class RedisManager
     uint32_t GetBlockCount()
     {
         // fix
-        redisReply *reply =
+        auto *reply =
             (redisReply *)redisCommand(rc, "GET " COIN_SYMBOL ":block_number");
 
-        if (reply != REDIS_OK)
+        if (!reply)
         {
             Logger::Log(LogType::Error, LogField::Redis,
                         "Failed to get block count: %s", rc->errstr);

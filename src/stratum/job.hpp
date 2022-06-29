@@ -67,7 +67,7 @@ class Job
 
     uint8_t* GetStaticHeaderData() { return this->staticHeaderData; }
 
-    void GetBlockHex(uint8_t* header, char* res)
+    void GetBlockHex(const uint8_t* header, char* res) const
     {
         Hexlify(res, header, BLOCK_HEADER_SIZE);
         memcpy(res + (BLOCK_HEADER_SIZE * 2), txsHex.data(), txsHex.size());
@@ -86,7 +86,7 @@ class Job
     {
         return (BLOCK_HEADER_SIZE * 2) + (int)txsHex.size();
     }
-    const char* GetId() const { return jobIdStr; }
+    std::string_view GetId() const { return std::string_view(jobIdStr, sizeof(jobIdStr)); }
     int64_t GetMinTime() const { return minTime; }
     char* GetNotifyBuff() { return notifyBuff; }
     std::size_t GetNotifyBuffSize() const { return notifyBuffSize; }
@@ -113,6 +113,6 @@ class Job
     const int64_t minTime;
     const uint32_t height;
 
-    char jobIdStr[8 + 1];
+    char jobIdStr[8];
 };
 #endif

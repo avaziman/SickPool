@@ -4,7 +4,6 @@
 #include <memory>
 #include <set>
 #include <unordered_set>
-#include <format>
 
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/utils.hpp"

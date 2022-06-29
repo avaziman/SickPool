@@ -13,16 +13,15 @@ using namespace std::chrono;
 class ShareProcessor
 {
    public:
-    static ShareResult Process(int64_t curTime, StratumClient& cli, job_t& job,
-                               const Share& share)
+    static void Process(int64_t curTime, StratumClient& cli, const job_t& job,
+                               const Share& share, ShareResult& result)
     {
-        ShareResult result;
         unsigned char* headerData = cli.GetBlockheaderBuff();
 
         if(!cli.GetIsAuthorized()){
             result.Code = ShareCode::UNAUTHORIZED_WORKER;
             result.Message = "Unauthorized worker";
-            return result;
+            return;
         }
 
         // veirfy params before even hashing
@@ -41,7 +40,7 @@ class ShareProcessor
                 "(min: " +
                 std::to_string(minTime) + ", max: " + std::to_string(maxTime) +
                 ", given: " + std::to_string(shareTime) + ")";
-            return result;
+            return;
         }
         // TODO: verify solution
 
@@ -68,7 +67,7 @@ class ShareProcessor
             result.Code = ShareCode::DUPLICATE_SHARE;
             result.Message = "Duplicate share";
             result.Diff = INVALID_SHARE_DIFF;
-            return result;
+            return;
         }
         
         result.Diff = BitsToDiff(UintToArith256(hash).GetCompact(false));
@@ -77,7 +76,7 @@ class ShareProcessor
         if (result.Diff >= job.GetTargetDiff())
         {
             result.Code = ShareCode::VALID_BLOCK;
-            return result;
+            return;
         }
         else if (result.Diff / cli.GetDifficulty() < 1)  // allow 5% below
         {
@@ -91,10 +90,10 @@ class ShareProcessor
             Logger::Log(LogType::Debug, LogField::ShareProcessor,
                         "Block header: %.*s", BLOCK_HEADER_SIZE * 2,
                         blockHeaderHex);
-            return result;
+            return;
         }
 
         result.Code = ShareCode::VALID_SHARE;
-        return result;
+        return;
     }
 };

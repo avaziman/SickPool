@@ -88,7 +88,7 @@ class VerusJob : public Job
                      "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
                      "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%"
                      "08x\",\"%08x\",%s,\"%.144s\"]}\n",
-                     GetId(), revVer, prevBlockRevHex, merkleRootHex,
+                     GetId().data(), revVer, prevBlockRevHex, merkleRootHex,
                      finalSRootRevHex, (uint32_t)revMinTime, bitsUint,
                      BoolToCstring(clean), bTemplate.solution.data());
 
@@ -103,9 +103,9 @@ class VerusJob : public Job
         std::cout << notifyBuff << std::endl;
     }
 
-    uint8_t* GetHeaderData(uint8_t* buff, std::string_view time,
+    void GetHeaderData(uint8_t* buff, std::string_view time,
                            std::string_view nonce1, std::string_view nonce2,
-                           std::string_view sol) /* override */
+                           std::string_view sol) const/* override */
     {
         memcpy(buff, this->staticHeaderData, BLOCK_HEADER_STATIC_SIZE);
 
@@ -129,8 +129,6 @@ class VerusJob : public Job
         pos += (NONCE_SIZE - EXTRANONCE_SIZE);
         Unhexlify(buff + pos, sol.data(),
                   (SOLUTION_LENGTH_SIZE + SOLUTION_SIZE) * 2);
-
-        return this->staticHeaderData;
     }
 
    private:
