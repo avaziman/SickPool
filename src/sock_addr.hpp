@@ -12,7 +12,7 @@
 class SockAddr
 {
    public:
-    SockAddr(std::string sockAddrStr)
+    SockAddr(const std::string& sockAddrStr)
     {
         std::string ip_str, port_str;
 
@@ -21,9 +21,9 @@ class SockAddr
             sockAddrStr.substr(sockAddrStr.find(':') + 1, sockAddrStr.size());
 
         ip = inet_addr(ip_str.c_str());
-        port = htons(std::stoi(port_str));
+        port = htons(std::stoul(port_str));
     }
     unsigned short port;
-    unsigned long ip;
+    in_addr_t ip;
 };
 #endif
