@@ -4,7 +4,7 @@
 #include <ctime>
 #include <string_view>
 #include <vector>
-#include "../config.hpp"
+#include "static_config/config.hpp"
 
 struct TransactionData
 {

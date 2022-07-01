@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../config.hpp"
+#include "static_config/config.hpp"
 #include "../logger.hpp"
 #include "./share.hpp"
 #include "block_submission.hpp"

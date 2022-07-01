@@ -5,7 +5,7 @@
 // #include "stratum/stratum_server.hpp"
 // #include "stratum_test.hpp"
 // #include <simdjson.h>
-// #include "../src/coin_config.hpp"
+// #include "../src/coin_static_config/config.hpp"
 
 // #define PORT 4444
 

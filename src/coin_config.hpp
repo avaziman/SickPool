@@ -23,5 +23,6 @@ struct CoinConfig
     int64_t hashrate_interval_seconds;
     int64_t effort_interval_seconds;
     int64_t average_hashrate_interval_seconds;
+    int64_t hashrate_ttl_seconds;
 };
 #endif

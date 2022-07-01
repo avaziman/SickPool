@@ -1,5 +1,0 @@
-if(EXISTS "/home/sickguy/Documents/Projects/SickPool/server/release/tests/SickPool_tests[1]_tests.cmake")
-  include("/home/sickguy/Documents/Projects/SickPool/server/release/tests/SickPool_tests[1]_tests.cmake")
-else()
-  add_test(SickPool_tests_NOT_BUILT SickPool_tests_NOT_BUILT)
-endif()

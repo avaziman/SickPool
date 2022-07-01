@@ -2,21 +2,22 @@
 
 StatsManager::StatsManager(redisContext* rc, std::mutex* rc_mutex,
                            int hr_interval, int effort_interval,
-                           int avg_hr_interval)
+                           int avg_hr_interval, int hashrate_ttl)
     : rc(rc),
       rc_mutex(rc_mutex),
       hashrate_interval_seconds(hr_interval),
       effort_interval_seconds(effort_interval),
-      average_hashrate_interval_seconds(avg_hr_interval)
+      average_hashrate_interval_seconds(avg_hr_interval),
+      hashrate_ttl_seconds(hashrate_ttl)
 {
     LoadCurrentRound();
     redisCommand(rc,
                  "TS.CREATE"
                  " hashrate:pool:IL"
-                 " RETENTION " xstr(HASHRATE_RETENTION)  // time to live
+                 " RETENTION %d"  // time to live
                  " ENCODING COMPRESSED"                  // very data efficient
                  " LABELS coin " COIN_SYMBOL
-                 " type pool-hashrate server IL");
+                 " type pool-hashrate server IL", hashrate_ttl * 1000);
 }
 
 void StatsManager::Start()
@@ -263,7 +264,7 @@ bool StatsManager::LoadCurrentRound()
                                                "total");
     if (!reply) return false;
 
-    if (reply->type == REDIS_REPLY_r)
+    if (reply->type == REDIS_REPLY_STRING)
     {
         // if the key doesn't exist, don't create a key and so it will be 0
         round_map[COIN_SYMBOL].pow =
@@ -276,7 +277,7 @@ bool StatsManager::LoadCurrentRound()
 
     if (!reply) return false;
 
-    if (reply->type == REDIS_REPLY_r)
+    if (reply->type == REDIS_REPLY_STRING)
     {
         round_map[COIN_SYMBOL].round_start_ms =
             std::strtoll(reply->str, nullptr, 10);
@@ -448,10 +449,10 @@ bool StatsManager::AddWorker(std::string_view address,
         redisAppendCommand(rc,
                        "TS.CREATE"
                        " worker-count:%b"
-                       " RETENTION " xstr(HASHRATE_RETENTION)
+                       " RETENTION %d"
                        " ENCODING COMPRESSED"
                        " LABELS coin " COIN_SYMBOL " type worker-count",
-                       address.data(), address.size());
+                       address.data(), address.size(), hashrate_ttl_seconds * 1000);
         command_count++;
 
         redisAppendCommand(rc, "ZADD solver-index:join-time %f %b",
@@ -524,11 +525,11 @@ int StatsManager::AppendCreateStatsTs(std::string_view addrOrWorker,
             rc,
             "TS.CREATE"
             " %b:%b:%b"
-            " RETENTION " xstr(HASHRATE_RETENTION)  // time to live
+            " RETENTION %d"  // time to live
             " ENCODING COMPRESSED"                  // very data efficient
             " LABELS coin " COIN_SYMBOL " type %b-%b address %b server IL",
             i.data(), i.size(), prefix.data(), prefix.size(),
-            addrOrWorker.data(), addrOrWorker.size(), prefix.data(),
+            addrOrWorker.data(), addrOrWorker.size(), hashrate_ttl_seconds * 1000, prefix.data(),
             prefix.size(), i.data(), i.size(), address.data(), address.size());
         command_count++;
     }

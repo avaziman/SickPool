@@ -11,7 +11,7 @@
 #include <thread>
 #include <vector>
 
-#include "../config.hpp"
+#include "../stratum/static_config/config.hpp"
 #include "verushash/arith_uint256.h"
 #include "verushash/endian.h"
 #include "verushash/uint256.h"

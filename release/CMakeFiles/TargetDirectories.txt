@@ -1,8 +1,0 @@
-/home/sickguy/Documents/Projects/SickPool/server/release/CMakeFiles/rebuild_cache.dir
-/home/sickguy/Documents/Projects/SickPool/server/release/CMakeFiles/edit_cache.dir
-/home/sickguy/Documents/Projects/SickPool/server/release/src/CMakeFiles/rebuild_cache.dir
-/home/sickguy/Documents/Projects/SickPool/server/release/src/CMakeFiles/edit_cache.dir
-/home/sickguy/Documents/Projects/SickPool/server/release/src/CMakeFiles/SickPool.dir
-/home/sickguy/Documents/Projects/SickPool/server/release/stratum_notifier/CMakeFiles/rebuild_cache.dir
-/home/sickguy/Documents/Projects/SickPool/server/release/stratum_notifier/CMakeFiles/edit_cache.dir
-/home/sickguy/Documents/Projects/SickPool/server/release/stratum_notifier/CMakeFiles/stratum_notifier.dir

@@ -11,7 +11,7 @@
 #include <thread>
 #include <unordered_map>
 
-#include "config.hpp"
+#include "static_config/config.hpp"
 #include "logger.hpp"
 #include "round.hpp"
 #include "share.hpp"
@@ -19,9 +19,6 @@
 
 #define STALE_SHARE_DIFF -1
 #define INVALID_SHARE_DIFF -2
-
-#define xstr(s) str(s)
-#define str(s) #s
 
 // #define STATS_INTERVAL_SECONDS (60 * 5)
 
@@ -54,7 +51,7 @@ class StatsManager
 {
    public:
     StatsManager(redisContext* rc, std::mutex* rc_mutex, int hr_interval,
-                 int effort_interval, int avg_hr_interval);
+                 int effort_interval, int avg_hr_interval, int hashrate_ttl);
 
     // Every hashrate_interval_seconds we need to write:
     // ) worker hashrate
@@ -91,6 +88,7 @@ class StatsManager
     const int hashrate_interval_seconds;
     const int effort_interval_seconds;
     const int average_hashrate_interval_seconds;
+    const int hashrate_ttl_seconds;
 
     std::mutex stats_map_mutex;
     // worker -> stats

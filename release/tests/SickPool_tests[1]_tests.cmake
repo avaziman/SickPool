@@ -1,7 +1,0 @@
-add_test( HashWrapperTest.VerusHash2_2 /home/sickguy/Documents/Projects/SickPool/server/release/tests/SickPool_tests [==[--gtest_filter=HashWrapperTest.VerusHash2_2]==] --gtest_also_run_disabled_tests)
-set_tests_properties( HashWrapperTest.VerusHash2_2 PROPERTIES WORKING_DIRECTORY /home/sickguy/Documents/Projects/SickPool/server/release/tests)
-add_test( MerkleRootTest.SHA256MerkleRoot1Tx /home/sickguy/Documents/Projects/SickPool/server/release/tests/SickPool_tests [==[--gtest_filter=MerkleRootTest.SHA256MerkleRoot1Tx]==] --gtest_also_run_disabled_tests)
-set_tests_properties( MerkleRootTest.SHA256MerkleRoot1Tx PROPERTIES WORKING_DIRECTORY /home/sickguy/Documents/Projects/SickPool/server/release/tests)
-add_test( MerkleRootTest.SHA256MerkleRoot2Tx /home/sickguy/Documents/Projects/SickPool/server/release/tests/SickPool_tests [==[--gtest_filter=MerkleRootTest.SHA256MerkleRoot2Tx]==] --gtest_also_run_disabled_tests)
-set_tests_properties( MerkleRootTest.SHA256MerkleRoot2Tx PROPERTIES WORKING_DIRECTORY /home/sickguy/Documents/Projects/SickPool/server/release/tests)
-set( SickPool_tests_TESTS HashWrapperTest.VerusHash2_2 MerkleRootTest.SHA256MerkleRoot1Tx MerkleRootTest.SHA256MerkleRoot2Tx)

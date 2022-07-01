@@ -9,7 +9,8 @@ StratumServer::StratumServer()
     : stats_manager(redis_manager.rc, &redis_mutex,
                     (int)coin_config.hashrate_interval_seconds,
                     (int)coin_config.effort_interval_seconds,
-                    (int)coin_config.average_hashrate_interval_seconds),
+                    (int)coin_config.average_hashrate_interval_seconds,
+                    (int)coin_config.hashrate_ttl_seconds),
       reqParser(REQ_BUFF_SIZE),
       httpParser(MAX_HTTP_REQ_SIZE)
 {

@@ -16,7 +16,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../coin_config.hpp"
+#include "coin_config.hpp"
+#include "static_config/config.hpp"
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/merkle_tree.hpp"
 #include "../crypto/transaction.hpp"
