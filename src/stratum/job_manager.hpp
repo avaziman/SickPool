@@ -2,6 +2,8 @@
 #define JOB_MANAGER_HPP
 #include <simdjson.h>
 
+
+#include "daemon_manager.hpp"
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/verus_transaction.hpp"
 #include "../daemon/daemon_rpc.hpp"
@@ -18,18 +20,20 @@ using namespace simdjson;
 class JobManager
 {
    public:
-    JobManager() : jobCount(0), blockTemplate() {}
+    JobManager(DaemonManager* daemon_manager, std::string pool_addr) : jobCount(0), blockTemplate(), daemon_manager(daemon_manager), pool_addr(pool_addr) {}
 
     job_t* GetNewJob();
 
-    BlockTemplate ParseBlockTemplateJson(std::vector<char>& json);
-
    private:
     // multiple jobs can use the same block template, (append transactions only)
+
+    DaemonManager* daemon_manager;
+    
     int64_t jobCount;
     BlockTemplate blockTemplate;
     ondemand::parser jsonParser;
     std::string coinbaseExtra = "SickPool is in the building.";
+    std::string pool_addr;
 
     VerusTransaction GetCoinbaseTx(int64_t value,
                                    uint32_t height, int64_t,
@@ -38,7 +42,5 @@ class JobManager
     TransactionData GetCoinbaseTxData(int64_t value, uint32_t height, int64_t,
                                       std::string_view rpc_coinbase);
 };
-
-#include "stratum_server.hpp" // TODO: VERY UGLY FIX
 
 #endif

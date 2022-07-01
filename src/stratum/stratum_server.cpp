@@ -1,16 +1,14 @@
 #include "stratum_server.hpp"
 
-std::mutex StratumServer::rpc_mutex;
-CoinConfig StratumServer::coin_config;
-std::vector<DaemonRpc *> StratumServer::rpcs;
-JobManager StratumServer::job_manager;
-
-StratumServer::StratumServer()
-    : stats_manager(redis_manager.rc, &redis_mutex,
+StratumServer::StratumServer(CoinConfig conf)
+    : coin_config(conf),
+      stats_manager(redis_manager.rc, &redis_mutex,
                     (int)coin_config.hashrate_interval_seconds,
                     (int)coin_config.effort_interval_seconds,
                     (int)coin_config.average_hashrate_interval_seconds,
                     (int)coin_config.hashrate_ttl_seconds),
+      daemon_manager(coin_config.rpcs),
+      job_manager(&daemon_manager, coin_config.pool_addr),
       reqParser(REQ_BUFF_SIZE),
       httpParser(MAX_HTTP_REQ_SIZE)
 {
@@ -81,7 +79,7 @@ StratumServer::StratumServer()
     redis_manager.ResetWorkerCount();
     block_number = redis_manager.GetBlockCount();
     // std::vector<char> c;
-    // SendRpcReq(c, 1, "getblockcount", nullptr, 0);
+    // daemon_manager.SendRpcReq(c, 1, "getblockcount", nullptr, 0);
     // redis_manager.UpdatePoS(0, GetCurrentTimeMs());
 
     std::thread stats_thread(&StatsManager::Start, &stats_manager);
@@ -98,7 +96,6 @@ StratumServer::~StratumServer()
     //     close(cli.get()->GetSock());
     // }
     close(this->sockfd);
-    for (DaemonRpc *rpc : this->rpcs) delete rpc;
 }
 
 void StratumServer::HandleControlCommands()
@@ -380,7 +377,7 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
                                          block_id_str.c_str());
         immature_block_submissions.emplace_back(
             submission.timeMs,
-            std::string((char*)submission.hashHex, sizeof(submission.hashHex)),
+            std::string((char *)submission.hashHex, sizeof(submission.hashHex)),
             block_id_str);
     }
 
@@ -431,45 +428,12 @@ void StratumServer::HandleBlockNotify(const ondemand::array &params)
     redis_manager.AddNetworkHr(curtimeMs, newJob->GetTargetDiff());
 
     std::string resBody;
-    // if (block_timestamps.size() < BLOCK_MATURITY)
-    if (mature_timestamp_ms == 0)
-    {
-        try
-        {
-            std::string params =
-                "\"" +
-                std::to_string(newJob->GetHeight() - BLOCK_MATURITY - 1) + "\"";
-            int resCode = SendRpcReq(resBody, 1, "getblock", params.c_str(),
-                                     params.size());
-            ondemand::document doc = httpParser.iterate(
-                resBody.data(), resBody.size(), resBody.capacity());
-
-            ondemand::object res = doc["result"].get_object();
-            mature_timestamp_ms = res["time"].get_uint64();
-            mature_timestamp_ms *= 1000;  // ms accuracy
-        }
-        catch (const simdjson_error &err)
-        {
-            // it remains zero
-            Logger::Log(LogType::Warn, LogField::Stratum,
-                        "Failed to get mature timestamp error: %s", err.what());
-        }
-    }
-    else
-    {
-        mature_timestamp_ms =
-            mature_timestamp_ms + (curtimeMs - last_block_timestamp_map);
-    }
-
-    redis_manager.SetMatureTimestamp(mature_timestamp_ms);
-    last_block_timestamp_map = curtimeMs;
 
     for (int i = 0; i < immature_block_submissions.size(); i++)
     {
         ImmatureSubmission *submission = &immature_block_submissions[i];
-        std::string param = "\"" + submission->hashHex + "\"";
-        SendRpcReq(resBody, 1, "getblockheader", param.data(),
-                   param.length());
+        daemon_manager.SendRpcReq<std::any>(resBody, 1, "getblockheader",
+                                  std::any(std::string_view(submission->hashHex)));
 
         int32_t confirmations = -1;
         try
@@ -552,9 +516,9 @@ void StratumServer::HandleWalletNotify(ondemand::array &params)
     return;
     std::string resBody;
     char rpcParams[64];
-    int len = sprintf(rpcParams, "\"%.*s\",1", (int)txId.size(), txId.data());
 
-    int resCode = SendRpcReq(resBody, 1, "getrawtransaction", rpcParams, len);
+    int resCode = daemon_manager.SendRpcReq<std::any>(resBody, 1, "getrawtransaction",
+                                            std::any(txId), std::any(1));  // verboose
 
     if (resCode != 200)
     {
@@ -600,9 +564,7 @@ void StratumServer::HandleWalletNotify(ondemand::array &params)
         return;
     }
 
-    len =
-        sprintf(rpcParams, "\"%.*s\"", (int)blockHash.size(), blockHash.data());
-    resCode = SendRpcReq(resBody, 1, "getblock", rpcParams, len);
+    resCode = daemon_manager.SendRpcReq<std::any>(resBody, 1, "getblock", std::any(blockHash));
 
     if (resCode != 200)
     {
@@ -713,8 +675,9 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     {
         reqParams = "\"" + std::string(given_addr) + "\"";
 
-        resCode = SendRpcReq(resultBody, 1, "validateaddress",
-                             reqParams.c_str(), reqParams.size());
+        resCode =
+            daemon_manager.SendRpcReq<std::any>(resultBody, 1, "validateaddress",
+                                      std::any(given_addr));
         try
         {
             doc = httpParser.iterate(resultBody.data(), resultBody.size(),
@@ -748,9 +711,8 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
             if (given_addr == valid_addr)
             {
                 // we were given an identity address, get the id@
-                reqParams = "\"" + std::string(valid_addr) + "\"";
-                resCode = SendRpcReq(resultBody, 1, "getidentity",
-                                     valid_addr.data(), valid_addr.size());
+                resCode = daemon_manager.SendRpcReq<std::any>(resultBody, 1,
+                                                    "getidentity", std::any(valid_addr));
 
                 try
                 {
@@ -870,19 +832,13 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
         case ShareCode::VALID_BLOCK:
         {
             int blockSize = job->GetBlockSize();
-            auto blockData = std::make_unique<char[]>(blockSize + 3);
+            char blockData[blockSize];
 
-            blockData[0] = '\"';
-            job->GetBlockHex(cli->GetBlockheaderBuff(), blockData.get() + 1);
-            blockData[blockSize + 1] = '\"';
-            blockData[blockSize + 2] = 0;
-            // std::cout << (char *)blockData << std::endl;
+            job->GetBlockHex(cli->GetBlockheaderBuff(), blockData);
 
-            bool submissionGood = SubmitBlock(blockData.get(), blockSize + 3);
+            bool submissionGood = SubmitBlock(std::string_view(blockData, blockSize));
             auto chain = std::string_view{"VRSCTEST"};
-            int64_t duration = 0;  // TODO: fix
             const auto chainEffort = stats_manager.GetChainRound(chain);
-            // TODO:: append block number to db
             block_submissions.emplace_back(chain, job, shareRes,
                                            cli->GetFullWorkerName(), time,
                                            chainEffort, block_number);
@@ -944,11 +900,11 @@ void StratumServer::SendAccept(StratumClient *cli, int id)
     SendRaw(cli->GetSock(), buff, len);
 }
 
-bool StratumServer::SubmitBlock(const char *blockHex, int blockHexLen)
+bool StratumServer::SubmitBlock(std::string_view block_hex)
 {
     std::string resultBody;
     int resCode =
-        SendRpcReq(resultBody, 1, "submitblock", blockHex, blockHexLen);
+        daemon_manager.SendRpcReq<std::any>(resultBody, 1, "submitblock", std::any(block_hex));
 
     if (resCode != 200)
     {
@@ -1060,19 +1016,4 @@ std::size_t StratumServer::SendRaw(int sock, const char *data,
 {
     // dont send sigpipe
     return send(sock, data, len, MSG_NOSIGNAL);
-}
-
-// TODO: make this like printf for readability
-int StratumServer::SendRpcReq(std::string &result, int id, const char *method,
-                              const char *params, std::size_t paramsLen)
-{
-    std::lock_guard rpc_lock(rpc_mutex);
-    for (DaemonRpc *rpc : rpcs)
-    {
-        int res = rpc->SendRequest(result, id, method, params, paramsLen);
-
-        if (res != -1) return res;
-    }
-
-    return -2;
 }

@@ -3,6 +3,7 @@
 #include <simdjson.h>
 #include <sys/socket.h>
 
+#include <any>
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
@@ -52,13 +53,10 @@ using namespace std::chrono;
 class StratumServer
 {
    public:
-    StratumServer();
+    StratumServer(CoinConfig conf);
     ~StratumServer();
     void StartListening();
-    static CoinConfig coin_config;
-    static std::vector<DaemonRpc*> rpcs;
-    static int SendRpcReq(std::string& result, int id, const char* method,
-                          const char* params, std::size_t paramsLen);
+    CoinConfig coin_config;
 
    private:
     int sockfd;
@@ -71,7 +69,8 @@ class StratumServer
     ControlServer control_server;
     RedisManager redis_manager;
     StatsManager stats_manager;
-    static JobManager job_manager;
+    DaemonManager daemon_manager;
+    JobManager job_manager;
     // DifficultyManager* diff_manager;
 
     std::vector<std::unique_ptr<StratumClient>> clients;
@@ -92,8 +91,6 @@ class StratumServer
     std::mutex clients_mutex;
     std::mutex redis_mutex;
 
-    static std::mutex rpc_mutex;
-
     void HandleControlCommands();
     void HandleControlCommand(ControlCommands cmd);
 
@@ -110,7 +107,7 @@ class StratumServer
     void HandleShare(StratumClient* cli, int id, Share& share);
     void SendReject(StratumClient* cli, int id, int error, const char* msg);
     void SendAccept(StratumClient* cli, int id);
-    bool SubmitBlock(const char* blockHex, int blockHexLen);
+    bool SubmitBlock(std::string_view block_hex);
 
     void UpdateDifficulty(StratumClient* cli);
     void AdjustDifficulty(StratumClient* cli, int64_t curTime);

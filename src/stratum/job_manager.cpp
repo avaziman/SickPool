@@ -5,7 +5,7 @@ job_t* JobManager::GetNewJob()
     job_t* job = nullptr;
     std::string json;
     int resCode =
-        StratumServer::SendRpcReq(json, 1, "getblocktemplate", nullptr, 0);
+        daemon_manager->SendRpcReq<>(json, 1, "getblocktemplate");
 
     if (resCode != 200)
     {
@@ -90,11 +90,6 @@ job_t* JobManager::GetNewJob()
     return job;
 }
 
-BlockTemplate JobManager::ParseBlockTemplateJson(std::vector<char>& json)
-{
-    return blockTemplate;
-}
-
 // doesnt include dataHex
 TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
                                               int64_t locktime,
@@ -132,7 +127,7 @@ VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
            coinbaseExtra.size());
 
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
-    coinbaseTx.AddP2PKHOutput(StratumServer::coin_config.pool_addr, value);
+    coinbaseTx.AddP2PKHOutput(pool_addr, value);
 #if POOL_COIN == COIN_VRSCTEST
     coinbaseTx.AddFeePoolOutput(rpc_coinbase);  // without this gives bad-blk-fees
 #endif

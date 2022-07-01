@@ -54,14 +54,7 @@ int main(int argc, char** argv)
         Logger::Log(LogType::Info, LogField::Config, "Effort retention: %ds",
                     coinConfig.effort_interval_seconds);
 
-        StratumServer::coin_config = coinConfig;
-        for (int i = 0; i < coinConfig.rpcs.size(); i++)
-        {
-            StratumServer::rpcs.push_back(new DaemonRpc(
-                coinConfig.rpcs[i].host, coinConfig.rpcs[i].auth));
-        }
-    
-        StratumServer stratumServer;
+        StratumServer stratumServer(coinConfig);
         stratumServer.StartListening();
     }
     catch (std::runtime_error e)

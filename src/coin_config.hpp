@@ -1,6 +1,8 @@
 #ifndef COIN_CONFIG_HPP
 #define COIN_CONFIG_HPP
 #include <string_view>
+#include <vector>
+
 struct RpcConfig{
     std::string host;
     std::string auth;
