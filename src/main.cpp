@@ -13,9 +13,9 @@
 #include "sock_addr.hpp"
 #include "stratum/stratum_server.hpp"
 
-#define CONFIG_PATH                                                   \
-    "//home/sickguy/Documents/Projects/SickPool/server/config/coins/" \
-    "VRSC.json"
+// #define CONFIG_PATH                                                   \
+//     "//home/sickguy/Documents/Projects/SickPool/server/config/coins/" \
+//     "VRSC.json"
 // #define CONFIG_PATH_VRSC \
 //     "C:\\projects\\pool\\pool-server\\config\\coins\\VRSC.json"
 
@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     CoinConfig coinConfig;
     try
     {
-        padded_string json = padded_string::load(CONFIG_PATH);
+        padded_string json = padded_string::load(argv[1]);
         ParseCoinConfig(json, coinConfig);
 
         Logger::Log(LogType::Info, LogField::Config, "Coin config loaded:");
