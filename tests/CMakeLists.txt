@@ -1,29 +1,15 @@
 enable_testing()
 include(GoogleTest)
 
-get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
-
-set(CMAKE_CXX_STANDARD 17)
-
-file(GLOB_RECURSE SRC_FILES
-     "${PARENT_DIR}/src/*.h"
-     "${PARENT_DIR}/src/*.c"
-     "${PARENT_DIR}/src/*.hpp"
-     "${PARENT_DIR}/src/*.cpp"
-     "${PARENT_DIR}/lib/simdjson.cpp"
-)
-
-list(REMOVE_ITEM SRC_FILES "${PARENT_DIR}/src/main.cpp")
-
-set_source_files_properties(${PARENT_DIR}/src/crypto/verushash/verus_clhash.cpp PROPERTIES COMPILE_FLAGS " -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")
-set_source_files_properties(${PARENT_DIR}/src/crypto/verushash/verus_hash.cpp PROPERTIES COMPILE_FLAGS "   -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")
-set_source_files_properties(${PARENT_DIR}/src/crypto/verushash/haraka.c PROPERTIES COMPILE_FLAGS "         -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")
+set(CMAKE_CXX_STANDARD 20)
 
 include_directories(../src)
 
-add_executable(${PROJECT_NAME}_tests ${SRC_FILES} 
-job_construction_test.cpp
-        hash_wrapper_test.cpp
+add_executable(${PROJECT_NAME}_tests 
+        main.cpp
+        difficulty_test.cpp
+        # job_construction_test.cpp
+        # hash_wrapper_test.cpp
         # merkle_root_test.cpp
         # difficulty_test.cpp
         #stratum_test.cpp
@@ -35,10 +21,12 @@ target_include_directories(${PROJECT_NAME}_tests PUBLIC ${HIREDIS_HEADER})
 
 find_library(HIREDIS_LIB hiredis)
 
+set_property(TARGET ${PROJECT_NAME} PROPERTY ENABLE_EXPORTS 1)
+
 target_link_libraries(
     ${PROJECT_NAME}_tests
+    ${PROJECT_NAME} # link the pool
     ${HIREDIS_LIB}
-    ${REDIS_PLUS_PLUS_LIB}
-    gtest_main
+    gtest
 )
 gtest_discover_tests(${PROJECT_NAME}_tests)

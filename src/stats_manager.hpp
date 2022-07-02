@@ -11,11 +11,11 @@
 #include <thread>
 #include <unordered_map>
 
-#include "block_submission.hpp"
+#include "stratum/block_submission.hpp"
+#include "stratum/round.hpp"
+#include "stratum/share.hpp"
+#include "stratum/static_config/config.hpp"
 #include "logger.hpp"
-#include "round.hpp"
-#include "share.hpp"
-#include "static_config/config.hpp"
 
 enum class BadDiff
 {

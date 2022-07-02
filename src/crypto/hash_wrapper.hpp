@@ -20,9 +20,9 @@ class HashWrapper
                                      const unsigned char* in, int size,
                                      CVerusHashV2* hasher)
     {
+        hasher->Reset();
         hasher->Write(in, size);
         hasher->Finalize2b(dest);
-        hasher->Reset();
     }
     inline static void SHA256d(unsigned char* dest, const unsigned char* in,
                                int size)

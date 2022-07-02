@@ -1,0 +1,1 @@
+/usr/bin/c++  -O0 -g3 -O0 -g -g CMakeFiles/stratum_notifier.dir/stratum_notifier.cpp.o -o stratum_notifier 

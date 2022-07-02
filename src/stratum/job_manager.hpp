@@ -1,6 +1,6 @@
 #ifndef JOB_MANAGER_HPP
 #define JOB_MANAGER_HPP
-#include <simdjson.h>
+#include <simdjson/simdjson.h>
 
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/verus_transaction.hpp"

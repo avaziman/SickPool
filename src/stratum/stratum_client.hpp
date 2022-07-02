@@ -57,6 +57,7 @@ class StratumClient
         worker_full = std::string(worker);
         address = std::string(addr);
         is_authorized = true;
+        
 #if POOL_COIN <= COIN_VRSC
         this->verusHasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 #endif

@@ -11,21 +11,21 @@
 #include <unordered_map>
 #include <vector>
 
-#include "coin_config.hpp"
-#include "static_config/config.hpp"
 #include "../crypto/hash_wrapper.hpp"
 #include "../logger.hpp"
 #include "../sock_addr.hpp"
 #include "../stats_manager.hpp"
+#include "block_submission.hpp"
+#include "coin_config.hpp"
+#include "control_server.hpp"
 #include "job_manager.hpp"
 #include "redis_manager.hpp"
-#include "submission_manager.hpp"
-#include "control_server.hpp"
 #include "share.hpp"
 #include "share_processor.hpp"
+#include "static_config/config.hpp"
 #include "stratum_client.hpp"
+#include "submission_manager.hpp"
 #include "verus_job.hpp"
-#include "block_submission.hpp"
 
 #define MAX_HTTP_REQ_SIZE (MAX_BLOCK_SIZE * 2)
 #define MAX_HTTP_JSON_DEPTH 3
@@ -34,7 +34,6 @@
 #define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - simdjson::SIMDJSON_PADDING)
 #define SOCK_TIMEOUT 5
 #define MIN_PERIOD_SECONDS 20
-
 
 class StratumServer
 {
@@ -49,8 +48,10 @@ class StratumServer
     int sockfd;
     struct sockaddr_in addr;
 
-    simdjson::ondemand::parser reqParser;
-    simdjson::ondemand::parser httpParser;
+    simdjson::ondemand::parser reqParser =
+        simdjson::ondemand::parser(REQ_BUFF_SIZE);
+    simdjson::ondemand::parser httpParser =
+        simdjson::ondemand::parser(MAX_HTTP_REQ_SIZE);
 
     ControlServer control_server;
     RedisManager redis_manager;
@@ -73,24 +74,29 @@ class StratumServer
 
     void Listen();
     void HandleSocket(int sockfd);
-    void HandleReq(StratumClient* cli, char buffer[], int reqSize);
+    void HandleReq(StratumClient* cli, char buffer[], std::size_t reqSize);
     void HandleBlockNotify(const simdjson::ondemand::array& params);
     void HandleWalletNotify(simdjson::ondemand::array& params);
 
-    void HandleSubscribe(StratumClient* cli, int id, simdjson::ondemand::array& params);
-    void HandleAuthorize(StratumClient* cli, int id, simdjson::ondemand::array& params);
-    void HandleSubmit(StratumClient* cli, int id, simdjson::ondemand::array& params);
+    void HandleSubscribe(StratumClient* cli, int id,
+                         simdjson::ondemand::array& params);
+    void HandleAuthorize(StratumClient* cli, int id,
+                         simdjson::ondemand::array& params);
+    void HandleSubmit(StratumClient* cli, int id,
+                      simdjson::ondemand::array& params);
 
     void HandleShare(StratumClient* cli, int id, Share& share);
-    void SendReject(const StratumClient* cli, int id, int error, const char* msg);
+    void SendReject(const StratumClient* cli, int id, int error,
+                    const char* msg);
     void SendAccept(const StratumClient* cli, int id);
     bool SubmitBlock(std::string_view block_hex);
 
     void UpdateDifficulty(StratumClient* cli);
     void AdjustDifficulty(StratumClient* cli, int64_t curTime);
 
-    void BroadcastJob(const StratumClient* cli, const Job* job);
+    void BroadcastJob(const StratumClient* cli, const Job* job) const;
 
-    inline std::size_t SendRaw(int sock, const char* data, std::size_t len) const;
+    inline std::size_t SendRaw(int sock, const char* data,
+                               std::size_t len) const;
 };
 #endif

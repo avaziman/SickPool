@@ -11,12 +11,14 @@
 class ShareProcessor
 {
    public:
-    static void Process(int64_t curTime, StratumClient& cli, const job_t& job,
-                               const Share& share, ShareResult& result)
+    inline static void Process(int64_t curTime, StratumClient& cli,
+                               const job_t& job, const Share& share,
+                               ShareResult& result)
     {
         uint8_t* headerData = cli.GetBlockheaderBuff();
 
-        if(!cli.GetIsAuthorized()){
+        if (!cli.GetIsAuthorized())
+        {
             result.Code = ShareCode::UNAUTHORIZED_WORKER;
             result.Message = "Unauthorized worker";
             return;
@@ -52,9 +54,6 @@ class ShareProcessor
 #endif
         uint256 hash(result.HashBytes);
         // arith_uint256 hashArith = UintToArith256(hash);
-        // Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash:
-        // %s",
-        //             hash.GetHex().c_str());
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
@@ -67,7 +66,7 @@ class ShareProcessor
             result.Diff = static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
             return;
         }
-        
+
         result.Diff = BitsToDiff(UintToArith256(hash).GetCompact(false));
 
         // if (hashArith >= *job.GetTarget())

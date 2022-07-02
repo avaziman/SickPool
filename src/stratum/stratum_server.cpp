@@ -2,8 +2,6 @@
 
 StratumServer::StratumServer(const CoinConfig &conf)
     : coin_config(conf),
-      reqParser(REQ_BUFF_SIZE),
-      httpParser(MAX_HTTP_REQ_SIZE),
       redis_manager(),
       stats_manager(redis_manager.rc, &redis_mutex,
                     (int)coin_config.hashrate_interval_seconds,
@@ -47,7 +45,7 @@ StratumServer::StratumServer(const CoinConfig &conf)
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(coin_config.stratum_port);
+    addr.sin_port = htons(static_cast<uint16_t>(coin_config.stratum_port));
 
     if (bind(sockfd, (const sockaddr *)&addr, sizeof(addr)) != 0)
     {
@@ -125,13 +123,13 @@ void StratumServer::Listen()
         socklen_t addr_len = sizeof(conn_addr);
         conn_fd = accept(sockfd, (sockaddr *)&conn_addr, &addr_len);
 
-        std::cout << "tcp client connected, starting new thread..."
-                  << std::endl;
+        Logger::Log(LogType::Info, LogField::Stratum,
+                    "tcp client connected, starting new thread...");
 
         if (conn_fd <= 0)
         {
-            std::cerr << "Invalid connecting socket accepted. Ignoring..."
-                      << std::endl;
+            Logger::Log(LogType::Warn, LogField::Stratum,
+                        "Invalid connecting socket accepted. Ignoring...");
             continue;
         }
 
@@ -156,8 +154,11 @@ void StratumServer::HandleSocket(int conn_fd)
 
     // simdjson requires some extra bytes, so don't write to the last bytes
     char buffer[REQ_BUFF_SIZE];
-    char *reqEnd = nullptr, *reqStart = nullptr;
-    int total = 0, reqLen = 0, nextReqLen = 0;
+    char *reqEnd = nullptr;
+    char *reqStart = nullptr;
+    std::size_t total = 0;
+    std::size_t reqLen = 0;
+    std::size_t nextReqLen = 0;
     std::size_t recvRes = 0;
     bool isTooBig = false;
 
@@ -183,7 +184,7 @@ void StratumServer::HandleSocket(int conn_fd)
 
             {
                 std::scoped_lock cli_lock(clients_mutex);
-                // TODO: clean up clients
+                // TODO: fix
                 //  clients.erase(
                 //      std::find(clients.begin(), clients.end(), cli_ptr));
             }
@@ -193,7 +194,6 @@ void StratumServer::HandleSocket(int conn_fd)
                         errno);
             break;
         }
-        // std::cout << "buff: " << buffer << std::endl;
 
         // if (std::strchr(buffer, '\n') == NULL)
         // {
@@ -210,14 +210,14 @@ void StratumServer::HandleSocket(int conn_fd)
 
         // there can be multiple messages in 1 recv
         // {1}]\n{2}
-        while (reqEnd != NULL)
+        while (reqEnd != nullptr)
         {
             reqStart = strchr(buffer, '{');
             reqLen = reqEnd - reqStart + 1;
             HandleReq(cli_ptr, reqStart, reqLen);
 
             char *newReqEnd = strchr(reqEnd + 1, '}');
-            if (newReqEnd == NULL)
+            if (newReqEnd == nullptr)
                 break;
             else
                 reqEnd = newReqEnd;
@@ -228,13 +228,11 @@ void StratumServer::HandleSocket(int conn_fd)
         buffer[nextReqLen] = '\0';
 
         total = nextReqLen;
-        // std::cout << "total: " << total << std::endl;
     }
 }
 
-void StratumServer::HandleReq(StratumClient *cli, char *buffer, int reqSize)
+void StratumServer::HandleReq(StratumClient *cli, char *buffer, std::size_t reqSize)
 {
-    // std::cout << buffer << std::endl;
     int id = 0;
     std::string_view method;
     simdjson::ondemand::array params;
@@ -712,12 +710,6 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
         stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
                                shareRes.Diff);
     }
-    // bool dbRes =
-    //     redis_manager.AddShare(cli->GetWorkerName(), time, shareRes.Diff);
-    // TODO: there may be bug if handle notify runs before add share, total
-    // effort wont include block share HandleBlockNotify(*new
-    // ondemand::array());
-
     auto duration = DIFF_US(end, start);
 
     // Logger::Log(LogType::Debug, LogField::Stratum,
@@ -791,9 +783,9 @@ void StratumServer::AdjustDifficulty(StratumClient *cli, int64_t curTime)
     cli->ResetShareCount();
 }
 
-void StratumServer::BroadcastJob(const StratumClient *cli, const Job *job)
+void StratumServer::BroadcastJob(const StratumClient *cli, const Job *job) const
 {
-    auto res =
+    // auto res =
         SendRaw(cli->GetSock(), job->GetNotifyBuff(), job->GetNotifyBuffSize());
 }
 
