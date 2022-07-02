@@ -9,7 +9,7 @@
 class DaemonManager
 {
    public:
-    DaemonManager(const std::vector<RpcConfig> rpc_configs)
+    DaemonManager(const std::vector<RpcConfig>& rpc_configs)
     {
         for (const auto& config : rpc_configs)
         {

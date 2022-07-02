@@ -14,10 +14,10 @@ StatsManager::StatsManager(redisContext* rc, std::mutex* rc_mutex,
     redisCommand(rc,
                  "TS.CREATE"
                  " hashrate:pool:IL"
-                 " RETENTION %d"  // time to live
-                 " ENCODING COMPRESSED"                  // very data efficient
-                 " LABELS coin " COIN_SYMBOL
-                 " type pool-hashrate server IL", hashrate_ttl * 1000);
+                 " RETENTION %d"         // time to live
+                 " ENCODING COMPRESSED"  // very data efficient
+                 " LABELS coin " COIN_SYMBOL " type pool-hashrate server IL",
+                 hashrate_ttl * 1000);
 }
 
 void StatsManager::Start()
@@ -147,8 +147,9 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
             miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
             miner_stats.interval_stale_shares += ws.interval_stale_shares;
 
-            command_count += AppendStatsUpdate(worker, std::string_view("worker"), update_time_ms,
-                                               interval_hashrate, ws);
+            command_count +=
+                AppendStatsUpdate(worker, std::string_view("worker"),
+                                  update_time_ms, interval_hashrate, ws);
 
             ws.ResetInterval();
         }
@@ -177,8 +178,8 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
             miner_ws.average_hashrate_sum += interval_hashrate;
 
             command_count +=
-                AppendStatsUpdate(miner_addr, std::string_view("miner"), update_time_ms,
-                                  interval_hashrate, miner_ws);
+                AppendStatsUpdate(miner_addr, std::string_view("miner"),
+                                  update_time_ms, interval_hashrate, miner_ws);
 
             // sorted miner hashrate set (index)
             redisAppendCommand(rc, "ZADD solver-index:hashrate %f %b",
@@ -399,11 +400,11 @@ void StatsManager::AddShare(std::string_view worker_full,
     WorkerStats* worker_stats = &worker_stats_map[worker_full];
     MinerStats* miner_stats = &miner_stats_map[miner_addr];
 
-    if (diff == STALE_SHARE_DIFF)
+    if (diff == static_cast<double>(BadDiff::STALE_SHARE_DIFF))
     {
         worker_stats->interval_stale_shares++;
     }
-    else if (diff == INVALID_SHARE_DIFF)
+    else if (diff == static_cast<double>(BadDiff::INVALID_SHARE_DIFF))
     {
         worker_stats->interval_invalid_shares++;
     }
@@ -447,12 +448,13 @@ bool StatsManager::AddWorker(std::string_view address,
         command_count++;
 
         redisAppendCommand(rc,
-                       "TS.CREATE"
-                       " worker-count:%b"
-                       " RETENTION %d"
-                       " ENCODING COMPRESSED"
-                       " LABELS coin " COIN_SYMBOL " type worker-count",
-                       address.data(), address.size(), hashrate_ttl_seconds * 1000);
+                           "TS.CREATE"
+                           " worker-count:%b"
+                           " RETENTION %d"
+                           " ENCODING COMPRESSED"
+                           " LABELS coin " COIN_SYMBOL " type worker-count",
+                           address.data(), address.size(),
+                           hashrate_ttl_seconds * 1000);
         command_count++;
 
         redisAppendCommand(rc, "ZADD solver-index:join-time %f %b",
@@ -525,12 +527,13 @@ int StatsManager::AppendCreateStatsTs(std::string_view addrOrWorker,
             rc,
             "TS.CREATE"
             " %b:%b:%b"
-            " RETENTION %d"  // time to live
-            " ENCODING COMPRESSED"                  // very data efficient
+            " RETENTION %d"         // time to live
+            " ENCODING COMPRESSED"  // very data efficient
             " LABELS coin " COIN_SYMBOL " type %b-%b address %b server IL",
             i.data(), i.size(), prefix.data(), prefix.size(),
-            addrOrWorker.data(), addrOrWorker.size(), hashrate_ttl_seconds * 1000, prefix.data(),
-            prefix.size(), i.data(), i.size(), address.data(), address.size());
+            addrOrWorker.data(), addrOrWorker.size(),
+            hashrate_ttl_seconds * 1000, prefix.data(), prefix.size(), i.data(),
+            i.size(), address.data(), address.size());
         command_count++;
     }
 

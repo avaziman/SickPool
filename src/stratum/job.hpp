@@ -32,7 +32,7 @@
 class Job
 {
    public:
-    Job(uint32_t jobId, const BlockTemplate& bTemplate)
+    Job(const std::string& jobId, const BlockTemplate& bTemplate)
         : jobId(jobId),
           blockReward(bTemplate.coinbaseValue),
           minTime(bTemplate.minTime),
@@ -40,8 +40,6 @@ class Job
     //   target()
     {
         // target.SetHex(std::string(bTemplate.target));
-
-        ToHex(jobIdStr, jobId);
 
         txCount = bTemplate.txList.transactions.size();
         txAmountByteValue = txCount;
@@ -52,13 +50,12 @@ class Job
         Hexlify(txsHex.data(), (unsigned char*)&txAmountByteValue,
                 txAmountByteLength);
 
-        int written = txAmountByteLength * 2;
-        for (int i = 0; i < bTemplate.txList.transactions.size(); i++)
+        std::size_t written = txAmountByteLength * 2;
+        for (const auto& txData : bTemplate.txList.transactions)
         {
-            memcpy(txsHex.data() + written,
-                   bTemplate.txList.transactions[i].dataHex.data(),
-                   bTemplate.txList.transactions[i].dataHex.size());
-            written += bTemplate.txList.transactions[i].dataHex.size();
+            memcpy(txsHex.data() + written, txData.dataHex.data(),
+                   txData.dataHex.size());
+            written += txData.dataHex.size();
         }
 
         // Logger::Log(LogType::Debug, LogField::JobManager, "tx hex: %.*s",
@@ -67,7 +64,7 @@ class Job
 
     uint8_t* GetStaticHeaderData() { return this->staticHeaderData; }
 
-    void GetBlockHex(const uint8_t* header, char* res) const
+    inline void GetBlockHex(const uint8_t* header, char* res) const
     {
         Hexlify(res, header, BLOCK_HEADER_SIZE);
         memcpy(res + (BLOCK_HEADER_SIZE * 2), txsHex.data(), txsHex.size());
@@ -86,16 +83,16 @@ class Job
     {
         return (BLOCK_HEADER_SIZE * 2) + (int)txsHex.size();
     }
-    std::string_view GetId() const { return std::string_view(jobIdStr, sizeof(jobIdStr)); }
+    std::string_view GetId() const { return std::string_view(jobId); }
     int64_t GetMinTime() const { return minTime; }
-    char* GetNotifyBuff() { return notifyBuff; }
+    const char* GetNotifyBuff() const { return notifyBuff; }
     std::size_t GetNotifyBuffSize() const { return notifyBuffSize; }
     double GetTargetDiff() const { return targetDiff; }
     double GetEstimatedShares() const { return expectedShares; }
     // arith_uint256* GetTarget() { return &target; }
 
    protected:
-    const uint32_t jobId;
+    const std::string jobId;
     uint8_t staticHeaderData[BLOCK_HEADER_STATIC_SIZE];
     char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
     std::size_t notifyBuffSize;
@@ -107,12 +104,10 @@ class Job
     // arith_uint256 target;
     std::vector<char> txsHex;
     uint64_t txAmountByteValue;
-    int txAmountByteLength;
-    int txCount;
+    std::size_t txAmountByteLength;
+    std::size_t txCount;
 
     const int64_t minTime;
     const uint32_t height;
-
-    char jobIdStr[8];
 };
 #endif

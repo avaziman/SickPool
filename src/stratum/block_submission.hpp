@@ -1,38 +1,29 @@
 #ifndef BLOCK_SUBMISSION_HPP
 #define BLOCK_SUBMISSION_HPP
 
-#include <string>
 #include <cinttypes>
 #include <cstring>
-#include "verus_job.hpp"
-#include "./crypto/utils.hpp"
+#include <string>
 
-struct ImmatureSubmission
-{
-   public:
-    ImmatureSubmission(int64_t time, const std::string& hash, const std::string& subId)
-        : timeMs(time), hashHex(hash), submission_id(subId)
-    {
-    }
-     int64_t timeMs;
-     std::string hashHex;
-     std::string submission_id;
-};
+#include "./crypto/utils.hpp"
+#include "round.hpp"
+#include "share.hpp"
+#include "verus_job.hpp"
 
 struct BlockSubmission
 {
    public:
-    BlockSubmission(std::string_view chainsv, const job_t* job,
-                    const ShareResult& shareRes, std::string_view workerFull,
-                    int64_t time, const Round& chainEffort, int32_t number)
+    BlockSubmission(const std::string_view chainsv,
+                    const std::string_view workerFull, const job_t* job,
+                    const ShareResult& shareRes, const Round& chainRound,
+                    const int64_t time, const int32_t number)
         : blockReward(job->GetBlockReward()),
           timeMs(time),
-          durationMs(time - chainEffort.round_start_ms),
+          durationMs(time - chainRound.round_start_ms),
           height(job->GetHeight()),
           number(number),
           difficulty(shareRes.Diff),
-          effortPercent(chainEffort.pow / job->GetEstimatedShares() * 100.f),
-          confirmations(0)
+          effortPercent(chainRound.pow / job->GetEstimatedShares() * 100.f)
     {
         memset(miner, 0, sizeof(miner));
         memset(worker, 0, sizeof(worker));
@@ -50,10 +41,10 @@ struct BlockSubmission
         ReverseHex((char*)hashHex, (char*)hashHex, HASH_SIZE_HEX);
     }
 
-    const int32_t confirmations = 0;     // up to 100, changed in database
-    int64_t blockReward;       // changed if rejected
-    const int64_t timeMs;      // ms percision
-    const int64_t durationMs;  // ms percision
+    const int32_t confirmations = 0;  // up to 100, changed in database
+    const int64_t blockReward;             
+    const int64_t timeMs;             // ms percision
+    const int64_t durationMs;         // ms percision
     const uint32_t height;
     const uint32_t number;
     const double difficulty;
@@ -62,8 +53,8 @@ struct BlockSubmission
     unsigned char miner[ADDRESS_LEN];
     unsigned char worker[MAX_WORKER_NAME_LEN];  // separated
     unsigned char hashHex[HASH_SIZE_HEX];
-};  //__attribute__((packed));
-// don't pack for speed
+};
+// don't pack
 
 /* block submission attributes are
     sortable:

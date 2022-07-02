@@ -10,6 +10,9 @@
  */
 #define MAX_FUTURE_BLOCK_TIME 60  // minute in to the future
 
+#define TXVERSION_GROUP 0x892f2085
+#define TXVERSION 0x04
+
 #define POW_ALGO "verushash"
 // target: 0x0f0f0f0000000000000000000000000000000000000000000000000000000000
 #define DIFF1_BITS 0x200f0f0f

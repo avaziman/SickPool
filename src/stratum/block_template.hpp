@@ -15,13 +15,13 @@ struct TransactionData
 };
 
 struct TransactionDataList{
-    std::vector<TransactionData> transactions;
-    unsigned int byteCount;
+    std::vector<TransactionData> transactions{1};
+    std::size_t byteCount = 0;
 
-    TransactionDataList() : byteCount(0), transactions(1) {}
+    TransactionDataList() = default;
 
-    void AddCoinbaseTxData(TransactionData& td) { 
-        int txSize = td.data.size();
+    void AddCoinbaseTxData(const TransactionData& td) { 
+        std::size_t txSize = td.data.size();
         byteCount += txSize;
 
         // if there is no space for coinbase transaction, remove other txs
@@ -33,9 +33,9 @@ struct TransactionDataList{
         transactions[0] = td;
     }
 
-    bool AddTxData(TransactionData& td)
+    bool AddTxData(const TransactionData& td)
     {
-        int txSize = td.data.size();
+        std::size_t txSize = td.data.size();
 
         // 2 bytes for tx count (max 65k)
         if (byteCount + txSize + BLOCK_HEADER_SIZE + 2 > MAX_BLOCK_SIZE) return false;

@@ -4,15 +4,9 @@
 #include <sys/socket.h>
 
 #include <any>
-#include <algorithm>
-#include <cerrno>
 #include <chrono>
-#include <cstring>
-#include <ctime>
 #include <deque>
-#include <iostream>
 #include <mutex>
-#include <queue>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -20,19 +14,13 @@
 #include "coin_config.hpp"
 #include "static_config/config.hpp"
 #include "../crypto/hash_wrapper.hpp"
-#include "../crypto/merkle_tree.hpp"
-#include "../crypto/transaction.hpp"
-#include "../crypto/verus_header.hpp"
-#include "../crypto/verus_transaction.hpp"
-#include "../daemon/daemon_rpc.hpp"
 #include "../logger.hpp"
 #include "../sock_addr.hpp"
 #include "../stats_manager.hpp"
-#include "byteswap.h"
 #include "job_manager.hpp"
-#include "control_server.hpp"
 #include "redis_manager.hpp"
-#include "round.hpp"
+#include "submission_manager.hpp"
+#include "control_server.hpp"
 #include "share.hpp"
 #include "share_processor.hpp"
 #include "stratum_client.hpp"
@@ -43,49 +31,38 @@
 #define MAX_HTTP_JSON_DEPTH 3
 
 #define REQ_BUFF_SIZE (1024 * 32)
-#define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - SIMDJSON_PADDING)
+#define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - simdjson::SIMDJSON_PADDING)
 #define SOCK_TIMEOUT 5
 #define MIN_PERIOD_SECONDS 20
 
-using namespace simdjson;
-using namespace std::chrono;
 
 class StratumServer
 {
    public:
-    StratumServer(CoinConfig conf);
+    StratumServer(const CoinConfig& conf);
     ~StratumServer();
     void StartListening();
-    CoinConfig coin_config;
 
    private:
+    CoinConfig coin_config;
+
     int sockfd;
     struct sockaddr_in addr;
-    std::string_view last_job_id_hex;
 
-    ondemand::parser reqParser;
-    ondemand::parser httpParser;
+    simdjson::ondemand::parser reqParser;
+    simdjson::ondemand::parser httpParser;
 
     ControlServer control_server;
     RedisManager redis_manager;
     StatsManager stats_manager;
     DaemonManager daemon_manager;
     JobManager job_manager;
+    SubmissionManager submission_manager;
     // DifficultyManager* diff_manager;
 
     std::vector<std::unique_ptr<StratumClient>> clients;
 
-    std::deque<BlockSubmission> block_submissions;
-    // hash + block id
-    std::vector<ImmatureSubmission> immature_block_submissions;
-
-    // job id hex str -> job, O(1) job lookup
-    std::unordered_map<std::string_view, job_t*> jobs;
-    // chain name str -> chain round
-
     uint32_t block_number = 0;
-    int64_t mature_timestamp_ms = 0;
-    int64_t last_block_timestamp_map = 0;  // TODO: make map
 
     std::mutex jobs_mutex;
     std::mutex clients_mutex;
@@ -97,22 +74,22 @@ class StratumServer
     void Listen();
     void HandleSocket(int sockfd);
     void HandleReq(StratumClient* cli, char buffer[], int reqSize);
-    void HandleBlockNotify(const ondemand::array& params);
-    void HandleWalletNotify(ondemand::array& params);
+    void HandleBlockNotify(const simdjson::ondemand::array& params);
+    void HandleWalletNotify(simdjson::ondemand::array& params);
 
-    void HandleSubscribe(StratumClient* cli, int id, ondemand::array& params);
-    void HandleAuthorize(StratumClient* cli, int id, ondemand::array& params);
-    void HandleSubmit(StratumClient* cli, int id, ondemand::array& params);
+    void HandleSubscribe(StratumClient* cli, int id, simdjson::ondemand::array& params);
+    void HandleAuthorize(StratumClient* cli, int id, simdjson::ondemand::array& params);
+    void HandleSubmit(StratumClient* cli, int id, simdjson::ondemand::array& params);
 
     void HandleShare(StratumClient* cli, int id, Share& share);
-    void SendReject(StratumClient* cli, int id, int error, const char* msg);
-    void SendAccept(StratumClient* cli, int id);
+    void SendReject(const StratumClient* cli, int id, int error, const char* msg);
+    void SendAccept(const StratumClient* cli, int id);
     bool SubmitBlock(std::string_view block_hex);
 
     void UpdateDifficulty(StratumClient* cli);
     void AdjustDifficulty(StratumClient* cli, int64_t curTime);
 
-    void BroadcastJob(const StratumClient* cli, Job* job);
+    void BroadcastJob(const StratumClient* cli, const Job* job);
 
     inline std::size_t SendRaw(int sock, const char* data, std::size_t len) const;
 };

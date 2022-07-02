@@ -21,7 +21,7 @@ class SockAddr
             sockAddrStr.substr(sockAddrStr.find(':') + 1, sockAddrStr.size());
 
         ip = inet_addr(ip_str.c_str());
-        port = htons(std::stoul(port_str));
+        port = htons(static_cast<uint16_t>(std::stoul(port_str)));
     }
     unsigned short port;
     in_addr_t ip;

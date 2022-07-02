@@ -78,11 +78,7 @@ class DaemonRpc
                     std::string str = std::to_string(std::any_cast<int>(param));
                     params_json.append(str);
                 }
-                else
-                {
-                    // static_assert(false, "Invalid rpc parameter, may only be
-                    // string_view or int");
-                }
+                // assert type is one of these when .type is constexpr
 
                 if (i != params_vec.size() - 1)
                 {

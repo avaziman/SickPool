@@ -123,14 +123,9 @@ class RedisManager
         return true;
     }
 
-    bool AddBlockSubmission(BlockSubmission &submission, bool accepted, const char* block_id)
+    bool AddBlockSubmission(const BlockSubmission &submission, const char* block_id)
     {
         int command_count = 0;
-
-        if (!accepted)
-        {
-            submission.blockReward = 0;
-        }
 
         redisAppendCommand(rc, "MULTI");
         command_count++;
@@ -372,7 +367,7 @@ class RedisManager
         return roundStart;
     }
 
-    uint32_t GetBlockCount()
+    uint32_t GetBlockNumber()
     {
         // fix
         auto *reply =
@@ -482,8 +477,8 @@ class RedisManager
             }
         }
     }
-    redisContext *rc;
 
+    redisContext *rc;
    private:
     // redisContext *rc;
     std::string coin_symbol;

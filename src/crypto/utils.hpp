@@ -16,7 +16,7 @@
 #include "verushash/endian.h"
 #include "verushash/uint256.h"
 
-#define DIFF_US(end, start) duration_cast<microseconds>(end - start).count()
+#define DIFF_US(end, start) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 #define TIME_NOW() std::chrono::steady_clock::now()
 
 inline int64_t GetCurrentTimeMs()
@@ -230,22 +230,23 @@ inline char VarInt(uint64_t& len)
 {
     if (len < 0xfd)
         return 1;
-    else if (len <= 0xffffffff)
+    else if (len <= 0xFFFF)
     {
         len = (0xfd << 16) | len;
         return 3;
     }
-    else if (len <= 0xffffffff)
+    else if (len <= 0xFFFFFFFF)
     {
         len = ((uint64_t)0xfe << 32) | len;
         return 5;
     }
 
+    //problem 
     // len = ((uint64_t)0xff << 64) | len;
     return 9;
 }
 
-inline char GetByteAmount(uint32_t num)
+inline uint8_t GetByteAmount(uint32_t num)
 {
     if (num <= 0xff)
         return 1;
@@ -253,27 +254,8 @@ inline char GetByteAmount(uint32_t num)
         return 2;
     else if (num <= 0xffffff)
         return 3;
-    else if (num <= 0xffffffff)
-        return 4;
+    return 4;
 }
-
-// inline std::string VarInt(uint64_t len)
-// {
-//     std::stringstream ss;
-//     if (len < 0xfd)
-//         ss << std::hex << std::setfill('0') << std::setw(2) << len;
-//     else if (len <= 0xffffffff)
-//         ss << "fd" << std::hex << std::setfill('0') << std::setw(4)
-//            << htobe16(len);
-//     else if (len <= 0xffffffff)
-//         ss << "fe" << std::hex << std::setfill('0') << std::setw(8)
-//            << htobe32(len);
-//     else
-//         ss << "ff" << std::hex << std::setfill('0') << std::setw(16)
-//            << htobe64(len);
-
-//     return ss.str();
-// }
 
 inline int intPow(int x, unsigned int p)
 {

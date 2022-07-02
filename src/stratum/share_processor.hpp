@@ -8,15 +8,13 @@
 #include "stratum_client.hpp"
 #include "verus_job.hpp"
 
-using namespace std::chrono;
-
 class ShareProcessor
 {
    public:
     static void Process(int64_t curTime, StratumClient& cli, const job_t& job,
                                const Share& share, ShareResult& result)
     {
-        unsigned char* headerData = cli.GetBlockheaderBuff();
+        uint8_t* headerData = cli.GetBlockheaderBuff();
 
         if(!cli.GetIsAuthorized()){
             result.Code = ShareCode::UNAUTHORIZED_WORKER;
@@ -60,13 +58,13 @@ class ShareProcessor
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
-        uint32_t shareEnd = (uint32_t)hash.GetCheapHash();
-        // std::cout << std::hex << shareEnd << std::endl;
+        auto shareEnd = static_cast<uint32_t>(hash.GetCheapHash());
+
         if (!cli.SetLastShare(shareEnd, curTime))
         {
             result.Code = ShareCode::DUPLICATE_SHARE;
             result.Message = "Duplicate share";
-            result.Diff = INVALID_SHARE_DIFF;
+            result.Diff = static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
             return;
         }
         

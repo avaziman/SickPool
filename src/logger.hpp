@@ -34,6 +34,7 @@ enum class LogField
     Redis = 4,
     StatsManager = 5,
     ControlServer = 6,
+    SubmissionManager = 7,
 };
 
 inline const char* ToString(LogField v)
@@ -54,6 +55,8 @@ inline const char* ToString(LogField v)
             return "STATS";
         case LogField::ControlServer:
             return "CONTROL";
+        case LogField::SubmissionManager:
+            return "SUBMISSION";
         default:
             return "Unknown";
     }

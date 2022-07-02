@@ -11,16 +11,17 @@
 #include <thread>
 #include <unordered_map>
 
-#include "static_config/config.hpp"
+#include "block_submission.hpp"
 #include "logger.hpp"
 #include "round.hpp"
 #include "share.hpp"
-#include "block_submission.hpp"
+#include "static_config/config.hpp"
 
-#define STALE_SHARE_DIFF -1
-#define INVALID_SHARE_DIFF -2
-
-// #define STATS_INTERVAL_SECONDS (60 * 5)
+enum class BadDiff
+{
+    STALE_SHARE_DIFF = -1,
+    INVALID_SHARE_DIFF = -2
+};
 
 struct WorkerStats
 {

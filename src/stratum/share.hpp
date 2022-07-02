@@ -3,7 +3,6 @@
 #include <string_view>
 #include <vector>
 
-#include "stats_manager.hpp"
 #include "job.hpp"
 #include "verus_job.hpp"
 struct Share
@@ -31,12 +30,11 @@ enum class ShareCode
 
 struct ShareResult
 {
-    ShareResult() : HashBytes(32) {}
     ShareCode Code;
     std::string Message;
     double Diff;
     // uint256 takes vector as param
-    std::vector<uint8_t> HashBytes;
+    std::vector<uint8_t> HashBytes = std::vector<uint8_t>(32);
 };
 
 #endif

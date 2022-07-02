@@ -10,9 +10,6 @@ struct RpcConfig{
 
 struct CoinConfig
 {
-    // std::string name;
-    // std::string symbol;
-    // std::string algo;
     std::string pool_addr;
     double pow_fee;
     double pos_fee;

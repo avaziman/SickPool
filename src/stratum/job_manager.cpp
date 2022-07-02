@@ -1,11 +1,12 @@
 #include "job_manager.hpp"
 
-job_t* JobManager::GetNewJob()
+std::string_view last_job_id_hex;
+
+const job_t* JobManager::GetNewJob()
 {
-    job_t* job = nullptr;
+    const job_t* job;
     std::string json;
-    int resCode =
-        daemon_manager->SendRpcReq<>(json, 1, "getblocktemplate");
+    int resCode = daemon_manager->SendRpcReq<>(json, 1, "getblocktemplate");
 
     if (resCode != 200)
     {
@@ -19,6 +20,7 @@ job_t* JobManager::GetNewJob()
     // parsing needs to be done in same function otherwise data will be garbage
     try
     {
+        using namespace simdjson;
         blockTemplate = BlockTemplate();
         ondemand::document doc =
             jsonParser.iterate(json.data(), json.size(), json.capacity());
@@ -26,7 +28,8 @@ job_t* JobManager::GetNewJob()
         ondemand::object res = doc["result"].get_object();
 
         // this must be in the order they appear in the result for simdjson
-        blockTemplate.version = res["version"].get_int64();
+        blockTemplate.version =
+            static_cast<uint32_t>(res["version"].get_int64());
         blockTemplate.prevBlockHash = res["previousblockhash"].get_string();
         blockTemplate.finalsRootHash = res["finalsaplingroothash"].get_string();
         blockTemplate.solution = res["solution"].get_string();
@@ -65,11 +68,11 @@ job_t* JobManager::GetNewJob()
         blockTemplate.target = res["target"].get_string();
         blockTemplate.minTime = res["mintime"].get_int64();
         blockTemplate.bits = res["bits"].get_string();
-        blockTemplate.height = res["height"].get_int64();
+        blockTemplate.height = static_cast<uint32_t>(res["height"].get_int64());
 
-        TransactionData coinbaseTx =
-            GetCoinbaseTxData(blockTemplate.coinbaseValue, blockTemplate.height,
-                              blockTemplate.minTime, blockTemplate.coinbase_hex);
+        TransactionData coinbaseTx = GetCoinbaseTxData(
+            blockTemplate.coinbaseValue, blockTemplate.height,
+            blockTemplate.minTime, blockTemplate.coinbase_hex);
 
         // we need to hexlify here otherwise hex will be garbage
         char coinbaseHex[coinbaseTx.data.size() * 2];
@@ -77,17 +80,23 @@ job_t* JobManager::GetNewJob()
         coinbaseTx.dataHex = std::string_view(coinbaseHex, sizeof(coinbaseHex));
         blockTemplate.txList.AddCoinbaseTxData(coinbaseTx);
 
-        job = new VerusJob(jobCount, blockTemplate);
+        std::string jobIdHex(8, '0');
+        ToHex(jobIdHex.data(), job_count);
+
+        auto [it, added] = jobs.try_emplace(std::string_view(jobIdHex),
+                                            jobIdHex, blockTemplate);
+        last_job_id_hex = jobIdHex;
+        job_count++;
+
+        // return (const job_t*)(&it->second);
     }
-    catch (const simdjson_error& err)
+    catch (const simdjson::simdjson_error& err)
     {
         Logger::Log(LogType::Critical, LogField::JobManager,
                     "Failed to parse block template: %s", err.what());
         return nullptr;
     }
-    jobCount++;
-
-    return job;
+    return nullptr;
 }
 
 // doesnt include dataHex
@@ -96,7 +105,8 @@ TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
                                               std::string_view rpc_coinbase)
 {
     TransactionData res;
-    VerusTransaction coinbaseTx = GetCoinbaseTx(value, height, locktime, rpc_coinbase);
+    VerusTransaction coinbaseTx =
+        GetCoinbaseTx(value, height, locktime, rpc_coinbase);
 
     res.data = coinbaseTx.GetBytes();
     HashWrapper::SHA256d(res.hash, res.data.data(), res.data.size());
@@ -111,8 +121,7 @@ VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
     unsigned char prevTxIn[32] = {0};  // null last input
     // unsigned int locktime = 0;         // null locktime (no locktime)
 
-    VerusTransaction coinbaseTx =
-        VerusTransaction(TXVERSION, locktime, true, TXVERSION_GROUP);
+    VerusTransaction coinbaseTx(TXVERSION, locktime, true, TXVERSION_GROUP);
     // add signature with height script and extra data
 
     std::vector<unsigned char> heightScript = GenNumScript(height);
@@ -129,7 +138,8 @@ VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
     coinbaseTx.AddP2PKHOutput(pool_addr, value);
 #if POOL_COIN == COIN_VRSCTEST
-    coinbaseTx.AddFeePoolOutput(rpc_coinbase);  // without this gives bad-blk-fees
+    coinbaseTx.AddFeePoolOutput(
+        rpc_coinbase);  // without this gives bad-blk-fees
 #endif
     return coinbaseTx;
 }

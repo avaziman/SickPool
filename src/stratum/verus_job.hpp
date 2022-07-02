@@ -29,7 +29,7 @@
 class VerusJob : public Job
 {
    public:
-    VerusJob(uint32_t jobId, const BlockTemplate& bTemplate, bool clean = true)
+    VerusJob(const std::string& jobId, const BlockTemplate& bTemplate, bool clean = true)
         : Job(jobId, bTemplate)
     {
         char merkleRootHex[MERKLE_ROOT_SIZE * 2];

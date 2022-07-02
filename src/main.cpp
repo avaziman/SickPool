@@ -19,7 +19,7 @@
 // #define CONFIG_PATH_VRSC \
 //     "C:\\projects\\pool\\pool-server\\config\\coins\\VRSC.json"
 
-void ParseCoinConfig(padded_string& json, CoinConfig& cnfg);
+void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg);
 
 int main(int argc, char** argv)
 {
@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     CoinConfig coinConfig;
     try
     {
-        padded_string json = padded_string::load(argv[1]);
+        simdjson::padded_string json = simdjson::padded_string::load(argv[1]);
         ParseCoinConfig(json, coinConfig);
 
         Logger::Log(LogType::Info, LogField::Config, "Coin config loaded:");
@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;  // should never finish!
 }
 
-void AssignJson(const char* name, std::string& obj, ondemand::document& doc)
+void AssignJson(const char* name, std::string& obj, simdjson::ondemand::document& doc)
 {
     try
     {
@@ -81,7 +81,7 @@ void AssignJson(const char* name, std::string& obj, ondemand::document& doc)
 }
 
 template <typename T>
-void AssignJson(const char* name, T& obj, ondemand::document& doc)
+void AssignJson(const char* name, T& obj, simdjson::ondemand::document& doc)
 {
     try
     {
@@ -94,14 +94,11 @@ void AssignJson(const char* name, T& obj, ondemand::document& doc)
     }
 }
 
-void ParseCoinConfig(padded_string& json, CoinConfig& cnfg)
+void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
 {
-    ondemand::parser confParser;
-    ondemand::document configDoc = confParser.iterate(json);
+    simdjson::ondemand::parser confParser;
+    simdjson::ondemand::document configDoc = confParser.iterate(json);
 
-    // AssignJson("name", cnfg->name, configDoc);
-    // AssignJson("symbol", cnfg->symbol, configDoc);
-    // AssignJson("algo", cnfg->algo, configDoc);
     AssignJson("stratum_port", cnfg.stratum_port, configDoc);
     AssignJson("hashrate_interval_seconds", cnfg.hashrate_interval_seconds, configDoc);
     AssignJson("effort_interval_seconds", cnfg.effort_interval_seconds, configDoc);
