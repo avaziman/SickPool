@@ -38,15 +38,15 @@ FetchContent_MakeAvailable(simdjson)
 include(FetchContent)
 
 # GoogleTest requires at least C++14
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG tags/v1.12.0
-    GIT_SHALLOW TRUE
-)
-FetchContent_MakeAvailable(googletest)
+# FetchContent_Declare(
+#     googletest
+#     GIT_REPOSITORY https://github.com/google/googletest.git
+#     GIT_TAG tags/v1.12.0
+#     GIT_SHALLOW TRUE
+# )
+# FetchContent_MakeAvailable(googletest)
 
-include(FetchContent)
+# include(FetchContent)
 
 FetchContent_Declare(
     fmt

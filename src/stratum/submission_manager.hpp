@@ -17,9 +17,10 @@ class SubmissionManager
     SubmissionManager(RedisManager* redis_manager,
                       DaemonManager* daemon_manager,
                       StatsManager* stats_manager)
-        : redis_manager(redis_manager),
-          daemon_manager(daemon_manager),
+        :
           block_number(redis_manager->GetBlockNumber()),
+         redis_manager(redis_manager),
+          daemon_manager(daemon_manager),
           stats_manager(stats_manager)
     {
         Logger::Log(LogType::Info, LogField::SubmissionManager,

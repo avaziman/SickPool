@@ -5,8 +5,8 @@ int StatsManager::effort_interval_seconds;
 int StatsManager::average_hashrate_interval_seconds;
 int StatsManager::hashrate_ttl_seconds;
 
-StatsManager::StatsManager(int hr_interval, int effort_interval,
-                           int avg_hr_interval, int hashrate_ttl)
+StatsManager::StatsManager(RedisManager* redis_manager, int hr_interval, int effort_interval,
+                           int avg_hr_interval, int hashrate_ttl) : redis_manager(redis_manager)
 {
     StatsManager::hashrate_interval_seconds = hr_interval;
     StatsManager::effort_interval_seconds = effort_interval;
@@ -80,7 +80,7 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
     Logger::Log(LogType::Info, LogField::StatsManager,
                 "Updating stats for %d miners, %d workers, is_interval: %d",
                 miner_stats_map.size(), worker_stats_map.size(), update_hr);
-
+    return false;
     for (auto& [worker, ws] : worker_stats_map)
     {
         if (update_hr)
@@ -205,14 +205,14 @@ bool StatsManager::AddWorker(std::string_view address,
                                  newWorker, newMiner))
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
-                    "Worker %.*s added to database.", worker_full.data(),
-                    worker_full.size());
+                    "Worker %.*s added to database.", worker_full.size(),
+                    worker_full.data());
     }
     else
     {
         Logger::Log(LogType::Critical, LogField::StatsManager,
                     "Failed to add worker %.*s to database.",
-                    worker_full.data(), worker_full.size());
+                    worker_full.size(), worker_full.data());
         return false;
     }
 
@@ -243,7 +243,7 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
 {
     // redis mutex already locked
     std::scoped_lock stats_lock(stats_map_mutex);
-
+    redis_manager->ClosePoWRound(chain, submission, fee, miner_stats_map, round_map);
     return true;
 }
 

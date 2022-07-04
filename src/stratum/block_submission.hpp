@@ -10,6 +10,7 @@
 #include "share.hpp"
 #include "verus_job.hpp"
 
+#pragma pack(push, 1)
 struct BlockSubmission
 {
    public:
@@ -54,6 +55,8 @@ struct BlockSubmission
     unsigned char worker[MAX_WORKER_NAME_LEN];  // separated
     unsigned char hashHex[HASH_SIZE_HEX];
 };
+#pragma pack(pop)
+
 // don't pack
 
 /* block submission attributes are

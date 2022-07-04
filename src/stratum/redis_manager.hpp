@@ -25,7 +25,7 @@
 class RedisManager
 {
    public:
-    RedisManager();
+    RedisManager(std::string ip, int port);
 
     bool UpdateBlockConfirmations(std::string_view block_id,
                                   int32_t confirmations);

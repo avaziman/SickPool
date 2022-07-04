@@ -2,8 +2,8 @@
 
 StratumServer::StratumServer(const CoinConfig &conf)
     : coin_config(conf),
-      redis_manager(),
-      stats_manager((int)coin_config.hashrate_interval_seconds,
+      redis_manager("127.0.0.1", 6379),
+      stats_manager(&redis_manager, (int)coin_config.hashrate_interval_seconds,
                     (int)coin_config.effort_interval_seconds,
                     (int)coin_config.average_hashrate_interval_seconds,
                     (int)coin_config.hashrate_ttl_seconds),
@@ -660,8 +660,9 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
         }
     }
 
-    auto worker_full_str =
-        std::string(std::string(valid_addr) + "." + std::string(worker));
+    std::string worker_full_str = fmt::format("{}.{}", valid_addr, worker);
+
+    cli->SetAddress(worker_full_str, valid_addr);
 
     // string-views to non-local string
     bool added_to_db = stats_manager.AddWorker(
@@ -673,7 +674,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                    "Failed to add worker to database!");
         return;
     }
-    cli->HandleAuthorized(worker_full_str, valid_addr);
+    cli->SetAuthorized();
 
     Logger::Log(LogType::Info, LogField::Stratum,
                 "Authorized worker: %.*s, address: %.*s, id: %.*s",

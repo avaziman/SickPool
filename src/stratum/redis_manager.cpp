@@ -1,9 +1,9 @@
 #include "redis_manager.hpp"
 
-RedisManager::RedisManager()
+RedisManager::RedisManager(std::string ip, int port)
 {
     using namespace std::string_view_literals;
-    rc = redisConnect("127.0.0.1", 6379);
+    rc = redisConnect(ip.c_str(), port);
 
     if (rc->err)
     {
@@ -56,7 +56,7 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
     // serialize the block submission to save space and net
     // bandwidth, as the indexes are added manually anyway no need for hash
     redisAppendCommand(rc, "SET block:%u %b", block_id, submission,
-                       sizeof(submission));
+                       sizeof(BlockSubmission));
     command_count++;
 
     /* sortable indexes */
@@ -78,19 +78,20 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
     redisAppendCommand(rc, "ZADD block-index:duration %f %u",
                        (double)submission->durationMs, block_id);
     command_count += 5;
-    /* non-sortable indexes */
-    redisAppendCommand(rc, "SADD block-index:chain:%b %u", submission->chain,
-                       sizeof(submission->chain), block_id);
+    // /* non-sortable indexes */
+    redisAppendCommand(rc, "SADD block-index:chain:%s %u", chain.c_str(),
+                       block_id);
+    command_count++;
 
     redisAppendCommand(rc, "SADD block-index:type:PoW %u", block_id);
+    command_count++;
 
     redisAppendCommand(rc, "SADD block-index:solver:%b %u", submission->miner,
                        sizeof(submission->miner), block_id);
-    command_count += 3;
+    command_count++;
 
     command_count += AppendTsAdd(chain + ":round_effort_percent",
                                  submission->timeMs, submission->effortPercent);
-    command_count++;
 
     redisAppendCommand(rc, "EXEC");
     command_count++;
@@ -305,6 +306,7 @@ bool RedisManager::IncrBlockCount()
     {
         Logger::Log(LogType::Error, LogField::Redis,
                     "Failed to increment block count: %s", rc->errstr);
+        freeReplyObject(reply);
         return false;
     }
 
@@ -576,8 +578,8 @@ bool RedisManager::AddWorker(std::string_view address,
 
 int RedisManager::AppendUpdateWorkerCount(std::string_view address, int amount)
 {
-    redisAppendCommand(rc, "ZINCRBY solver-index:worker-count %d %b",
-                       address.data(), address.size(), amount);
+    redisAppendCommand(rc, "ZINCRBY solver-index:worker-count %d %b", amount,
+                       address.data(), address.size());
 
     redisAppendCommand(rc, "TS.INCRBY worker-count:%b %d", address.data(),
                        address.size(), amount);
@@ -602,8 +604,8 @@ bool RedisManager::PopWorker(std::string_view address)
 }
 int RedisManager::hgeti(std::string_view key, std::string_view field)
 {
-    auto reply =
-        (redisReply *)redisCommand(rc, "HGET round_start " COIN_SYMBOL);
+    auto reply = (redisReply *)redisCommand(
+        rc, "HGET %b %b", key.data(), key.size(), field.data(), key.size());
     int val = 0;
     if (reply && reply->type == REDIS_REPLY_STRING)
     {
@@ -616,8 +618,8 @@ int RedisManager::hgeti(std::string_view key, std::string_view field)
 
 double RedisManager::hgetd(std::string_view key, std::string_view field)
 {
-    auto reply =
-        (redisReply *)redisCommand(rc, "HGET round_start " COIN_SYMBOL);
+    auto reply = (redisReply *)redisCommand(
+        rc, "HGET %b %b", key.data(), key.size(), field.data(), field.size());
     double val = 0;
     if (reply && reply->type == REDIS_REPLY_STRING)
     {
@@ -766,14 +768,14 @@ bool RedisManager::ClosePoWRound(
             rc,
             "LSET round_entries:pow:%b 0 {\"height\":%d,\"effort\":%f,"
             "\"share\":%f,\"reward\":%f}",
-            miner_addr.data(), miner_addr.length(), height,
+            miner_addr.data(), miner_addr.size(), height,
             miner_stats.round_effort[COIN_SYMBOL].pow, miner_share,
             miner_reward);
         command_count++;
 
         // reset for next round
         redisAppendCommand(rc, "LPUSH round_entries:pow:%b {\"effort\":0}",
-                           miner_addr.data(), miner_addr.length());
+                           miner_addr.data(), miner_addr.size());
         command_count++;
 
         redisAppendCommand(rc,
@@ -787,7 +789,7 @@ bool RedisManager::ClosePoWRound(
 
         redisAppendCommand(rc, "ZINCRBY solver-index:balance %f %b",
                            miner_reward, miner_addr.data(),
-                           miner_addr.length());
+                           miner_addr.size());
         command_count++;
 
         redisAppendCommand(rc, "HSET round_start " COIN_SYMBOL " %" PRIi64,
@@ -798,7 +800,7 @@ bool RedisManager::ClosePoWRound(
         Logger::Log(LogType::Debug, LogField::Redis,
                     "Round id: %u, miner: %.*s, effort: %f, share: %f, reward: "
                     "%f, total effort: %f",
-                    submission->number, miner_addr.length(), miner_addr.data(),
+                    submission->number, miner_addr.size(), miner_addr.data(),
                     miner_effort, miner_share, miner_reward, total_effort);
     }
 

@@ -24,7 +24,7 @@ class RedisManager;
 class StatsManager
 {
    public:
-    StatsManager(int hr_interval, int effort_interval, int avg_hr_interval,
+    StatsManager(RedisManager* redis_manager, int hr_interval, int effort_interval, int avg_hr_interval,
                  int hashrate_ttl);
 
     // Every hashrate_interval_seconds we need to write:

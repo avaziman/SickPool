@@ -56,15 +56,18 @@ class StratumClient
     }
 
     // called after auth
-    void HandleAuthorized(std::string_view worker, std::string_view addr)
+    void SetAddress(std::string_view worker, std::string_view addr)
     {
         // add the hasher on authorization
         // copy the worker name (it will be destroyed)
-        share_uset = std::unordered_set<uint32_t>();
         worker_full = std::string(worker);
         address = std::string(addr);
+    }
 
+    void SetAuthorized()
+    {
         is_authorized = true;
+        share_uset = std::unordered_set<uint32_t>();
 
 #if POW_ALGO == POW_ALGO_VERUSHASH
         this->verusHasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
