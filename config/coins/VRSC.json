@@ -1,27 +1,20 @@
 {
     "control_port": 1111,
-    "stratum_port": 4444,
+    "stratum_port": 4000,
     "pow_fee": 0.01,
     "pos_fee": 0.01,
-    "default_diff1": 30000,
     "default_diff": 111111,
     "target_shares_rate": 100.0,
     "pool_addr": "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC",
     "redis_host": "127.0.0.1:6379",
-    "hashrate_interval_seconds1": 300,
     "hashrate_interval_seconds": 10,
-    "effort_interval_seconds": 5,
-    "average_hashrate_interval_seconds1": 21600,
-    "average_hashrate_interval_seconds": 20,
+    "effort_interval_seconds": 10,
+    "average_hashrate_interval_seconds": 21600,
     "hashrate_ttl": 86400,
     "rpcs": [
         {
-            "hostf": "127.0.0.1:27486",
-            "authf": "dXNlcjIxNDQwMzMwMDpwYXNzZDg5YmQ3Zjk1NGRhYTMzZjdjNDc5NDllN2QwYTQ5MjBmN2IzNjU0YTU5MjM0ZDllZDhmODBlNGU1ODgzNzMxNjY0",
-            "host1": "127.0.0.1:27397",
-            "auth1": "dXNlcjIwMzc1NTYyODY6cGFzc2Q4ZmMzZmVhMDhhYjFmZDg0NDU2YjZlZWFjZDQ0ODc4Mjc3YWZiOTdhMDY1NGRjODhhZTNlMzBlMTY5ZDYyZGJjNw==",
-            "auth": "YWRtaW4xOnBhc3MxMjM=",
-            "host": "127.0.0.1:6004"
+            "auth": "dXNlcjIxMjcyNjIwOTpwYXNzYzU0MDhhNTQ0YWE4ODQzOWNiNzM0Yjk1YmE1NGZhZmU5YWFlNGYzMjFhYTVjNDljZWNmNDhmYTIzMDY4ZGY4YWZi",
+            "host": "127.0.0.1:27486"
         }
     ]
 }
