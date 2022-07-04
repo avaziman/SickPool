@@ -19,13 +19,12 @@
 
 #include "../sock_addr.hpp"
 
-#define HTTP_HEADER_SIZE (1024 * 4)
+#define HTTP_HEADER_SIZE (1024 * 16)
 
 class DaemonRpc
 {
    public:
-    DaemonRpc(const std::string& hostHeader,
-                         const std::string& authHeader)
+    DaemonRpc(const std::string& hostHeader, const std::string& authHeader)
         : host_header(hostHeader), auth_header(authHeader)
     {
         SockAddr sock_addr(hostHeader);
@@ -39,9 +38,13 @@ class DaemonRpc
     int SendRequest(std::string& result, int id, const char* method,
                     T... params) /*const*/
     {
-        size_t bodySize, sendSize, recvSize;
-        int errCode, resCode;
-        int sent, contentLength, contentReceived, headerLength;
+        // int errCode;
+        int resCode;
+        size_t bodySize;
+        size_t sendSize;
+        size_t sent;
+        size_t contentLength;
+        size_t contentReceived;
 
         // initialize the socket
         sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -115,12 +118,12 @@ class DaemonRpc
         char headerBuff[HTTP_HEADER_SIZE];
 
         int headerRecv = 0;
-        char* endOfHeader = 0;
+        char* endOfHeader = nullptr;
         // receive http header (and potentially part or the whole body)
         do
         {
             std::size_t recvRes = recv(sockfd, headerBuff + headerRecv,
-                                       HTTP_HEADER_SIZE - headerRecv - 1, 0);
+                                       HTTP_HEADER_SIZE - headerRecv, 0);
             if (recvRes <= 0)
             {
                 return errno;
@@ -133,12 +136,11 @@ class DaemonRpc
 
         endOfHeader += 4;
 
-        resCode = std::atoi(headerBuff + std::strlen("HTTP/1.1 "));
+        resCode = std::atoi(headerBuff + sizeof("HTTP/1.1 ") - 1);
 
         contentLength = std::atoi(std::strstr(headerBuff, "Content-Length: ") +
                                   sizeof("Content-Length: ") - 1);
-        contentReceived = std::strlen(endOfHeader);
-        // contentReceived = headerRecv - (endOfHeader - headerBuff);
+        contentReceived = headerRecv - (endOfHeader - headerBuff);
 
         // simd json parser requires some extra bytes
         result.reserve(contentLength + simdjson::SIMDJSON_PADDING);
@@ -152,7 +154,7 @@ class DaemonRpc
         // receive http body if it wasn't already
         while (contentReceived < contentLength)
         {
-            std::size_t recvRes = recv(sockfd, result.data() + contentReceived,
+            std::size_t recvRes = recv(sockfd, result.data() + contentReceived - 1,
                                        contentLength - contentReceived, 0);
             if (recvRes <= 0)
             {
@@ -160,8 +162,6 @@ class DaemonRpc
             }
             contentReceived += recvRes;
         }
-
-        // result[contentReceived - 1] = '\0';
 
         close(sockfd);
         return resCode;

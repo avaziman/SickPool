@@ -75,11 +75,10 @@ class Job
     // char* GetPrevBlockhash() { return hashPrevBlock; }
     // char* GetTime() { return nTime; }
     // char* GetBits() { return nBits; }
-    // TODO: make VERSION_SIZE
-    uint8_t* GetPrevBlockHash() { return staticHeaderData + 4; }
+    uint8_t* GetPrevBlockHash() { return staticHeaderData + VERSION_SIZE; }
     uint32_t GetHeight() const { return height; }
     int GetTransactionCount() const { return txCount; }
-    int GetBlockSize() const
+    std::size_t GetBlockSize() const
     {
         return (BLOCK_HEADER_SIZE * 2) + (int)txsHex.size();
     }

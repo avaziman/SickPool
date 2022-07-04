@@ -7,7 +7,8 @@ include_directories(../src)
 
 add_executable(${PROJECT_NAME}_tests 
         main.cpp
-        difficulty_test.cpp
+        database.cpp
+        # difficulty_test.cpp
         # job_construction_test.cpp
         # hash_wrapper_test.cpp
         # merkle_root_test.cpp

@@ -2,6 +2,8 @@
 #define SUBMISSION_MANAGER_HPP
 
 #include <simdjson/simdjson.h>
+
+#include <any>
 #include <memory>
 
 #include "block_submission.hpp"
@@ -13,10 +15,12 @@ class SubmissionManager
 {
    public:
     SubmissionManager(RedisManager* redis_manager,
-                      DaemonManager* daemon_manager, StatsManager* stats_manager)
+                      DaemonManager* daemon_manager,
+                      StatsManager* stats_manager)
         : redis_manager(redis_manager),
           daemon_manager(daemon_manager),
-          block_number(redis_manager->GetBlockNumber())
+          block_number(redis_manager->GetBlockNumber()),
+          stats_manager(stats_manager)
     {
         Logger::Log(LogType::Info, LogField::SubmissionManager,
                     "Submission manager started, block number: %u",
@@ -38,18 +42,24 @@ class SubmissionManager
         return added;
     }
 
-    bool AddImmatureBlock(std::unique_ptr<BlockSubmission> submission);
+    bool AddImmatureBlock(const std::string_view chainsv,
+                          const std::string_view workerFull, const job_t* job,
+                          const ShareResult& shareRes, const Round& chainRound,
+                          const int64_t time, double pow_fee);
 
-    void CheckImmatureSubmissions(const double pow_fee);
+    void CheckImmatureSubmissions();
 
    private:
-    bool SubmitBlock(std::string_view block_hex); // TODO: make const when we wrapped rpc func, same for trysubmit
+    bool SubmitBlock(
+        std::string_view block_hex);  // TODO: make const when we wrapped rpc
+                                      // func, same for trysubmit
     const int submis_retries = 10;
+    uint32_t block_number;
+
     RedisManager* redis_manager;
     DaemonManager* daemon_manager;
     StatsManager* stats_manager;
 
-    uint32_t block_number;
     simdjson::ondemand::parser httpParser;
 
     // pointer as it is not assignable for erase
@@ -58,4 +68,4 @@ class SubmissionManager
 
 #endif
 
-//TODO: wrap all rpc methods we use
+// TODO: wrap all rpc methods we use

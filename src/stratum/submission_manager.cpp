@@ -1,6 +1,6 @@
 #include "submission_manager.hpp"
 
-void SubmissionManager::CheckImmatureSubmissions(const double pow_fee)
+void SubmissionManager::CheckImmatureSubmissions()
 {
     using namespace simdjson;
     std::string resBody;
@@ -13,7 +13,7 @@ void SubmissionManager::CheckImmatureSubmissions(const double pow_fee)
         auto chain =
             std::string_view((char*)submission.chain, sizeof(submission.chain));
 
-        daemon_manager->SendRpcReq<std::any>(resBody, 1, "getblockheader",
+        auto res = daemon_manager->SendRpcReq<std::any>(resBody, 1, "getblockheader",
                                              std::any(hashHex));
 
         int32_t confirmations = -1;
@@ -28,21 +28,21 @@ void SubmissionManager::CheckImmatureSubmissions(const double pow_fee)
         {
             Logger::Log(
                 LogType::Info, LogField::Stratum,
-                "Failed to get confirmations for block %.*s, parse error: %s",
-                hashHex.size(), hashHex.data(), err.what());
+                "Failed to get confirmations for block %.*s, parse error: %s, http code: %d",
+                hashHex.size(), hashHex.data(), err.what(), res);
             continue;
         }
 
         redis_manager->UpdateBlockConfirmations(
             std::string_view(std::to_string(submission.number)), confirmations);
 
-        if (confirmations > 100)
+        if (confirmations > BLOCK_MATURITY)
         {
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block %.*s has matured!", hashHex.size(),
                         hashHex.data());
-
-            stats_manager->ClosePoWRound(chain, submission, pow_fee);
+            redis_manager->UpdateImmatureRewards(chain, submission.timeMs,
+                                                 true);
 
             immature_block_submissions.erase(
                 immature_block_submissions.begin() + i);
@@ -53,6 +53,9 @@ void SubmissionManager::CheckImmatureSubmissions(const double pow_fee)
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block %.*s has been orphaned! :(", hashHex.size(),
                         hashHex.data());
+
+            redis_manager->UpdateImmatureRewards(chain, submission.timeMs,
+                                                 false);
             immature_block_submissions.erase(
                 immature_block_submissions.begin() + i);
             i--;
@@ -64,14 +67,27 @@ void SubmissionManager::CheckImmatureSubmissions(const double pow_fee)
 }
 
 // TODO: LOCKS
-bool SubmissionManager::AddImmatureBlock(std::unique_ptr<BlockSubmission> submission)
+bool SubmissionManager::AddImmatureBlock(const std::string_view chainsv,
+                                         const std::string_view workerFull,
+                                         const job_t* job,
+                                         const ShareResult& shareRes,
+                                         const Round& chainRound,
+                                         const int64_t time, double pow_fee)
 {
-    block_number++;
+    auto submission = std::make_unique<BlockSubmission>(
+        chainsv, workerFull, job, shareRes, chainRound, time, block_number);
+
     redis_manager->IncrBlockCount();
+    block_number++;
 
-    std::string block_id_str = std::to_string(block_number);
+    redis_manager->AddBlockSubmission(submission.get());
+    Logger::Log(LogType::Info, LogField::SubmissionManager,
+                "Block submission no %u added.", submission->number);
 
-    redis_manager->AddBlockSubmission(*submission.get(), block_id_str.c_str());
+    stats_manager->ClosePoWRound(chainsv, submission.get(), pow_fee);
+
+    Logger::Log(LogType::Info, LogField::SubmissionManager,
+                "Closed round for block submission no %u (immature).", submission->number);
 
     immature_block_submissions.push_back(std::move(submission));
 
@@ -136,3 +152,5 @@ bool SubmissionManager::SubmitBlock(std::string_view block_hex)
 
     return true;
 }
+
+// think of what happens if they deposit at the same time as the block was found

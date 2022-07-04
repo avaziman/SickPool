@@ -11,7 +11,6 @@ StratumClient::StratumClient(const int sock, const int64_t time, const double di
       last_diff(diff)
 {
     extra_nonce = extra_nonce_counter++;
-    
     char buff[8];
     ToHex(buff, extra_nonce);
     extra_nonce_str = std::string(buff, sizeof(buff));

@@ -3,6 +3,7 @@
 
 #include <hiredis/hiredis.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cinttypes>
 #include <mutex>
@@ -11,48 +12,20 @@
 #include <thread>
 #include <unordered_map>
 
+#include "stats.hpp"
+#include "logger.hpp"
 #include "stratum/block_submission.hpp"
 #include "stratum/round.hpp"
 #include "stratum/share.hpp"
 #include "stratum/static_config/config.hpp"
-#include "logger.hpp"
+#include "stratum/redis_manager.hpp"
 
-enum class BadDiff
-{
-    STALE_SHARE_DIFF = -1,
-    INVALID_SHARE_DIFF = -2
-};
-
-struct WorkerStats
-{
-    double average_hashrate_sum = 0.f;
-    double interval_effort = 0.f;
-    uint32_t interval_valid_shares = 0;
-    uint32_t interval_stale_shares = 0;
-    uint32_t interval_invalid_shares = 0;
-    uint32_t connection_count = 0;
-
-    inline void ResetInterval()
-    {
-        this->interval_effort = 0;
-        this->interval_valid_shares = 0;
-        this->interval_stale_shares = 0;
-        this->interval_invalid_shares = 0;
-    }
-};
-
-struct MinerStats : public WorkerStats
-{
-    std::unordered_map<std::string_view, Round> round_effort;
-    uint32_t worker_count = 0;
-};
-
-// beautiful!
+class RedisManager;
 class StatsManager
 {
    public:
-    StatsManager(redisContext* rc, std::mutex* rc_mutex, int hr_interval,
-                 int effort_interval, int avg_hr_interval, int hashrate_ttl);
+    StatsManager(int hr_interval, int effort_interval, int avg_hr_interval,
+                 int hashrate_ttl);
 
     // Every hashrate_interval_seconds we need to write:
     // ) worker hashrate
@@ -64,32 +37,26 @@ class StatsManager
     void AddShare(std::string_view worker_full, std::string_view miner_addr,
                   double diff);
     bool AddWorker(std::string_view address, std::string_view worker_full,
-                   std::time_t curtime);
+                   std::string_view idTag, std::time_t curtime);
     void PopWorker(std::string_view worker, std::string_view address);
 
     bool ClosePoWRound(std::string_view chain,
-                       const BlockSubmission& submission, double fee);
+                       const BlockSubmission* submission, double fee);
 
-    bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
+    // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
 
     bool UpdateStats(bool update_effort, bool update_hr,
                      int64_t update_time_ms);
 
-    int AppendStatsUpdate(std::string_view addr, std::string_view prefix,
-                          int64_t update_time_ms, double hr,
-                          const WorkerStats& ws);
-    int AppendCreateStatsTs(std::string_view addr, std::string_view prefix);
-
     Round GetChainRound(std::string_view chain);
 
+    static int hashrate_interval_seconds;
+    static int effort_interval_seconds;
+    static int average_hashrate_interval_seconds;
+    static int hashrate_ttl_seconds;
    private:
-    redisContext* rc;
-    std::mutex* rc_mutex;
 
-    const int hashrate_interval_seconds;
-    const int effort_interval_seconds;
-    const int average_hashrate_interval_seconds;
-    const int hashrate_ttl_seconds;
+    RedisManager* redis_manager;
 
     std::mutex stats_map_mutex;
     // worker -> stats

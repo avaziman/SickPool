@@ -23,7 +23,6 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg);
 
 int main(int argc, char** argv)
 {
-    std::cout << sizeof(BlockSubmission);
     Logger::Log(LogType::Info, LogField::Config, "Starting SickPool!");
 
     Logger::Log(LogType::Info, LogField::Config, "Static config:");

@@ -1,8 +1,8 @@
 #include "job_manager.hpp"
 
-
 const job_t* JobManager::GetNewJob()
 {
+    using namespace simdjson;
     std::string json;
     int resCode = daemon_manager->SendRpcReq<>(json, 1, "getblocktemplate");
 
@@ -18,7 +18,6 @@ const job_t* JobManager::GetNewJob()
     // parsing needs to be done in same function otherwise data will be garbage
     try
     {
-        using namespace simdjson;
         blockTemplate = BlockTemplate();
         ondemand::document doc =
             jsonParser.iterate(json.data(), json.size(), json.capacity());
@@ -83,17 +82,16 @@ const job_t* JobManager::GetNewJob()
 
         job_t job(jobIdHex, blockTemplate);
 
-        auto [it, added] = jobs.try_emplace(job.GetId(), std::move(job));
         last_job_id_hex = jobIdHex;
         job_count++;
 
-        return (const job_t*)(&it->second);
+        return &jobs.emplace_back(std::move(job));
     }
     catch (const simdjson::simdjson_error& err)
     {
         Logger::Log(LogType::Critical, LogField::JobManager,
-                    "Failed to parse block template: %s, json: %s", err.what(), json.c_str());
-        return nullptr;
+                    "Failed to parse block template: %s, json: %s", err.what(),
+                    json.c_str());
     }
     return nullptr;
 }

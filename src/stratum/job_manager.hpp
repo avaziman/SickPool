@@ -2,6 +2,8 @@
 #define JOB_MANAGER_HPP
 #include <simdjson/simdjson.h>
 
+#include <algorithm>
+
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/verus_transaction.hpp"
 #include "../daemon/daemon_rpc.hpp"
@@ -22,8 +24,15 @@ class JobManager
     const job_t* GetNewJob();
     inline const job_t* GetJob(std::string_view hexId)
     {
-        decltype(jobs)::const_iterator it = jobs.find(hexId);
-        return it == jobs.end() ? nullptr : &it->second;
+        std::scoped_lock lock(jobs_mutex);
+        for (const auto& job : jobs)
+        {
+            if (job.GetId() == hexId)
+            {
+                return &job;
+            }
+        }
+        return nullptr;
     }
 
     inline const job_t* GetLastJob() { return GetJob(last_job_id_hex); }
@@ -33,8 +42,10 @@ class JobManager
 
     DaemonManager* daemon_manager;
 
-    // job id hex str -> job, O(1) job lookup
-    std::unordered_map<std::string_view, job_t> jobs;
+    std::mutex jobs_mutex;
+    // unordered map is not thread safe for modifying and accessing different
+    // elements, but a vector is, so we use other optimization (save last job)
+    std::vector<job_t> jobs;
     uint32_t job_count = 0;
 
     BlockTemplate blockTemplate;

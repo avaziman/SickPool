@@ -42,12 +42,11 @@ class ShareProcessor
                 ", given: " + std::to_string(shareTime) + ")";
             return;
         }
-        // TODO: verify solution
 
         job.GetHeaderData(headerData, share.time, cli.GetExtraNonce(),
                           share.nonce2, share.solution);
 
-#if POOL_COIN <= COIN_VRSC
+#if POW_ALGO == POW_ALGO_VERUSHASH
         // takes about 6-8 microseconds vs 8-12 on snomp
         HashWrapper::VerushashV2b2(result.HashBytes.data(), headerData,
                                    BLOCK_HEADER_SIZE, cli.GetHasher());
@@ -79,14 +78,15 @@ class ShareProcessor
         {
             result.Code = ShareCode::LOW_DIFFICULTY_SHARE;
             result.Message = "Low difficulty share";
-            Logger::Log(LogType::Debug, LogField::ShareProcessor,
-                        "Low difficulty share diff: %f, hash: %s", result.Diff,
-                        hash.GetHex().c_str());
             char blockHeaderHex[BLOCK_HEADER_SIZE * 2];
             Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
-            Logger::Log(LogType::Debug, LogField::ShareProcessor,
-                        "Block header: %.*s", BLOCK_HEADER_SIZE * 2,
-                        blockHeaderHex);
+
+            // Logger::Log(LogType::Debug, LogField::ShareProcessor,
+            //             "Low difficulty share diff: %f, hash: %s", result.Diff,
+            //             hash.GetHex().c_str());
+            // Logger::Log(LogType::Debug, LogField::ShareProcessor,
+            //             "Block header: %.*s", BLOCK_HEADER_SIZE * 2,
+                        // blockHeaderHex);
             return;
         }
 

@@ -269,7 +269,7 @@ inline int intPow(int x, unsigned int p)
         return x * tmp * tmp;
 }
 
-inline double difficulty(const unsigned bits)
+inline double BitsToDiff(const unsigned bits)
 {
     const unsigned exponent_diff = 8 * (0x20 - ((bits >> 24) & 0xFF));
     const double significand = bits & 0xFFFFFF;
@@ -279,7 +279,7 @@ inline double difficulty(const unsigned bits)
 inline double GetExpectedHashes(const double diff)
 {
     // return std::ldexp(diff / 0x0f0f0f, 24);
-    return diff * (17.00000101327902);  // 2^ 24 / 0x0f0f0f = 17...
+    return diff * 17.00000101327902;  // 2^ 24 / 0x0f0f0f = 17...
 }
 
 // ms
@@ -290,29 +290,29 @@ inline int64_t GetDailyTimestamp()
     return time * 1000;
 }
 
-static double BitsToDiff(int64_t nBits)
-{
-    // from chain params
+// static double BitsToDiff(int64_t nBits)
+// {
+//     // from chain params
 
-    int nShift = (nBits >> 24) & 0xff;
-    int nShiftAmount = (DIFF1_BITS >> 24) & 0xff;
+//     int nShift = (nBits >> 24) & 0xff;
+//     int nShiftAmount = (DIFF1_BITS >> 24) & 0xff;
 
-    double dDiff =
-        (double)(DIFF1_BITS & 0x00ffffff) / (double)(nBits & 0x00ffffff);
-    while (nShift < nShiftAmount)
-    {
-        dDiff *= 256.0;
-        nShift++;
-    }
+//     double dDiff =
+//         (double)(DIFF1_BITS & 0x00ffffff) / (double)(nBits & 0x00ffffff);
+//     while (nShift < nShiftAmount)
+//     {
+//         dDiff *= 256.0;
+//         nShift++;
+//     }
 
-    while (nShift > nShiftAmount)
-    {
-        nShift--;
-        dDiff /= 256.0;
-    }
+//     while (nShift > nShiftAmount)
+//     {
+//         nShift--;
+//         dDiff /= 256.0;
+//     }
 
-    return dDiff;
-}
+//     return dDiff;
+// }
 
 // https://bitcoin.stackexchange.com/questions/30467/what-are-the-equations-to-convert-between-bits-and-difficulty
 static uint32_t DiffToBits(double difficulty)

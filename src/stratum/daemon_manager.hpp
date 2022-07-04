@@ -3,7 +3,7 @@
 #include <mutex>
 #include <tuple>
 #include <type_traits>
-#include "daemon_rpc.hpp"
+#include "daemon/daemon_rpc.hpp"
 #include "coin_config.hpp"
 
 class DaemonManager

@@ -30,8 +30,6 @@
 #define MAX_HTTP_REQ_SIZE (MAX_BLOCK_SIZE * 2)
 #define MAX_HTTP_JSON_DEPTH 3
 
-#define REQ_BUFF_SIZE (1024 * 32)
-#define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - simdjson::SIMDJSON_PADDING)
 #define SOCK_TIMEOUT 5
 #define MIN_PERIOD_SECONDS 20
 
@@ -41,15 +39,15 @@ class StratumServer
     StratumServer(const CoinConfig& conf);
     ~StratumServer();
     void StartListening();
+    
 
    private:
     CoinConfig coin_config;
+    std::string_view chain{"VRSCTEST"};
 
     int sockfd;
     struct sockaddr_in addr;
 
-    simdjson::ondemand::parser reqParser =
-        simdjson::ondemand::parser(REQ_BUFF_SIZE);
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(MAX_HTTP_REQ_SIZE);
 
@@ -62,8 +60,6 @@ class StratumServer
     // DifficultyManager* diff_manager;
 
     std::vector<std::unique_ptr<StratumClient>> clients;
-
-    uint32_t block_number = 0;
 
     std::mutex jobs_mutex;
     std::mutex clients_mutex;
@@ -78,8 +74,8 @@ class StratumServer
     void HandleBlockNotify(const simdjson::ondemand::array& params);
     void HandleWalletNotify(simdjson::ondemand::array& params);
 
-    void HandleSubscribe(StratumClient* cli, int id,
-                         simdjson::ondemand::array& params);
+    void HandleSubscribe(const StratumClient* cli, int id,
+                         simdjson::ondemand::array& params) const;
     void HandleAuthorize(StratumClient* cli, int id,
                          simdjson::ondemand::array& params);
     void HandleSubmit(StratumClient* cli, int id,
@@ -97,6 +93,10 @@ class StratumServer
     void BroadcastJob(const StratumClient* cli, const Job* job) const;
 
     inline std::size_t SendRaw(int sock, const char* data,
-                               std::size_t len) const;
+                                       std::size_t len) const
+    {
+        // dont send sigpipe
+        return send(sock, data, len, MSG_NOSIGNAL);
+    }
 };
 #endif

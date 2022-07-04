@@ -1,5 +1,7 @@
 #ifndef STRATUM_CLIENT_HPP_
 #define STRATUM_CLIENT_HPP_
+#include <simdjson.h>
+
 #include <cstring>
 #include <memory>
 #include <set>
@@ -9,6 +11,8 @@
 #include "../crypto/utils.hpp"
 #include "../crypto/verushash/verus_hash.h"
 
+#define REQ_BUFF_SIZE (1024 * 32)
+#define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - simdjson::SIMDJSON_PADDING)
 class StratumClient
 {
    public:
@@ -16,7 +20,10 @@ class StratumClient
 
     int GetSock() const { return sockfd; }
     double GetDifficulty() const { return current_diff; }
-    std::string_view GetExtraNonce() const { return std::string_view(extra_nonce_str); }
+    std::string_view GetExtraNonce() const
+    {
+        return std::string_view(extra_nonce_str);
+    }
     uint32_t GetShareCount() const { return share_count; }
     bool GetIsAuthorized() const { return is_authorized; }
     std::string_view GetAddress() const { return std::string_view(address); }
@@ -26,7 +33,7 @@ class StratumClient
     {
         return std::string_view(worker_full);
     }
-    
+
     void ResetShareCount() { share_count = 0; }
 
     void SetDifficulty(double diff, int64_t curTime)
@@ -56,14 +63,17 @@ class StratumClient
         share_uset = std::unordered_set<uint32_t>();
         worker_full = std::string(worker);
         address = std::string(addr);
+
         is_authorized = true;
-        
-#if POOL_COIN <= COIN_VRSC
+
+#if POW_ALGO == POW_ALGO_VERUSHASH
         this->verusHasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 #endif
     }
 
-#if POOL_COIN <= COIN_VRSC
+    simdjson::ondemand::parser* GetParser() { return &parser; }
+
+#if POW_ALGO == POW_ALGO_VERUSHASH
     CVerusHashV2* GetHasher() { return &verusHasher; }
 #endif
    private:
@@ -83,6 +93,11 @@ class StratumClient
     std::string worker_full;
     std::string address;
 
+    // each parser can only process one request at a time,
+    // so we need a parser per client
+    simdjson::ondemand::parser parser =
+        simdjson::ondemand::parser(REQ_BUFF_SIZE);
+
     // needs to be thread-specific to allow simultanious processing
     uint8_t block_header[BLOCK_HEADER_SIZE];
 
@@ -92,7 +107,7 @@ class StratumClient
 
     // the hasher is thread-specific
     // so we need to store it in client so we only need to init once
-#if POOL_COIN <= COIN_VRSC
+#if POW_ALGO == POW_ALGO_VERUSHASH
     CVerusHashV2 verusHasher;
 #endif
 };

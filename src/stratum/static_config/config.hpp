@@ -1,7 +1,7 @@
 #define COIN_VRSC 1
 #define COIN_VRSCTEST 2
 
-#define POOL_COIN COIN_VRSC
+#define POOL_COIN COIN_VRSCTEST
 
 #if POOL_COIN == COIN_VRSC
 #define COIN_SYMBOL "VRSC"

@@ -1,12 +1,21 @@
 cmake_minimum_required(VERSION 3.16.0)
 
+# set(CMAKE_C_COMPILER /usr/bin/clang-14)
+# set(CMAKE_CXX_COMPILER /usr/bin/clang-14)
+
+set(CMAKE_C_COMPILER /usr/bin/gcc)
+set(CMAKE_CXX_COMPILER /usr/bin/g++)
+
 project("SickPool" CXX C)
+
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
 # set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_BUILD_TYPE "Debug")
+
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     #-g3 maximum debugging information
@@ -17,13 +26,43 @@ else()
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3 -Ofast")
 endif()
 
+include(FetchContent)
+
+FetchContent_Declare(
+    simdjson
+    GIT_REPOSITORY https://github.com/simdjson/simdjson.git
+    GIT_TAG tags/v2.1.0
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(simdjson)
+
+include(FetchContent)
+
+# GoogleTest requires at least C++14
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG tags/v1.12.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(googletest)
+
+include(FetchContent)
+
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG tags/8.1.1
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(fmt)
+
 # include_directories(lib/rapidjson/include)
-add_subdirectory(lib/simdjson)
+# add_subdirectory(lib/simdjson)
 # add_subdirectory(lib/googletest)
 # add_subdirectory(lib/benchmark)
+# add_subdirectory(fmt)
 
 add_subdirectory(src)
-add_subdirectory(stratum_notifier)
+# add_subdirectory(stratum_notifier)
 # add_subdirectory(benchmark)
 
 
