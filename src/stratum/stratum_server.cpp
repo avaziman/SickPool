@@ -546,7 +546,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     std::size_t split = 0;
     int resCode = 0;
     std::string valid_addr;
-    std::string_view idTag = "null";
+    std::string idTag = "null";
     std::string_view given_addr;
     std::string_view worker;
     bool isValid = false;
@@ -640,7 +640,8 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                                            resultBody.capacity());
 
                     res = doc["result"].get_object();
-                    idTag = res["name"];
+                    std::string_view id_sv = res["name"].get_string();
+                    idTag = std::string(id_sv);
                 }
                 catch (const simdjson_error &err)
                 {
@@ -655,7 +656,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
             else
             {
                 // we were given an id@
-                idTag = given_addr;
+                idTag = std::string(given_addr);
             }
         }
     }

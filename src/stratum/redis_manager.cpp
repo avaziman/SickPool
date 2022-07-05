@@ -630,8 +630,8 @@ double RedisManager::hgetd(std::string_view key, std::string_view field)
     return val;
 }
 bool RedisManager::LoadSolvers(
-    std::unordered_map<std::string_view, MinerStats> &miner_stats_map,
-    std::unordered_map<std::string_view, Round> &round_map)
+    std::unordered_map<std::string, MinerStats> &miner_stats_map,
+    std::unordered_map<std::string, Round> &round_map)
 {
     auto miners_reply =
         (redisReply *)redisCommand(rc, "ZRANGE solver-index:join-time 0 -1");
@@ -696,8 +696,8 @@ bool RedisManager::LoadSolvers(
     }
 
     for (int i = 0; i < miner_count; i++)
-    {
-        auto miner_addr = std::string_view(miners_reply->element[i]->str,
+    {   
+        auto miner_addr = std::string(miners_reply->element[i]->str,
                                            miners_reply->element[i]->len);
 
         const double miner_effort = std::strtod(
@@ -724,14 +724,14 @@ bool RedisManager::LoadSolvers(
     }
 
     freeReplyObject(reply);
-    // don't free the miners_reply as it will invalidate the string_views
+    freeReplyObject(miners_reply);
     return true;
 }
 
 bool RedisManager::ClosePoWRound(
     std::string_view chain, const BlockSubmission *submission, double fee,
-    std::unordered_map<std::string_view, MinerStats> &miner_stats_map,
-    std::unordered_map<std::string_view, Round> &round_map)
+    std::unordered_map<std::string, MinerStats> &miner_stats_map,
+    std::unordered_map<std::string, Round> &round_map)
 {
     double total_effort = round_map[COIN_SYMBOL].pow;
     double block_reward = (double)submission->blockReward / 1e8;

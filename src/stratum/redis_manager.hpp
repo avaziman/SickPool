@@ -63,12 +63,12 @@ class RedisManager
     double hgetd(std::string_view key, std::string_view field);
 
     bool LoadSolvers(
-        std::unordered_map<std::string_view, MinerStats> &miner_stats_map,
-        std::unordered_map<std::string_view, Round> &round_map);
+        std::unordered_map<std::string, MinerStats> &miner_stats_map,
+        std::unordered_map<std::string, Round> &round_map);
     bool ClosePoWRound(
         std::string_view chain, const BlockSubmission *submission, double fee,
-        std::unordered_map<std::string_view, MinerStats> &miner_stats_map,
-        std::unordered_map<std::string_view, Round> &round_map);
+        std::unordered_map<std::string, MinerStats> &miner_stats_map,
+        std::unordered_map<std::string, Round> &round_map);
 
    private:
     // redisContext *rc;

@@ -43,7 +43,7 @@ class StratumServer
 
    private:
     CoinConfig coin_config;
-    std::string_view chain{"VRSCTEST"};
+    std::string chain{"VRSCTEST"};
 
     int sockfd;
     struct sockaddr_in addr;

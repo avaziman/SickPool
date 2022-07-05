@@ -20,6 +20,15 @@
 #include "stratum/static_config/config.hpp"
 #include "stratum/redis_manager.hpp"
 
+struct string_hash
+{
+    using transparent_key_equal = std::equal_to<>;  // Pred to use
+    using hash_type = std::hash<std::string_view>;  // just a helper local type
+    size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
+    size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
+    size_t operator()(const char* txt) const { return hash_type{}(txt); }
+};
+
 class RedisManager;
 class StatsManager
 {
@@ -34,11 +43,11 @@ class StatsManager
     // ) staker points
     void Start();
     bool LoadCurrentRound();
-    void AddShare(std::string_view worker_full, std::string_view miner_addr,
-                  double diff);
-    bool AddWorker(std::string_view address, std::string_view worker_full,
-                   std::string_view idTag, std::time_t curtime);
-    void PopWorker(std::string_view worker, std::string_view address);
+    void AddShare(const std::string& worker_full, const std::string& miner_addr,
+                  const double diff);
+    bool AddWorker(const std::string& address, const std::string& worker_full,
+                   const std::string& idTag, std::time_t curtime);
+    void PopWorker(const std::string& worker, const std::string& address);
 
     bool ClosePoWRound(std::string_view chain,
                        const BlockSubmission* submission, double fee);
@@ -48,7 +57,7 @@ class StatsManager
     bool UpdateStats(bool update_effort, bool update_hr,
                      int64_t update_time_ms);
 
-    Round GetChainRound(std::string_view chain);
+    Round GetChainRound(const std::string& chain);
 
     static int hashrate_interval_seconds;
     static int effort_interval_seconds;
@@ -60,11 +69,11 @@ class StatsManager
 
     std::mutex stats_map_mutex;
     // worker -> stats
-    std::unordered_map<std::string_view, WorkerStats> worker_stats_map;
+    std::unordered_map<std::string, WorkerStats> worker_stats_map;
     // miner -> stats
-    std::unordered_map<std::string_view, MinerStats> miner_stats_map;
+    std::unordered_map<std::string, MinerStats> miner_stats_map;
     // chain -> effort
-    std::unordered_map<std::string_view, Round> round_map;
+    std::unordered_map<std::string, Round> round_map;
 };
 
 #endif

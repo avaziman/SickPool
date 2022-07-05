@@ -87,7 +87,7 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
         {
             ws.interval_hashrate =
                 ws.current_interval_effort / (double)hashrate_interval_seconds;
-            std::string_view addr = worker.substr(0, ADDRESS_LEN);
+            std::string addr = worker.substr(0, ADDRESS_LEN);
 
             ws.average_hashrate_sum += ws.interval_hashrate;
 
@@ -149,8 +149,8 @@ bool StatsManager::LoadCurrentRound()
     return true;
 }
 
-void StatsManager::AddShare(std::string_view worker_full,
-                            std::string_view miner_addr, double diff)
+void StatsManager::AddShare(const std::string& worker_full,
+                            const std::string& miner_addr, const double diff)
 {
     std::scoped_lock lock(stats_map_mutex);
     // both must exist, as we added in AddWorker
@@ -179,9 +179,9 @@ void StatsManager::AddShare(std::string_view worker_full,
     }
 }
 
-bool StatsManager::AddWorker(std::string_view address,
-                             std::string_view worker_full,
-                             std::string_view idTag, int64_t curtime)
+bool StatsManager::AddWorker(const std::string& address,
+                             const std::string& worker_full,
+                             const std::string& idTag, int64_t curtime)
 {
     using namespace std::literals;
     std::scoped_lock stats_db_lock(stats_map_mutex);
@@ -222,8 +222,8 @@ bool StatsManager::AddWorker(std::string_view address,
     return true;
 }
 
-void StatsManager::PopWorker(std::string_view worker_full,
-                             std::string_view address)
+void StatsManager::PopWorker(const std::string& worker_full,
+                             const std::string& address)
 {
     // db lock below
     std::scoped_lock stats_lock(stats_map_mutex);
@@ -319,7 +319,7 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
 //     return true;
 // }
 
-Round StatsManager::GetChainRound(std::string_view chain)
+Round StatsManager::GetChainRound(const std::string& chain)
 {
     std::lock_guard stats_lock(stats_map_mutex);
     return round_map[chain];

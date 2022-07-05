@@ -26,13 +26,11 @@ class StratumClient
     }
     uint32_t GetShareCount() const { return share_count; }
     bool GetIsAuthorized() const { return is_authorized; }
-    std::string_view GetAddress() const { return std::string_view(address); }
     int64_t GetLastAdjusted() const { return last_adjusted; }
     uint8_t* GetBlockheaderBuff() { return block_header; }
-    std::string_view GetFullWorkerName() const
-    {
-        return std::string_view(worker_full);
-    }
+    // make sting_view when unordered map supports it
+    const std::string& GetAddress() const { return address; }
+    const std::string& GetFullWorkerName() const { return worker_full; }
 
     void ResetShareCount() { share_count = 0; }
 
