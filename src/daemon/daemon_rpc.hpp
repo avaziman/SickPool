@@ -138,9 +138,18 @@ class DaemonRpc
 
         resCode = std::atoi(headerBuff + sizeof("HTTP/1.1 ") - 1);
 
+        // doens't include error message
         contentLength = std::atoi(std::strstr(headerBuff, "Content-Length: ") +
                                   sizeof("Content-Length: ") - 1);
         contentReceived = headerRecv - (endOfHeader - headerBuff);
+
+        if(resCode != 200){
+            // if there was an error return the header instead the body as there is none
+            result.resize(headerRecv);
+            memcpy(result.data(), headerBuff, headerRecv);
+            close(sockfd);
+            return resCode;
+        }
 
         // simd json parser requires some extra bytes
         result.reserve(contentLength + simdjson::SIMDJSON_PADDING);
@@ -158,7 +167,7 @@ class DaemonRpc
                                        contentLength - contentReceived, 0);
             if (recvRes <= 0)
             {
-                return errno;
+                return resCode;
             }
             contentReceived += recvRes;
         }

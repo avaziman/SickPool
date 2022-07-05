@@ -33,11 +33,16 @@ StratumServer::StratumServer(const CoinConfig &conf)
     }
 
     int optval = 1;
+    struct timeval timeout;
+    timeout.tv_sec = coin_config.socket_recv_timeout_seconds;
+    timeout.tv_usec = 0;
 
     sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) !=
-        0)
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)))
         throw std::runtime_error("Failed to set stratum socket options");
+
+    // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)))
+    //     throw std::runtime_error("Failed to set stratum socket options");
 
     if (sockfd == -1)
         throw std::runtime_error("Failed to create stratum socket");
@@ -121,13 +126,17 @@ void StratumServer::Listen()
         socklen_t addr_len = sizeof(conn_addr);
         conn_fd = accept(sockfd, (sockaddr *)&conn_addr, &addr_len);
 
+        char ip_str[INET_ADDRSTRLEN];
+        struct in_addr ip_addr = conn_addr.sin_addr;
+        inet_ntop(AF_INET, &ip_addr, ip_str, sizeof(ip_str));
+
         Logger::Log(LogType::Info, LogField::Stratum,
-                    "tcp client connected, starting new thread...");
+                    "Tcp client connected, ip: %s, starting new thread...", ip_str);
 
         if (conn_fd <= 0)
         {
             Logger::Log(LogType::Warn, LogField::Stratum,
-                        "Invalid connecting socket accepted. Ignoring...");
+                        "Invalid connecting socket accepted errno: %d. Ignoring...", errno);
             continue;
         }
 
@@ -188,7 +197,7 @@ void StratumServer::HandleSocket(int conn_fd)
             }
 
             Logger::Log(LogType::Info, LogField::Stratum,
-                        "client disconnected. res: %d, errno: %d", recvRes,
+                        "Client disconnected. res: %d, errno: %d", recvRes,
                         errno);
             break;
         }
@@ -316,7 +325,6 @@ void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
     // }
 
     // in case of a crash without shares, we need to update round start time
-    // redis_manager.SetNewRoundTime(round_start_pow);
 
     std::scoped_lock redis_lock(redis_mutex);
 

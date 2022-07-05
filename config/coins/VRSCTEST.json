@@ -14,6 +14,7 @@
     "average_hashrate_interval_seconds1": 21600,
     "average_hashrate_interval_seconds": 20,
     "hashrate_ttl": 86400,
+    "socket_recv_timeout_seconds": 3,
     "rpcs": [
         {
             "hostf": "127.0.0.1:27486",

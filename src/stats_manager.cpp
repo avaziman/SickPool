@@ -5,8 +5,10 @@ int StatsManager::effort_interval_seconds;
 int StatsManager::average_hashrate_interval_seconds;
 int StatsManager::hashrate_ttl_seconds;
 
-StatsManager::StatsManager(RedisManager* redis_manager, int hr_interval, int effort_interval,
-                           int avg_hr_interval, int hashrate_ttl) : redis_manager(redis_manager)
+StatsManager::StatsManager(RedisManager* redis_manager, int hr_interval,
+                           int effort_interval, int avg_hr_interval,
+                           int hashrate_ttl)
+    : redis_manager(redis_manager)
 {
     StatsManager::hashrate_interval_seconds = hr_interval;
     StatsManager::effort_interval_seconds = effort_interval;
@@ -131,13 +133,16 @@ bool StatsManager::LoadCurrentRound()
     double total_effort = redis_manager->hgetd(
         fmt::format("round:pow:{}", COIN_SYMBOL), "total_effort");
 
-    int round_start =
+    int64_t round_start =
         redis_manager->hgeti(fmt::format("round:pow:{}", COIN_SYMBOL), "start");
-    round_map[COIN_SYMBOL].round_start_ms = round_start;
     if (round_start == 0)
     {
-        round_map[COIN_SYMBOL].round_start_ms = GetCurrentTimeMs();
+        round_start = GetCurrentTimeMs();
+        round_map[COIN_SYMBOL].round_start_ms = round_start;
+
+        redis_manager->SetLastRoundTimePow(COIN_SYMBOL, round_start);
     }
+    round_map[COIN_SYMBOL].round_start_ms = round_start;
 
     Logger::Log(LogType::Info, LogField::StatsManager,
                 "Loaded pow round effort of: %f, started at: %" PRIi64,
@@ -243,7 +248,8 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
 {
     // redis mutex already locked
     std::scoped_lock stats_lock(stats_map_mutex);
-    redis_manager->ClosePoWRound(chain, submission, fee, miner_stats_map, round_map);
+    redis_manager->ClosePoWRound(chain, submission, fee, miner_stats_map,
+                                 round_map);
     return true;
 }
 

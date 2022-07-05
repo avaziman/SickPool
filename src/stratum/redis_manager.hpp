@@ -41,6 +41,7 @@ class RedisManager
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
     int64_t GetLastRoundTimePow();
+    bool SetLastRoundTimePow(std::string_view chain, int64_t time);
 
     uint32_t GetBlockNumber();
 
@@ -75,6 +76,7 @@ class RedisManager
     redisContext *rc;
     std::string coin_symbol;
 
+    bool hset(std::string_view key, std::string_view field, std::string_view val);
     int AppendUpdateWorkerCount(std::string_view address, int amount);
     int AppendCreateStatsTs(std::string_view addrOrWorker, std::string_view id,
                             std::string_view prefix);

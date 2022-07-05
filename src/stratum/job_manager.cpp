@@ -10,8 +10,8 @@ const job_t* JobManager::GetNewJob()
     {
         Logger::Log(
             LogType::Critical, LogField::JobManager,
-            "Failed to get block template, http code: %d, response: %*.s",
-            resCode, json.size(), json.data());
+            "Failed to get block template, http code: %d, response: %s",
+            resCode, json.c_str());
         return nullptr;
     }
 

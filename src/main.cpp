@@ -59,13 +59,15 @@ int main(int argc, char** argv)
     }
     catch (std::runtime_error e)
     {
-        Logger::Log(LogType::Critical, LogField::Config, "START-UP ERROR: %s.", e.what());
+        Logger::Log(LogType::Critical, LogField::Config, "START-UP ERROR: %s.",
+                    e.what());
         return EXIT_FAILURE;
     }
     return EXIT_FAILURE;  // should never finish!
 }
 
-void AssignJson(const char* name, std::string& obj, simdjson::ondemand::document& doc)
+void AssignJson(const char* name, std::string& obj,
+                simdjson::ondemand::document& doc)
 {
     try
     {
@@ -100,12 +102,15 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
     simdjson::ondemand::document configDoc = confParser.iterate(json);
 
     AssignJson("stratum_port", cnfg.stratum_port, configDoc);
-    AssignJson("hashrate_interval_seconds", cnfg.hashrate_interval_seconds, configDoc);
-    AssignJson("effort_interval_seconds", cnfg.effort_interval_seconds, configDoc);
+    AssignJson("hashrate_interval_seconds", cnfg.hashrate_interval_seconds,
+               configDoc);
+    AssignJson("effort_interval_seconds", cnfg.effort_interval_seconds,
+               configDoc);
     AssignJson("average_hashrate_interval_seconds",
                cnfg.average_hashrate_interval_seconds, configDoc);
-    AssignJson("hashrate_ttl",
-               cnfg.hashrate_ttl_seconds, configDoc);
+    AssignJson("hashrate_ttl", cnfg.hashrate_ttl_seconds, configDoc);
+    AssignJson("socket_recv_timeout_seconds", cnfg.socket_recv_timeout_seconds,
+               configDoc);
     AssignJson("pow_fee", cnfg.pow_fee, configDoc);
     AssignJson("pos_fee", cnfg.pos_fee, configDoc);
     AssignJson("default_diff", cnfg.default_diff, configDoc);

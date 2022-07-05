@@ -11,6 +11,7 @@
     "effort_interval_seconds": 10,
     "average_hashrate_interval_seconds": 21600,
     "hashrate_ttl": 86400,
+    "socket_recv_timeout_seconds": 300,
     "rpcs": [
         {
             "auth": "dXNlcjIxMjcyNjIwOTpwYXNzYzU0MDhhNTQ0YWE4ODQzOWNiNzM0Yjk1YmE1NGZhZmU5YWFlNGYzMjFhYTVjNDljZWNmNDhmYTIzMDY4ZGY4YWZi",

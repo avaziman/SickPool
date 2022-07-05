@@ -602,6 +602,17 @@ bool RedisManager::PopWorker(std::string_view address)
     }
     return true;
 }
+
+bool RedisManager::hset(std::string_view key, std::string_view field,
+                        std::string_view val)
+{
+    auto reply = (redisReply *)redisCommand(
+        rc, "HSET %b %b %b", key.data(), key.size(), field.data(), field.size(),
+        val.data(), val.size());
+
+    return reply;
+}
+
 int RedisManager::hgeti(std::string_view key, std::string_view field)
 {
     auto reply = (redisReply *)redisCommand(
@@ -614,6 +625,12 @@ int RedisManager::hgeti(std::string_view key, std::string_view field)
     }
     freeReplyObject(reply);
     return val;
+}
+
+bool RedisManager::SetLastRoundTimePow(std::string_view chain, int64_t val)
+{
+    return hset(fmt::format("round:pow:{}", chain), "start",
+                std::to_string(val));
 }
 
 double RedisManager::hgetd(std::string_view key, std::string_view field)
@@ -696,9 +713,9 @@ bool RedisManager::LoadSolvers(
     }
 
     for (int i = 0; i < miner_count; i++)
-    {   
+    {
         auto miner_addr = std::string(miners_reply->element[i]->str,
-                                           miners_reply->element[i]->len);
+                                      miners_reply->element[i]->len);
 
         const double miner_effort = std::strtod(
             reply->element[i * 4]->str + sizeof("{\"effort\":") - 1, nullptr);
@@ -739,6 +756,8 @@ bool RedisManager::ClosePoWRound(
     int command_count = 0;
 
     round_map[COIN_SYMBOL].round_start_ms = submission->timeMs;
+    SetLastRoundTimePow(COIN_SYMBOL, submission->timeMs);
+
     // reset for next round
     round_map[COIN_SYMBOL].pow = 0;
 
@@ -788,8 +807,7 @@ bool RedisManager::ClosePoWRound(
         command_count++;
 
         redisAppendCommand(rc, "ZINCRBY solver-index:balance %f %b",
-                           miner_reward, miner_addr.data(),
-                           miner_addr.size());
+                           miner_reward, miner_addr.data(), miner_addr.size());
         command_count++;
 
         redisAppendCommand(rc, "HSET round_start " COIN_SYMBOL " %" PRIi64,
