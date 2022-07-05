@@ -1,7 +1,7 @@
 #ifndef STATS_HPP
 #define STATS_HPP
 #include <unordered_map>
-#include "round.hpp"
+#include "./stratum/round.hpp"
 
 enum class BadDiff
 {

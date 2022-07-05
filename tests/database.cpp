@@ -7,7 +7,7 @@ TEST(DATABASE, AddBlockSubmission)
 {
     using namespace std::string_view_literals;
 
-    RedisManager redis_manager;
+    RedisManager redis_manager("127.0.0.1", 6397);
     DaemonManager daemon_manager(
         {RpcConfig{.host = "127.0.0.1:6004", .auth = "YWRtaW4xOnBhc3MxMjM="}});
     JobManager job_manager(&daemon_manager,
@@ -23,5 +23,5 @@ TEST(DATABASE, AddBlockSubmission)
     BlockSubmission submission("GTEST"sv, "GTEST_WORKER"sv, job, share_res,
                                round, 1, 1);
 
-    redis_manager.AddBlockSubmission(submission);
+    redis_manager.AddBlockSubmission(&submission);
 }

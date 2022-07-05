@@ -59,7 +59,6 @@ FetchContent_MakeAvailable(fmt)
 # add_subdirectory(lib/simdjson)
 # add_subdirectory(lib/googletest)
 # add_subdirectory(lib/benchmark)
-# add_subdirectory(fmt)
 
 add_subdirectory(src)
 # add_subdirectory(stratum_notifier)

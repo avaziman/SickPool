@@ -38,6 +38,7 @@ RedisManager::RedisManager(std::string ip, int port)
 bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,
                                             int32_t confirmations)
 {
+    std::scoped_lock lock(rc_mutex);
     // redis bitfield uses be so gotta swap em
     return redisCommand(rc, "BITFIELD block:%b SET i32 0 %d", block_id.data(),
                         block_id.size(), bswap_32(confirmations)) == nullptr;
@@ -45,6 +46,8 @@ bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,
 
 bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
 {
+    std::scoped_lock lock(rc_mutex);
+
     int command_count = 0;
     uint32_t block_id = submission->number;
     auto chain =
@@ -114,6 +117,8 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
 bool RedisManager::SetEstimatedNeededEffort(std::string_view chain,
                                             double effort)
 {
+    std::scoped_lock lock(rc_mutex);
+
     redisReply *reply;
     redisAppendCommand(rc, "HSET %b:round_effort_pow estimated %f",
                        chain.data(), chain.size(), effort);
@@ -133,6 +138,8 @@ void RedisManager::ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
                                  int64_t reward, uint32_t height,
                                  const double totalEffort, const double fee)
 {
+    std::scoped_lock lock(rc_mutex);
+
     redisReply *hashReply, *balReply;
 
     if (totalEffort == 0)
@@ -212,6 +219,8 @@ void RedisManager::ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
 bool RedisManager::DoesAddressExist(std::string_view addrOrId,
                                     std::string &valid_addr)
 {
+    std::scoped_lock lock(rc_mutex);
+
     redisReply *reply;
     bool isId = addrOrId.ends_with("@");
 
@@ -249,6 +258,8 @@ bool RedisManager::DoesAddressExist(std::string_view addrOrId,
 
 int64_t RedisManager::GetLastRoundTimePow()
 {
+    std::scoped_lock lock(rc_mutex);
+
     redisReply *reply;
     redisAppendCommand(rc, "TS.GET " COIN_SYMBOL ":round_effort");
 
@@ -274,6 +285,8 @@ int64_t RedisManager::GetLastRoundTimePow()
 
 uint32_t RedisManager::GetBlockNumber()
 {
+    std::scoped_lock lock(rc_mutex);
+
     // fix
     auto *reply =
         (redisReply *)redisCommand(rc, "GET " COIN_SYMBOL ":block_number");
@@ -300,6 +313,8 @@ uint32_t RedisManager::GetBlockNumber()
 
 bool RedisManager::IncrBlockCount()
 {
+    std::scoped_lock lock(rc_mutex);
+
     auto *reply = (redisReply *)redisCommand(rc, "INCR block_number");
 
     if (!reply)
@@ -316,6 +331,8 @@ bool RedisManager::IncrBlockCount()
 
 int RedisManager::AddNetworkHr(std::string_view chain, int64_t time, double hr)
 {
+    std::scoped_lock lock(rc_mutex);
+
     redisReply *reply;
     std::string key = fmt::format("{}:{}", chain, "network_difficulty");
     AppendTsAdd(std::string_view(key), time, hr);
@@ -332,6 +349,8 @@ int RedisManager::AddNetworkHr(std::string_view chain, int64_t time, double hr)
 
 void RedisManager::UpdatePoS(uint64_t from, uint64_t maturity)
 {
+    std::scoped_lock lock(rc_mutex);
+
     redisReply *reply;
     redisAppendCommand(rc,
                        "TS.MRANGE %" PRId64 " %" PRId64
@@ -370,6 +389,8 @@ void RedisManager::UpdatePoS(uint64_t from, uint64_t maturity)
 bool RedisManager::UpdateImmatureRewards(std::string_view chain,
                                          int64_t rewardTime, bool matured)
 {
+    std::scoped_lock lock(rc_mutex);
+
     const auto *immatureReply = (redisReply *)redisCommand(
         rc, "TS.MRANGE %" PRId64 " %" PRId64 " FILTER type=immature-balance",
         rewardTime, rewardTime);
@@ -510,6 +531,8 @@ bool RedisManager::AddWorker(std::string_view address,
 {
     using namespace std::string_view_literals;
 
+    std::scoped_lock lock(rc_mutex);
+
     int command_count = 0;
 
     redisAppendCommand(rc, "MULTI");
@@ -587,6 +610,8 @@ int RedisManager::AppendUpdateWorkerCount(std::string_view address, int amount)
 }
 bool RedisManager::PopWorker(std::string_view address)
 {
+    std::scoped_lock lock(rc_mutex);
+
     int command_count = AppendUpdateWorkerCount(address, -1);
 
     redisReply *reply;
@@ -615,6 +640,8 @@ bool RedisManager::hset(std::string_view key, std::string_view field,
 
 int RedisManager::hgeti(std::string_view key, std::string_view field)
 {
+    std::scoped_lock lock(rc_mutex);
+
     auto reply = (redisReply *)redisCommand(
         rc, "HGET %b %b", key.data(), key.size(), field.data(), key.size());
     int val = 0;
@@ -629,12 +656,16 @@ int RedisManager::hgeti(std::string_view key, std::string_view field)
 
 bool RedisManager::SetLastRoundTimePow(std::string_view chain, int64_t val)
 {
+    std::scoped_lock lock(rc_mutex);
+
     return hset(fmt::format("round:pow:{}", chain), "start",
                 std::to_string(val));
 }
 
 double RedisManager::hgetd(std::string_view key, std::string_view field)
 {
+    std::scoped_lock lock(rc_mutex);
+
     auto reply = (redisReply *)redisCommand(
         rc, "HGET %b %b", key.data(), key.size(), field.data(), field.size());
     double val = 0;
@@ -650,6 +681,8 @@ bool RedisManager::LoadSolvers(
     std::unordered_map<std::string, MinerStats> &miner_stats_map,
     std::unordered_map<std::string, Round> &round_map)
 {
+    std::scoped_lock lock(rc_mutex);
+
     auto miners_reply =
         (redisReply *)redisCommand(rc, "ZRANGE solver-index:join-time 0 -1");
 
@@ -750,6 +783,8 @@ bool RedisManager::ClosePoWRound(
     std::unordered_map<std::string, MinerStats> &miner_stats_map,
     std::unordered_map<std::string, Round> &round_map)
 {
+    std::scoped_lock lock(rc_mutex);
+
     double total_effort = round_map[COIN_SYMBOL].pow;
     double block_reward = (double)submission->blockReward / 1e8;
     uint32_t height = submission->height;

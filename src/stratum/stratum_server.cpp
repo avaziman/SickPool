@@ -858,7 +858,7 @@ void StratumServer::AdjustDifficulty(StratumClient *cli, int64_t curTime)
                          cli->GetDifficulty();
         if (newDiff == 0) newDiff = cli->GetDifficulty() / 5;
 
-        cli->SetDifficulty(newDiff, curTime);
+        cli->SetPendingDifficulty(newDiff, curTime);
         this->UpdateDifficulty(cli);
         std::cout << "new diff: " << newDiff << std::endl;
     }

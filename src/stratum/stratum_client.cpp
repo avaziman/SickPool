@@ -8,7 +8,7 @@ StratumClient::StratumClient(const int sock, const int64_t time, const double di
       last_adjusted(time),
       last_share_time(time),
       current_diff(diff),
-      last_diff(diff)
+      pending_diff(diff)
 {
     extra_nonce = extra_nonce_counter++;
     char buff[8];

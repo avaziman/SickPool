@@ -20,25 +20,34 @@ class StratumClient
 
     int GetSock() const { return sockfd; }
     double GetDifficulty() const { return current_diff; }
+    double GetPendingDifficulty() const { return pending_diff; }
+    bool GetIsAuthorized() const { return is_authorized; }
+    bool GetIsPendingDiff() const { return is_pending_diff; }
+    uint32_t GetShareCount() const { return share_count; }
+    int64_t GetLastAdjusted() const { return last_adjusted; }
+    uint8_t* GetBlockheaderBuff() { return block_header; }
+
     std::string_view GetExtraNonce() const
     {
         return std::string_view(extra_nonce_str);
     }
-    uint32_t GetShareCount() const { return share_count; }
-    bool GetIsAuthorized() const { return is_authorized; }
-    int64_t GetLastAdjusted() const { return last_adjusted; }
-    uint8_t* GetBlockheaderBuff() { return block_header; }
     // make sting_view when unordered map supports it
     const std::string& GetAddress() const { return address; }
     const std::string& GetFullWorkerName() const { return worker_full; }
 
     void ResetShareCount() { share_count = 0; }
 
-    void SetDifficulty(double diff, int64_t curTime)
+    void SetPendingDifficulty(double diff, int64_t curTime)
     {
-        last_diff = current_diff;
-        current_diff = diff;
+        is_pending_diff = true;
+        pending_diff = diff;
         last_adjusted = curTime;
+    }
+
+    void ActivatePendingDiff()
+    {
+        is_pending_diff = false;
+        current_diff = pending_diff;
     }
 
     bool SetLastShare(uint32_t shareEnd, int64_t time)
@@ -53,7 +62,7 @@ class StratumClient
         return inserted;
     }
 
-    // called after auth
+    // called after auth, before added to databse
     void SetAddress(std::string_view worker, std::string_view addr)
     {
         // add the hasher on authorization
@@ -87,8 +96,9 @@ class StratumClient
     uint32_t extra_nonce;
     uint32_t share_count = 0;
     double current_diff;
-    double last_diff;
+    double pending_diff;
     bool is_authorized;
+    bool is_pending_diff;
 
     std::string extra_nonce_str;
     std::string worker_full;

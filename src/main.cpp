@@ -111,6 +111,7 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
     AssignJson("hashrate_ttl", cnfg.hashrate_ttl_seconds, configDoc);
     AssignJson("socket_recv_timeout_seconds", cnfg.socket_recv_timeout_seconds,
                configDoc);
+    AssignJson("diff_adjust_seconds", cnfg.diff_adjust_seconds, configDoc);
     AssignJson("pow_fee", cnfg.pow_fee, configDoc);
     AssignJson("pos_fee", cnfg.pos_fee, configDoc);
     AssignJson("default_diff", cnfg.default_diff, configDoc);

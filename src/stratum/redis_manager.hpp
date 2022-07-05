@@ -37,7 +37,6 @@ class RedisManager
                        int64_t reward, uint32_t height,
                        const double totalEffort, const double fee);
 
-    // TODO: review this
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
     int64_t GetLastRoundTimePow();
@@ -72,8 +71,8 @@ class RedisManager
         std::unordered_map<std::string, Round> &round_map);
 
    private:
-    // redisContext *rc;
     redisContext *rc;
+    std::mutex rc_mutex;
     std::string coin_symbol;
 
     bool hset(std::string_view key, std::string_view field, std::string_view val);

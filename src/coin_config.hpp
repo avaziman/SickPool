@@ -23,6 +23,7 @@ struct CoinConfig
     int64_t effort_interval_seconds;
     int64_t average_hashrate_interval_seconds;
     int64_t hashrate_ttl_seconds;
+    int64_t diff_adjust_seconds;
     int64_t socket_recv_timeout_seconds;
 };
 #endif
