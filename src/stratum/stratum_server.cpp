@@ -179,7 +179,7 @@ void StratumServer::HandleSocket(int conn_fd)
             total += recvRes;
             buffer[total] = '\0';  // for strchr
             reqEnd = std::strchr(buffer, '\n');
-            isBuffMaxed = total < REQ_BUFF_SIZE_REAL;
+            isBuffMaxed = total >= REQ_BUFF_SIZE_REAL;
         } while (reqEnd == nullptr && recvRes && !isBuffMaxed);
 
         // exit loop, miner disconnected
