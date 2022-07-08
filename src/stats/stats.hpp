@@ -1,7 +1,18 @@
 #ifndef STATS_HPP
 #define STATS_HPP
 #include <unordered_map>
-#include "./stratum/round.hpp"
+#include "round.hpp"
+
+struct StringHash
+{
+    using is_transparent = void;  // enables heterogenous lookup
+
+    std::size_t operator()(std::string_view sv) const
+    {
+        std::hash<std::string_view> hasher;
+        return hasher(sv);
+    }
+};
 
 enum class BadDiff
 {
@@ -34,5 +45,13 @@ struct MinerStats : public WorkerStats
     std::unordered_map<std::string_view, Round> round_effort;
     uint32_t worker_count = 0;
 };
+
+typedef std::unordered_map<std::string, WorkerStats, StringHash, std::less<>>
+    worker_map;
+typedef std::unordered_map<std::string, MinerStats, StringHash, std::less<>>
+    miner_map;
+
+typedef std::unordered_map<std::string, Round, StringHash, std::less<>>
+    round_map;
 
 #endif

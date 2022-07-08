@@ -1,13 +1,16 @@
 enable_testing()
 include(GoogleTest)
 
-set(CMAKE_CXX_STANDARD 20)
+# include_directories(../src)
+include_directories(../src/daemon)
+include_directories(../src/stratum)
 
-include_directories(../src)
+set(PROJECT_NAME_TESTS ${PROJECT_NAME}_tests)
 
-add_executable(${PROJECT_NAME}_tests 
+add_executable(${PROJECT_NAME_TESTS}
         main.cpp
-        database.cpp
+        job_manager_test.cpp
+        req_parse_test.cpp
         # difficulty_test.cpp
         # job_construction_test.cpp
         # hash_wrapper_test.cpp
@@ -16,18 +19,10 @@ add_executable(${PROJECT_NAME}_tests
         #stratum_test.cpp
         )
 
-# <------------ add hiredis dependency here --------------->
-find_path(HIREDIS_HEADER hiredis)
-target_include_directories(${PROJECT_NAME}_tests PUBLIC ${HIREDIS_HEADER})
-
-find_library(HIREDIS_LIB hiredis)
-
-set_property(TARGET ${PROJECT_NAME} PROPERTY ENABLE_EXPORTS 1)
 
 target_link_libraries(
-    ${PROJECT_NAME}_tests
-    ${PROJECT_NAME} # link the pool
-    ${HIREDIS_LIB}
+    ${PROJECT_NAME_TESTS}
+    ${PROJECT_NAME_CORE} # link the pool
     gtest
 )
-gtest_discover_tests(${PROJECT_NAME}_tests)
+# gtest_discover_tests(${PROJECT_NAME}_tests)

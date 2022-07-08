@@ -15,13 +15,19 @@ const job_t* JobManager::GetNewJob()
         return nullptr;
     }
 
-    // parsing needs to be done in same function otherwise data will be garbage
+    return GetNewJob(json);
+}
+
+const job_t* JobManager::GetNewJob(const std::string& json_template)
+{
+    using namespace simdjson;
     try
     {
-        blockTemplate = BlockTemplate();
         ondemand::document doc =
-            jsonParser.iterate(json.data(), json.size(), json.capacity());
+            jsonParser.iterate(json_template.data(), json_template.size(),
+                               json_template.capacity());
 
+        blockTemplate = BlockTemplate();
         ondemand::object res = doc["result"].get_object();
 
         // this must be in the order they appear in the result for simdjson
@@ -91,7 +97,7 @@ const job_t* JobManager::GetNewJob()
     {
         Logger::Log(LogType::Critical, LogField::JobManager,
                     "Failed to parse block template: %s, json: %s", err.what(),
-                    json.c_str());
+                    json_template.c_str());
     }
     return nullptr;
 }

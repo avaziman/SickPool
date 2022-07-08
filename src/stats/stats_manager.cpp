@@ -138,19 +138,18 @@ bool StatsManager::LoadCurrentRound()
     if (round_start == 0)
     {
         round_start = GetCurrentTimeMs();
-        round_map[COIN_SYMBOL].round_start_ms = round_start;
+        round_stats_map[COIN_SYMBOL].round_start_ms = round_start;
 
         redis_manager->SetLastRoundTimePow(COIN_SYMBOL, round_start);
     }
-    round_map[COIN_SYMBOL].round_start_ms = round_start;
+    round_stats_map[COIN_SYMBOL].round_start_ms = round_start;
 
     Logger::Log(LogType::Info, LogField::StatsManager,
                 "Loaded pow round effort of: %f, started at: %" PRIi64,
-                round_map[COIN_SYMBOL].pow,
-                round_map[COIN_SYMBOL].round_start_ms);
+                round_stats_map[COIN_SYMBOL].pow,
+                round_stats_map[COIN_SYMBOL].round_start_ms);
 
-    redis_manager->LoadSolvers(miner_stats_map, round_map);
-    // freeReplyObject(miners_reply);
+    redis_manager->LoadSolvers(miner_stats_map, round_stats_map);
     return true;
 }
 
@@ -172,7 +171,7 @@ void StatsManager::AddShare(const std::string& worker_full,
     }
     else
     {
-        this->round_map[COIN_SYMBOL].pow += diff;
+        this->round_stats_map[COIN_SYMBOL].pow += diff;
 
         worker_stats->interval_valid_shares++;
         worker_stats->current_interval_effort += diff;
@@ -249,7 +248,7 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
     // redis mutex already locked
     std::scoped_lock stats_lock(stats_map_mutex);
     redis_manager->ClosePoWRound(chain, submission, fee, miner_stats_map,
-                                 round_map);
+                                 round_stats_map);
     return true;
 }
 
@@ -328,7 +327,7 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
 Round StatsManager::GetChainRound(const std::string& chain)
 {
     std::lock_guard stats_lock(stats_map_mutex);
-    return round_map[chain];
+    return round_stats_map[chain];
 }
 
 // TODO: idea: since writing all shares on all pbaas is expensive every 10 sec,

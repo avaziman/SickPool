@@ -41,8 +41,8 @@ int main(int argc, char** argv)
         Logger::Log(LogType::Info, LogField::Config, "Coin config loaded:");
         Logger::Log(LogType::Info, LogField::Config, "Pool address: %s",
                     coinConfig.pool_addr.c_str());
-        Logger::Log(LogType::Info, LogField::Config, "Redis host: %s",
-                    coinConfig.redis_host.c_str());
+        Logger::Log(LogType::Info, LogField::Config, "Redis port: %d",
+                    coinConfig.redis_port);
         Logger::Log(LogType::Info, LogField::Config, "PoW fee: %f",
                     coinConfig.pow_fee);
         Logger::Log(LogType::Info, LogField::Config, "PoS fee: %f",
@@ -102,6 +102,8 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
     simdjson::ondemand::document configDoc = confParser.iterate(json);
 
     AssignJson("stratum_port", cnfg.stratum_port, configDoc);
+    AssignJson("control_port", cnfg.control_port, configDoc);
+    AssignJson("redis_port", cnfg.redis_port, configDoc);
     AssignJson("hashrate_interval_seconds", cnfg.hashrate_interval_seconds,
                configDoc);
     AssignJson("effort_interval_seconds", cnfg.effort_interval_seconds,
@@ -117,7 +119,6 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
     AssignJson("default_diff", cnfg.default_diff, configDoc);
     AssignJson("target_shares_rate", cnfg.target_shares_rate, configDoc);
     AssignJson("pool_addr", cnfg.pool_addr, configDoc);
-    AssignJson("redis_host", cnfg.redis_host, configDoc);
 
     try
     {

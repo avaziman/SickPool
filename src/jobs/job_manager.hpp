@@ -22,6 +22,8 @@ class JobManager
     }
 
     const job_t* GetNewJob();
+    const job_t* GetNewJob(const std::string& json_template);
+    
     inline const job_t* GetJob(std::string_view hexId)
     {
         std::scoped_lock lock(jobs_mutex);

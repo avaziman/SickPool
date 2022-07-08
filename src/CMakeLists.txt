@@ -1,31 +1,29 @@
-include_directories(daemon)
-include_directories(stratum)
-include_directories(.)
-
 # optimized hash function
 add_subdirectory(crypto/verushash)
+find_path(HIREDIS_HEADER hiredis)
 
 file(GLOB SRC_FILES
-     "main.cpp"
-     "daemon/*.cpp"
-     "stratum/*.cpp"
-     "crypto/*.cpp"
-     "stats_manager.cpp"
-     )
+    "stratum/*.cpp"
+    "crypto/*.cpp"
+    "stats/*.cpp"
+    "blocks/*.cpp"
+    "jobs/*.cpp"
+    "redis/*.cpp"
+)
 
-add_executable(${PROJECT_NAME} ${SRC_FILES})
+add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
 
-# <------------ add hiredis dependency here --------------->
-find_path(HIREDIS_HEADER hiredis)
-target_include_directories(${PROJECT_NAME} PUBLIC ${HIREDIS_HEADER})
+set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks)
+target_include_directories(${PROJECT_NAME_CORE} ${SICKPOOL_INCLUDE})
+
 find_library(HIREDIS_LIB hiredis)
+target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER})
 
 target_link_libraries(
-    ${PROJECT_NAME}
+    ${PROJECT_NAME_CORE}
     ${HIREDIS_LIB}
     pthread
     simdjson
     fmt::fmt
     sickverushash
-    
 )

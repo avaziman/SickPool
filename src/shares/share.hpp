@@ -3,8 +3,8 @@
 #include <string_view>
 #include <vector>
 
-#include "job.hpp"
-#include "verus_job.hpp"
+#include "jobs/job.hpp"
+#include "jobs/verus_job.hpp"
 struct Share
 {
     std::string_view worker;

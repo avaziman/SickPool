@@ -5,10 +5,9 @@
 #include <cstring>
 #include <string>
 
-#include "./crypto/utils.hpp"
-#include "round.hpp"
-#include "share.hpp"
-#include "verus_job.hpp"
+#include "stats/round.hpp"
+#include "shares/share.hpp"
+#include "jobs/verus_job.hpp"
 
 #pragma pack(push, 1)
 struct BlockSubmission

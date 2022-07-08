@@ -1,10 +1,12 @@
 #ifndef VERUS_JOB_HPP_
 #define VERUS_JOB_HPP_
+#include <byteswap.h>
+#include <fmt/format.h>
+
 #include <experimental/array>
 #include <iomanip>
 #include <sstream>
 #include <string>
-#include <byteswap.h>
 
 #include "job.hpp"
 
@@ -29,7 +31,8 @@
 class VerusJob : public Job
 {
    public:
-    VerusJob(const std::string& jobId, const BlockTemplate& bTemplate, bool clean = true)
+    VerusJob(const std::string& jobId, const BlockTemplate& bTemplate,
+             bool clean = true)
         : Job(jobId, bTemplate)
     {
         char merkleRootHex[MERKLE_ROOT_SIZE * 2];
@@ -39,13 +42,13 @@ class VerusJob : public Job
         this->targetDiff = BitsToDiff(bitsUint);
         this->expectedShares = GetExpectedHashes(this->targetDiff);
 
-
         // reverse all numbers for block encoding
 
         char prevBlockRevHex[PREVHASH_SIZE * 2];
         char finalSRootRevHex[FINALSROOT_SIZE * 2];
 
-        ReverseHex(prevBlockRevHex, bTemplate.prevBlockHash.data(), PREVHASH_SIZE * 2);
+        ReverseHex(prevBlockRevHex, bTemplate.prevBlockHash.data(),
+                   PREVHASH_SIZE * 2);
         ReverseHex(finalSRootRevHex, bTemplate.finalsRootHash.data(),
                    FINALSROOT_SIZE * 2);
 
@@ -76,7 +79,6 @@ class VerusJob : public Job
         // WriteUnhexlify(bTemplate.solution, 144);
 
         // only generating notify message once for efficiency
-        auto start = std::chrono::steady_clock::now();
 
         // reverse all numbers for notify, they are written in correct order
         int32_t revVer = bswap_32(bTemplate.version);
@@ -84,28 +86,18 @@ class VerusJob : public Job
         bitsUint = bswap_32(bitsUint);
 
         notifyBuffSize =
-            snprintf(notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
-                     "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
-                     "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%"
-                     "08x\",\"%08x\",%s,\"%.144s\"]}\n",
-                     GetId().data(), revVer, prevBlockRevHex, merkleRootHex,
-                     finalSRootRevHex, (uint32_t)revMinTime, bitsUint,
-                     BoolToCstring(clean), bTemplate.solution.data());
-
-        auto end = std::chrono::steady_clock::now();
-
-        std::cout << "sprintf dur: "
-                  << std::chrono::duration_cast<std::chrono::microseconds>(
-                         end - start)
-                         .count()
-                  << "us" << std::endl;
-
-        std::cout << notifyBuff << std::endl;
+        snprintf(notifyBuff, MAX_NOTIFY_MESSAGE_SIZE,
+         "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+         "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%"
+         "08x\",\"%08x\",%s,\"%.144s\"]}\n",
+         GetId().data(), revVer, prevBlockRevHex, merkleRootHex,
+         finalSRootRevHex, (uint32_t)revMinTime, bitsUint,
+         BoolToCstring(clean), bTemplate.solution.data());
     }
 
     void GetHeaderData(uint8_t* buff, std::string_view time,
-                           std::string_view nonce1, std::string_view nonce2,
-                           std::string_view sol) const/* override */
+                       std::string_view nonce1, std::string_view nonce2,
+                       std::string_view sol) const /* override */
     {
         memcpy(buff, this->staticHeaderData, BLOCK_HEADER_STATIC_SIZE);
 

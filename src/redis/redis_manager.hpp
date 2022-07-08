@@ -10,12 +10,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../logger.hpp"
-#include "../stats.hpp"
-#include "../stats_manager.hpp"
-#include "./share.hpp"
-#include "block_submission.hpp"
-#include "payment_manager.hpp"
+#include "redis_transactoin.hpp"
+#include "logger.hpp"
+#include "stats/stats.hpp"
+#include "stats/stats_manager.hpp"
+#include "shares/share.hpp"
+#include "blocks/block_submission.hpp"
 #include "static_config/config.hpp"
 
 #define xstr(s) str(s)
@@ -62,20 +62,22 @@ class RedisManager
 
     double hgetd(std::string_view key, std::string_view field);
 
-    bool LoadSolvers(
-        std::unordered_map<std::string, MinerStats> &miner_stats_map,
-        std::unordered_map<std::string, Round> &round_map);
+    bool LoadSolvers(miner_map &miner_stats_map,
+                     round_map &round_map);
     bool ClosePoWRound(
         std::string_view chain, const BlockSubmission *submission, double fee,
-        std::unordered_map<std::string, MinerStats> &miner_stats_map,
-        std::unordered_map<std::string, Round> &round_map);
+        miner_map
+            &miner_stats_map,
+        round_map
+            &round_map);
 
    private:
     redisContext *rc;
     std::mutex rc_mutex;
     std::string coin_symbol;
 
-    bool hset(std::string_view key, std::string_view field, std::string_view val);
+    bool hset(std::string_view key, std::string_view field,
+              std::string_view val);
     int AppendUpdateWorkerCount(std::string_view address, int amount);
     int AppendCreateStatsTs(std::string_view addrOrWorker, std::string_view id,
                             std::string_view prefix);

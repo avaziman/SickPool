@@ -35,85 +35,6 @@ RedisManager::RedisManager(std::string ip, int port)
     }
 }
 
-bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,
-                                            int32_t confirmations)
-{
-    std::scoped_lock lock(rc_mutex);
-    // redis bitfield uses be so gotta swap em
-    return redisCommand(rc, "BITFIELD block:%b SET i32 0 %d", block_id.data(),
-                        block_id.size(), bswap_32(confirmations)) == nullptr;
-}
-
-bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
-{
-    std::scoped_lock lock(rc_mutex);
-
-    int command_count = 0;
-    uint32_t block_id = submission->number;
-    auto chain =
-        std::string((char *)submission->chain, sizeof(submission->chain));
-
-    redisAppendCommand(rc, "MULTI");
-    command_count++;
-
-    // serialize the block submission to save space and net
-    // bandwidth, as the indexes are added manually anyway no need for hash
-    redisAppendCommand(rc, "SET block:%u %b", block_id, submission,
-                       sizeof(BlockSubmission));
-    command_count++;
-
-    /* sortable indexes */
-    // block no. and block time will always be same order
-    // so only one index is required to sort by either of them
-    // (block num value is smaller)
-    redisAppendCommand(rc, "ZADD block-index:number %f %u",
-                       (double)submission->number, block_id);
-
-    redisAppendCommand(rc, "ZADD block-index:reward %f %u",
-                       (double)submission->blockReward, block_id);
-
-    redisAppendCommand(rc, "ZADD block-index:difficulty %f %u",
-                       submission->difficulty, block_id);
-
-    redisAppendCommand(rc, "ZADD block-index:effort %f %u",
-                       submission->effortPercent, block_id);
-
-    redisAppendCommand(rc, "ZADD block-index:duration %f %u",
-                       (double)submission->durationMs, block_id);
-    command_count += 5;
-    // /* non-sortable indexes */
-    redisAppendCommand(rc, "SADD block-index:chain:%s %u", chain.c_str(),
-                       block_id);
-    command_count++;
-
-    redisAppendCommand(rc, "SADD block-index:type:PoW %u", block_id);
-    command_count++;
-
-    redisAppendCommand(rc, "SADD block-index:solver:%b %u", submission->miner,
-                       sizeof(submission->miner), block_id);
-    command_count++;
-
-    command_count += AppendTsAdd(chain + ":round_effort_percent",
-                                 submission->timeMs, submission->effortPercent);
-
-    redisAppendCommand(rc, "EXEC");
-    command_count++;
-
-    redisReply *reply;
-    for (int i = 0; i < command_count; i++)
-    {
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Critical, LogField::Redis,
-                        "Failed to add block submission and indexes: %s",
-                        rc->errstr);
-            return false;
-        }
-        freeReplyObject(reply);
-    }
-    return true;
-}
-
 bool RedisManager::SetEstimatedNeededEffort(std::string_view chain,
                                             double effort)
 {
@@ -405,42 +326,40 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
     double matured_funds = 0;
     int command_count = 0;
     // either mature everything or nothing
-    redisAppendCommand(rc, "MULTI");
-    command_count++;
-
-    for (int i = 0; i < immatureReply->elements; i++)
     {
-        const redisReply *replyEntry = immatureReply->element[i];
-        const auto minerAddr = std::string_view(
-            strrchr(replyEntry->element[0]->str, ':'), ADDRESS_LEN);
-        double minerReward = 0;
+        RedisTransaction update_rewards_tx(rc, command_count);
 
-        if (replyEntry->element[2]->elements &&
-            replyEntry->element[2]->element[0]->elements)
+        for (int i = 0; i < immatureReply->elements; i++)
         {
-            const redisReply *rewardReply =
-                replyEntry->element[2]->element[0]->element[1];
-            minerReward = strtod(rewardReply->str, nullptr);
-            matured_funds += minerReward;
-        }
+            const redisReply *replyEntry = immatureReply->element[i];
+            const auto minerAddr = std::string_view(
+                strrchr(replyEntry->element[0]->str, ':'), ADDRESS_LEN);
+            double minerReward = 0;
 
-        if (matured)
-        {
-            redisAppendCommand(rc, "TS.INCRBY %b:mature-balance:%b %f",
+            if (replyEntry->element[2]->elements &&
+                replyEntry->element[2]->element[0]->elements)
+            {
+                const redisReply *rewardReply =
+                    replyEntry->element[2]->element[0]->element[1];
+                minerReward = strtod(rewardReply->str, nullptr);
+                matured_funds += minerReward;
+            }
+
+            if (matured)
+            {
+                redisAppendCommand(rc, "TS.INCRBY %b:mature-balance:%b %f",
+                                   chain.data(), chain.size(), minerAddr.data(),
+                                   minerAddr.size(), minerReward);
+                command_count++;
+            }
+
+            // if a block has been orphaned only remove the immature
+            redisAppendCommand(rc, "TS.INCRBY %b:immature-balance:%b -%f",
                                chain.data(), chain.size(), minerAddr.data(),
                                minerAddr.size(), minerReward);
             command_count++;
         }
-
-        // if a block has been orphaned only remove the immature
-        redisAppendCommand(rc, "TS.INCRBY %b:immature-balance:%b -%f",
-                           chain.data(), chain.size(), minerAddr.data(),
-                           minerAddr.size(), minerReward);
-        command_count++;
     }
-
-    redisAppendCommand(rc, "EXEC");
-    command_count++;
 
     redisReply *reply;
     for (int i = 0; i < command_count; i++)
@@ -535,55 +454,56 @@ bool RedisManager::AddWorker(std::string_view address,
 
     int command_count = 0;
 
-    redisAppendCommand(rc, "MULTI");
-    command_count++;
-
-    // 100% new, as we loaded all existing miners
-    if (newMiner)
     {
-        auto chain = std::string_view(COIN_SYMBOL);
-        auto balance_keys = {"immature-balance"sv, "mature-balance"sv};
-        for (std::string_view key_type : balance_keys)
+        RedisTransaction add_worker_tx(rc, command_count);
+
+        // 100% new, as we loaded all existing miners
+        if (newMiner)
         {
-            auto key = fmt::format("{}:{}:{}", chain, key_type, address);
-            command_count += AppendTsCreate(key, 0,
-                                            {{"type"sv, key_type},
-                                             {"address"sv, address},
-                                             {"id"sv, idTag}});
+            auto chain = std::string_view(COIN_SYMBOL);
+            auto balance_keys = {"immature-balance"sv, "mature-balance"sv};
+            for (std::string_view key_type : balance_keys)
+            {
+                auto key = fmt::format("{}:{}:{}", chain, key_type, address);
+                command_count += AppendTsCreate(key, 0,
+                                                {{"type"sv, key_type},
+                                                 {"address"sv, address},
+                                                 {"id"sv, idTag}});
+            }
+
+            command_count +=
+                AppendTsCreate(fmt::format("worker-count:{}", address),
+                               StatsManager::hashrate_ttl_seconds * 1000,
+                               {{"type"sv, "worker-count"sv}});
+
+            // reset all indexes of new miner
+            redisAppendCommand(rc, "ZADD solver-index:join-time %f %b",
+                               (double)curtime, address.data(), address.size());
+
+            for (auto index :
+                 {"worker-count"sv, "hashrate"sv, "mature-balance"sv})
+            {
+                redisAppendCommand(rc, "ZADD solver-index:%b 0 %b",
+                                   index.data(), index.size(), address.data(),
+                                   address.size());
+            }
+
+            redisAppendCommand(rc, "RPUSH round_entries:pow:%b {\"effort:\":0}",
+                               address.data(), address.size());
+
+            command_count += 5;
+
+            command_count += AppendCreateStatsTs(address, idTag, "miner"sv);
         }
 
-        command_count +=
-            AppendTsCreate(fmt::format("worker-count:{}", address),
-                           StatsManager::hashrate_ttl_seconds * 1000,
-                           {{"type"sv, "worker-count"sv}});
-
-        // reset all indexes of new miner
-        redisAppendCommand(rc, "ZADD solver-index:join-time %f %b",
-                           (double)curtime, address.data(), address.size());
-
-        for (auto index : {"worker-count"sv, "hashrate"sv, "mature-balance"sv})
+        // worker has been disconnected and came back, add him again
+        if (newWorker)
         {
-            redisAppendCommand(rc, "ZADD solver-index:%b 0 %b", index.data(),
-                               index.size(), address.data(), address.size());
+            command_count +=
+                AppendCreateStatsTs(worker_full, idTag, "worker"sv);
         }
-
-        redisAppendCommand(rc, "RPUSH round_entries:pow:%b {\"effort:\":0}",
-                           address.data(), address.size());
-
-        command_count += 5;
-
-        command_count += AppendCreateStatsTs(address, idTag, "miner"sv);
+        command_count += AppendUpdateWorkerCount(address, 1);
     }
-
-    // worker has been disconnected and came back, add him again
-    if (newWorker)
-    {
-        command_count += AppendCreateStatsTs(worker_full, idTag, "worker"sv);
-    }
-    command_count += AppendUpdateWorkerCount(address, 1);
-
-    redisAppendCommand(rc, "EXEC");
-    command_count++;
 
     redisReply *reply;
     for (int i = 0; i < command_count; i++)
@@ -677,9 +597,7 @@ double RedisManager::hgetd(std::string_view key, std::string_view field)
     freeReplyObject(reply);
     return val;
 }
-bool RedisManager::LoadSolvers(
-    std::unordered_map<std::string, MinerStats> &miner_stats_map,
-    std::unordered_map<std::string, Round> &round_map)
+bool RedisManager::LoadSolvers(miner_map &miner_stats_map, round_map &round_map)
 {
     std::scoped_lock lock(rc_mutex);
 
@@ -687,47 +605,46 @@ bool RedisManager::LoadSolvers(
         (redisReply *)redisCommand(rc, "ZRANGE solver-index:join-time 0 -1");
 
     int command_count = 0;
-
-    // either load everyone or no one
-    redisAppendCommand(rc, "MULTI");
-    command_count++;
-
-    size_t miner_count = miners_reply->elements;
-    for (int i = 0; i < miner_count; i++)
+    size_t miner_count = 0;
+    
+    // either load everyone or no
     {
-        std::string_view miner_addr(miners_reply->element[i]->str,
-                                    miners_reply->element[i]->len);
+        RedisTransaction load_tx(rc, command_count);
 
-        // load round effort
-        redisAppendCommand(rc, "LINDEX round_entries:pow:%b 0",
-                           miner_addr.data(), miner_addr.size());
+        miner_count = miners_reply->elements;
+        for (int i = 0; i < miner_count; i++)
+        {
+            std::string_view miner_addr(miners_reply->element[i]->str,
+                                        miners_reply->element[i]->len);
 
-        // load sum of hashrate over last average period
-        auto now = std::time(0);
-        // exactly same formula as updating stats
-        int64_t from = (now - (now % StatsManager::hashrate_interval_seconds) -
-                        StatsManager::hashrate_interval_seconds) *
-                       1000;
+            // load round effort
+            redisAppendCommand(rc, "LINDEX round_entries:pow:%b 0",
+                               miner_addr.data(), miner_addr.size());
 
-        redisAppendCommand(
-            rc,
-            "TS.RANGE hashrate:miner:%b %" PRIi64 " + AGGREGATION SUM %" PRIi64,
-            miner_addr.data(), miner_addr.size(), from,
-            StatsManager::average_hashrate_interval_seconds * 1000);
+            // load sum of hashrate over last average period
+            auto now = GetCurrentTimeMs();
+            // exactly same formula as updating stats
+            int64_t from =
+                now - (now % (StatsManager::hashrate_interval_seconds * 1000)) -
+                (StatsManager::hashrate_interval_seconds * 1000);
 
-        // reset worker count
-        redisAppendCommand(rc, "ZADD solver-index:worker-count 0 %b",
-                           miner_addr.data(), miner_addr.size());
+            redisAppendCommand(
+                rc,
+                "TS.RANGE hashrate:miner:%b %" PRIi64
+                " + AGGREGATION SUM %" PRIi64,
+                miner_addr.data(), miner_addr.size(), from,
+                StatsManager::average_hashrate_interval_seconds * 1000);
 
-        redisAppendCommand(rc, "TS.ADD worker-count:%b * 0", miner_addr.data(),
-                           miner_addr.size());
+            // reset worker count
+            redisAppendCommand(rc, "ZADD solver-index:worker-count 0 %b",
+                               miner_addr.data(), miner_addr.size());
 
-        command_count += 4;
+            redisAppendCommand(rc, "TS.ADD worker-count:%b * 0",
+                               miner_addr.data(), miner_addr.size());
+
+            command_count += 4;
+        }
     }
-
-    redisAppendCommand(rc, "EXEC");
-    command_count++;
-
     redisReply *reply;
     for (int i = 0; i < command_count; i++)
     {
@@ -778,10 +695,10 @@ bool RedisManager::LoadSolvers(
     return true;
 }
 
-bool RedisManager::ClosePoWRound(
-    std::string_view chain, const BlockSubmission *submission, double fee,
-    std::unordered_map<std::string, MinerStats> &miner_stats_map,
-    std::unordered_map<std::string, Round> &round_map)
+bool RedisManager::ClosePoWRound(std::string_view chain,
+                                 const BlockSubmission *submission, double fee,
+                                 miner_map &miner_stats_map,
+                                 round_map &round_map)
 {
     std::scoped_lock lock(rc_mutex);
 
@@ -801,64 +718,64 @@ bool RedisManager::ClosePoWRound(
     // AppendPoSBalances(chain, submission.timeMs);
 
     // redis transaction, so either all balances are added or none
-    redisAppendCommand(rc, "MULTI");
-    command_count++;
-
-    redisAppendCommand(rc, "HSET round_start " COIN_SYMBOL " %" PRIi64,
-                       submission->timeMs);
-    command_count++;
-
-    redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pow total 0");
-    command_count++;
-
-    for (auto &[miner_addr, miner_stats] : miner_stats_map)
     {
-        const double miner_effort = miner_stats.round_effort[chain].pow;
-
-        const double miner_share = miner_effort / total_effort;
-        const double miner_reward = block_reward * miner_share * (1 - fee);
-
-        redisAppendCommand(
-            rc,
-            "LSET round_entries:pow:%b 0 {\"height\":%d,\"effort\":%f,"
-            "\"share\":%f,\"reward\":%f}",
-            miner_addr.data(), miner_addr.size(), height,
-            miner_stats.round_effort[COIN_SYMBOL].pow, miner_share,
-            miner_reward);
-        command_count++;
-
-        // reset for next round
-        redisAppendCommand(rc, "LPUSH round_entries:pow:%b {\"effort\":0}",
-                           miner_addr.data(), miner_addr.size());
-        command_count++;
-
-        redisAppendCommand(rc,
-                           "TS.INCRBY "
-                           "%b:immature-balance:%b %f"
-                           " TIMESTAMP %" PRId64,
-                           chain.data(), chain.length(), miner_addr.data(),
-                           miner_addr.length(), miner_reward,
-                           submission->timeMs);
-        command_count++;
-
-        redisAppendCommand(rc, "ZINCRBY solver-index:balance %f %b",
-                           miner_reward, miner_addr.data(), miner_addr.size());
-        command_count++;
+        RedisTransaction close_round_tx(rc, command_count);
 
         redisAppendCommand(rc, "HSET round_start " COIN_SYMBOL " %" PRIi64,
                            submission->timeMs);
+        command_count++;
 
-        miner_stats.round_effort[chain].pow = 0;
+        redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pow total 0");
+        command_count++;
 
-        Logger::Log(LogType::Debug, LogField::Redis,
-                    "Round id: %u, miner: %.*s, effort: %f, share: %f, reward: "
-                    "%f, total effort: %f",
-                    submission->number, miner_addr.size(), miner_addr.data(),
-                    miner_effort, miner_share, miner_reward, total_effort);
+        for (auto &[miner_addr, miner_stats] : miner_stats_map)
+        {
+            const double miner_effort = miner_stats.round_effort[chain].pow;
+
+            const double miner_share = miner_effort / total_effort;
+            const double miner_reward = block_reward * miner_share * (1 - fee);
+
+            redisAppendCommand(
+                rc,
+                "LSET round_entries:pow:%b 0 {\"height\":%d,\"effort\":%f,"
+                "\"share\":%f,\"reward\":%f}",
+                miner_addr.data(), miner_addr.size(), height,
+                miner_stats.round_effort[COIN_SYMBOL].pow, miner_share,
+                miner_reward);
+            command_count++;
+
+            // reset for next round
+            redisAppendCommand(rc, "LPUSH round_entries:pow:%b {\"effort\":0}",
+                               miner_addr.data(), miner_addr.size());
+            command_count++;
+
+            redisAppendCommand(rc,
+                               "TS.INCRBY "
+                               "%b:immature-balance:%b %f"
+                               " TIMESTAMP %" PRId64,
+                               chain.data(), chain.length(), miner_addr.data(),
+                               miner_addr.length(), miner_reward,
+                               submission->timeMs);
+            command_count++;
+
+            redisAppendCommand(rc, "ZINCRBY solver-index:balance %f %b",
+                               miner_reward, miner_addr.data(),
+                               miner_addr.size());
+            command_count++;
+
+            redisAppendCommand(rc, "HSET round_start " COIN_SYMBOL " %" PRIi64,
+                               submission->timeMs);
+
+            miner_stats.round_effort[chain].pow = 0;
+
+            Logger::Log(
+                LogType::Debug, LogField::Redis,
+                "Round id: %u, miner: %.*s, effort: %f, share: %f, reward: "
+                "%f, total effort: %f",
+                submission->number, miner_addr.size(), miner_addr.data(),
+                miner_effort, miner_share, miner_reward, total_effort);
+        }
     }
-
-    redisAppendCommand(rc, "EXEC");
-    command_count++;
 
     redisReply *reply;
     for (int i = 0; i < command_count; i++)

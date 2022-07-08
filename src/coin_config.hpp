@@ -16,12 +16,13 @@ struct CoinConfig
     double default_diff;
     double target_shares_rate;
     int64_t stratum_port;
-    std::string redis_host;
+    int64_t control_port;
+    int64_t redis_port;
     std::vector<RpcConfig> rpcs;
 
     int64_t hashrate_interval_seconds;
     int64_t effort_interval_seconds;
-    int64_t average_hashrate_interval_seconds;
+    int64_t average_hashrate_interval_seconds;  
     int64_t hashrate_ttl_seconds;
     int64_t diff_adjust_seconds;
     int64_t socket_recv_timeout_seconds;

@@ -2,7 +2,7 @@
 
 StratumServer::StratumServer(const CoinConfig &conf)
     : coin_config(conf),
-      redis_manager("127.0.0.1", 6379),
+      redis_manager("127.0.0.1", (int)conf.redis_port),
       stats_manager(&redis_manager, (int)coin_config.hashrate_interval_seconds,
                     (int)coin_config.effort_interval_seconds,
                     (int)coin_config.average_hashrate_interval_seconds,
@@ -33,15 +33,16 @@ StratumServer::StratumServer(const CoinConfig &conf)
     }
 
     int optval = 1;
-    struct timeval timeout;
-    timeout.tv_sec = coin_config.socket_recv_timeout_seconds;
-    timeout.tv_usec = 0;
+    // struct timeval timeout;
+    // timeout.tv_sec = coin_config.socket_recv_timeout_seconds;
+    // timeout.tv_usec = 0;
 
     sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)))
         throw std::runtime_error("Failed to set stratum socket options");
 
-    // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)))
+    // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+    // sizeof(timeout)))
     //     throw std::runtime_error("Failed to set stratum socket options");
 
     if (sockfd == -1)
@@ -68,7 +69,7 @@ StratumServer::StratumServer(const CoinConfig &conf)
     std::thread stats_thread(&StatsManager::Start, &stats_manager);
     stats_thread.detach();
 
-    control_server.Start(1111);
+    control_server.Start(coin_config.control_port);
     std::thread control_thread(&StratumServer::HandleControlCommands, this);
     control_thread.detach();
 }
@@ -131,24 +132,27 @@ void StratumServer::Listen()
         inet_ntop(AF_INET, &ip_addr, ip_str, sizeof(ip_str));
 
         Logger::Log(LogType::Info, LogField::Stratum,
-                    "Tcp client connected, ip: %s, starting new thread...", ip_str);
+                    "Tcp client connected, ip: %s, starting new thread...",
+                    ip_str);
 
         if (conn_fd <= 0)
         {
-            Logger::Log(LogType::Warn, LogField::Stratum,
-                        "Invalid connecting socket accepted errno: %d. Ignoring...", errno);
+            Logger::Log(
+                LogType::Warn, LogField::Stratum,
+                "Invalid connecting socket accepted errno: %d. Ignoring...",
+                errno);
             continue;
         }
 
         std::thread cliHandler(&StratumServer::HandleSocket, this, conn_fd);
-        SetHighPriorityThread(cliHandler);
+        // SetHighPriorityThrea d(cliHandler);
         cliHandler.detach();
     }
 }
 
 void StratumServer::HandleSocket(int conn_fd)
 {
-    auto client = std::make_unique<StratumClient>(conn_fd, time(nullptr),
+    auto client = std::make_unique<StratumClient>(conn_fd, GetCurrentTimeMs(),
                                                   coin_config.default_diff);
     auto cli_ptr = client.get();
 
@@ -191,7 +195,6 @@ void StratumServer::HandleSocket(int conn_fd)
 
             {
                 std::scoped_lock cli_lock(clients_mutex);
-                // TODO: fix
                 clients.erase(
                     std::find(clients.begin(), clients.end(), client));
             }
@@ -210,7 +213,6 @@ void StratumServer::HandleSocket(int conn_fd)
                         "Request too big. %.*s", total, buffer);
 
             total = 0;
-            isBuffMaxed = false;
             continue;
         }
 
@@ -258,6 +260,7 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer,
     }
     catch (const simdjson::simdjson_error &err)
     {
+        SendReject(cli, id, (int)ShareCode::UNKNOWN, "Bad request");
         Logger::Log(LogType::Error, LogField::Stratum,
                     "Request JSON parse error: %s\nRequest: %.*s\n", err.what(),
                     reqSize, buffer);
@@ -283,6 +286,7 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer,
     }
     else
     {
+        SendReject(cli, id, (int)ShareCode::UNKNOWN, "Unknown method");
         Logger::Log(LogType::Warn, LogField::Stratum,
                     "Unknown request method: %.*s", method.size(),
                     method.data());
@@ -734,27 +738,11 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
 void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 {
     int64_t time = GetCurrentTimeMs();
-    auto start = TIME_NOW();
 
     ShareResult shareRes;
-
-    // we don't write to job just read so no lock needed
     const job_t *job = job_manager.GetJob(share.jobId);
 
-    if (job == nullptr)
-    {
-        shareRes.Code = ShareCode::JOB_NOT_FOUND;
-        shareRes.Message = "Job not found";
-        Logger::Log(LogType::Warn, LogField::Stratum,
-                    "Received share for unknown job id: %.*s",
-                    share.jobId.size(), share.jobId.data());
-    }
-    else
-    {
-        ShareProcessor::Process(time, *cli, *job, share, shareRes);
-        shareRes.Code = ShareCode::VALID_BLOCK;
-    }
-    auto end = TIME_NOW();
+    ShareProcessor::Process(*cli, job, share, shareRes, time);
 
     // > add share stats before submission to have accurate effort (its fast)
     // > possible that a timeseries wasn't created yet, so don't add shares
@@ -763,6 +751,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
         stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
                                shareRes.Diff);
     }
+
     switch (shareRes.Code)
     {
         case ShareCode::VALID_BLOCK:
@@ -781,18 +770,19 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
                                                 job, shareRes, chainRound, time,
                                                 coin_config.pow_fee);
             SendAccept(cli, id);
+            break;
         }
-        break;
         case ShareCode::VALID_SHARE:
             SendAccept(cli, id);
             break;
+        case ShareCode::JOB_NOT_FOUND:
+            Logger::Log(LogType::Warn, LogField::Stratum,
+                        "Received share for unknown job id: %.*s",
+                        share.jobId.size(), share.jobId.data());
         default:
             SendReject(cli, id, (int)shareRes.Code, shareRes.Message.c_str());
             break;
     }
-    // auto end = TIME_NOW();
-
-    auto duration = DIFF_US(end, start);
 
     // Logger::Log(LogType::Debug, LogField::Stratum,
     //             "Share processed in %dus, diff: %f, res: %d", duration,
@@ -800,7 +790,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 }
 
 void StratumServer::SendReject(const StratumClient *cli, int id, int err,
-                               const char *msg)
+                               const char *msg) const
 {
     char buffer[512];
     int len =
@@ -810,7 +800,7 @@ void StratumServer::SendReject(const StratumClient *cli, int id, int err,
     SendRaw(cli->GetSock(), buffer, len);
 }
 
-void StratumServer::SendAccept(const StratumClient *cli, int id)
+void StratumServer::SendAccept(const StratumClient *cli, int id) const
 {
     char buff[512];
     int len = snprintf(buff, sizeof(buff),
@@ -868,5 +858,6 @@ void StratumServer::AdjustDifficulty(StratumClient *cli, int64_t curTime)
 void StratumServer::BroadcastJob(const StratumClient *cli, const Job *job) const
 {
     // auto res =
-    SendRaw(cli->GetSock(), job->GetNotifyBuff(), job->GetNotifyBuffSize());
+    auto notifyMsg = job->GetNotifyMessage();
+    SendRaw(cli->GetSock(), notifyMsg.data(), notifyMsg.size());
 }

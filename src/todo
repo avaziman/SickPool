@@ -5,9 +5,9 @@ pos
 load workers for stats
 
 reset ws
-set round time if there isnt in db
 
 done
 
+set round time if there isnt in db
 >fix on bad auth crash?
 fix request too big when its not?

@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "../crypto/merkle_tree.hpp"
-#include "../crypto/utils.hpp"
+#include "merkle_tree.hpp"
+#include "utils.hpp"
 #include "block_template.hpp"
 
 #define EXTRANONCE_SIZE 4
@@ -83,9 +83,8 @@ class Job
         return (BLOCK_HEADER_SIZE * 2) + (int)txsHex.size();
     }
     std::string_view GetId() const { return std::string_view(jobId); }
+    std::string_view GetNotifyMessage() const { return std::string_view(notifyBuff, notifyBuffSize); }
     int64_t GetMinTime() const { return minTime; }
-    const char* GetNotifyBuff() const { return notifyBuff; }
-    std::size_t GetNotifyBuffSize() const { return notifyBuffSize; }
     double GetTargetDiff() const { return targetDiff; }
     double GetEstimatedShares() const { return expectedShares; }
     // arith_uint256* GetTarget() { return &target; }

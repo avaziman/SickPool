@@ -1,20 +1,28 @@
 #include <chrono>
 #include <iostream>
 
-#include "../crypto/utils.hpp"
-#include "../crypto/verushash/verus_hash.h"
-#include "../logger.hpp"
+#include "utils.hpp"
+#include "verushash/verus_hash.h"
+#include "logger.hpp"
+#include "jobs/job_manager.hpp"
 #include "share.hpp"
 #include "stratum_client.hpp"
-#include "verus_job.hpp"
+#include "jobs/verus_job.hpp"
 
 class ShareProcessor
 {
    public:
-    inline static void Process(int64_t curTime, StratumClient& cli,
-                               const job_t& job, const Share& share,
-                               ShareResult& result)
+    inline static void Process(StratumClient& cli, const job_t* job,
+                        const Share& share, ShareResult& result,
+                        int64_t curTime)
     {
+        if (job == nullptr)
+        {
+            result.Code = ShareCode::JOB_NOT_FOUND;
+            result.Message = "Job not found";
+            return;
+        }
+
         uint8_t* headerData = cli.GetBlockheaderBuff();
 
         if (!cli.GetIsAuthorized())
@@ -29,7 +37,7 @@ class ShareProcessor
         uint32_t shareTime = HexToUint(share.time.data(), share.time.size());
         shareTime = bswap_32(shareTime);  // swap to little endian
 
-        int64_t minTime = job.GetMinTime();
+        int64_t minTime = job->GetMinTime();
         int64_t maxTime = curTime / 1000 + MAX_FUTURE_BLOCK_TIME;
 
         if (shareTime < minTime || shareTime > maxTime)
@@ -43,8 +51,8 @@ class ShareProcessor
             return;
         }
 
-        job.GetHeaderData(headerData, share.time, cli.GetExtraNonce(),
-                          share.nonce2, share.solution);
+        job->GetHeaderData(headerData, share.time, cli.GetExtraNonce(),
+                           share.nonce2, share.solution);
 
 #if POW_ALGO == POW_ALGO_VERUSHASH
         // takes about 6-8 microseconds vs 8-12 on snomp
@@ -68,8 +76,8 @@ class ShareProcessor
 
         result.Diff = BitsToDiff(UintToArith256(hash).GetCompact(false));
 
-        // if (hashArith >= *job.GetTarget())
-        if (result.Diff >= job.GetTargetDiff())
+        // if (hashArith >= *job->GetTarget())
+        if (result.Diff >= job->GetTargetDiff())
         {
             result.Code = ShareCode::VALID_BLOCK;
             return;
@@ -82,11 +90,11 @@ class ShareProcessor
             Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
 
             // Logger::Log(LogType::Debug, LogField::ShareProcessor,
-            //             "Low difficulty share diff: %f, hash: %s", result.Diff,
-            //             hash.GetHex().c_str());
+            //             "Low difficulty share diff: %f, hash: %s",
+            //             result.Diff, hash.GetHex().c_str());
             // Logger::Log(LogType::Debug, LogField::ShareProcessor,
             //             "Block header: %.*s", BLOCK_HEADER_SIZE * 2,
-                        // blockHeaderHex);
+            // blockHeaderHex);
             return;
         }
 

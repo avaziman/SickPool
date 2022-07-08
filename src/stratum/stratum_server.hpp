@@ -11,21 +11,18 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../crypto/hash_wrapper.hpp"
-#include "../logger.hpp"
 #include "../sock_addr.hpp"
-#include "../stats_manager.hpp"
-#include "block_submission.hpp"
+#include "stats_manager.hpp"
 #include "coin_config.hpp"
-#include "control_server.hpp"
-#include "job_manager.hpp"
-#include "redis_manager.hpp"
-#include "share.hpp"
-#include "share_processor.hpp"
+#include "blocks/block_submission.hpp"
+#include "control/control_server.hpp"
+#include "jobs/job_manager.hpp"
+#include "redis/redis_manager.hpp"
+#include "shares/share_processor.hpp"
 #include "static_config/config.hpp"
 #include "stratum_client.hpp"
-#include "submission_manager.hpp"
-#include "verus_job.hpp"
+#include "blocks/block_submission_manager.hpp"
+#include "jobs/verus_job.hpp"
 
 #define MAX_HTTP_REQ_SIZE (MAX_BLOCK_SIZE * 2)
 #define MAX_HTTP_JSON_DEPTH 3
@@ -83,8 +80,8 @@ class StratumServer
 
     void HandleShare(StratumClient* cli, int id, Share& share);
     void SendReject(const StratumClient* cli, int id, int error,
-                    const char* msg);
-    void SendAccept(const StratumClient* cli, int id);
+                    const char* msg) const;
+    void SendAccept(const StratumClient* cli, int id) const;
     bool SubmitBlock(std::string_view block_hex);
 
     void UpdateDifficulty(StratumClient* cli);

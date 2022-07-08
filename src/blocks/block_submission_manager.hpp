@@ -8,8 +8,8 @@
 
 #include "block_submission.hpp"
 #include "daemon_manager.hpp"
-#include "redis_manager.hpp"
-#include "stats_manager.hpp"
+#include "redis/redis_manager.hpp"
+#include "stats/stats_manager.hpp"
 
 class SubmissionManager
 {

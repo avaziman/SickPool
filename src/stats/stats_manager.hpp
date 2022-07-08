@@ -12,29 +12,20 @@
 #include <thread>
 #include <unordered_map>
 
-#include "stats.hpp"
 #include "logger.hpp"
-#include "stratum/block_submission.hpp"
-#include "stratum/round.hpp"
-#include "stratum/share.hpp"
-#include "stratum/static_config/config.hpp"
-#include "stratum/redis_manager.hpp"
-
-// struct string_hash
-// {
-//     using transparent_key_equal = std::equal_to<>;  // Pred to use
-//     using hash_type = std::hash<std::string_view>;  // just a helper local type
-//     size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
-//     size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
-//     size_t operator()(const char* txt) const { return hash_type{}(txt); }
-// };
+#include "redis/redis_manager.hpp"
+#include "stats/stats.hpp"
+#include "blocks/block_submission.hpp"
+#include "round.hpp"
+#include "shares/share.hpp"
+#include "static_config/config.hpp"
 
 class RedisManager;
 class StatsManager
 {
    public:
-    StatsManager(RedisManager* redis_manager, int hr_interval, int effort_interval, int avg_hr_interval,
-                 int hashrate_ttl);
+    StatsManager(RedisManager* redis_manager, int hr_interval,
+                 int effort_interval, int avg_hr_interval, int hashrate_ttl);
 
     // Every hashrate_interval_seconds we need to write:
     // ) worker hashrate
@@ -63,17 +54,17 @@ class StatsManager
     static int effort_interval_seconds;
     static int average_hashrate_interval_seconds;
     static int hashrate_ttl_seconds;
-   private:
 
+   private:
     RedisManager* redis_manager;
 
     std::mutex stats_map_mutex;
     // worker -> stats
-    std::unordered_map<std::string, WorkerStats> worker_stats_map;
+    worker_map worker_stats_map;
     // miner -> stats
-    std::unordered_map<std::string, MinerStats> miner_stats_map;
+    miner_map miner_stats_map;
     // chain -> effort
-    std::unordered_map<std::string, Round> round_map;
+    round_map round_stats_map;
 };
 
 #endif

@@ -7,9 +7,10 @@
 #include <set>
 #include <unordered_set>
 
-#include "../crypto/hash_wrapper.hpp"
-#include "../crypto/utils.hpp"
-#include "../crypto/verushash/verus_hash.h"
+#include "hash_wrapper.hpp"
+#include "config.hpp"
+#include "utils.hpp"
+#include "verushash/verus_hash.h"
 
 #define REQ_BUFF_SIZE (1024 * 32)
 #define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - simdjson::SIMDJSON_PADDING)
@@ -26,14 +27,12 @@ class StratumClient
     uint32_t GetShareCount() const { return share_count; }
     int64_t GetLastAdjusted() const { return last_adjusted; }
     uint8_t* GetBlockheaderBuff() { return block_header; }
+    std::string_view GetExtraNonce() const { return extra_nonce_str; }
 
-    std::string_view GetExtraNonce() const
-    {
-        return std::string_view(extra_nonce_str);
-    }
     // make sting_view when unordered map supports it
     const std::string& GetAddress() const { return address; }
     const std::string& GetFullWorkerName() const { return worker_full; }
+    simdjson::ondemand::parser* GetParser() { return &parser; }
 
     void ResetShareCount() { share_count = 0; }
 
@@ -80,8 +79,6 @@ class StratumClient
         this->verusHasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
 #endif
     }
-
-    simdjson::ondemand::parser* GetParser() { return &parser; }
 
 #if POW_ALGO == POW_ALGO_VERUSHASH
     CVerusHashV2* GetHasher() { return &verusHasher; }
