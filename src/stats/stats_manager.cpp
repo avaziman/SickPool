@@ -74,15 +74,13 @@ void StatsManager::Start()
 bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
                                int64_t update_time_ms)
 {
-    redisReply* remove_avg_reply;
-    double pool_hr = 0;
-    int command_count = 0;
+    double pool_hr;
 
     std::scoped_lock lock(stats_map_mutex);
     Logger::Log(LogType::Info, LogField::StatsManager,
                 "Updating stats for %d miners, %d workers, is_interval: %d",
                 miner_stats_map.size(), worker_stats_map.size(), update_hr);
-    return false;
+
     for (auto& [worker, ws] : worker_stats_map)
     {
         if (update_hr)
@@ -130,19 +128,18 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
 
 bool StatsManager::LoadCurrentRound()
 {
-    double total_effort = redis_manager->hgetd(
-        fmt::format("round:pow:{}", COIN_SYMBOL), "total_effort");
+    double total_effort = redis_manager->GetRoundEffortPow(COIN_SYMBOL);
 
-    int64_t round_start =
-        redis_manager->hgeti(fmt::format("round:pow:{}", COIN_SYMBOL), "start");
+    int64_t round_start = redis_manager->GetRoundTimePow(COIN_SYMBOL);
     if (round_start == 0)
     {
         round_start = GetCurrentTimeMs();
-        round_stats_map[COIN_SYMBOL].round_start_ms = round_start;
 
-        redis_manager->SetLastRoundTimePow(COIN_SYMBOL, round_start);
+        redis_manager->SetRoundTimePow(COIN_SYMBOL, round_start);
+        redis_manager->SetRoundEffortPow(COIN_SYMBOL, total_effort);
     }
     round_stats_map[COIN_SYMBOL].round_start_ms = round_start;
+    round_stats_map[COIN_SYMBOL].pow = total_effort;
 
     Logger::Log(LogType::Info, LogField::StatsManager,
                 "Loaded pow round effort of: %f, started at: %" PRIi64,
@@ -176,10 +173,7 @@ void StatsManager::AddShare(const std::string& worker_full,
         worker_stats->interval_valid_shares++;
         worker_stats->current_interval_effort += diff;
 
-        // no need the interval shares, as its easy (fast) to calculate from
-        // workers on frontend (for miner)
-        miner_stats->round_effort[COIN_SYMBOL].pow += diff;
-        // other miner stats are calculated from worker stats for efficiency
+        miner_stats->round_effort_map[COIN_SYMBOL] += diff;
     }
 }
 
@@ -194,7 +188,6 @@ bool StatsManager::AddWorker(const std::string& address,
     bool newWorker = !worker_stats_map.contains(worker_full);
     bool newMiner = !miner_stats_map.contains(address);
     bool returning_worker = !worker_stats_map[worker_full].connection_count;
-    int command_count = 0;
 
     // 100% new, as we loaded all existing miners
     if (newMiner)
@@ -229,7 +222,6 @@ bool StatsManager::AddWorker(const std::string& address,
 void StatsManager::PopWorker(const std::string& worker_full,
                              const std::string& address)
 {
-    // db lock below
     std::scoped_lock stats_lock(stats_map_mutex);
 
     int con_count = (--worker_stats_map[worker_full].connection_count);
@@ -247,8 +239,28 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
 {
     // redis mutex already locked
     std::scoped_lock stats_lock(stats_map_mutex);
-    redis_manager->ClosePoWRound(chain, submission, fee, miner_stats_map,
-                                 round_stats_map);
+
+    auto chain_str = std::string(chain.data(), chain.size());
+
+    std::vector<RoundShare> miner_shares;
+    PaymentManager::GetRewardsProp(miner_shares, chain, submission->blockReward,
+                                   miner_stats_map,
+                                   round_stats_map[chain_str].pow, fee);
+
+    redis_manager->AddMinerShares(chain, submission, miner_shares);
+
+    // reset round
+    redis_manager->SetRoundTimePow(chain, submission->timeMs);
+    redis_manager->SetRoundEffortPow(chain, 0);
+
+    round_stats_map[chain_str].round_start_ms = submission->timeMs;
+    round_stats_map[chain_str].pow = 0;
+
+    for (auto& [_, miner] : miner_stats_map)
+    {
+        miner.ResetEffort();
+    }
+
     return true;
 }
 

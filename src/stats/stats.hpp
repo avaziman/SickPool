@@ -1,6 +1,7 @@
 #ifndef STATS_HPP
 #define STATS_HPP
 #include <unordered_map>
+
 #include "round.hpp"
 
 struct StringHash
@@ -42,8 +43,11 @@ struct WorkerStats
 
 struct MinerStats : public WorkerStats
 {
-    std::unordered_map<std::string_view, Round> round_effort;
+    std::unordered_map<std::string, double, StringHash, std::less<>>
+        round_effort_map;
     uint32_t worker_count = 0;
+
+    inline void ResetEffort() { round_effort_map.clear(); }
 };
 
 typedef std::unordered_map<std::string, WorkerStats, StringHash, std::less<>>

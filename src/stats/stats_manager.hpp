@@ -12,6 +12,7 @@
 #include <thread>
 #include <unordered_map>
 
+#include "payments/payment_manager.hpp"
 #include "logger.hpp"
 #include "redis/redis_manager.hpp"
 #include "stats/stats.hpp"

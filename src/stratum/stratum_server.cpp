@@ -341,7 +341,7 @@ void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
     submission_manager.CheckImmatureSubmissions();
     redis_manager.AddNetworkHr(chain, curtimeMs, newJob->GetTargetDiff());
 
-    redis_manager.SetEstimatedNeededEffort(chain, newJob->GetEstimatedShares());
+    redis_manager.SetRoundEstimatedEffort(chain, newJob->GetEstimatedShares());
     // TODO: combine all redis functions one new block to one pipelined
     // Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %"
     // PRId64,

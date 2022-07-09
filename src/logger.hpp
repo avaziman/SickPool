@@ -25,16 +25,17 @@ enum LogType
     Critical = 4,
 };
 
-enum class LogField
-{
-    Config = 0,
-    Stratum = 1,
-    JobManager = 2,
-    ShareProcessor = 3,
-    Redis = 4,
-    StatsManager = 5,
-    ControlServer = 6,
-    SubmissionManager = 7,
+enum class LogField {
+    Config,
+    Stratum,
+    JobManager,
+    ShareProcessor,
+    Redis,
+    StatsManager,
+    ControlServer,
+    SubmissionManager,
+    PaymentManager,
+
 };
 
 inline const char* ToString(LogField v)
@@ -57,6 +58,8 @@ inline const char* ToString(LogField v)
             return "CONTROL";
         case LogField::SubmissionManager:
             return "SUBMISSION";
+        case LogField::PaymentManager:
+            return "PAYMENT";
         default:
             return "Unknown";
     }
