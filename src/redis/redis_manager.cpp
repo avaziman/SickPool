@@ -12,8 +12,6 @@ RedisManager::RedisManager(std::string ip, int port) :
         exit(EXIT_FAILURE);
     }
 
-    redisReply *reply;
-
     AppendTsCreate("round_effort_percent"sv, 0, {});
     AppendTsCreate("worker_count"sv, 0, {});
     AppendTsCreate("miner_count"sv, 0, {});
@@ -47,13 +45,13 @@ void RedisManager::ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
     if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
     {
         Logger::Log(LogType::Critical, LogField::Redis,
-                    "Failed to get balances: %s", rc->errstr);
+                    "Failed to get balances: {}", rc->errstr);
         return;
     }
 
-    Logger::Log(LogType::Info, LogField::Redis,
-                "Closing round with %d balance changes",
-                hashReply->elements / 2);
+    const size_t miner_count = hashReply->elements / 2;
+     Logger::Log(LogType::Info, LogField::Redis,
+                  "Closing round with {} balance changes", miner_count);
 
     // separate append and get to pipeline (1 send, 1 recv!)
     for (int i = 0; i < hashReply->elements; i += 2)
@@ -349,29 +347,6 @@ void RedisManager::AppendTsAdd(std::string_view key_name, int64_t time,
     AppendCommand("TS.ADD %b %" PRId64 " %f", key_name.data(), key_name.size(),
                   time, value);
 }
-void RedisManager::AppendStatsUpdate(std::string_view addr,
-                                     std::string_view prefix,
-                                     int64_t update_time_ms, double hr,
-                                     const WorkerStats &ws)
-{
-    // miner hashrate
-    std::string key = fmt::format("{}:{}:{}", "hashrate", prefix, addr);
-    AppendTsAdd(key, update_time_ms, hr);
-
-    // average hashrate
-    key = fmt::format("{}:{}:{}", "hashrate:average", prefix, addr);
-    AppendTsAdd(key, update_time_ms, ws.average_hashrate);
-
-    // shares
-    key = fmt::format("{}:{}:{}", "shares:valid", prefix, addr);
-    AppendTsAdd(key, update_time_ms, ws.interval_valid_shares);
-
-    key = fmt::format("{}:{}:{}", "shares:invalid", prefix, addr);
-    AppendTsAdd(key, update_time_ms, ws.interval_invalid_shares);
-
-    key = fmt::format("{}:{}:{}", "shares:stale", prefix, addr);
-    AppendTsAdd(key, update_time_ms, ws.interval_stale_shares);
-}
 
 bool RedisManager::AddWorker(std::string_view address,
                              std::string_view worker_full,
@@ -488,101 +463,6 @@ double RedisManager::hgetd(std::string_view key, std::string_view field)
     }
     freeReplyObject(reply);
     return val;
-}
-bool RedisManager::LoadSolvers(miner_map &miner_stats_map, round_map &round_map)
-{
-    std::scoped_lock lock(rc_mutex);
-
-    auto miners_reply =
-        (redisReply *)redisCommand(rc, "ZRANGE solver-index:join-time 0 -1");
-
-    size_t miner_count = 0;
-
-    // either load everyone or no
-    {
-        RedisTransaction load_tx(rc, command_count);
-
-        miner_count = miners_reply->elements;
-        for (int i = 0; i < miner_count; i++)
-        {
-            std::string_view miner_addr(miners_reply->element[i]->str,
-                                        miners_reply->element[i]->len);
-
-            // load round effort
-            AppendCommand("LINDEX round_entries:pow:%b 0", miner_addr.data(),
-                          miner_addr.size());
-
-            // load sum of hashrate over last average period
-            auto now = GetCurrentTimeMs();
-            // exactly same formula as updating stats
-            int64_t from =
-                now - (now % (StatsManager::hashrate_interval_seconds * 1000)) -
-                (StatsManager::hashrate_interval_seconds * 1000);
-
-            AppendCommand(
-                "TS.RANGE hashrate:miner:%b %" PRIi64
-                " + AGGREGATION SUM %" PRIi64,
-                miner_addr.data(), miner_addr.size(), from,
-                StatsManager::average_hashrate_interval_seconds * 1000);
-
-            // reset worker count
-            AppendCommand("ZADD solver-index:worker-count 0 %b",
-                          miner_addr.data(), miner_addr.size());
-
-            AppendCommand("TS.ADD worker-count:%b * 0", miner_addr.data(),
-                          miner_addr.size());
-
-            command_count += 4;
-        }
-    }
-    redisReply *reply;
-    for (int i = 0; i < command_count; i++)
-    {
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Critical, LogField::StatsManager,
-                        "Failed to queue round_entries:pow get");
-            return false;
-        }
-
-        // we need to read the last response
-        if (i != command_count - 1)
-        {
-            freeReplyObject(reply);
-        }
-    }
-
-    for (int i = 0; i < miner_count; i++)
-    {
-        auto miner_addr = std::string(miners_reply->element[i]->str,
-                                      miners_reply->element[i]->len);
-
-        const double miner_effort = std::strtod(
-            reply->element[i * 4]->str + sizeof("{\"effort\":") - 1, nullptr);
-
-        double sum_last_avg_interval = 0;
-        if (reply->element[i * 4 + 1]->elements &&
-            reply->element[i * 4 + 1]->element[0]->elements)
-        {
-            sum_last_avg_interval = std::strtod(
-                reply->element[i * 4 + 1]->element[0]->element[1]->str,
-                nullptr);
-        }
-
-        miner_stats_map[miner_addr].round_effort_map[COIN_SYMBOL] =
-            miner_effort;
-        miner_stats_map[miner_addr].average_hashrate_sum +=
-            sum_last_avg_interval;
-
-        Logger::Log(LogType::Debug, LogField::StatsManager,
-                    "Loaded %.*s effort of %f, hashrate sum of %f",
-                    miner_addr.size(), miner_addr.data(), miner_effort,
-                    sum_last_avg_interval);
-    }
-
-    freeReplyObject(reply);
-    freeReplyObject(miners_reply);
-    return true;
 }
 
 bool RedisManager::AddMinerShares(std::string_view chain,

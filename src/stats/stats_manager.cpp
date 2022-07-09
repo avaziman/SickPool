@@ -64,21 +64,15 @@ void StatsManager::Start()
 
         auto endChrono = system_clock::now();
         auto duration = duration_cast<microseconds>(endChrono - startChrono);
-        // Logger::Log(LogType::Info, LogField::StatsManager,
-        //             "Stats update (is_interval: %d) took %dus, performed "
-        //             "%d redis commands.",
-        //             should_update_hr, duration.count(), command_count);
     }
 }
 
 bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
                                int64_t update_time_ms)
 {
-    double pool_hr;
-
     std::scoped_lock lock(stats_map_mutex);
     Logger::Log(LogType::Info, LogField::StatsManager,
-                "Updating stats for %d miners, %d workers, is_interval: %d",
+                "Updating stats for {} miners, {} workers, is_interval: {}",
                 miner_stats_map.size(), worker_stats_map.size(), update_hr);
 
     for (auto& [worker, ws] : worker_stats_map)
@@ -87,6 +81,14 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
         {
             ws.interval_hashrate =
                 ws.current_interval_effort / (double)hashrate_interval_seconds;
+
+            if (worker.size() < ADDRESS_LEN)
+            {
+                Logger::Log(LogType::Error, LogField::StatsManager,
+                            "Removing invalid worker name: {}", worker);
+                worker_stats_map.erase(worker);
+                continue;
+            }
             std::string addr = worker.substr(0, ADDRESS_LEN);
 
             ws.average_hashrate_sum += ws.interval_hashrate;
@@ -117,13 +119,11 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
                 miner_ws.average_hashrate_sum /
                 ((double)average_hashrate_interval_seconds /
                  hashrate_interval_seconds);
-
-            // pool hashrate
-            pool_hr += miner_ws.current_interval_effort;
         }
     }
 
-    return true;
+    return redis_manager->UpdateStats(worker_stats_map, miner_stats_map,
+                                      update_time_ms, update_hr, update_effort);
 }
 
 bool StatsManager::LoadCurrentRound()
@@ -146,7 +146,7 @@ bool StatsManager::LoadCurrentRound()
                 round_stats_map[COIN_SYMBOL].pow,
                 round_stats_map[COIN_SYMBOL].round_start_ms);
 
-    redis_manager->LoadSolvers(miner_stats_map, round_stats_map);
+    redis_manager->LoadSolverStats(miner_stats_map, round_stats_map);
     return true;
 }
 
@@ -193,8 +193,7 @@ bool StatsManager::AddWorker(const std::string& address,
     if (newMiner)
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
-                    "New miner has spawned: %.*s", address.size(),
-                    address.data());
+                    "New miner has spawned: {}", address);
     }
 
     // worker has been disconnected and came back, add him again
@@ -202,14 +201,13 @@ bool StatsManager::AddWorker(const std::string& address,
                                  newWorker, newMiner))
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
-                    "Worker %.*s added to database.", worker_full.size(),
-                    worker_full.data());
+                    "Worker {} added to database.", worker_full);
     }
     else
     {
         Logger::Log(LogType::Critical, LogField::StatsManager,
-                    "Failed to add worker %.*s to database.",
-                    worker_full.size(), worker_full.data());
+                    "Failed to add worker {} to database.",
+                    worker_full);
         return false;
     }
 

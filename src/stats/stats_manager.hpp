@@ -48,7 +48,6 @@ class StatsManager
 
     bool UpdateStats(bool update_effort, bool update_hr,
                      int64_t update_time_ms);
-
     Round GetChainRound(const std::string& chain);
 
     static int hashrate_interval_seconds;

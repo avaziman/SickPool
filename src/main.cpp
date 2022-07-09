@@ -23,11 +23,11 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg);
 
 int main(int argc, char** argv)
 {
-    std::cout << "Block Submission Size: " << sizeof(BlockSubmission);
+    // std::cout << "Block Submission Size: " << sizeof(BlockSubmission);
     Logger::Log(LogType::Info, LogField::Config, "Starting SickPool!");
 
     Logger::Log(LogType::Info, LogField::Config, "Static config:");
-    Logger::Log(LogType::Info, LogField::Config, "Coin symbol: %s",
+    Logger::Log(LogType::Info, LogField::Config, "Coin symbol: {}",
                 COIN_SYMBOL);
 
     Logger::Log(LogType::Info, LogField::Config, "Loading dynamic config...");
@@ -39,19 +39,19 @@ int main(int argc, char** argv)
         ParseCoinConfig(json, coinConfig);
 
         Logger::Log(LogType::Info, LogField::Config, "Coin config loaded:");
-        Logger::Log(LogType::Info, LogField::Config, "Pool address: %s",
-                    coinConfig.pool_addr.c_str());
-        Logger::Log(LogType::Info, LogField::Config, "Redis port: %d",
+        Logger::Log(LogType::Info, LogField::Config, "Pool address: {}",
+                    coinConfig.pool_addr);
+        Logger::Log(LogType::Info, LogField::Config, "Redis port: {}",
                     coinConfig.redis_port);
-        Logger::Log(LogType::Info, LogField::Config, "PoW fee: %f",
+        Logger::Log(LogType::Info, LogField::Config, "PoW fee: {}",
                     coinConfig.pow_fee);
-        Logger::Log(LogType::Info, LogField::Config, "PoS fee: %f",
+        Logger::Log(LogType::Info, LogField::Config, "PoS fee: {}",
                     coinConfig.pos_fee);
-        Logger::Log(LogType::Info, LogField::Config, "Hashrate retention: %ds",
+        Logger::Log(LogType::Info, LogField::Config, "Hashrate retention: {}s",
                     coinConfig.hashrate_interval_seconds);
-        Logger::Log(LogType::Info, LogField::Config, "Hashrate ttl: %ds",
+        Logger::Log(LogType::Info, LogField::Config, "Hashrate ttl: {}s",
                     coinConfig.hashrate_ttl_seconds);
-        Logger::Log(LogType::Info, LogField::Config, "Effort retention: %ds",
+        Logger::Log(LogType::Info, LogField::Config, "Effort retention: {}s",
                     coinConfig.effort_interval_seconds);
 
         StratumServer stratumServer(coinConfig);
@@ -59,7 +59,7 @@ int main(int argc, char** argv)
     }
     catch (std::runtime_error e)
     {
-        Logger::Log(LogType::Critical, LogField::Config, "START-UP ERROR: %s.",
+        Logger::Log(LogType::Critical, LogField::Config, "START-UP ERROR: {}.",
                     e.what());
         return EXIT_FAILURE;
     }

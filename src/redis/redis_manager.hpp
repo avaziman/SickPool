@@ -54,6 +54,12 @@ class RedisManager
                         const BlockSubmission *submission,
                         std::vector<RoundShare> &miner_shares);
 
+    /* stats */
+    bool LoadSolverStats(miner_map &miner_stats_map, round_map &round_map);
+    bool UpdateStats(worker_map worker_stats, miner_map miner_stats,
+                     int64_t update_time_ms, bool update_interval,
+                     bool update_effort);
+
     void ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
                        int64_t reward, uint32_t height,
                        const double totalEffort, const double fee);
@@ -63,8 +69,6 @@ class RedisManager
     int AddNetworkHr(std::string_view chain, int64_t time, double hr);
 
     void UpdatePoS(uint64_t from, uint64_t maturity);
-
-    bool LoadSolvers(miner_map &miner_stats_map, round_map &round_map);
 
    private:
     redisContext *rc;
@@ -88,7 +92,7 @@ class RedisManager
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
             {
                 Logger::Log(LogType::Critical, LogField::Redis,
-                            "Failed to get reply: %s\n", rc->errstr);
+                            "Failed to get reply: {}\n", rc->errstr);
                 res = false;
             }
             freeReplyObject(reply);
@@ -114,9 +118,10 @@ class RedisManager
 
     void AppendTsAdd(std::string_view key_name, int64_t time, double value);
 
-    void AppendStatsUpdate(std::string_view addr, std::string_view prefix,
-                           int64_t update_time_ms, double hr,
-                           const WorkerStats &ws);
+    void AppendIntervalStatsUpdate(std::string_view addr,
+                                   std::string_view prefix,
+                                   int64_t update_time_ms,
+                                   const WorkerStats &ws);
 };
 
 #endif

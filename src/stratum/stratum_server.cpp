@@ -11,23 +11,11 @@ StratumServer::StratumServer(const CoinConfig &conf)
       job_manager(&daemon_manager, coin_config.pool_addr),
       submission_manager(&redis_manager, &daemon_manager, &stats_manager)
 {
-    // never grow beyond this size
-    // simdjson::error_code error =
-    //     reqParser.allocate(REQ_BUFF_SIZE, MAX_HTTP_JSON_DEPTH);
-
-    // if (error != simdjson::SUCCESS)
-    // {
-    //     Logger::Log(LogType::Critical, LogField::Stratum,
-    //                 "Failed to allocate request parser buffer: %d -> %s",
-    //                 error, simdjson::error_message(error));
-    //     exit(EXIT_FAILURE);
-    // }
-
     auto error = httpParser.allocate(MAX_HTTP_REQ_SIZE, MAX_HTTP_JSON_DEPTH);
     if (error != simdjson::SUCCESS)
     {
         Logger::Log(LogType::Critical, LogField::Stratum,
-                    "Failed to allocate http parser buffer: %d -> %s", error,
+                    "Failed to allocate http parser buffer: {}",
                     simdjson::error_message(error));
         exit(EXIT_FAILURE);
     }
@@ -118,7 +106,7 @@ void StratumServer::StartListening()
 void StratumServer::Listen()
 {
     Logger::Log(LogType::Info, LogField::Stratum,
-                "Started listenning on port: %d", ntohs(this->addr.sin_port));
+                "Started listenning on port: {}", ntohs(this->addr.sin_port));
 
     while (true)
     {
@@ -217,8 +205,8 @@ void StratumServer::HandleSocket(int conn_fd)
         }
 
         // there can be multiple messages in 1 recv
-        // {1}]\n{2}
-        reqStart = strchr(buffer, '{');  // first { should be at first char
+        // {1}\n{2}
+        reqStart = strchr(buffer, '{'); 
         while (reqEnd != nullptr)
         {
             reqLen = reqEnd - reqStart;
@@ -262,8 +250,8 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer,
     {
         SendReject(cli, id, (int)ShareCode::UNKNOWN, "Bad request");
         Logger::Log(LogType::Error, LogField::Stratum,
-                    "Request JSON parse error: %s\nRequest: %.*s\n", err.what(),
-                    reqSize, buffer);
+                    "Request JSON parse error: {}\nRequest: {}\n", err.what(),
+                    std::string_view(buffer, reqSize));
         return;
     }
     auto end = std::chrono::steady_clock::now();
@@ -288,8 +276,7 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer,
     {
         SendReject(cli, id, (int)ShareCode::UNKNOWN, "Unknown method");
         Logger::Log(LogType::Warn, LogField::Stratum,
-                    "Unknown request method: %.*s", method.size(),
-                    method.data());
+                    "Unknown request method: {}", method);
     }
 }
 
@@ -343,28 +330,24 @@ void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
 
     redis_manager.SetRoundEstimatedEffort(chain, newJob->GetEstimatedShares());
     // TODO: combine all redis functions one new block to one pipelined
-    // Logger::Log(LogType::Info, LogField::Stratum, "Mature timestamp: %"
-    // PRId64,
-    //             mature_timestamp_ms);
 
     Logger::Log(LogType::Info, LogField::JobManager,
-                "Broadcasted new job: #%.*s", newJob->GetId().length(),
-                newJob->GetId().data());
-    Logger::Log(LogType::Info, LogField::JobManager, "Height: %d",
+                "Broadcasted new job: # {}", newJob->GetId());
+    Logger::Log(LogType::Info, LogField::JobManager, "Height: {}",
                 newJob->GetHeight());
-    Logger::Log(LogType::Info, LogField::JobManager, "Min time: %d",
+    Logger::Log(LogType::Info, LogField::JobManager, "Min time: {}",
                 newJob->GetMinTime());
-    Logger::Log(LogType::Info, LogField::JobManager, "Difficutly: %f",
+    Logger::Log(LogType::Info, LogField::JobManager, "Difficutly: {}",
                 newJob->GetTargetDiff());
-    Logger::Log(LogType::Info, LogField::JobManager, "Est. shares: %f",
+    Logger::Log(LogType::Info, LogField::JobManager, "Est. shares: {}",
                 newJob->GetEstimatedShares());
     // Logger::Log(LogType::Info, LogField::JobManager, "Target: %s",
     //             job->GetTarget()->GetHex().c_str());
-    Logger::Log(LogType::Info, LogField::JobManager, "Block reward: %d",
+    Logger::Log(LogType::Info, LogField::JobManager, "Block reward: {}",
                 newJob->GetBlockReward());
-    Logger::Log(LogType::Info, LogField::JobManager, "Transaction count: %d",
+    Logger::Log(LogType::Info, LogField::JobManager, "Transaction count: {}",
                 newJob->GetTransactionCount());
-    Logger::Log(LogType::Info, LogField::JobManager, "Block size: %d",
+    Logger::Log(LogType::Info, LogField::JobManager, "Block size: {}",
                 newJob->GetBlockSize());
 }
 
@@ -389,8 +372,8 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     catch (const simdjson::simdjson_error &err)
     {
         Logger::Log(LogType::Warn, LogField::Stratum,
-                    "Failed to parse wallet notify, txid: %.*s, error: %s",
-                    txId.size(), txId.data(), err.what());
+                    "Failed to parse wallet notify, txid: {}, error: {}",
+                    txId, err.what());
         return;
     }
 
@@ -407,14 +390,13 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     {
         Logger::Log(
             LogType::Error, LogField::Stratum,
-            "CheckAcceptedBlock error: Wrong address: %.*s, block: %.*s",
-            address.size(), address.data(), blockHash.size(), blockHash.data());
+            "CheckAcceptedBlock error: Wrong address: {}, block: {}",
+            address, blockHash);
         return;
     }
 
     Logger::Log(LogType::Info, LogField::Stratum,
-                "Received PoS TxId: %.*s, block hash: %.*s", txId.size(),
-                txId.data(), blockHash.size(), blockHash.data());
+                "Received PoS TxId: {}, block hash: {}", txId, blockHash);
 
     // now make sure we actually staked the PoS block and not just received a tx
     // inside one.
@@ -452,7 +434,7 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     catch (const simdjson_error &err)
     {
         Logger::Log(LogType::Error, LogField::Stratum,
-                    "HandleWalletNotify: Failed to parse json, error: %s",
+                    "HandleWalletNotify: Failed to parse json, error: {}",
                     err.what());
         return;
     }
@@ -462,8 +444,8 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     {
         Logger::Log(
             LogType::Error, LogField::Stratum,
-            "CheckAcceptedBlock error: Wrong address: %.*s, block: %.*s",
-            address.size(), address.data(), blockHash.size(), blockHash.data());
+            "CheckAcceptedBlock error: Wrong address: {}, block: {}",
+            address, blockHash);
     }
 
     resCode = daemon_manager.SendRpcReq<std::any>(resBody, 1, "getblock",
@@ -473,7 +455,7 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     {
         Logger::Log(LogType::Error, LogField::Stratum,
                     "CheckAcceptedBlock error: Failed to getblock, "
-                    "http code: %d",
+                    "http code: {}",
                     resCode);
         return;
     }
@@ -492,7 +474,7 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     catch (const simdjson_error &err)
     {
         Logger::Log(LogType::Error, LogField::Stratum,
-                    "HandleWalletNotify (1): Failed to parse json, error: %s",
+                    "HandleWalletNotify (1): Failed to parse json, error: {}",
                     err.what());
         return;
     }
@@ -500,15 +482,14 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     if (validationType != "stake")
     {
         Logger::Log(LogType::Critical, LogField::Stratum,
-                    "Double PoS block check failed! block hash: %.*s",
-                    blockHash.size(), blockHash.data());
+                    "Double PoS block check failed! block hash: {}",
+                    blockHash);
         return;
     }
     if (coinbaseTxId != txId)
     {
         Logger::Log(LogType::Critical, LogField::Stratum,
-                    "TxId is not coinbase, block hash: %.*s", blockHash.size(),
-                    blockHash.data());
+                    "TxId is not coinbase, block hash: {}", blockHash);
         return;
     }
     // we have verified:
@@ -516,8 +497,8 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     // the txid is ours (got its value),
     // the txid is indeed the coinbase tx
 
-    Logger::Log(LogType::Info, LogField::Stratum, "Found PoS Block! hash: %.*s",
-                blockHash.size(), blockHash.data());
+    Logger::Log(LogType::Info, LogField::Stratum, "Found PoS Block! hash: {}",
+                blockHash);
 }
 
 void StratumServer::HandleSubscribe(const StratumClient *cli, int id,
@@ -577,7 +558,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     catch (const simdjson_error &err)
     {
         Logger::Log(LogType::Error, LogField::Stratum,
-                    "No worker name provided in authorization. err: %s",
+                    "No worker name provided in authorization. err: {}",
                     err.what());
         return;
     }
@@ -632,7 +613,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
             SendReject(cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
                        "Server error: Failed to validate address!");
             Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Authorize RPC (validateaddress) failed: %s",
+                        "Authorize RPC (validateaddress) failed: {}",
                         err.what());
             return;
         }
@@ -660,7 +641,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
                     SendReject(cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
                                "Server error: Failed to get id!");
                     Logger::Log(LogType::Critical, LogField::Stratum,
-                                "Authorize RPC (getidentity) failed: %s",
+                                "Authorize RPC (getidentity) failed: {}",
                                 err.what());
                     return;
                 }
@@ -690,9 +671,8 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     cli->SetAuthorized();
 
     Logger::Log(LogType::Info, LogField::Stratum,
-                "Authorized worker: %.*s, address: %.*s, id: %.*s",
-                worker.size(), worker.data(), valid_addr.size(),
-                valid_addr.data(), idTag.size(), idTag.data());
+                "Authorized worker: {}, address: {}, id: {}",
+                worker, valid_addr, idTag);
 
     SendAccept(cli, id);
     this->UpdateDifficulty(cli);
@@ -728,7 +708,7 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
     {
         SendReject(cli, id, (int)ShareCode::UNKNOWN, "invalid params");
         Logger::Log(LogType::Critical, LogField::Stratum,
-                    "Failed to parse submit: %s", err.what());
+                    "Failed to parse submit: {}", err.what());
         return;
     }
 
@@ -777,16 +757,16 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
             break;
         case ShareCode::JOB_NOT_FOUND:
             Logger::Log(LogType::Warn, LogField::Stratum,
-                        "Received share for unknown job id: %.*s",
-                        share.jobId.size(), share.jobId.data());
+                        "Received share for unknown job id: {}",
+                        share.jobId);
         default:
             SendReject(cli, id, (int)shareRes.Code, shareRes.Message.c_str());
             break;
     }
 
-    // Logger::Log(LogType::Debug, LogField::Stratum,
-    //             "Share processed in %dus, diff: %f, res: %d", duration,
-    //             shareRes.Diff, (int)shareRes.Code);
+    Logger::Log(LogType::Debug, LogField::Stratum,
+                "Share processed in {}us, diff: {}, res: {}", GetCurrentTimeMs() - time,
+                shareRes.Diff, (int)shareRes.Code);
 }
 
 void StratumServer::SendReject(const StratumClient *cli, int id, int err,
@@ -823,8 +803,8 @@ void StratumServer::UpdateDifficulty(StratumClient *cli)
 
     SendRaw(cli->GetSock(), request, len);
 
-    Logger::Log(LogType::Debug, LogField::Stratum, "Set difficulty to %s",
-                arith256.GetHex().c_str());
+    Logger::Log(LogType::Debug, LogField::Stratum, "Set difficulty to {}",
+                arith256.GetHex());
 }
 
 void StratumServer::AdjustDifficulty(StratumClient *cli, int64_t curTime)

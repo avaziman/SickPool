@@ -38,18 +38,18 @@ include(FetchContent)
 FetchContent_Declare(
     fmt
     GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-    GIT_TAG tags/8.1.1
+    GIT_TAG tags/9.0.0
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(fmt)
 
 # GoogleTest requires at least C++14
-# FetchContent_Declare(
-#     googletest
-#     GIT_REPOSITORY https://github.com/google/googletest.git
-#     GIT_TAG tags/v1.12.0
-#     GIT_SHALLOW TRUE
-# )
-# FetchContent_MakeAvailable(googletest)
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG tags/v1.12.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(googletest)
 
 # include_directories(lib/rapidjson/include)
 # add_subdirectory(lib/benchmark)
@@ -57,6 +57,6 @@ add_subdirectory(src)
 
 # add_subdirectory(stratum_notifier)
 # add_subdirectory(benchmark)
-# add_subdirectory(tests)
+add_subdirectory(tests)
 add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME_CORE})

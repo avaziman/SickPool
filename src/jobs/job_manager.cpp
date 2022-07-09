@@ -10,8 +10,8 @@ const job_t* JobManager::GetNewJob()
     {
         Logger::Log(
             LogType::Critical, LogField::JobManager,
-            "Failed to get block template, http code: %d, response: %s",
-            resCode, json.c_str());
+            "Failed to get block template, http code: {}, response: {}",
+            resCode, json);
         return nullptr;
     }
 
@@ -96,8 +96,8 @@ const job_t* JobManager::GetNewJob(const std::string& json_template)
     catch (const simdjson::simdjson_error& err)
     {
         Logger::Log(LogType::Critical, LogField::JobManager,
-                    "Failed to parse block template: %s, json: %s", err.what(),
-                    json_template.c_str());
+                    "Failed to parse block template: {}, json: {}", err.what(),
+                    json_template);
     }
     return nullptr;
 }

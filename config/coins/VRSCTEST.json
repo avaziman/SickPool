@@ -1,6 +1,7 @@
 {
     "control_port": 1111,
     "stratum_port": 4444,
+    "redis_port": 6379,
     "pow_fee": 0.01,
     "pos_fee": 0.01,
     "default_diff1": 30000,

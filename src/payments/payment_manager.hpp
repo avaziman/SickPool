@@ -23,7 +23,7 @@ class PaymentManager
 
         if (total_effort == 0)
         {
-            Logger::Log(LogType::Critical, LogField::PaymentManager,
+            Logger::Log<>(LogType::Critical, LogField::PaymentManager,
                         "Round effort is 0!");
             return false;
         }
@@ -41,10 +41,10 @@ class PaymentManager
 
             Logger::Log(
                 LogType::Info, LogField::PaymentManager,
-                "Miner round share: %.*s, effort: %f, share: %f, reward: "
-                "%f, total effort: %f",
-                round_share.address.size(), round_share.address.data(),
-                round_share.effort, round_share.share, round_share.reward);
+                "Miner round share: {}, effort: {}, share: {}, reward: "
+                "{}, total effort: {}",
+                round_share.address,
+                round_share.effort, round_share.share, round_share.reward, total_effort);
         }
 
         return true;

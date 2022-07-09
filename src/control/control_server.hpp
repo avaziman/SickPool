@@ -62,7 +62,7 @@ class ControlServer
         close(connfd);
 
         Logger::Log(LogType::Info, LogField::ControlServer,
-                    "Received command: %d", cmd);
+                    "Received command: {}", (int)cmd);
 
         return cmd;
     }

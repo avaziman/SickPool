@@ -2,6 +2,7 @@
 #define LOGGER_HPP_
 
 #include <cstdio>
+#include <fmt/format.h>
 
 enum ColorCode
 {
@@ -68,9 +69,10 @@ inline const char* ToString(LogField v)
 class Logger
 {
    public:
-    template <typename... Args>
-    static void Log(LogType type, LogField field, const char* message, Args... args){
-        
+    template <typename... T>
+     static void Log(LogType type, LogField field, fmt::format_string<T...> message,
+                    T&&... args)
+    {
         const char* field_str = ToString(field);
         switch (type)
         {
@@ -92,14 +94,14 @@ class Logger
                 break;
         }
 
-        if constexpr (sizeof...(args))
-        {
-            printf(message, args...);
-        }
-        else
-        {
-            printf("%s", message);
-        }
+        // if constexpr (sizeof...(args))
+        // {
+            fmt::print(message, args...);
+        // // }
+        // else
+        // {
+        //     fmt::print(message);
+        // }
         printf("\n");
     }
 };

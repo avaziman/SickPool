@@ -9,6 +9,7 @@ set(PROJECT_NAME_TESTS ${PROJECT_NAME}_tests)
 
 add_executable(${PROJECT_NAME_TESTS}
         main.cpp
+        redis_test.cpp
         job_manager_test.cpp
         req_parse_test.cpp
         # difficulty_test.cpp
@@ -25,4 +26,4 @@ target_link_libraries(
     ${PROJECT_NAME_CORE} # link the pool
     gtest
 )
-# gtest_discover_tests(${PROJECT_NAME}_tests)
+gtest_discover_tests(${PROJECT_NAME_TESTS})
