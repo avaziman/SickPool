@@ -3,9 +3,12 @@
 StratumServer::StratumServer(const CoinConfig &conf)
     : coin_config(conf),
       redis_manager("127.0.0.1", (int)conf.redis_port),
-      stats_manager(&redis_manager, (int)coin_config.hashrate_interval_seconds,
+      diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
+      stats_manager(&redis_manager, &diff_manager,
+                    (int)coin_config.hashrate_interval_seconds,
                     (int)coin_config.effort_interval_seconds,
                     (int)coin_config.average_hashrate_interval_seconds,
+                    (int)coin_config.diff_adjust_seconds,
                     (int)coin_config.hashrate_ttl_seconds),
       daemon_manager(coin_config.rpcs),
       job_manager(&daemon_manager, coin_config.pool_addr),
@@ -120,14 +123,14 @@ void StratumServer::Listen()
         inet_ntop(AF_INET, &ip_addr, ip_str, sizeof(ip_str));
 
         Logger::Log(LogType::Info, LogField::Stratum,
-                    "Tcp client connected, ip: %s, starting new thread...",
+                    "Tcp client connected, ip: {}, starting new thread...",
                     ip_str);
 
         if (conn_fd <= 0)
         {
             Logger::Log(
                 LogType::Warn, LogField::Stratum,
-                "Invalid connecting socket accepted errno: %d. Ignoring...",
+                "Invalid connecting socket accepted errno: {}. Ignoring...",
                 errno);
             continue;
         }
@@ -188,7 +191,7 @@ void StratumServer::HandleSocket(int conn_fd)
             }
 
             Logger::Log(LogType::Info, LogField::Stratum,
-                        "Client disconnected. res: %d, errno: %d", recvRes,
+                        "Client disconnected. res: {}, errno: {}", recvRes,
                         errno);
             break;
         }
@@ -198,7 +201,7 @@ void StratumServer::HandleSocket(int conn_fd)
         if (isBuffMaxed && !reqEnd)
         {
             Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Request too big. %.*s", total, buffer);
+                        "Request too big. {}", std::string_view(buffer, total));
 
             total = 0;
             continue;
@@ -206,7 +209,7 @@ void StratumServer::HandleSocket(int conn_fd)
 
         // there can be multiple messages in 1 recv
         // {1}\n{2}
-        reqStart = strchr(buffer, '{'); 
+        reqStart = strchr(buffer, '{');
         while (reqEnd != nullptr)
         {
             reqLen = reqEnd - reqStart;
@@ -301,19 +304,19 @@ void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
     // save it to process round
     {
         std::scoped_lock clients_lock(clients_mutex);
-        for (auto it = clients.begin(); it != clients.end(); it++)
+        for (auto& cli : clients)
         {
             // (*it)->SetDifficulty(1000000, curtimeMs);
             // (*it)->SetDifficulty(job->GetTargetDiff(), curtimeMs);
             // UpdateDifficulty(*it);
-            BroadcastJob((*it).get(), newJob);
+            if (cli->GetIsPendingDiff())
+            {
+                cli->ActivatePendingDiff();
+                UpdateDifficulty(cli.get());
+            }
+            BroadcastJob(cli.get(), newJob);
         }
     }
-
-    // for (auto it = clients.begin(); it != clients.end(); it++)
-    // {
-    //     AdjustDifficulty(*it, curtime);
-    // }
 
     // in case of a crash without shares, we need to update round start time
 
@@ -372,8 +375,8 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     catch (const simdjson::simdjson_error &err)
     {
         Logger::Log(LogType::Warn, LogField::Stratum,
-                    "Failed to parse wallet notify, txid: {}, error: {}",
-                    txId, err.what());
+                    "Failed to parse wallet notify, txid: {}, error: {}", txId,
+                    err.what());
         return;
     }
 
@@ -388,10 +391,9 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
 
     if (address != coin_config.pool_addr)
     {
-        Logger::Log(
-            LogType::Error, LogField::Stratum,
-            "CheckAcceptedBlock error: Wrong address: {}, block: {}",
-            address, blockHash);
+        Logger::Log(LogType::Error, LogField::Stratum,
+                    "CheckAcceptedBlock error: Wrong address: {}, block: {}",
+                    address, blockHash);
         return;
     }
 
@@ -442,10 +444,9 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     // double check
     if (address != coin_config.pool_addr)
     {
-        Logger::Log(
-            LogType::Error, LogField::Stratum,
-            "CheckAcceptedBlock error: Wrong address: {}, block: {}",
-            address, blockHash);
+        Logger::Log(LogType::Error, LogField::Stratum,
+                    "CheckAcceptedBlock error: Wrong address: {}, block: {}",
+                    address, blockHash);
     }
 
     resCode = daemon_manager.SendRpcReq<std::any>(resBody, 1, "getblock",
@@ -482,8 +483,7 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     if (validationType != "stake")
     {
         Logger::Log(LogType::Critical, LogField::Stratum,
-                    "Double PoS block check failed! block hash: {}",
-                    blockHash);
+                    "Double PoS block check failed! block hash: {}", blockHash);
         return;
     }
     if (coinbaseTxId != txId)
@@ -671,8 +671,8 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     cli->SetAuthorized();
 
     Logger::Log(LogType::Info, LogField::Stratum,
-                "Authorized worker: {}, address: {}, id: {}",
-                worker, valid_addr, idTag);
+                "Authorized worker: {}, address: {}, id: {}", worker,
+                valid_addr, idTag);
 
     SendAccept(cli, id);
     this->UpdateDifficulty(cli);
@@ -757,16 +757,15 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
             break;
         case ShareCode::JOB_NOT_FOUND:
             Logger::Log(LogType::Warn, LogField::Stratum,
-                        "Received share for unknown job id: {}",
-                        share.jobId);
+                        "Received share for unknown job id: {}", share.jobId);
         default:
             SendReject(cli, id, (int)shareRes.Code, shareRes.Message.c_str());
             break;
     }
 
     Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in {}us, diff: {}, res: {}", GetCurrentTimeMs() - time,
-                shareRes.Diff, (int)shareRes.Code);
+                "Share processed in {}us, diff: {}, res: {}",
+                GetCurrentTimeMs() - time, shareRes.Diff, (int)shareRes.Code);
 }
 
 void StratumServer::SendReject(const StratumClient *cli, int id, int err,
@@ -788,13 +787,13 @@ void StratumServer::SendAccept(const StratumClient *cli, int id) const
     SendRaw(cli->GetSock(), buff, len);
 }
 
-void StratumServer::UpdateDifficulty(StratumClient *cli)
+void StratumServer::UpdateDifficulty(StratumClient* cli)
 {
     uint32_t diffBits = DiffToBits(cli->GetDifficulty());
     uint256 diff256;
     arith_uint256 arith256 = UintToArith256(diff256).SetCompact(diffBits);
 
-    char request[1024];
+    char request[512];
     int len = snprintf(
         request, sizeof(request),
         "{\"id\":null,\"method\":\"mining.set_target\",\"params\":[\"%s\"]}\n",
@@ -803,36 +802,8 @@ void StratumServer::UpdateDifficulty(StratumClient *cli)
 
     SendRaw(cli->GetSock(), request, len);
 
-    Logger::Log(LogType::Debug, LogField::Stratum, "Set difficulty to {}",
-                arith256.GetHex());
-}
-
-void StratumServer::AdjustDifficulty(StratumClient *cli, int64_t curTime)
-{
-    auto period = curTime - cli->GetLastAdjusted();
-
-    if (period < MIN_PERIOD_SECONDS) return;
-
-    double minuteRate = ((double)60 / period) * (double)cli->GetShareCount();
-
-    std::cout << "share minute rate: " << minuteRate << std::endl;
-
-    // we allow 20% difference from target
-    if (minuteRate > coin_config.target_shares_rate * 1.2 ||
-        minuteRate < coin_config.target_shares_rate * 0.8)
-    {
-        std::cout << "old diff: " << cli->GetDifficulty() << std::endl;
-
-        // similar to bitcoin difficulty calculation
-        double newDiff = (minuteRate / coin_config.target_shares_rate) *
-                         cli->GetDifficulty();
-        if (newDiff == 0) newDiff = cli->GetDifficulty() / 5;
-
-        cli->SetPendingDifficulty(newDiff, curTime);
-        this->UpdateDifficulty(cli);
-        std::cout << "new diff: " << newDiff << std::endl;
-    }
-    cli->ResetShareCount();
+    Logger::Log(LogType::Debug, LogField::Stratum, "Set difficulty for {} to {}",
+                cli->GetFullWorkerName(), arith256.GetHex());
 }
 
 void StratumServer::BroadcastJob(const StratumClient *cli, const Job *job) const

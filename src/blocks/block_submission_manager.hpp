@@ -24,7 +24,7 @@ class SubmissionManager
           stats_manager(stats_manager)
     {
         Logger::Log(LogType::Info, LogField::SubmissionManager,
-                    "Submission manager started, block number: %u",
+                    "Submission manager started, block number: {}",
                     block_number);
     }
 
@@ -43,7 +43,7 @@ class SubmissionManager
         return added;
     }
 
-    bool AddImmatureBlock(const std::string_view chainsv,
+    bool AddImmatureBlock(const std::string& chainsv,
                           const std::string_view workerFull, const job_t* job,
                           const ShareResult& shareRes, const Round& chainRound,
                           const int64_t time, double pow_fee);

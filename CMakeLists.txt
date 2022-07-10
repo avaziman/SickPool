@@ -52,7 +52,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 # include_directories(lib/rapidjson/include)
-# add_subdirectory(lib/benchmark)
 add_subdirectory(src)
 
 # add_subdirectory(stratum_notifier)

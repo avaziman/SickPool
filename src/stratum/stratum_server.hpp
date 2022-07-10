@@ -54,7 +54,7 @@ class StratumServer
     DaemonManager daemon_manager;
     JobManager job_manager;
     SubmissionManager submission_manager;
-    // DifficultyManager* diff_manager;
+    DifficultyManager diff_manager;
 
     std::vector<std::unique_ptr<StratumClient>> clients;
 
@@ -85,7 +85,6 @@ class StratumServer
     bool SubmitBlock(std::string_view block_hex);
 
     void UpdateDifficulty(StratumClient* cli);
-    void AdjustDifficulty(StratumClient* cli, int64_t curTime);
 
     void BroadcastJob(const StratumClient* cli, const Job* job) const;
 

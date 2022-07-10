@@ -1,14 +1,14 @@
 #include "redis_manager.hpp"
 
-RedisManager::RedisManager(std::string ip, int port) :
-    rc(redisConnect(ip.c_str(), port))
+RedisManager::RedisManager(std::string ip, int port)
+    : rc(redisConnect(ip.c_str(), port))
 {
     using namespace std::string_view_literals;
 
     if (rc->err)
     {
         Logger::Log(LogType::Critical, LogField::Redis,
-                    "Failed to connect to redis: %s", rc->errstr);
+                    "Failed to connect to redis: {}", rc->errstr);
         exit(EXIT_FAILURE);
     }
 
@@ -22,84 +22,85 @@ RedisManager::RedisManager(std::string ip, int port) :
     GetReplies();
 }
 
-void RedisManager::ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
-                                 int64_t reward, uint32_t height,
-                                 const double totalEffort, const double fee)
-{
-    std::scoped_lock lock(rc_mutex);
+// void RedisManager::ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
+//                                  int64_t reward, uint32_t height,
+//                                  const double totalEffort, const double fee)
+// {
+//     std::scoped_lock lock(rc_mutex);
 
-    redisReply *hashReply, *balReply;
+//     redisReply *hashReply, *balReply;
 
-    if (totalEffort == 0)
-    {
-        Logger::Log(LogType::Critical, LogField::Redis,
-                    "Total effort is 0, cannot close PoS round!");
-        return;
-    }
+//     if (totalEffort == 0)
+//     {
+//         Logger::Log(LogType::Critical, LogField::Redis,
+//                     "Total effort is 0, cannot close PoS round!");
+//         return;
+//     }
 
-    AppendCommand("TS.MRANGE %" PRId64 " %" PRId64
-                  " FILTER type=balance coin=" COIN_SYMBOL,
-                  roundStartMs, foundTimeMs);
+//     AppendCommand("TS.MRANGE %" PRId64 " %" PRId64
+//                   " FILTER type=balance coin=" COIN_SYMBOL,
+//                   roundStartMs, foundTimeMs);
 
-    // reply for TS.MRANGE
-    if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
-    {
-        Logger::Log(LogType::Critical, LogField::Redis,
-                    "Failed to get balances: {}", rc->errstr);
-        return;
-    }
+//     // reply for TS.MRANGE
+//     if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
+//     {
+//         Logger::Log(LogType::Critical, LogField::Redis,
+//                     "Failed to get balances: {}", rc->errstr);
+//         return;
+//     }
 
-    const size_t miner_count = hashReply->elements / 2;
-     Logger::Log(LogType::Info, LogField::Redis,
-                  "Closing round with {} balance changes", miner_count);
+//     const size_t miner_count = hashReply->elements / 2;
+//     Logger::Log(LogType::Info, LogField::Redis,
+//                 "Closing round with {} balance changes", miner_count);
 
-    // separate append and get to pipeline (1 send, 1 recv!)
-    for (int i = 0; i < hashReply->elements; i += 2)
-    {
-        char *miner = hashReply->element[i]->str;
-        double minerEffort = std::stod(hashReply->element[i + 1]->str);
+//     // separate append and get to pipeline (1 send, 1 recv!)
+//     for (int i = 0; i < hashReply->elements; i += 2)
+//     {
+//         char *miner = hashReply->element[i]->str;
+//         double minerEffort = std::stod(hashReply->element[i + 1]->str);
 
-        double minerShare = minerEffort / totalEffort;
-        int64_t minerReward = (int64_t)(reward * minerShare);
-        minerReward -= minerReward * fee;  // substract fee
+//         double minerShare = minerEffort / totalEffort;
+//         int64_t minerReward = (int64_t)(reward * minerShare);
+//         minerReward -= minerReward * fee;  // substract fee
 
-        AppendCommand("TS.INCRBY " COIN_SYMBOL ":immature-balance:%s %" PRId64
-                      " TIMESTAMP %" PRId64,
-                      miner, minerReward, foundTimeMs);
+//         AppendCommand("TS.INCRBY " COIN_SYMBOL ":immature-balance:%s %"
+//         PRId64
+//                       " TIMESTAMP %" PRId64,
+//                       miner, minerReward, foundTimeMs);
 
-        // round format: height:effort_percent:reward
-        // NX = only new
-        AppendCommand("ZADD " COIN_SYMBOL ":rounds:%s NX %" PRId64
-                      " %u:%f:%" PRId64,
-                      miner, foundTimeMs, height, minerShare, minerReward);
+//         // round format: height:effort_percent:reward
+//         // NX = only new
+//         AppendCommand("ZADD " COIN_SYMBOL ":rounds:%s NX %" PRId64
+//                       " %u:%f:%" PRId64,
+//                       miner, foundTimeMs, height, minerShare, minerReward);
 
-        Logger::Log(LogType::Debug, LogField::Redis,
-                    "Round: %d, miner: %s, effort: %f, share: %f, reward: "
-                    "%" PRId64 ", total effort: %f",
-                    height, miner, minerEffort, minerShare, minerReward,
-                    totalEffort);
-    }
+//         Logger::Log(LogType::Debug, LogField::Redis,
+//                     "Round: {}, miner: {}, effort: {}, share: {}, reward: "
+//                     "{}, total effort: {}",
+//                     height, miner, minerEffort, minerShare, minerReward,
+//                     totalEffort);
+//     }
 
-    for (int i = 0; i < hashReply->elements; i += 2)
-    {
-        // reply for TS.INCRBY
-        if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Critical, LogField::Redis,
-                        "Failed to increase balance: %s", rc->errstr);
-        }
-        freeReplyObject(balReply);
+//     for (int i = 0; i < hashReply->elements; i += 2)
+//     {
+//         // reply for TS.INCRBY
+//         if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
+//         {
+//             Logger::Log(LogType::Critical, LogField::Redis,
+//                         "Failed to increase balance: {}", rc->errstr);
+//         }
+//         freeReplyObject(balReply);
 
-        if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Critical, LogField::Redis,
-                        "Failed to set round earning stats: %s", rc->errstr);
-        }
+//         if (redisGetReply(rc, (void **)&balReply) != REDIS_OK)
+//         {
+//             Logger::Log(LogType::Critical, LogField::Redis,
+//                         "Failed to set round earning stats: {}", rc->errstr);
+//         }
 
-        freeReplyObject(balReply);
-    }
-    freeReplyObject(hashReply);  // free HGETALL reply
-}
+//         freeReplyObject(balReply);
+//     }
+//     freeReplyObject(hashReply);  // free HGETALL reply
+// }
 
 bool RedisManager::DoesAddressExist(std::string_view addrOrId,
                                     std::string &valid_addr)
@@ -111,33 +112,27 @@ bool RedisManager::DoesAddressExist(std::string_view addrOrId,
 
     if (isId)
     {
-        AppendCommand("TS.QUERYINDEX id=%b", addrOrId.data(), addrOrId.size());
+        reply =
+            (redisReply *)redisCommand(rc, "TS.QUERYINDEX id=%b type=hashrate",
+                                       addrOrId.data(), addrOrId.size());
     }
     else
     {
-        AppendCommand("TS.QUERYINDEX address=%b", addrOrId.data(),
-                      addrOrId.size());
+        reply = (redisReply *)redisCommand(
+            rc, "TS.QUERYINDEX address=%b type=hashrate", addrOrId.data(),
+            addrOrId.size());
     }
 
-    if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-    {
-        Logger::Log(LogType::Error, LogField::Redis,
-                    "Failed to check if address/identity exists: %s",
-                    rc->errstr);
-        return false;
-    }
-
-    bool exists = reply->elements == 1;
+    bool exists = reply && reply->elements == 1;
+    bool res = false;
     if (exists)
     {
         valid_addr =
-            reply->element[0]->str + sizeof(COIN_SYMBOL ":balance:") - 1;
-        freeReplyObject(reply);
-        return true;
+            reply->element[0]->str + sizeof(COIN_SYMBOL ":hashrate:") - 1;
+        res = true;
     }
     freeReplyObject(reply);
-
-    return false;
+    return res;
 }
 
 uint32_t RedisManager::GetBlockNumber()
@@ -151,7 +146,7 @@ uint32_t RedisManager::GetBlockNumber()
     if (!reply)
     {
         Logger::Log(LogType::Error, LogField::Redis,
-                    "Failed to get block count: %s", rc->errstr);
+                    "Failed to get block count: {}", rc->errstr);
         return 0;
     }
     else if (reply->type != REDIS_REPLY_INTEGER)
@@ -177,7 +172,7 @@ bool RedisManager::IncrBlockCount()
     if (!reply)
     {
         Logger::Log(LogType::Error, LogField::Redis,
-                    "Failed to increment block count: %s", rc->errstr);
+                    "Failed to increment block count: {}", rc->errstr);
         freeReplyObject(reply);
         return false;
     }
@@ -193,54 +188,46 @@ int RedisManager::AddNetworkHr(std::string_view chain, int64_t time, double hr)
     redisReply *reply;
     std::string key = fmt::format("{}:{}", chain, "network_difficulty");
     AppendTsAdd(std::string_view(key), time, hr);
-    if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-    {
-        Logger::Log(LogType::Error, LogField::Redis,
-                    "Failed to add network difficulty: %s", rc->errstr);
-        freeReplyObject(reply);
-        return 1;
-    }
-    freeReplyObject(reply);
-    return 0;
+    return GetReplies();
 }
 
-void RedisManager::UpdatePoS(uint64_t from, uint64_t maturity)
-{
-    std::scoped_lock lock(rc_mutex);
+// void RedisManager::UpdatePoS(uint64_t from, uint64_t maturity)
+// {
+//     std::scoped_lock lock(rc_mutex);
 
-    redisReply *reply;
-    AppendCommand("TS.MRANGE %" PRId64 " %" PRId64
-                  " FILTER type=balance coin=" COIN_SYMBOL,
-                  from, maturity);
+//     redisReply *reply;
+//     AppendCommand("TS.MRANGE %" PRId64 " %" PRId64
+//                   " FILTER type=balance coin=" COIN_SYMBOL,
+//                   from, maturity);
 
-    if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-    {
-        Logger::Log(LogType::Error, LogField::Redis,
-                    "Failed to get balances: %s", rc->errstr);
-        return;
-    }
+//     if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+//     {
+//         Logger::Log(LogType::Error, LogField::Redis,
+//                     "Failed to get balances: {}", rc->errstr);
+//         return;
+//     }
 
-    // assert type = arr (2)
-    for (int i = 0; i < reply->elements; i++)
-    {
-        // key is 2d array of the following arrays: key name, (empty array -
-        // labels), values (array of tuples)
-        redisReply *key = reply->element[i];
-        char *keyName = key[0].element[0]->str;
+//     // assert type = arr (2)
+//     for (int i = 0; i < reply->elements; i++)
+//     {
+//         // key is 2d array of the following arrays: key name, (empty array -
+//         // labels), values (array of tuples)
+//         redisReply *key = reply->element[i];
+//         char *keyName = key[0].element[0]->str;
 
-        // skip key name + null value
-        redisReply *values = key[0].element[2];
+//         // skip key name + null value
+//         redisReply *values = key[0].element[2];
 
-        for (int j = 0; j < values->elements; j++)
-        {
-            int64_t timestamp = values->element[j]->element[0]->integer;
-            char *value_str = values->element[j]->element[1]->str;
-            int64_t value = std::stoll(value_str);
-            std::cout << "timestamp: " << timestamp << " value: " << value
-                      << " " << value_str << std::endl;
-        }
-    }
-}
+//         for (int j = 0; j < values->elements; j++)
+//         {
+//             int64_t timestamp = values->element[j]->element[0]->integer;
+//             char *value_str = values->element[j]->element[1]->str;
+//             int64_t value = std::stoll(value_str);
+//             std::cout << "timestamp: " << timestamp << " value: " << value
+//                       << " " << value_str << std::endl;
+//         }
+//     }
+// }
 
 bool RedisManager::UpdateImmatureRewards(std::string_view chain,
                                          int64_t rewardTime, bool matured)
@@ -254,14 +241,14 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
     if (!immatureReply)
     {
         Logger::Log(LogType::Error, LogField::Redis,
-                    "Failed to add set mature rewards: %s", rc->errstr);
+                    "Failed to add set mature rewards: {}", rc->errstr);
         return false;
     }
 
     double matured_funds = 0;
     // either mature everything or nothing
     {
-        RedisTransaction update_rewards_tx(rc, command_count);
+        RedisTransaction update_rewards_tx(this);
 
         for (int i = 0; i < immatureReply->elements; i++)
         {
@@ -293,23 +280,10 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
         }
     }
 
-    redisReply *reply;
-    for (int i = 0; i < command_count; i++)
-    {
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Error, LogField::Redis,
-                        "Failed to update immature rewards of time %" PRId64
-                        ", error: %s",
-                        rewardTime, rc->errstr);
-        }
-        freeReplyObject(reply);
-    }
-
-    Logger::Log(LogType::Info, LogField::Redis, "%f funds have matured!",
+    Logger::Log(LogType::Info, LogField::Redis, "{} funds have matured!",
                 matured_funds);
 
-    return true;
+    return GetReplies();
 }
 
 void RedisManager::AppendTsCreate(
@@ -358,7 +332,7 @@ bool RedisManager::AddWorker(std::string_view address,
     std::scoped_lock lock(rc_mutex);
 
     {
-        RedisTransaction add_worker_tx(rc, command_count);
+        RedisTransaction add_worker_tx(this);
 
         // 100% new, as we loaded all existing miners
         if (newMiner)
@@ -395,7 +369,6 @@ bool RedisManager::AddWorker(std::string_view address,
             AppendCreateStatsTs(address, idTag, "miner"sv);
         }
 
-        // worker has been disconnected and came back, add him again
         if (newWorker)
         {
             AppendCreateStatsTs(worker_full, idTag, "worker"sv);
@@ -423,23 +396,25 @@ bool RedisManager::PopWorker(std::string_view address)
     return GetReplies();
 }
 
+void RedisManager::AppendHset(std::string_view key, std::string_view field,
+                              std::string_view val)
+{
+    AppendCommand("HSET %b %b %b", key.data(), key.size(), field.data(),
+                  field.size(), val.data(), val.size());
+}
+
 bool RedisManager::hset(std::string_view key, std::string_view field,
                         std::string_view val)
 {
-    auto reply = (redisReply *)redisCommand(
-        rc, "HSET %b %b %b", key.data(), key.size(), field.data(), field.size(),
-        val.data(), val.size());
-
-    return reply;
+    AppendHset(key, field, val);
+    return GetReplies();
 }
 
 int64_t RedisManager::hgeti(std::string_view key, std::string_view field)
 {
-    std::scoped_lock lock(rc_mutex);
-
     auto reply = (redisReply *)redisCommand(
-        rc, "HGET %b %b", key.data(), key.size(), field.data(), key.size());
-    int val = 0;
+        rc, "HGET %b %b", key.data(), key.size(), field.data(), field.size());
+    int64_t val = 0;
     if (reply && reply->type == REDIS_REPLY_STRING)
     {
         // returns 0 if failed
@@ -451,8 +426,6 @@ int64_t RedisManager::hgeti(std::string_view key, std::string_view field)
 
 double RedisManager::hgetd(std::string_view key, std::string_view field)
 {
-    std::scoped_lock lock(rc_mutex);
-
     auto reply = (redisReply *)redisCommand(
         rc, "HGET %b %b", key.data(), key.size(), field.data(), field.size());
     double val = 0;
@@ -466,8 +439,8 @@ double RedisManager::hgetd(std::string_view key, std::string_view field)
 }
 
 bool RedisManager::AddMinerShares(std::string_view chain,
-                                 const BlockSubmission *submission,
-                                 std::vector<RoundShare> &miner_shares)
+                                  const BlockSubmission *submission,
+                                  const std::vector<RoundShare> &miner_shares)
 {
     std::scoped_lock lock(rc_mutex);
 
@@ -479,13 +452,13 @@ bool RedisManager::AddMinerShares(std::string_view chain,
 
     // redis transaction, so either all balances are added or none
     {
-        RedisTransaction close_round_tx(rc, command_count);
+        RedisTransaction close_round_tx(this);
 
         for (const auto &miner_share : miner_shares)
         {
             AppendCommand(
-                "LSET round_entries:pow:%b 0 {\"height\":%d,\"effort\":%f,"
-                "\"share\":%f,\"reward\":%f}",
+                "LSET round_entries:pow:%b 0 "
+                "{\"height\":%d,\"effort\":%f,\"share\":%f,\"reward\":%" PRId64 "}",
                 miner_share.address.data(), miner_share.address.size(), height,
                 miner_share.effort, miner_share.share, miner_share.reward);
 
@@ -496,13 +469,13 @@ bool RedisManager::AddMinerShares(std::string_view chain,
 
             AppendCommand(
                 "TS.INCRBY "
-                "%b:immature-balance:%b %f"
+                "%b:immature-balance:%b %" PRId64
                 " TIMESTAMP %" PRId64,
-                chain.data(), chain.length(), miner_share.address.data(),
-                miner_share.address.length(), miner_share.reward,
+                chain.data(), chain.size(), miner_share.address.data(),
+                miner_share.address.size(), miner_share.reward,
                 submission->timeMs);
 
-            AppendCommand("ZINCRBY solver-index:balance %f %b",
+            AppendCommand("ZINCRBY solver-index:balance %" PRId64 " %b",
                           miner_share.reward, miner_share.address.data(),
                           miner_share.address.size());
         }

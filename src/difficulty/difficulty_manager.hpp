@@ -5,20 +5,24 @@
 #include <thread>
 #include <vector>
 
+#include "logger.hpp"
 #include "stratum_client.hpp"
 
 class DifficultyManager
 {
    public:
-    DifficultyManager(double targetSharesRate, )
-        : target_shares_rate(targetSharesRate), clients(clients)
+    DifficultyManager(std::vector<std::unique_ptr<StratumClient>>* clients,
+                      std::mutex* clients_mutex, double targetSharesRate)
+        : clients(clients),
+          clients_mutex(clients_mutex),
+          target_share_rate(targetSharesRate)
     {
     }
 
-    void Adjust(double target_share_rate,
-                std::vector<std::unique_ptr<StratumClient>>& clients)
+    void Adjust(const int passed_seconds)
     {
-        for (auto& client : clients)
+        std::scoped_lock lock(*clients_mutex);
+        for (auto& client : *clients)
         {
             const double current_diff = client->GetDifficulty();
             const double minute_rate =
@@ -34,17 +38,21 @@ class DifficultyManager
             if (variance_ratio > 0.1)
             {
                 client->SetPendingDifficulty(new_diff);
+                Logger::Log(
+                    LogType::Debug, LogField::DiffManager,
+                    "Adjusted difficulty for {} from {} to {}, share rate: {}",
+                    client->GetFullWorkerName(), current_diff, new_diff,
+                    target_share_rate);
             }
         }
     }
 
     // static std::mutex clients_mutex;
 
-    void Start(std::mutex& mutex);
-
    private:
-    double target_shares_rate;
-    std::vector<StratumClient*>& clients;
+    double target_share_rate;
+    std::vector<std::unique_ptr<StratumClient>>* clients;
+    std::mutex* clients_mutex;
 };
 
 #endif

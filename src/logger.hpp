@@ -26,7 +26,8 @@ enum LogType
     Critical = 4,
 };
 
-enum class LogField {
+enum class LogField
+{
     Config,
     Stratum,
     JobManager,
@@ -36,6 +37,7 @@ enum class LogField {
     ControlServer,
     SubmissionManager,
     PaymentManager,
+    DiffManager,
 
 };
 
@@ -61,6 +63,8 @@ inline const char* ToString(LogField v)
             return "SUBMISSION";
         case LogField::PaymentManager:
             return "PAYMENT";
+        case LogField::DiffManager:
+            return "DIFF";
         default:
             return "Unknown";
     }

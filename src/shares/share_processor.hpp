@@ -1,20 +1,22 @@
+#include <fmt/format.h>
+
 #include <chrono>
 #include <iostream>
 
-#include "utils.hpp"
-#include "verushash/verus_hash.h"
-#include "logger.hpp"
 #include "jobs/job_manager.hpp"
+#include "jobs/verus_job.hpp"
+#include "logger.hpp"
 #include "share.hpp"
 #include "stratum_client.hpp"
-#include "jobs/verus_job.hpp"
+#include "utils.hpp"
+#include "verushash/verus_hash.h"
 
 class ShareProcessor
 {
    public:
     inline static void Process(StratumClient& cli, const job_t* job,
-                        const Share& share, ShareResult& result,
-                        int64_t curTime)
+                               const Share& share, ShareResult& result,
+                               int64_t curTime)
     {
         if (job == nullptr)
         {
@@ -85,7 +87,8 @@ class ShareProcessor
         else if (result.Diff / cli.GetDifficulty() < 1)  // allow 5% below
         {
             result.Code = ShareCode::LOW_DIFFICULTY_SHARE;
-            result.Message = "Low difficulty share";
+            result.Message =
+                fmt::format("Low difficulty share of {}", result.Diff);
             char blockHeaderHex[BLOCK_HEADER_SIZE * 2];
             Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
 

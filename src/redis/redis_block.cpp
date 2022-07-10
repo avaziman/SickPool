@@ -9,10 +9,10 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
 
     uint32_t block_id = submission->number;
     auto chain =
-        std::string((char *)submission->chain, sizeof(submission->chain));
+        std::string((char *)submission->chain       );
 
     {
-        RedisTransaction add_block_tx(rc, command_count);
+        RedisTransaction add_block_tx(this);
 
         // serialize the block submission to save space and net
         // bandwidth, as the indexes are added manually anyway no need for
@@ -44,23 +44,12 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
 
         AppendCommand("SADD block-index:solver:%b %u", submission->miner,
                       sizeof(submission->miner), block_id);
+
         AppendTsAdd(chain + ":round_effort_percent", submission->timeMs,
                     submission->effortPercent);
     }
 
-    redisReply *reply;
-    for (int i = 0; i < command_count; i++)
-    {
-        if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-        {
-            Logger::Log(LogType::Critical, LogField::Redis,
-                        "Failed to add block submission and indexes: %s",
-                        rc->errstr);
-            return false;
-        }
-        freeReplyObject(reply);
-    }
-    return true;
+    return GetReplies();
 }
 
 bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,

@@ -4,15 +4,18 @@ int StatsManager::hashrate_interval_seconds;
 int StatsManager::effort_interval_seconds;
 int StatsManager::average_hashrate_interval_seconds;
 int StatsManager::hashrate_ttl_seconds;
+int StatsManager::diff_adjust_seconds;
 
-StatsManager::StatsManager(RedisManager* redis_manager, int hr_interval,
+StatsManager::StatsManager(RedisManager* redis_manager,
+                           DifficultyManager* diff_manager, int hr_interval,
                            int effort_interval, int avg_hr_interval,
-                           int hashrate_ttl)
-    : redis_manager(redis_manager)
+                           int diff_adjust_seconds, int hashrate_ttl)
+    : redis_manager(redis_manager), diff_manager(diff_manager)
 {
     StatsManager::hashrate_interval_seconds = hr_interval;
     StatsManager::effort_interval_seconds = effort_interval;
     StatsManager::average_hashrate_interval_seconds = avg_hr_interval;
+    StatsManager::diff_adjust_seconds = diff_adjust_seconds;
     StatsManager::hashrate_ttl_seconds = hashrate_ttl;
 
     LoadCurrentRound();
@@ -30,54 +33,65 @@ void StatsManager::Start()
     int64_t next_effort_update =
         now - (now % effort_interval_seconds) + effort_interval_seconds;
 
-    int64_t next_hr_update =
+    int64_t next_interval_update =
         now - (now % hashrate_interval_seconds) + hashrate_interval_seconds;
+
+    int64_t next_diff_update =
+        now - (now % diff_adjust_seconds) + diff_adjust_seconds;
 
     while (true)
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
-                    "Next stats update in: %d", next_effort_update);
+                    "Next stats update in: {}", next_effort_update);
 
-        int64_t next_update = std::min(next_hr_update, next_effort_update);
+        int64_t next_update = std::min(
+            {next_interval_update, next_effort_update, next_diff_update});
 
-        bool should_update_hr = false;
-        bool should_update_effort = false;
+        uint8_t update_flags;
 
-        if (next_update == next_hr_update)
+        if (next_update == next_interval_update)
         {
-            should_update_hr = true;
-            next_hr_update += hashrate_interval_seconds;
+            next_interval_update += hashrate_interval_seconds;
+            update_flags |= UPDATE_INTERVAL;
         }
 
         // possible that both need to be updated at the same time
         if (next_update == next_effort_update)
         {
-            should_update_effort = true;
             next_effort_update += effort_interval_seconds;
+            update_flags |= UPDATE_EFFORT;
+        }
+
+        if (next_update == next_diff_update)
+        {
+            next_diff_update += diff_adjust_seconds;
+            update_flags |= UPDATE_DIFFICULTY;
+
+            diff_manager->Adjust(diff_adjust_seconds);
         }
 
         std::this_thread::sleep_until(system_clock::from_time_t(next_update));
         auto startChrono = system_clock::now();
 
         int64_t update_time_ms = next_update * 1000;
-        UpdateStats(should_update_effort, should_update_hr, update_time_ms);
+        UpdateStats(update_time_ms, update_flags);
 
         auto endChrono = system_clock::now();
         auto duration = duration_cast<microseconds>(endChrono - startChrono);
     }
 }
 
-bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
-                               int64_t update_time_ms)
+bool StatsManager::UpdateStats(int64_t update_time_ms, uint8_t update_flags)
 {
     std::scoped_lock lock(stats_map_mutex);
     Logger::Log(LogType::Info, LogField::StatsManager,
                 "Updating stats for {} miners, {} workers, is_interval: {}",
-                miner_stats_map.size(), worker_stats_map.size(), update_hr);
+                miner_stats_map.size(), worker_stats_map.size(),
+                update_flags & UPDATE_INTERVAL);
 
-    for (auto& [worker, ws] : worker_stats_map)
+    if (update_flags & UPDATE_INTERVAL)
     {
-        if (update_hr)
+        for (auto& [worker, ws] : worker_stats_map)
         {
             ws.interval_hashrate =
                 ws.current_interval_effort / (double)hashrate_interval_seconds;
@@ -104,11 +118,11 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
             miner_stats.interval_stale_shares += ws.interval_stale_shares;
         }
     }
-    for (auto& [miner_addr, miner_ws] : miner_stats_map)
+    if (update_flags & UPDATE_INTERVAL)
     {
-        // miner round entry
-        if (update_hr)
+        for (auto& [miner_addr, miner_ws] : miner_stats_map)
         {
+            // miner round entry
             miner_ws.interval_hashrate = miner_ws.current_interval_effort /
                                          (double)hashrate_interval_seconds;
 
@@ -123,30 +137,32 @@ bool StatsManager::UpdateStats(bool update_effort, bool update_hr,
     }
 
     return redis_manager->UpdateStats(worker_stats_map, miner_stats_map,
-                                      update_time_ms, update_hr, update_effort);
+                                      update_time_ms, update_flags);
 }
 
 bool StatsManager::LoadCurrentRound()
 {
-    double total_effort = redis_manager->GetRoundEffortPow(COIN_SYMBOL);
+    auto chain = std::string(COIN_SYMBOL);
+    double total_effort = redis_manager->GetRoundEffortPow(chain);
 
-    int64_t round_start = redis_manager->GetRoundTimePow(COIN_SYMBOL);
+    int64_t round_start = redis_manager->GetRoundTimePow(chain);
     if (round_start == 0)
     {
         round_start = GetCurrentTimeMs();
 
-        redis_manager->SetRoundTimePow(COIN_SYMBOL, round_start);
-        redis_manager->SetRoundEffortPow(COIN_SYMBOL, total_effort);
+        redis_manager->SetRoundTimePow(chain, round_start);
+        redis_manager->SetRoundEffortPow(chain, total_effort);
     }
-    round_stats_map[COIN_SYMBOL].round_start_ms = round_start;
-    round_stats_map[COIN_SYMBOL].pow = total_effort;
+
+    auto round = &round_stats_map[chain];
+    round->round_start_ms = round_start;
+    round->pow = total_effort;
 
     Logger::Log(LogType::Info, LogField::StatsManager,
-                "Loaded pow round effort of: %f, started at: %" PRIi64,
-                round_stats_map[COIN_SYMBOL].pow,
-                round_stats_map[COIN_SYMBOL].round_start_ms);
+                "Loaded pow round chain: {}, effort of: {}, started at: {}",
+                chain, round->pow, round->round_start_ms);
 
-    redis_manager->LoadSolverStats(miner_stats_map, round_stats_map);
+    // redis_manager->LoadSolverStats(miner_stats_map, round_stats_map);
     return true;
 }
 
@@ -206,8 +222,7 @@ bool StatsManager::AddWorker(const std::string& address,
     else
     {
         Logger::Log(LogType::Critical, LogField::StatsManager,
-                    "Failed to add worker {} to database.",
-                    worker_full);
+                    "Failed to add worker {} to database.", worker_full);
         return false;
     }
 
@@ -232,7 +247,7 @@ void StatsManager::PopWorker(const std::string& worker_full,
     }
 }
 
-bool StatsManager::ClosePoWRound(std::string_view chain,
+bool StatsManager::ClosePoWRound(const std::string& chain,
                                  const BlockSubmission* submission, double fee)
 {
     // redis mutex already locked
@@ -336,7 +351,7 @@ bool StatsManager::ClosePoWRound(std::string_view chain,
 
 Round StatsManager::GetChainRound(const std::string& chain)
 {
-    std::lock_guard stats_lock(stats_map_mutex);
+    std::scoped_lock stats_lock(stats_map_mutex);
     return round_stats_map[chain];
 }
 

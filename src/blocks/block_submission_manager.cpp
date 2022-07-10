@@ -65,7 +65,7 @@ void SubmissionManager::CheckImmatureSubmissions()
 
 // TODO: LOCKS
 bool SubmissionManager::AddImmatureBlock(
-    const std::string_view chainsv, const std::string_view workerFull,
+    const std::string& chain, const std::string_view workerFull,
     const job_t* job, const ShareResult& shareRes, const Round& chainRound,
     const int64_t time, const double pow_fee)
 {
@@ -79,7 +79,7 @@ bool SubmissionManager::AddImmatureBlock(
         confirmations, job->GetBlockReward(), time, duration, job->GetHeight(),
         block_number, shareRes.Diff, effortPercent);
 
-    memcpy(submission->chain, chainsv.data(), chainsv.size());
+    memcpy(submission->chain, chain.data(), chain.size());
     memcpy(submission->miner, workerFull.data(), ADDRESS_LEN);
     memcpy(submission->worker, workerFull.data(), workerFull.size());
 
@@ -90,7 +90,7 @@ bool SubmissionManager::AddImmatureBlock(
     Logger::Log(LogType::Info, LogField::SubmissionManager,
                 "Block submission no {} added.", submission->number);
 
-    stats_manager->ClosePoWRound(chainsv, submission.get(), pow_fee);
+    stats_manager->ClosePoWRound(chain, submission.get(), pow_fee);
 
     Logger::Log(LogType::Info, LogField::SubmissionManager,
                 "Closed round for block submission no {} (immature).",

@@ -43,19 +43,19 @@ struct WorkerStats
 
 struct MinerStats : public WorkerStats
 {
-    std::unordered_map<std::string, double, StringHash, std::less<>>
+    std::unordered_map<std::string, double>
         round_effort_map;
     uint32_t worker_count = 0;
 
     inline void ResetEffort() { round_effort_map.clear(); }
 };
 
-typedef std::unordered_map<std::string, WorkerStats, StringHash, std::less<>>
+typedef std::unordered_map<std::string, WorkerStats>
     worker_map;
-typedef std::unordered_map<std::string, MinerStats, StringHash, std::less<>>
+typedef std::unordered_map<std::string, MinerStats>
     miner_map;
 
-typedef std::unordered_map<std::string, Round, StringHash, std::less<>>
+typedef std::unordered_map<std::string, Round>
     round_map;
 
 #endif

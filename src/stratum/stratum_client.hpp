@@ -7,8 +7,8 @@
 #include <set>
 #include <unordered_set>
 
-#include "hash_wrapper.hpp"
 #include "config.hpp"
+#include "hash_wrapper.hpp"
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
 
@@ -34,13 +34,13 @@ class StratumClient
     const std::string& GetFullWorkerName() const { return worker_full; }
     simdjson::ondemand::parser* GetParser() { return &parser; }
 
-    void ResetShareCount() { share_count = 0; }
-
-    void SetPendingDifficulty(double diff, int64_t curTime)
+    void SetPendingDifficulty(double diff)
     {
+        std::scoped_lock lock(shares_mutex);
         is_pending_diff = true;
         pending_diff = diff;
-        last_adjusted = curTime;
+        share_count = 0;
+        // last_adjusted = curTime;
     }
 
     void ActivatePendingDiff()
@@ -51,6 +51,8 @@ class StratumClient
 
     bool SetLastShare(uint32_t shareEnd, int64_t time)
     {
+        std::scoped_lock lock(shares_mutex);
+
         last_share_time = time;
         share_count++;
 
@@ -100,6 +102,8 @@ class StratumClient
     std::string extra_nonce_str;
     std::string worker_full;
     std::string address;
+
+    std::mutex shares_mutex;
 
     // each parser can only process one request at a time,
     // so we need a parser per client

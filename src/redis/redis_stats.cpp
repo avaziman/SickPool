@@ -27,11 +27,12 @@ void RedisManager::AppendIntervalStatsUpdate(std::string_view addr,
 
 bool RedisManager::UpdateStats(worker_map worker_stats_map,
                                miner_map miner_stats_map,
-                               int64_t update_time_ms, bool update_interval,
-                               bool update_effort)
+                               int64_t update_time_ms, uint8_t update_flags)
 {
+    std::scoped_lock lock(rc_mutex);
+
     double pool_hr = 0;
-    if (update_interval)
+    if (update_flags & UPDATE_INTERVAL)
     {
         for (const auto &[worker_name, worker_stats] : worker_stats_map)
         {
@@ -42,7 +43,7 @@ bool RedisManager::UpdateStats(worker_map worker_stats_map,
 
     for (auto &[miner_addr, miner_stats] : miner_stats_map)
     {
-        if (update_interval)
+        if (update_flags & UPDATE_INTERVAL)
         {
             AppendIntervalStatsUpdate(miner_addr, "miner", update_time_ms,
                                       miner_stats);
@@ -53,7 +54,7 @@ bool RedisManager::UpdateStats(worker_map worker_stats_map,
             pool_hr += miner_stats.interval_hashrate;
         }
 
-        if (update_effort)
+        if (update_flags & UPDATE_EFFORT)
         {
             AppendCommand("LSET round_entries:pow:%b 0 {\"effort:\"%" PRId64
                           "}",
@@ -62,9 +63,15 @@ bool RedisManager::UpdateStats(worker_map worker_stats_map,
         }
     }
 
-    if (update_interval)
+    if (update_flags & UPDATE_INTERVAL)
     {
         AppendTsAdd("pool_hashrate", update_time_ms, pool_hr);
+    }
+
+    if (update_flags & UPDATE_EFFORT)
+    {
+        AppendHset(fmt::format("round:pow:{}", COIN_SYMBOL), "total_effort",
+                   std::to_string(pool_hr));
     }
 
     return GetReplies();
@@ -82,7 +89,7 @@ bool RedisManager::LoadSolverStats(miner_map &miner_stats_map,
 
     // either load everyone or no
     {
-        RedisTransaction load_tx(rc, command_count);
+        RedisTransaction load_tx(this);
 
         miner_count = miners_reply->elements;
         for (int i = 0; i < miner_count; i++)
@@ -111,12 +118,10 @@ bool RedisManager::LoadSolverStats(miner_map &miner_stats_map,
             AppendCommand("ZADD solver-index:worker-count 0 %b",
                           miner_addr.data(), miner_addr.size());
 
-            AppendCommand("TS.ADD worker-count:%b * 0", miner_addr.data(),
-                          miner_addr.size());
-
-            command_count += 4;
+            AppendTsAdd(fmt::format("worker-count:{}", miner_addr), now, 0.f);
         }
     }
+
     redisReply *reply;
     for (int i = 0; i < command_count; i++)
     {
@@ -133,6 +138,7 @@ bool RedisManager::LoadSolverStats(miner_map &miner_stats_map,
             freeReplyObject(reply);
         }
     }
+    command_count = 0;
 
     for (int i = 0; i < miner_count; i++)
     {
@@ -157,9 +163,8 @@ bool RedisManager::LoadSolverStats(miner_map &miner_stats_map,
             sum_last_avg_interval;
 
         Logger::Log(LogType::Debug, LogField::StatsManager,
-                    "Loaded {} effort of {}, hashrate sum of {}",
-                    miner_addr, miner_effort,
-                    sum_last_avg_interval);
+                    "Loaded {} effort of {}, hashrate sum of {}", miner_addr,
+                    miner_effort, sum_last_avg_interval);
     }
 
     freeReplyObject(reply);

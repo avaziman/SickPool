@@ -13,18 +13,20 @@
 #include "blocks/block_submission.hpp"
 #include "logger.hpp"
 #include "payments/payment_manager.hpp"
-#include "redis_transaction.hpp"
 #include "shares/share.hpp"
 #include "static_config/config.hpp"
 #include "stats/stats.hpp"
 #include "stats/stats_manager.hpp"
+#include "redis_transaction.hpp"
 
 #define xstr(s) str(s)
 #define str(s) #s
 
-// how we store stale and invalid shares in database
+class RedisTransaction;
 class RedisManager
 {
+    friend class RedisTransaction;
+
    public:
     RedisManager(std::string ip, int port);
 
@@ -52,23 +54,22 @@ class RedisManager
     double GetRoundEffortPow(std::string_view chain);
     bool AddMinerShares(std::string_view chain,
                         const BlockSubmission *submission,
-                        std::vector<RoundShare> &miner_shares);
+                        const std::vector<RoundShare> &miner_shares);
 
     /* stats */
     bool LoadSolverStats(miner_map &miner_stats_map, round_map &round_map);
     bool UpdateStats(worker_map worker_stats, miner_map miner_stats,
-                     int64_t update_time_ms, bool update_interval,
-                     bool update_effort);
+                     int64_t update_time_ms, uint8_t update_flags);
 
-    void ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
-                       int64_t reward, uint32_t height,
-                       const double totalEffort, const double fee);
+    // void ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
+    //                    int64_t reward, uint32_t height,
+    //                    const double totalEffort, const double fee);
 
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
     int AddNetworkHr(std::string_view chain, int64_t time, double hr);
 
-    void UpdatePoS(uint64_t from, uint64_t maturity);
+    // void UpdatePoS(uint64_t from, uint64_t maturity);
 
    private:
     redisContext *rc;
@@ -77,8 +78,9 @@ class RedisManager
     int command_count = 0;
 
     template <typename... Args>
-    inline void AppendCommand(const char *str, Args... args)
+    void AppendCommand(const char *str, Args... args)
     {
+        // std::cout << command_count << "cnt: "  << str << std::endl;
         redisAppendCommand(rc, str, args...);
         command_count++;
     }
@@ -87,12 +89,13 @@ class RedisManager
     {
         redisReply *reply;
         bool res = true;
+        // std::cout << "clear " << command_count << std::endl;
         for (int i = 0; i < command_count; i++)
         {
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
             {
                 Logger::Log(LogType::Critical, LogField::Redis,
-                            "Failed to get reply: {}\n", rc->errstr);
+                            "Failed to get reply: {}", rc->errstr);
                 res = false;
             }
             freeReplyObject(reply);
@@ -103,6 +106,8 @@ class RedisManager
 
     bool hset(std::string_view key, std::string_view field,
               std::string_view val);
+    void AppendHset(std::string_view key, std::string_view field,
+                    std::string_view val);
 
     int64_t hgeti(std::string_view key, std::string_view field);
 

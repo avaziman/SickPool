@@ -1,37 +1,81 @@
+#include <fmt/format.h>
 #include <gtest/gtest.h>
+#include <hiredis/hiredis.h>
 
-// #include "redis_manager.hpp"
 #include "block_submission.hpp"
+#include "redis/redis_manager.hpp"
 
-TEST(DATABASE, AddBlockSubmission)
+class RedisTest : public ::testing::Test
+{
+   protected:
+    void SetUp() override
+    {
+        rc = redisConnect("127.0.0.1", 6379);
+
+        strcpy((char*)submission.miner, "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC");
+        strcpy((char*)submission.worker,
+               "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC.worker");
+        strcpy((char*)submission.chain, "GTEST");
+    }
+
+    RedisManager redis_manager{"127.0.0.1", 6379};
+    redisContext* rc;
+    BlockSubmission submission
+    {
+        .confirmations = rand(), .blockReward = rand(), .timeMs = rand(),
+        .durationMs = rand(), .height = (uint32_t)rand(),
+        .number = (uint32_t)rand(), .difficulty = (double)rand(),
+        .effortPercent = (double)rand()
+    };
+    // void TearDown() override {}
+};
+
+TEST_F(RedisTest, AddBlockSubmission)
 {
     using namespace std::string_view_literals;
 
-    // RedisManager redis_manager("127.0.0.1", 6397);
-    // DaemonManager daemon_manager(
-    //     {RpcConfig{.host = "127.0.0.1:6004", .auth = "YWRtaW4xOnBhc3MxMjM="}});
-    // JobManager job_manager(&daemon_manager,
-    //                        "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC");
+    std::string block_key = fmt::format("block:{}", submission.number);
 
-    // ShareResult share_res;
-    // share_res.Diff = 1;
-    // share_res.HashBytes = std::vector<unsigned char>(0, 32);
+    strcpy((char*)submission.miner, "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC");
+    strcpy((char*)submission.worker,
+           "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC.worker");
+    strcpy((char*)submission.chain, "GTEST");
 
-    // Round round{.pow = 10, .round_start_ms = 0};
+    bool res = redis_manager.AddBlockSubmission(&submission);
 
-    // const job_t* job = job_manager.GetNewJob();
-    // BlockSubmission submission("GTEST"sv, "GTEST_WORKER"sv, job, share_res,
-    //                            round, 1, 1);
+    ASSERT_TRUE(res);
 
-    // redis_manager.AddBlockSubmission(&submission);
+    // make sure everything is in the database
+    auto reply = (redisReply*)redisCommand(rc, "GET %s", block_key.c_str());
 
-    BlockSubmission submission = {.confirmations = 0,
-                               .blockReward = 0,
-                               .timeMs = 0,
-                               .durationMs = 0,
-                               .height = 0,
-                               .number = 0,
-                               .difficulty = 0,
-                               .effortPercent = 0
-                               };
+    BlockSubmission received = *((BlockSubmission*)reply->str);
+
+    ASSERT_EQ(memcmp(&submission, &received, sizeof(BlockSubmission)), 0);
+
+    // check one index exists, assume the rest do too as they use same func
+    reply = (redisReply*)redisCommand(rc, "ZSCORE block-index:number %u",
+                                      submission.number);
+    ASSERT_STREQ(reply->str, std::to_string(submission.number).c_str());
+}
+
+TEST_F(RedisTest, UpdateBlockConfirmation)
+{
+    const int confirmations = 10;
+
+    bool res = redis_manager.AddBlockSubmission(&submission);
+
+    redis_manager.UpdateBlockConfirmations(std::to_string(submission.number), confirmations);
+    auto reply = (redisReply*)redisCommand(rc, "GET block:%u", submission.number);
+    BlockSubmission received = *((BlockSubmission*)reply->str);
+
+    ASSERT_EQ(confirmations, received.confirmations);
+}
+
+TEST_F(RedisTest, SetMinerShares){
+    std::vector<RoundShare> miner_shares{RoundShare{
+        .address = "ADDRESS", .effort = 1.f, .share = 0.1, .reward = 1}};
+
+    bool res = redis_manager.AddMinerShares("GTEST", &submission, miner_shares);
+
+    ASSERT_TRUE(res);
 }

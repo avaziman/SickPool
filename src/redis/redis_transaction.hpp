@@ -2,19 +2,17 @@
 #define REDIS_TRANSACTION_HPP
 
 #include <hiredis/hiredis.h>
+#include "redis_manager.hpp"
 
+class RedisManager;
 class RedisTransaction
 {
    public:
-    RedisTransaction(redisContext* rc, int& command_count) : rc(rc)
-    {
-        redisAppendCommand(rc, "MULTI");
-        command_count += 2;
-    }
-    ~RedisTransaction() { redisAppendCommand(rc, "EXEC"); }
+    RedisTransaction(RedisManager* redis_manager);
+    ~RedisTransaction();
 
    private:
-    redisContext* rc;
+    RedisManager* redis_manager;
 };
 
 #endif

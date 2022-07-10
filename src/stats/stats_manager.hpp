@@ -12,21 +12,28 @@
 #include <thread>
 #include <unordered_map>
 
-#include "payments/payment_manager.hpp"
-#include "logger.hpp"
-#include "redis/redis_manager.hpp"
-#include "stats/stats.hpp"
+#include "difficulty/difficulty_manager.hpp"
 #include "blocks/block_submission.hpp"
+#include "logger.hpp"
+#include "payments/payment_manager.hpp"
+#include "redis/redis_manager.hpp"
 #include "round.hpp"
 #include "shares/share.hpp"
 #include "static_config/config.hpp"
+#include "stats/stats.hpp"
+
+#define UPDATE_EFFORT 0b1
+#define UPDATE_INTERVAL 0b01
+#define UPDATE_DIFFICULTY 0b001
 
 class RedisManager;
+// update manager?
 class StatsManager
 {
    public:
-    StatsManager(RedisManager* redis_manager, int hr_interval,
-                 int effort_interval, int avg_hr_interval, int hashrate_ttl);
+    StatsManager(RedisManager* redis_manager, DifficultyManager* diff_manager, int hr_interval,
+                 int effort_interval, int avg_hr_interval,
+                 int diff_adjust_seconds, int hashrate_ttl);
 
     // Every hashrate_interval_seconds we need to write:
     // ) worker hashrate
@@ -41,22 +48,23 @@ class StatsManager
                    const std::string& idTag, std::time_t curtime);
     void PopWorker(const std::string& worker, const std::string& address);
 
-    bool ClosePoWRound(std::string_view chain,
+    bool ClosePoWRound(const std::string& chain,
                        const BlockSubmission* submission, double fee);
 
     // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
 
-    bool UpdateStats(bool update_effort, bool update_hr,
-                     int64_t update_time_ms);
+    bool UpdateStats(int64_t update_time_ms, uint8_t update_flags);
     Round GetChainRound(const std::string& chain);
 
     static int hashrate_interval_seconds;
     static int effort_interval_seconds;
     static int average_hashrate_interval_seconds;
+    static int diff_adjust_seconds;
     static int hashrate_ttl_seconds;
 
    private:
     RedisManager* redis_manager;
+    DifficultyManager* diff_manager;
 
     std::mutex stats_map_mutex;
     // worker -> stats
