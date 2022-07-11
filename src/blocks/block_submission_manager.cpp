@@ -1,17 +1,21 @@
 #include "block_submission_manager.hpp"
 
+uint32_t SubmissionManager::block_number;
+
 void SubmissionManager::CheckImmatureSubmissions()
 {
     using namespace simdjson;
+    std::scoped_lock lock(blocks_lock);
+
     std::string resBody;
 
     for (int i = 0; i < immature_block_submissions.size(); i++)
     {
-        const auto& submission = *immature_block_submissions[i];
-        auto hashHex = std::string_view((char*)submission.hashHex,
-                                        sizeof(submission.hashHex));
-        auto chain =
-            std::string_view((char*)submission.chain, sizeof(submission.chain));
+        const auto& submission = immature_block_submissions[i];
+        auto hashHex = std::string_view((char*)submission->hashHex,
+                                        sizeof(submission->hashHex));
+        auto chain = std::string_view((char*)submission->chain,
+                                      sizeof(submission->chain));
 
         auto res = daemon_manager->SendRpcReq<std::any>(
             resBody, 1, "getblockheader", std::any(hashHex));
@@ -34,17 +38,30 @@ void SubmissionManager::CheckImmatureSubmissions()
         }
 
         redis_manager->UpdateBlockConfirmations(
-            std::string_view(std::to_string(submission.number)), confirmations);
+            std::string_view(std::to_string(submission->number)),
+            confirmations);
 
+        int submissions_ago = block_number - submission->number;
+
+        int64_t confirmation_time = GetCurrentTimeMs();
         if (confirmations > BLOCK_MATURITY)
         {
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block {} has matured!", hashHex);
-            redis_manager->UpdateImmatureRewards(chain, submission.timeMs,
-                                                 true);
+
+            if (last_matured_time)
+            {
+                int64_t duration_ms = confirmation_time - last_matured_time;
+                redis_manager->AddStakingPoints(chain, duration_ms);
+            }
+
+            redis_manager->UpdateImmatureRewards(chain, submissions_ago,
+                                                 confirmation_time, true);
 
             immature_block_submissions.erase(
                 immature_block_submissions.begin() + i);
+
+            last_matured_time = confirmation_time;
             i--;
         }
         else if (confirmations == -1)
@@ -52,8 +69,8 @@ void SubmissionManager::CheckImmatureSubmissions()
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Block {} has been orphaned! :(", hashHex);
 
-            redis_manager->UpdateImmatureRewards(chain, submission.timeMs,
-                                                 false);
+            redis_manager->UpdateImmatureRewards(chain, submission->number,
+                                                 confirmation_time, false);
             immature_block_submissions.erase(
                 immature_block_submissions.begin() + i);
             i--;
@@ -65,32 +82,20 @@ void SubmissionManager::CheckImmatureSubmissions()
 
 // TODO: LOCKS
 bool SubmissionManager::AddImmatureBlock(
-    const std::string& chain, const std::string_view workerFull,
-    const job_t* job, const ShareResult& shareRes, const Round& chainRound,
-    const int64_t time, const double pow_fee)
+    std::unique_ptr<BlockSubmission> submission, const double pow_fee)
 {
-    // auto submission = std::make_unique<BlockSubmission>(
-    //     chainsv, workerFull, job, shareRes, chainRound, time, block_number);
-    const int confirmations = 0;
-    const int64_t duration = time - chainRound.round_start_ms;
-    const double effortPercent = chainRound.pow / job->GetEstimatedShares();
-
-    auto submission = std::make_unique<BlockSubmission>(
-        confirmations, job->GetBlockReward(), time, duration, job->GetHeight(),
-        block_number, shareRes.Diff, effortPercent);
-
-    memcpy(submission->chain, chain.data(), chain.size());
-    memcpy(submission->miner, workerFull.data(), ADDRESS_LEN);
-    memcpy(submission->worker, workerFull.data(), workerFull.size());
-
+    std::scoped_lock lock(blocks_lock);
     redis_manager->IncrBlockCount();
     block_number++;
 
-    redis_manager->AddBlockSubmission(submission.get());
-    Logger::Log(LogType::Info, LogField::SubmissionManager,
-                "Block submission no {} added.", submission->number);
-
-    stats_manager->ClosePoWRound(chain, submission.get(), pow_fee);
+    if (submission->block_type == BlockType::POW)
+    {
+        round_manager->ClosePowRound(submission.get(), pow_fee);
+    }
+    else if (submission->block_type == BlockType::POS)
+    {
+        round_manager->ClosePosRound(submission.get(), pow_fee);
+    }
 
     Logger::Log(LogType::Info, LogField::SubmissionManager,
                 "Closed round for block submission no {} (immature).",
@@ -109,7 +114,7 @@ bool SubmissionManager::SubmitBlock(std::string_view block_hex)
 
     if (resCode != 200)
     {
-        Logger::Log(LogType::Critical, LogField::Stratum,
+        Logger::Log(LogType::Critical, LogField::SubmissionManager,
                     "Failed to send block submission, http code: {}, res: {}",
                     resCode, resultBody);
         return false;
@@ -128,7 +133,7 @@ bool SubmissionManager::SubmitBlock(std::string_view block_hex)
         if (!errorField.is_null())
         {
             std::string_view res = errorField.get_string();
-            Logger::Log(LogType::Critical, LogField::Stratum,
+            Logger::Log(LogType::Critical, LogField::SubmissionManager,
                         "Block submission rejected, rpc error: {}", res);
             return false;
         }
@@ -136,9 +141,8 @@ bool SubmissionManager::SubmitBlock(std::string_view block_hex)
         if (!resultField.is_null())
         {
             std::string_view result = resultField.get_string();
-            Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Block submission rejected, rpc result: {}",
-                        result);
+            Logger::Log(LogType::Critical, LogField::SubmissionManager,
+                        "Block submission rejected, rpc result: {}", result);
 
             if (result == "inconclusive")
             {
@@ -152,7 +156,7 @@ bool SubmissionManager::SubmitBlock(std::string_view block_hex)
     }
     catch (const simdjson::simdjson_error& err)
     {
-        Logger::Log(LogType::Critical, LogField::Stratum,
+        Logger::Log(LogType::Critical, LogField::SubmissionManager,
                     "Submit block response parse error: {}", err.what());
         return false;
     }

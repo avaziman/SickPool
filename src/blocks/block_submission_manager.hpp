@@ -8,7 +8,6 @@
 
 #include "block_submission.hpp"
 #include "daemon_manager.hpp"
-#include "redis/redis_manager.hpp"
 #include "stats/stats_manager.hpp"
 
 class SubmissionManager
@@ -16,13 +15,12 @@ class SubmissionManager
    public:
     SubmissionManager(RedisManager* redis_manager,
                       DaemonManager* daemon_manager,
-                      StatsManager* stats_manager)
-        :
-          block_number(redis_manager->GetBlockNumber()),
-         redis_manager(redis_manager),
+                      RoundManager* stats_manager)
+        : redis_manager(redis_manager),
           daemon_manager(daemon_manager),
-          stats_manager(stats_manager)
+          round_manager(stats_manager)
     {
+        SubmissionManager::block_number = redis_manager->GetBlockNumber();
         Logger::Log(LogType::Info, LogField::SubmissionManager,
                     "Submission manager started, block number: {}",
                     block_number);
@@ -43,23 +41,24 @@ class SubmissionManager
         return added;
     }
 
-    bool AddImmatureBlock(const std::string& chainsv,
-                          const std::string_view workerFull, const job_t* job,
-                          const ShareResult& shareRes, const Round& chainRound,
-                          const int64_t time, double pow_fee);
+    bool AddImmatureBlock(std::unique_ptr<BlockSubmission> submission,
+                          double pow_fee);
 
     void CheckImmatureSubmissions();
+
+    static uint32_t block_number;
 
    private:
     bool SubmitBlock(
         std::string_view block_hex);  // TODO: make const when we wrapped rpc
                                       // func, same for trysubmit
+    int64_t last_matured_time = 0;
     const int submis_retries = 10;
-    uint32_t block_number;
 
+    std::mutex blocks_lock;
     RedisManager* redis_manager;
     DaemonManager* daemon_manager;
-    StatsManager* stats_manager;
+    RoundManager* round_manager;
 
     simdjson::ondemand::parser httpParser;
 

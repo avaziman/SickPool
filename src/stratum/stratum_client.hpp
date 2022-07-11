@@ -63,6 +63,13 @@ class StratumClient
         return inserted;
     }
 
+    void ResetShareSet()
+    {
+        std::scoped_lock lock(shares_mutex);
+
+        share_uset.clear();
+    }
+
     // called after auth, before added to databse
     void SetAddress(std::string_view worker, std::string_view addr)
     {
@@ -94,6 +101,7 @@ class StratumClient
     int64_t last_share_time;
     uint32_t extra_nonce;
     uint32_t share_count = 0;
+    
     double current_diff;
     double pending_diff;
     bool is_authorized;

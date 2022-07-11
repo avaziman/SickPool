@@ -3,8 +3,7 @@
 
 struct Round {
     // ms
-    double pow = 0;
-    double pos = 0;
+    double total_effort = 0;
     int64_t round_start_ms = 0;
 };
 

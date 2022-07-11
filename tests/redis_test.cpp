@@ -10,23 +10,28 @@ class RedisTest : public ::testing::Test
    protected:
     void SetUp() override
     {
+        using namespace std::string_view_literals;
+
         rc = redisConnect("127.0.0.1", 6379);
 
-        strcpy((char*)submission.miner, "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC");
-        strcpy((char*)submission.worker,
-               "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC.worker");
-        strcpy((char*)submission.chain, "GTEST");
+        auto miner = "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC"sv;
+        auto worker = "worker"sv;
+        memcpy(submission.miner, miner.data(), ADDRESS_LEN);
+        memcpy(submission.worker, worker.data(), worker.size());
+        memcpy(submission.chain, chain, strlen(chain));
     }
 
+    const char* chain = "GTEST";
     RedisManager redis_manager{"127.0.0.1", 6379};
     redisContext* rc;
-    BlockSubmission submission
-    {
-        .confirmations = rand(), .blockReward = rand(), .timeMs = rand(),
-        .durationMs = rand(), .height = (uint32_t)rand(),
-        .number = (uint32_t)rand(), .difficulty = (double)rand(),
-        .effortPercent = (double)rand()
-    };
+    BlockSubmission submission{.confirmations = rand(),
+                               .block_reward = rand(),
+                               .time_ms = rand(),
+                               .duration_ms = rand(),
+                               .height = (uint32_t)rand(),
+                               .number = (uint32_t)rand(),
+                               .difficulty = (double)rand(),
+                               .effort_percent = (double)rand()};
     // void TearDown() override {}
 };
 
@@ -36,11 +41,12 @@ TEST_F(RedisTest, AddBlockSubmission)
 
     std::string block_key = fmt::format("block:{}", submission.number);
 
-    strcpy((char*)submission.miner, "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC");
-    strcpy((char*)submission.worker,
-           "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC.worker");
-    strcpy((char*)submission.chain, "GTEST");
-
+    auto miner = "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC"sv;
+    auto worker = "worker"sv;
+    memcpy(submission.miner, miner.data(), ADDRESS_LEN);
+    memcpy(submission.worker, worker.data(), worker.size());
+    memcpy(submission.chain, chain, strlen(chain));
+    
     bool res = redis_manager.AddBlockSubmission(&submission);
 
     ASSERT_TRUE(res);
@@ -64,18 +70,121 @@ TEST_F(RedisTest, UpdateBlockConfirmation)
 
     bool res = redis_manager.AddBlockSubmission(&submission);
 
-    redis_manager.UpdateBlockConfirmations(std::to_string(submission.number), confirmations);
-    auto reply = (redisReply*)redisCommand(rc, "GET block:%u", submission.number);
+    redis_manager.UpdateBlockConfirmations(std::to_string(submission.number),
+                                           confirmations);
+    auto reply =
+        (redisReply*)redisCommand(rc, "GET block:%u", submission.number);
     BlockSubmission received = *((BlockSubmission*)reply->str);
 
     ASSERT_EQ(confirmations, received.confirmations);
 }
 
-TEST_F(RedisTest, SetMinerShares){
-    std::vector<RoundShare> miner_shares{RoundShare{
-        .address = "ADDRESS", .effort = 1.f, .share = 0.1, .reward = 1}};
+TEST_F(RedisTest, SetMinerShares)
+{
+    const char* addr = "ADDRESS";
+    std::vector<std::pair<std::string, RoundShare>> miner_shares{
+        {addr, RoundShare{.effort = 1.f, .share = 0.1, .reward = 1}}};
 
-    bool res = redis_manager.AddMinerShares("GTEST", &submission, miner_shares);
+    bool res = redis_manager.AddRoundShares(chain, &submission, miner_shares);
 
     ASSERT_TRUE(res);
+
+    // make sure our share was saved (immature reward)
+    auto reply = (redisReply*)redisCommand(rc, "HGET immature-rewards:%u %s",
+                                           submission.number, addr);
+
+    RoundShare* received = ((RoundShare*)reply->str);
+
+    ASSERT_EQ(memcmp(&miner_shares[0].second, received, sizeof(RoundShare)), 0);
+}
+
+TEST_F(RedisTest, UpdateImmatureRewardsConfirmed)
+{
+    std::string addr = "GTEST_ADDR_CONFIRMED";
+    std::vector<std::pair<std::string, RoundShare>> miner_shares{
+        {addr, RoundShare{.effort = 1.f, .share = 0.1, .reward = 1}}};
+
+    bool res = redis_manager.AddRoundShares(chain, &submission, miner_shares);
+
+    // matured
+    res =
+        redis_manager.UpdateImmatureRewards(chain, submission.number, 0, true);
+
+    ASSERT_TRUE(res);
+
+    redisReply* reply = (redisReply*)redisCommand(
+        rc, "HGET %s:balance-immature %s", chain, addr.c_str());
+
+    // no immature balance
+    ASSERT_STREQ(reply->str, "0");
+
+    reply = (redisReply*)redisCommand(rc, "HGET %s:balance-mature %s", chain,
+                                      addr.c_str());
+
+    // exactly same mature balance
+    ASSERT_STREQ(reply->str,
+                 std::to_string(miner_shares[0].second.reward).c_str());
+
+    // clean up
+    redisCommand(rc, "DEL %s:balance-mature %s", chain, addr.c_str());
+}
+
+TEST_F(RedisTest, UpdateImmatureRewardsOrphaned)
+{
+    std::string addr = "GTEST_ADDR_ORPHAN";
+    std::vector<std::pair<std::string, RoundShare>> miner_shares{
+        {addr, RoundShare{.effort = 1.f, .share = 0.1, .reward = 1}}};
+
+    bool res = redis_manager.AddRoundShares(chain, &submission, miner_shares);
+
+    // orphaned
+    res =
+        redis_manager.UpdateImmatureRewards(chain, submission.number, 0, false);
+
+    ASSERT_TRUE(res);
+
+    redisReply* reply = (redisReply*)redisCommand(
+        rc, "HGET %s:balance-immature %s", chain, addr.c_str());
+
+    // no immature balance
+    ASSERT_STREQ(reply->str, "0");
+
+    reply = (redisReply*)redisCommand(rc, "HGET %s:balance-mature %s", chain,
+                                      addr.c_str());
+
+    // no mature balance
+    ASSERT_STREQ(reply->str, "0");
+
+    // clean up
+    redisCommand(rc, "DEL %s:balance-mature %s", chain, addr.c_str());
+}
+
+TEST_F(RedisTest, AddStakingPoints)
+{
+    bool res = redis_manager.AddStakingPoints(chain, 100);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_F(RedisTest, GetPosPoints)
+{
+    std::vector<std::pair<std::string, double>> stakers_effort;
+    bool res = redis_manager.GetPosPoints(stakers_effort, chain);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_F(RedisTest, TsCreate)
+{
+    using namespace std::string_view_literals;
+
+    redis_manager.TsCreate("TS_CREATE_TEST"sv, 1,
+                           {{"TEST_LABEL"sv, "TEST_LABEL_VAL"sv}});
+
+    auto reply = (redisReply*)redisCommand(
+        rc, "TS.QUERYINDEX TEST_LABEL=TEST_LABEL_VAL");
+    ASSERT_EQ(reply->elements, 1);
+
+    // clean up
+    redisCommand(rc, "DEL TS_CREATE_TEST");
 }

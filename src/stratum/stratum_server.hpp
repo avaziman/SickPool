@@ -10,6 +10,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include "benchmark.hpp"
 
 #include "../sock_addr.hpp"
 #include "stats_manager.hpp"
@@ -54,6 +55,7 @@ class StratumServer
     DaemonManager daemon_manager;
     JobManager job_manager;
     SubmissionManager submission_manager;
+    RoundManager round_manager;
     DifficultyManager diff_manager;
 
     std::vector<std::unique_ptr<StratumClient>> clients;
@@ -82,7 +84,6 @@ class StratumServer
     void SendReject(const StratumClient* cli, int id, int error,
                     const char* msg) const;
     void SendAccept(const StratumClient* cli, int id) const;
-    bool SubmitBlock(std::string_view block_hex);
 
     void UpdateDifficulty(StratumClient* cli);
 

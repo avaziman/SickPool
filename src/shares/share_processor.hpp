@@ -20,8 +20,8 @@ class ShareProcessor
     {
         if (job == nullptr)
         {
-            result.Code = ShareCode::JOB_NOT_FOUND;
-            result.Message = "Job not found";
+            result.code = ShareCode::JOB_NOT_FOUND;
+            result.message = "Job not found";
             return;
         }
 
@@ -29,8 +29,8 @@ class ShareProcessor
 
         if (!cli.GetIsAuthorized())
         {
-            result.Code = ShareCode::UNAUTHORIZED_WORKER;
-            result.Message = "Unauthorized worker";
+            result.code = ShareCode::UNAUTHORIZED_WORKER;
+            result.message = "Unauthorized worker";
             return;
         }
 
@@ -44,8 +44,8 @@ class ShareProcessor
 
         if (shareTime < minTime || shareTime > maxTime)
         {
-            result.Code = ShareCode::UNKNOWN;
-            result.Message =
+            result.code = ShareCode::UNKNOWN;
+            result.message =
                 "Invalid nTime "
                 "(min: " +
                 std::to_string(minTime) + ", max: " + std::to_string(maxTime) +
@@ -58,10 +58,10 @@ class ShareProcessor
 
 #if POW_ALGO == POW_ALGO_VERUSHASH
         // takes about 6-8 microseconds vs 8-12 on snomp
-        HashWrapper::VerushashV2b2(result.HashBytes.data(), headerData,
+        HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
                                    BLOCK_HEADER_SIZE, cli.GetHasher());
 #endif
-        uint256 hash(result.HashBytes);
+        uint256 hash(result.hash_bytes);
         // arith_uint256 hashArith = UintToArith256(hash);
 
         // take from the end as first will have zeros
@@ -70,25 +70,25 @@ class ShareProcessor
 
         if (!cli.SetLastShare(shareEnd, curTime))
         {
-            result.Code = ShareCode::DUPLICATE_SHARE;
-            result.Message = "Duplicate share";
-            result.Diff = static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
+            result.code = ShareCode::DUPLICATE_SHARE;
+            result.message = "Duplicate share";
+            result.difficulty = static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
             return;
         }
 
-        result.Diff = BitsToDiff(UintToArith256(hash).GetCompact(false));
+        result.difficulty = BitsToDiff(UintToArith256(hash).GetCompact(false));
 
         // if (hashArith >= *job->GetTarget())
-        if (result.Diff >= job->GetTargetDiff())
+        if (result.difficulty >= job->GetTargetDiff())
         {
-            result.Code = ShareCode::VALID_BLOCK;
+            result.code = ShareCode::VALID_BLOCK;
             return;
         }
-        else if (result.Diff / cli.GetDifficulty() < 1)  // allow 5% below
+        else if (result.difficulty / cli.GetDifficulty() < 1)  // allow 5% below
         {
-            result.Code = ShareCode::LOW_DIFFICULTY_SHARE;
-            result.Message =
-                fmt::format("Low difficulty share of {}", result.Diff);
+            result.code = ShareCode::LOW_DIFFICULTY_SHARE;
+            result.message =
+                fmt::format("Low difficulty share of {}", result.difficulty);
             char blockHeaderHex[BLOCK_HEADER_SIZE * 2];
             Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
 
@@ -101,7 +101,7 @@ class ShareProcessor
             return;
         }
 
-        result.Code = ShareCode::VALID_SHARE;
+        result.code = ShareCode::VALID_SHARE;
         return;
     }
 };

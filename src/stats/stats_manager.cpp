@@ -18,7 +18,11 @@ StatsManager::StatsManager(RedisManager* redis_manager,
     StatsManager::diff_adjust_seconds = diff_adjust_seconds;
     StatsManager::hashrate_ttl_seconds = hashrate_ttl;
 
-    LoadCurrentRound();
+    if (!LoadEffortHashrate())
+    {
+        Logger::Log(LogType::Critical, LogField::StatsManager,
+                    "Failed to load current round!");
+    }
 }
 
 void StatsManager::Start()
@@ -140,30 +144,19 @@ bool StatsManager::UpdateStats(int64_t update_time_ms, uint8_t update_flags)
                                       update_time_ms, update_flags);
 }
 
-bool StatsManager::LoadCurrentRound()
+bool StatsManager::LoadEffortHashrate()
 {
-    auto chain = std::string(COIN_SYMBOL);
-    double total_effort = redis_manager->GetRoundEffortPow(chain);
+    return redis_manager->LoadMinersAverageHashrate(miner_stats_map);
+}
 
-    int64_t round_start = redis_manager->GetRoundTimePow(chain);
-    if (round_start == 0)
+void StatsManager::ResetRoundEfforts(const std::string& chain)
+{
+    std::scoped_lock lock(stats_map_mutex);
+
+    for (auto& miner : miner_stats_map)
     {
-        round_start = GetCurrentTimeMs();
-
-        redis_manager->SetRoundTimePow(chain, round_start);
-        redis_manager->SetRoundEffortPow(chain, total_effort);
+        miner.second.ResetEffort(chain);
     }
-
-    auto round = &round_stats_map[chain];
-    round->round_start_ms = round_start;
-    round->pow = total_effort;
-
-    Logger::Log(LogType::Info, LogField::StatsManager,
-                "Loaded pow round chain: {}, effort of: {}, started at: {}",
-                chain, round->pow, round->round_start_ms);
-
-    // redis_manager->LoadSolverStats(miner_stats_map, round_stats_map);
-    return true;
 }
 
 void StatsManager::AddShare(const std::string& worker_full,
@@ -184,8 +177,6 @@ void StatsManager::AddShare(const std::string& worker_full,
     }
     else
     {
-        this->round_stats_map[COIN_SYMBOL].pow += diff;
-
         worker_stats->interval_valid_shares++;
         worker_stats->current_interval_effort += diff;
 
@@ -247,115 +238,24 @@ void StatsManager::PopWorker(const std::string& worker_full,
     }
 }
 
-bool StatsManager::ClosePoWRound(const std::string& chain,
-                                 const BlockSubmission* submission, double fee)
+void StatsManager::GetMiningEffortsReset(
+    std::vector<std::pair<std::string, double>>& efforts,
+    const std::string& chain_str)
 {
-    // redis mutex already locked
-    std::scoped_lock stats_lock(stats_map_mutex);
-
-    auto chain_str = std::string(chain.data(), chain.size());
-
-    std::vector<RoundShare> miner_shares;
-    PaymentManager::GetRewardsProp(miner_shares, chain, submission->blockReward,
-                                   miner_stats_map,
-                                   round_stats_map[chain_str].pow, fee);
-
-    redis_manager->AddMinerShares(chain, submission, miner_shares);
-
-    // reset round
-    redis_manager->SetRoundTimePow(chain, submission->timeMs);
-    redis_manager->SetRoundEffortPow(chain, 0);
-
-    round_stats_map[chain_str].round_start_ms = submission->timeMs;
-    round_stats_map[chain_str].pow = 0;
-
-    for (auto& [_, miner] : miner_stats_map)
     {
-        miner.ResetEffort();
+        std::scoped_lock stats_lock(stats_map_mutex);
+
+        std::transform(miner_stats_map.begin(), miner_stats_map.end(),
+                       std::back_inserter(efforts),
+                       [&](auto& obj) {
+                           return std::make_pair(
+                               obj.first,
+                               obj.second.round_effort_map[chain_str]);
+                       });
     }
-
-    return true;
-}
-
-// bool StatsManager::AppendPoSBalances(std::string_view chain, int64_t from_ms)
-// {
-//     redisReply* reply;
-//     redisAppendCommand(rc, "TS.MGET FILTER type=mature-balance coin=%b",
-//                        chain.data(), chain.length());
-
-//     if (redisGetReply(rc, (void**)&reply) != REDIS_OK)
-//     {
-//         Logger::Log(LogType::Critical, LogField::StatsManager,
-//                     "Failed to get balances: %s\n", rc->errstr);
-//         return false;
-//     }
-
-//     // assert type = arr (2)
-//     int command_count = 0;
-//     for (int i = 0; i < reply->elements; i++)
-//     {
-//         // key is 2d array of the following arrays: key name, (empty array -
-//         // labels), values (array of tuples)
-//         const redisReply* key = reply->element[i];
-//         auto keyName = std::string(key[0].element[0]->str);
-//         std::string minerAddr =
-//             keyName.substr(keyName.find_last_of(':') + 1, keyName.size());
-
-//         // skip key name + null value of labels
-//         const redisReply* values = key[0].element[2];
-
-//         int64_t timestamp = values->element[0]->integer;
-//         const char* value_str = values->element[1]->str;
-//         int64_t value = std::stoll(value_str);
-
-//         // time staked * value staked
-//         int64_t posPoints = (from_ms - timestamp) * value;
-
-//         round_map[chain].pos += posPoints;
-
-//         miner_stats_map[minerAddr].round_effort[chain].pos += posPoints;
-
-//         // update pos effort
-//         redisAppendCommand(
-//             rc, "LSET round_entries:pos:%s 0 {\"effort\":% " PRIi64 "}",
-//             minerAddr.c_str(),
-//             miner_stats_map[minerAddr].round_effort[chain].pos);
-//         command_count++;
-
-//         std::cout << "timestamp: " << timestamp << " value: " << value << " "
-//                   << value_str << std::endl;
-//     }
-
-//     redisAppendCommand(rc, "SET %b:round_effort_pos %" PRIi64, chain.data(),
-//                        chain.length(), round_map[chain].pos);
-//     command_count++;
-//     // redisAppendCommand(rc, "HSET " COIN_SYMBOL ":round_effort_pos total
-//     0");
-
-//     // free balances reply
-//     freeReplyObject(reply);
-
-//     for (int i = 0; i < command_count; i++)
-//     {
-//         if (redisGetReply(rc, (void**)&reply) != REDIS_OK)
-//         {
-//             Logger::Log(LogType::Critical, LogField::StatsManager,
-//                         "Failed to append pos points: %s\n", rc->errstr);
-//             return false;
-//         }
-//         freeReplyObject(reply);
-//     }
-
-//     return true;
-// }
-
-Round StatsManager::GetChainRound(const std::string& chain)
-{
-    std::scoped_lock stats_lock(stats_map_mutex);
-    return round_stats_map[chain];
+    ResetRoundEfforts(chain_str);
 }
 
 // TODO: idea: since writing all shares on all pbaas is expensive every 10 sec,
 // just write to primary and to side chains write every 5 mins
-// TODO: maybe create block submission manager;
 // TODO: check that ts indeed exists

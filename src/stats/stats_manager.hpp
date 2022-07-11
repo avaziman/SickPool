@@ -10,10 +10,10 @@
 #include <string>
 #include <string_view>
 #include <thread>
-#include <unordered_map>
 
-#include "difficulty/difficulty_manager.hpp"
+#include "round_manager.hpp"
 #include "blocks/block_submission.hpp"
+#include "difficulty/difficulty_manager.hpp"
 #include "logger.hpp"
 #include "payments/payment_manager.hpp"
 #include "redis/redis_manager.hpp"
@@ -27,12 +27,13 @@
 #define UPDATE_DIFFICULTY 0b001
 
 class RedisManager;
+class RoundManager;
 // update manager?
 class StatsManager
 {
    public:
-    StatsManager(RedisManager* redis_manager, DifficultyManager* diff_manager, int hr_interval,
-                 int effort_interval, int avg_hr_interval,
+    StatsManager(RedisManager* redis_manager, DifficultyManager* diff_manager,
+                 int hr_interval, int effort_interval, int avg_hr_interval,
                  int diff_adjust_seconds, int hashrate_ttl);
 
     // Every hashrate_interval_seconds we need to write:
@@ -41,20 +42,18 @@ class StatsManager
     // ) pool hashrate
     // ) staker points
     void Start();
-    bool LoadCurrentRound();
+    bool LoadEffortHashrate();
     void AddShare(const std::string& worker_full, const std::string& miner_addr,
                   const double diff);
     bool AddWorker(const std::string& address, const std::string& worker_full,
                    const std::string& idTag, std::time_t curtime);
     void PopWorker(const std::string& worker, const std::string& address);
+    void GetMiningEffortsReset(std::vector<std::pair<std::string, double>>& efforts, const std::string& chain);
 
-    bool ClosePoWRound(const std::string& chain,
-                       const BlockSubmission* submission, double fee);
-
+    void ResetRoundEfforts(const std::string& chain);
     // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
 
     bool UpdateStats(int64_t update_time_ms, uint8_t update_flags);
-    Round GetChainRound(const std::string& chain);
 
     static int hashrate_interval_seconds;
     static int effort_interval_seconds;
@@ -65,14 +64,13 @@ class StatsManager
    private:
     RedisManager* redis_manager;
     DifficultyManager* diff_manager;
+    RoundManager* round_manager;
 
     std::mutex stats_map_mutex;
     // worker -> stats
     worker_map worker_stats_map;
     // miner -> stats
     miner_map miner_stats_map;
-    // chain -> effort
-    round_map round_stats_map;
 };
 
 #endif

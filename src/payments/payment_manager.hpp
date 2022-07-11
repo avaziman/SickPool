@@ -2,21 +2,24 @@
 #define PAYMENT_MANAGER_HPP
 #include "logger.hpp"
 #include "stats.hpp"
+
+#pragma pack(push, 1)
 struct RoundShare
 {
-    std::string address;
     double effort;
     double share;
     int64_t reward;
 };
+#pragma pack(pop)
 
 class PaymentManager
 {
    public:
-    static bool GetRewardsProp(std::vector<RoundShare>& miner_shares,
-                               const std::string& chain, int64_t block_reward,
-                               miner_map& miners, double total_effort,
-                               double fee)
+    static bool GetRewardsProp(
+        std::vector<std::pair<std::string, RoundShare>>& miner_shares,
+        int64_t block_reward,
+        const std::vector<std::pair<std::string, double>>& miner_efforts,
+        double total_effort, double fee)
     {
         int64_t substracted_reward = static_cast<int64_t>(
             static_cast<double>(block_reward) * (1.f - fee));
@@ -29,20 +32,20 @@ class PaymentManager
         }
         // miner_shares.resize(miners.size());
 
-        for (auto& [addr, stats] : miners)
+        for (auto& [addr, effort] : miner_efforts)
         {
             RoundShare round_share;
-            round_share.address = addr;
-            round_share.effort = stats.round_effort_map[chain];
+            round_share.effort = effort;
             round_share.share = round_share.effort / total_effort;
-            round_share.reward = static_cast<int64_t>(round_share.share * substracted_reward);
-            miner_shares.push_back(round_share);
+            round_share.reward =
+                static_cast<int64_t>(round_share.share * substracted_reward);
+            miner_shares.emplace_back(addr, round_share);
 
             Logger::Log(LogType::Info, LogField::PaymentManager,
                         "Miner round share: {}, effort: {}, share: {}, reward: "
                         "{}, total effort: {}",
-                        round_share.address, round_share.effort,
-                        round_share.share, round_share.reward, total_effort);
+                        addr, round_share.effort, round_share.share,
+                        round_share.reward, total_effort);
         }
 
         return true;

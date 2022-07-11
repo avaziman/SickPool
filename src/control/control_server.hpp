@@ -8,7 +8,8 @@
 enum class ControlCommands
 {
     NONE = 0,
-    UPDATE_BLOCK = 1,
+    BLOCK_NOTIFY = 1,
+    WALLET_NOTFIY = 2,
 };
 
 class ControlServer

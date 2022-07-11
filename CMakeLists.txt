@@ -54,7 +54,7 @@ FetchContent_MakeAvailable(googletest)
 # include_directories(lib/rapidjson/include)
 add_subdirectory(src)
 
-# add_subdirectory(stratum_notifier)
+add_subdirectory(stratum_notifier)
 # add_subdirectory(benchmark)
 add_subdirectory(tests)
 add_executable(${PROJECT_NAME} src/main.cpp)

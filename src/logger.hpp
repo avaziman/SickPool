@@ -38,6 +38,8 @@ enum class LogField
     SubmissionManager,
     PaymentManager,
     DiffManager,
+    RoundManager,
+    Benchmark,
 
 };
 
@@ -65,6 +67,10 @@ inline const char* ToString(LogField v)
             return "PAYMENT";
         case LogField::DiffManager:
             return "DIFF";
+        case LogField::RoundManager:
+            return "ROUND";
+        case LogField::Benchmark:
+            return "BENCH";
         default:
             return "Unknown";
     }

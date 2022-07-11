@@ -12,7 +12,8 @@ StratumServer::StratumServer(const CoinConfig &conf)
                     (int)coin_config.hashrate_ttl_seconds),
       daemon_manager(coin_config.rpcs),
       job_manager(&daemon_manager, coin_config.pool_addr),
-      submission_manager(&redis_manager, &daemon_manager, &stats_manager)
+      round_manager(&redis_manager, &stats_manager),
+      submission_manager(&redis_manager, &daemon_manager, &round_manager)
 {
     auto error = httpParser.allocate(MAX_HTTP_REQ_SIZE, MAX_HTTP_JSON_DEPTH);
     if (error != simdjson::SUCCESS)
@@ -84,11 +85,14 @@ void StratumServer::HandleControlCommands()
 
 void StratumServer::HandleControlCommand(ControlCommands cmd)
 {
+    auto val = simdjson::ondemand::array();
     switch (cmd)
     {
-        case ControlCommands::UPDATE_BLOCK:
-            auto val = simdjson::ondemand::array();
+        case ControlCommands::BLOCK_NOTIFY:
             HandleBlockNotify(val);
+            break;
+        case ControlCommands::WALLET_NOTFIY:
+            HandleWalletNotify(val);
             break;
     }
 }
@@ -304,7 +308,7 @@ void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
     // save it to process round
     {
         std::scoped_lock clients_lock(clients_mutex);
-        for (auto& cli : clients)
+        for (auto &cli : clients)
         {
             // (*it)->SetDifficulty(1000000, curtimeMs);
             // (*it)->SetDifficulty(job->GetTargetDiff(), curtimeMs);
@@ -315,6 +319,7 @@ void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
                 UpdateDifficulty(cli.get());
             }
             BroadcastJob(cli.get(), newJob);
+            cli->ResetShareSet();
         }
     }
 
@@ -331,11 +336,12 @@ void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
     submission_manager.CheckImmatureSubmissions();
     redis_manager.AddNetworkHr(chain, curtimeMs, newJob->GetTargetDiff());
 
-    redis_manager.SetRoundEstimatedEffort(chain, newJob->GetEstimatedShares());
+    redis_manager.SetRoundEstimatedEffort(chain, "pow",
+                                          newJob->GetEstimatedShares());
     // TODO: combine all redis functions one new block to one pipelined
 
     Logger::Log(LogType::Info, LogField::JobManager,
-                "Broadcasted new job: # {}", newJob->GetId());
+                "Broadcasted new job: #{}", newJob->GetId());
     Logger::Log(LogType::Info, LogField::JobManager, "Height: {}",
                 newJob->GetHeight());
     Logger::Log(LogType::Info, LogField::JobManager, "Min time: {}",
@@ -576,7 +582,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
     {
         SendReject(
             cli, id, (int)ShareCode::UNAUTHORIZED_WORKER,
-            "Worker name too long! (max " str(MAX_WORKER_NAME_LEN) " chars)");
+            "Worker name too long! (max " STRM(MAX_WORKER_NAME_LEN) " chars)");
         return;
     }
 
@@ -718,21 +724,24 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
 void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 {
     int64_t time = GetCurrentTimeMs();
+    Benchmark<std::chrono::microseconds> share_bench("Share process");
+    auto start = TIME_NOW();
 
-    ShareResult shareRes;
+    ShareResult share_res;
     const job_t *job = job_manager.GetJob(share.jobId);
 
-    ShareProcessor::Process(*cli, job, share, shareRes, time);
+    ShareProcessor::Process(*cli, job, share, share_res, time);
 
     // > add share stats before submission to have accurate effort (its fast)
     // > possible that a timeseries wasn't created yet, so don't add shares
-    if (shareRes.Code != ShareCode::UNAUTHORIZED_WORKER)
+    if (share_res.code != ShareCode::UNAUTHORIZED_WORKER)
     {
+        round_manager.AddRoundEffort(COIN_SYMBOL, share_res.difficulty);
         stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
-                               shareRes.Diff);
+                               share_res.difficulty);
     }
 
-    switch (shareRes.Code)
+    switch (share_res.code)
     {
         case ShareCode::VALID_BLOCK:
         {
@@ -745,9 +754,29 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
             auto block_hex = std::string_view(blockData, blockSize);
             submission_manager.TrySubmit(chain, block_hex);
 
-            const auto chainRound = stats_manager.GetChainRound(chain);
-            submission_manager.AddImmatureBlock(chain, cli->GetFullWorkerName(),
-                                                job, shareRes, chainRound, time,
+            const int confirmations = 0;
+            const std::string_view worker_full(cli->GetFullWorkerName());
+            const auto chainRound = round_manager.GetChainRound(chain);
+            const auto type = BlockType::POW;
+            const int64_t duration_ms = time - chainRound.round_start_ms;
+            const double effort_percent =
+                chainRound.total_effort / job->GetEstimatedShares();
+
+            auto submission = std::make_unique<BlockSubmission>(
+                confirmations, type, job->GetBlockReward(), time, duration_ms,
+                job->GetHeight(), SubmissionManager::block_number,
+                share_res.difficulty, effort_percent);
+
+            memcpy(submission->chain, chain.data(), chain.size());
+            memcpy(submission->miner, worker_full.data(), ADDRESS_LEN);
+            memcpy(submission->worker, worker_full.data() + ADDRESS_LEN,
+                   worker_full.size() - ADDRESS_LEN);
+            Hexlify((char *)submission->hashHex, share_res.hash_bytes.data(),
+                    HASH_SIZE);
+            ReverseHex((char *)submission->hashHex, (char *)submission->hashHex,
+                       HASH_SIZE_HEX);
+
+            submission_manager.AddImmatureBlock(std::move(submission),
                                                 coin_config.pow_fee);
             SendAccept(cli, id);
             break;
@@ -759,13 +788,15 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
             Logger::Log(LogType::Warn, LogField::Stratum,
                         "Received share for unknown job id: {}", share.jobId);
         default:
-            SendReject(cli, id, (int)shareRes.Code, shareRes.Message.c_str());
+            SendReject(cli, id, (int)share_res.code, share_res.message.c_str());
             break;
     }
 
-    Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in {}us, diff: {}, res: {}",
-                GetCurrentTimeMs() - time, shareRes.Diff, (int)shareRes.Code);
+    auto end = TIME_NOW();
+
+    // Logger::Log(LogType::Debug, LogField::Stratum,
+    //             "Share processed in {}us, diff: {}, res: {}",
+    //             std::chrono::duration_cast<std::chrono::microseconds>(end - start).count(), share_res.difficulty, (int)share_res.code);
 }
 
 void StratumServer::SendReject(const StratumClient *cli, int id, int err,
@@ -787,7 +818,7 @@ void StratumServer::SendAccept(const StratumClient *cli, int id) const
     SendRaw(cli->GetSock(), buff, len);
 }
 
-void StratumServer::UpdateDifficulty(StratumClient* cli)
+void StratumServer::UpdateDifficulty(StratumClient *cli)
 {
     uint32_t diffBits = DiffToBits(cli->GetDifficulty());
     uint256 diff256;
@@ -802,8 +833,9 @@ void StratumServer::UpdateDifficulty(StratumClient* cli)
 
     SendRaw(cli->GetSock(), request, len);
 
-    Logger::Log(LogType::Debug, LogField::Stratum, "Set difficulty for {} to {}",
-                cli->GetFullWorkerName(), arith256.GetHex());
+    Logger::Log(LogType::Debug, LogField::Stratum,
+                "Set difficulty for {} to {}", cli->GetFullWorkerName(),
+                arith256.GetHex());
 }
 
 void StratumServer::BroadcastJob(const StratumClient *cli, const Job *job) const

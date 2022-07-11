@@ -13,14 +13,14 @@
 #include "blocks/block_submission.hpp"
 #include "logger.hpp"
 #include "payments/payment_manager.hpp"
+#include "redis_transaction.hpp"
 #include "shares/share.hpp"
 #include "static_config/config.hpp"
 #include "stats/stats.hpp"
 #include "stats/stats_manager.hpp"
-#include "redis_transaction.hpp"
 
 #define xstr(s) str(s)
-#define str(s) #s
+#define STRM(s) #s
 
 class RedisTransaction;
 class RedisManager
@@ -36,8 +36,8 @@ class RedisManager
                                   int32_t confirmations);
     bool IncrBlockCount();
     uint32_t GetBlockNumber();
-    bool UpdateImmatureRewards(std::string_view chain, int64_t rewardTime,
-                               bool matured);
+    bool UpdateImmatureRewards(std::string_view chain, uint32_t block_num,
+                               int64_t matured_time, bool matured);
 
     /* stats */
     bool AddWorker(std::string_view address, std::string_view worker_full,
@@ -46,30 +46,46 @@ class RedisManager
 
     bool PopWorker(std::string_view address);
 
-    /* pow round */
-    bool SetRoundEstimatedEffort(std::string_view chain, double effort);
-    bool SetRoundTimePow(std::string_view chain, int64_t time);
-    bool SetRoundEffortPow(std::string_view chain, double effort);
-    int64_t GetRoundTimePow(std::string_view chain);
-    double GetRoundEffortPow(std::string_view chain);
-    bool AddMinerShares(std::string_view chain,
-                        const BlockSubmission *submission,
-                        const std::vector<RoundShare> &miner_shares);
+    /* round */
+    bool SetRoundEstimatedEffort(std::string_view chain, std::string_view type,
+                                 double effort);
+    bool SetRoundStartTime(std::string_view chain, std::string_view type,
+                           int64_t time);
+    bool SetRoundEffort(std::string_view chain, std::string_view type,
+                        double effort);
+    int64_t GetRoundTime(std::string_view chain, std::string_view type);
+    double GetRoundEffort(std::string_view chain, std::string_view type);
+    void AppendSetMinerEffort(std::string_view chain, std::string_view miner,
+                              std::string_view type, double effort);
+    void AppendSetRoundEffort(std::string_view chain, std::string_view type,
+                              double effort);
+    bool ResetRoundEfforts(std::string_view chain, std::string_view type);
+    bool AddRoundShares(
+        std::string_view chain, const BlockSubmission *submission,
+        const std::vector<std::pair<std::string, RoundShare>> &miner_shares);
 
     /* stats */
-    bool LoadSolverStats(miner_map &miner_stats_map, round_map &round_map);
+    bool LoadMinersAverageHashrate(miner_map &miner_stats_map);
+    bool LoadMinersEfforts(const std::string& chain, miner_map &miner_stats_map);
     bool UpdateStats(worker_map worker_stats, miner_map miner_stats,
                      int64_t update_time_ms, uint8_t update_flags);
 
-    // void ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
-    //                    int64_t reward, uint32_t height,
-    //                    const double totalEffort, const double fee);
+    /* pos */
+    bool AddStakingPoints(std::string_view chain, int64_t duration_ms);
+    bool GetPosPoints(std::vector<std::pair<std::string, double>> &stakers, std::string_view chain);
+
+    void ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
+                       int64_t reward, uint32_t height,
+                       const double totalEffort, const double fee);
+    // void UpdatePoS(uint64_t from, uint64_t maturity);
 
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
     int AddNetworkHr(std::string_view chain, int64_t time, double hr);
-
-    // void UpdatePoS(uint64_t from, uint64_t maturity);
+    bool TsCreate(
+        std::string_view key_name, int retention,
+        std::initializer_list<std::tuple<std::string_view, std::string_view>>
+            labels);
 
    private:
     redisContext *rc;

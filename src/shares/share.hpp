@@ -30,11 +30,11 @@ enum class ShareCode
 
 struct ShareResult
 {
-    ShareCode Code;
-    std::string Message;
-    double Diff;
+    ShareCode code;
+    std::string message;
+    double difficulty;
     // uint256 takes vector as param
-    std::vector<uint8_t> HashBytes = std::vector<uint8_t>(32);
+    std::vector<uint8_t> hash_bytes = std::vector<uint8_t>(32);
 };
 
 #endif

@@ -8,8 +8,7 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
     std::scoped_lock lock(rc_mutex);
 
     uint32_t block_id = submission->number;
-    auto chain =
-        std::string((char *)submission->chain       );
+    auto chain = std::string((char *)submission->chain);
 
     {
         RedisTransaction add_block_tx(this);
@@ -27,16 +26,16 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
                       (double)submission->number, block_id);
 
         AppendCommand("ZADD block-index:reward %f %u",
-                      (double)submission->blockReward, block_id);
+                      (double)submission->block_reward, block_id);
 
         AppendCommand("ZADD block-index:difficulty %f %u",
                       submission->difficulty, block_id);
 
         AppendCommand("ZADD block-index:effort %f %u",
-                      submission->effortPercent, block_id);
+                      submission->effort_percent, block_id);
 
         AppendCommand("ZADD block-index:duration %f %u",
-                      (double)submission->durationMs, block_id);
+                      (double)submission->duration_ms, block_id);
         /* non-sortable indexes */
         AppendCommand("SADD block-index:chain:%s %u", chain.c_str(), block_id);
 
@@ -45,8 +44,8 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
         AppendCommand("SADD block-index:solver:%b %u", submission->miner,
                       sizeof(submission->miner), block_id);
 
-        AppendTsAdd(chain + ":round_effort_percent", submission->timeMs,
-                    submission->effortPercent);
+        AppendTsAdd(chain + ":round_effort_percent", submission->time_ms,
+                    submission->effort_percent);
     }
 
     return GetReplies();

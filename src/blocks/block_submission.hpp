@@ -9,6 +9,13 @@
 #include "shares/share.hpp"
 #include "jobs/verus_job.hpp"
 
+enum BlockType : uint8_t
+{
+    POW = 1,
+    POW_PAYMENT = 2,
+    POS = 3,
+};
+
 #pragma pack(push, 1)
 struct BlockSubmission
 {
@@ -42,13 +49,14 @@ struct BlockSubmission
     // }
 
     const int32_t confirmations = 0;  // up to 100, changed in database
-    const int64_t blockReward;             
-    const int64_t timeMs;             // ms percision
-    const int64_t durationMs;         // ms percision
+    const BlockType block_type;
+    const int64_t block_reward;
+    const int64_t time_ms;             // ms percision
+    const int64_t duration_ms;         // ms percision
     const uint32_t height;
     const uint32_t number;
     const double difficulty;
-    const double effortPercent;
+    const double effort_percent;
     unsigned char chain[8] = {0};
     unsigned char miner[ADDRESS_LEN] = {0};
     unsigned char worker[MAX_WORKER_NAME_LEN] = {0};  // separated

@@ -23,13 +23,15 @@ enum class BadDiff
 
 struct WorkerStats
 {
-    double average_hashrate_sum = 0.f;
     double average_hashrate = 0.f;
     double interval_hashrate = 0.f;
+    
+    double average_hashrate_sum = 0.f;
     double current_interval_effort = 0.f;
     uint32_t interval_valid_shares = 0;
     uint32_t interval_stale_shares = 0;
     uint32_t interval_invalid_shares = 0;
+    
     uint32_t connection_count = 0;
 
     inline void ResetInterval()
@@ -47,7 +49,7 @@ struct MinerStats : public WorkerStats
         round_effort_map;
     uint32_t worker_count = 0;
 
-    inline void ResetEffort() { round_effort_map.clear(); }
+    inline void ResetEffort(const std::string& chain) { round_effort_map[chain] = 0; }
 };
 
 typedef std::unordered_map<std::string, WorkerStats>
