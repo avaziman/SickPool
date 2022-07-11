@@ -190,4 +190,5 @@ bool RedisManager::LoadMinersEfforts(const std::string &chain,
     }
 
     freeReplyObject(reply);
+    return true;
 }

@@ -76,23 +76,28 @@ StratumServer::~StratumServer()
 
 void StratumServer::HandleControlCommands()
 {
+    char buff[256] = {0};
     while (true)
     {
-        ControlCommands cmd = control_server.GetNextCommand();
-        HandleControlCommand(cmd);
+        ControlCommands cmd = control_server.GetNextCommand(buff, sizeof(buff));
+        HandleControlCommand(cmd, buff);
+        Logger::Log(LogType::Info, LogField::ControlServer,
+                    "Processed control command: {}", buff);
     }
 }
 
-void StratumServer::HandleControlCommand(ControlCommands cmd)
+void StratumServer::HandleControlCommand(ControlCommands cmd, char buff[])
 {
-    auto val = simdjson::ondemand::array();
     switch (cmd)
     {
         case ControlCommands::BLOCK_NOTIFY:
-            HandleBlockNotify(val);
+            HandleBlockNotify();
             break;
         case ControlCommands::WALLET_NOTFIY:
-            HandleWalletNotify(val);
+            // format: %b%s%w (block hash, txid, wallet address)
+            WalletNotify *wallet_notify =
+                reinterpret_cast<WalletNotify *>(buff + 2);
+            HandleWalletNotify(wallet_notify);
             break;
     }
 }
@@ -103,8 +108,7 @@ void StratumServer::StartListening()
         throw std::runtime_error(
             "Stratum server failed to enter listenning state.");
 
-    auto val = simdjson::ondemand::array();
-    HandleBlockNotify(val);
+    HandleBlockNotify();
 
     std::thread listeningThread(&StratumServer::Listen, this);
     listeningThread.join();
@@ -287,7 +291,7 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer,
     }
 }
 
-void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
+void StratumServer::HandleBlockNotify()
 {
     using namespace simdjson;
     int64_t curtimeMs = GetCurrentTimeMs();
@@ -340,53 +344,45 @@ void StratumServer::HandleBlockNotify(const simdjson::ondemand::array &params)
                                           newJob->GetEstimatedShares());
     // TODO: combine all redis functions one new block to one pipelined
 
-    Logger::Log(LogType::Info, LogField::JobManager,
-                "Broadcasted new job: #{}", newJob->GetId());
-    Logger::Log(LogType::Info, LogField::JobManager, "Height: {}",
-                newJob->GetHeight());
-    Logger::Log(LogType::Info, LogField::JobManager, "Min time: {}",
-                newJob->GetMinTime());
-    Logger::Log(LogType::Info, LogField::JobManager, "Difficutly: {}",
-                newJob->GetTargetDiff());
-    Logger::Log(LogType::Info, LogField::JobManager, "Est. shares: {}",
-                newJob->GetEstimatedShares());
-    // Logger::Log(LogType::Info, LogField::JobManager, "Target: %s",
-    //             job->GetTarget()->GetHex().c_str());
-    Logger::Log(LogType::Info, LogField::JobManager, "Block reward: {}",
-                newJob->GetBlockReward());
-    Logger::Log(LogType::Info, LogField::JobManager, "Transaction count: {}",
-                newJob->GetTransactionCount());
-    Logger::Log(LogType::Info, LogField::JobManager, "Block size: {}",
-                newJob->GetBlockSize());
+    Benchmark<std::chrono::microseconds> ben("WORK GEN");
+
+    Logger::Log(
+        LogType::Info, LogField::JobManager,
+        "Broadcasted new job: \n"
+        "┌{0:─^{9}}┐\n"
+        "│{1: ^{9}}│\n"
+        "│{2: <{9}}│\n"
+        "│{3: <{9}}│\n"
+        "│{4: <{9}}│\n"
+        "│{5: <{9}}│\n"
+        "│{6: <{9}}│\n"
+        "│{7: <{9}}│\n"
+        "│{8: <{9}}│\n"
+        "└{0:─^{9}}┘\n",
+        "", fmt::format("Job #{}", newJob->GetId()),
+        fmt::format("Height: {}", newJob->GetHeight()),
+        fmt::format("Min time: {}", newJob->GetMinTime()),
+        fmt::format("Difficulty: {}", newJob->GetTargetDiff()),
+        fmt::format("Est. shares: {}", newJob->GetEstimatedShares()),
+        fmt::format("Block reward: {}", newJob->GetBlockReward()),
+        fmt::format("Transaction count: {}", newJob->GetTransactionCount()),
+        fmt::format("Block size: {}", newJob->GetBlockSize()), 40);
 }
 
 // use wallletnotify with "%b %s %w" arg (block hash, txid, wallet address),
 // check if block hash is smaller than current job's difficulty to check whether
 // its pos block.
-void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
+void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
 {
     using namespace simdjson;
     /// TODO: exception handle this and everything like this
-    std::string_view blockHash;
-    std::string_view txId;
-    std::string_view address;
+    std::string_view block_hash(wal_notify->block_hash,
+                                sizeof(wal_notify->block_hash));
+    std::string_view tx_id(wal_notify->txid, sizeof(wal_notify->txid));
+    std::string_view address(wal_notify->wallet_address,
+                             wal_notify->wallet_address);
 
-    try
-    {
-        auto it = params.begin();
-        blockHash = (*it).get_string();
-        txId = (*++it).get_string();
-        address = (*++it).get_string();
-    }
-    catch (const simdjson::simdjson_error &err)
-    {
-        Logger::Log(LogType::Warn, LogField::Stratum,
-                    "Failed to parse wallet notify, txid: {}, error: {}", txId,
-                    err.what());
-        return;
-    }
-
-    auto bhash256 = UintToArith256(uint256S(blockHash.data()));
+    auto bhash256 = UintToArith256(uint256S(block_hash.data()));
     double bhashDiff = BitsToDiff(bhash256.GetCompact());
     double pow_diff = job_manager.GetLastJob()->GetTargetDiff();
 
@@ -399,12 +395,12 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     {
         Logger::Log(LogType::Error, LogField::Stratum,
                     "CheckAcceptedBlock error: Wrong address: {}, block: {}",
-                    address, blockHash);
+                    address, block_hash);
         return;
     }
 
     Logger::Log(LogType::Info, LogField::Stratum,
-                "Received PoS TxId: {}, block hash: {}", txId, blockHash);
+                "Received PoS TxId: {}, block hash: {}", tx_id, block_hash);
 
     // now make sure we actually staked the PoS block and not just received a tx
     // inside one.
@@ -413,7 +409,7 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     int64_t value;
 
     int resCode = daemon_manager.SendRpcReq<std::any>(
-        resBody, 1, "getrawtransaction", std::any(txId),
+        resBody, 1, "getrawtransaction", std::any(tx_id),
         std::any(1));  // verboose
 
     if (resCode != 200)
@@ -452,11 +448,11 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     {
         Logger::Log(LogType::Error, LogField::Stratum,
                     "CheckAcceptedBlock error: Wrong address: {}, block: {}",
-                    address, blockHash);
+                    address, block_hash);
     }
 
     resCode = daemon_manager.SendRpcReq<std::any>(resBody, 1, "getblock",
-                                                  std::any(blockHash));
+                                                  std::any(block_hash));
 
     if (resCode != 200)
     {
@@ -489,13 +485,14 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     if (validationType != "stake")
     {
         Logger::Log(LogType::Critical, LogField::Stratum,
-                    "Double PoS block check failed! block hash: {}", blockHash);
+                    "Double PoS block check failed! block hash: {}",
+                    block_hash);
         return;
     }
-    if (coinbaseTxId != txId)
+    if (coinbaseTxId != tx_id)
     {
         Logger::Log(LogType::Critical, LogField::Stratum,
-                    "TxId is not coinbase, block hash: {}", blockHash);
+                    "TxId is not coinbase, block hash: {}", block_hash);
         return;
     }
     // we have verified:
@@ -504,7 +501,7 @@ void StratumServer::HandleWalletNotify(simdjson::ondemand::array &params)
     // the txid is indeed the coinbase tx
 
     Logger::Log(LogType::Info, LogField::Stratum, "Found PoS Block! hash: {}",
-                blockHash);
+                block_hash);
 }
 
 void StratumServer::HandleSubscribe(const StratumClient *cli, int id,
@@ -796,7 +793,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 
     // Logger::Log(LogType::Debug, LogField::Stratum,
     //             "Share processed in {}us, diff: {}, res: {}",
-    //             std::chrono::duration_cast<std::chrono::microseconds>(end - start).count(), share_res.difficulty, (int)share_res.code);
+    //             std::chrono::duration_cast<std::chrono::microseconds>(end -
+    //             start).count(), share_res.difficulty, (int)share_res.code);
 }
 
 void StratumServer::SendReject(const StratumClient *cli, int id, int err,

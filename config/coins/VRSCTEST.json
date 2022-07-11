@@ -5,7 +5,7 @@
     "pow_fee": 0.01,
     "pos_fee": 0.01,
     "default_diff1": 30000,
-    "default_diff": 1e5,
+    "default_diff": 1e-10,
     "target_shares_rate": 100.0,
     "pool_addr": "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC",
     "redis_host": "127.0.0.1:6379",

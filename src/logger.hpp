@@ -1,8 +1,10 @@
 #ifndef LOGGER_HPP_
 #define LOGGER_HPP_
 
-#include <cstdio>
+#include <fmt/color.h>
 #include <fmt/format.h>
+
+#include <cstdio>
 
 enum ColorCode
 {
@@ -80,38 +82,30 @@ class Logger
 {
    public:
     template <typename... T>
-     static void Log(LogType type, LogField field, fmt::format_string<T...> message,
-                    T&&... args)
+    static void Log(LogType type, LogField field,
+                    fmt::format_string<T...> message, T&&... args)
     {
         const char* field_str = ToString(field);
         switch (type)
         {
-            // make this printf
             case LogType::Debug:
-                printf("\033[1;%dm[DEBUG][%s] \033[0m", FG_GREEN, field_str);
+                fmt::print(fg(fmt::color::green), "[DEBUG][{}] ", field_str);
                 break;
             case LogType::Info:
-                printf("\033[1;%dm[INFO][%s] \033[0m", FG_BLUE, field_str);
+                fmt::print(fg(fmt::color::dodger_blue), "[INFO][{}] ", field_str);
                 break;
             case LogType::Warn:
-                printf("\033[1;%dm[WARN][%s] \033[0m", FG_YELLOW, field_str);
+                fmt::print(fg(fmt::color::yellow), "[WARN][{}] ", field_str);
                 break;
             case LogType::Error:
-                printf("\033[1;%dm[ERROR][%s] \033[0m", FG_RED, field_str);
+                fmt::print(fg(fmt::color::red), "[ERROR][{}] ", field_str);
                 break;
             case LogType::Critical:
-                printf("\033[1;%dm[CRITICAL][%s] \033[0m", FG_RED, field_str);
+                fmt::print(fg(fmt::color::red), "[CRITICAL][{}] ", field_str);
                 break;
         }
 
-        // if constexpr (sizeof...(args))
-        // {
-            fmt::print(message, args...);
-        // // }
-        // else
-        // {
-        //     fmt::print(message);
-        // }
+        fmt::print(message, args...);
         printf("\n");
     }
 };

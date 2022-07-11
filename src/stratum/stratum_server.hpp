@@ -65,13 +65,13 @@ class StratumServer
     std::mutex redis_mutex;
 
     void HandleControlCommands();
-    void HandleControlCommand(ControlCommands cmd);
+    void HandleControlCommand(ControlCommands cmd, char* buff);
 
     void Listen();
     void HandleSocket(int sockfd);
     void HandleReq(StratumClient* cli, char buffer[], std::size_t reqSize);
-    void HandleBlockNotify(const simdjson::ondemand::array& params);
-    void HandleWalletNotify(simdjson::ondemand::array& params);
+    void HandleBlockNotify();
+    void HandleWalletNotify(WalletNotify* wal_notify);
 
     void HandleSubscribe(const StratumClient* cli, int id,
                          simdjson::ondemand::array& params) const;

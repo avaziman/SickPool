@@ -12,6 +12,13 @@ enum class ControlCommands
     WALLET_NOTFIY = 2,
 };
 
+struct WalletNotify
+{
+    char block_hash[HASH_SIZE];
+    char txid[HASH_SIZE];
+    char wallet_address[ADDRESS_LEN];
+};
+
 class ControlServer
 {
    public:
@@ -31,8 +38,8 @@ class ControlServer
         {
             throw std::runtime_error("Failed to set control server options");
         }
-        
-        if (bind(sockfd, (const sockaddr*)&addr, sizeof(addr)) != 0)
+
+        if (bind(sockfd, (const sockaddr *)&addr, sizeof(addr)) != 0)
         {
             throw std::runtime_error("Control server failed to bind to port " +
                                      std::to_string(port));
@@ -45,15 +52,14 @@ class ControlServer
         }
     }
 
-    ControlCommands GetNextCommand() const
+    ControlCommands GetNextCommand(char *buf, std::size_t size) const
     {
         // one command per connection
         // we don't care about the address, as it must be local (is it
         // secure?)
         int connfd = accept(sockfd, nullptr, nullptr);
 
-        char buf[128];
-        if (recv(connfd, buf, sizeof(buf), 0) <= 0)
+        if (recv(connfd, buf, size, 0) <= 0)
         {
             // disconnected
             return ControlCommands::NONE;
@@ -61,9 +67,6 @@ class ControlServer
 
         auto cmd = static_cast<ControlCommands>(buf[0] - '0');
         close(connfd);
-
-        Logger::Log(LogType::Info, LogField::ControlServer,
-                    "Received command: {}", (int)cmd);
 
         return cmd;
     }
