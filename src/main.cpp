@@ -23,6 +23,9 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg);
 
 int main(int argc, char** argv)
 {
+    std::cout << std::hex << UintToArith256(uint256S("00000000000184c09e98da047ab3260fca551"
+                                         "c8c476551b63140d99b634aea2d"))
+                     .GetCompact();
     // std::cout << "Block Submission Size: " << sizeof(BlockSubmission);
     Logger::Log(LogType::Info, LogField::Config, "Starting SickPool!");
 

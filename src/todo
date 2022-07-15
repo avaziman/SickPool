@@ -1,13 +1,16 @@
 todo:
-diff manager
-maturity thing
 pos
 load workers for stats
-
-reset ws
+fix bug where connection is not handled
+make async sockets
+show share rate and share difficulty for each workers
+show personal luck
 
 done
 
+reset ws
+diff manager
+maturity thing
 set round time if there isnt in db
 >fix on bad auth crash?
 fix request too big when its not?

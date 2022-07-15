@@ -25,25 +25,50 @@ void RedisManager::AppendIntervalStatsUpdate(std::string_view addr,
     AppendTsAdd(key, update_time_ms, ws.interval_stale_shares);
 }
 
-bool RedisManager::UpdateStats(worker_map worker_stats_map,
-                               miner_map miner_stats_map,
-                               int64_t update_time_ms, uint8_t update_flags)
+bool RedisManager::UpdateEffortStats(efforts_map_t &miner_stats_map,
+                                     const double total_effort,
+                                     std::mutex *stats_mutex)
 {
+    std::scoped_lock redis_lock(rc_mutex);
+
+    {
+        std::scoped_lock stats_lock(*stats_mutex);
+        for (auto &[miner_addr, miner_stats] : miner_stats_map)
+        {
+            AppendSetMinerEffort(COIN_SYMBOL, miner_addr, "pow",
+                                 miner_stats[COIN_SYMBOL]);
+        }
+
+        AppendSetMinerEffort(COIN_SYMBOL, TOTAL_EFFORT_KEY, "pow",
+                             total_effort);
+    }
+
+    return GetReplies();
+}
+
+bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
+                                       worker_map &miner_stats_map,
+                                       std::mutex *stats_mutex,
+                                       int64_t update_time_ms)
+{
+    Benchmark<std::chrono::microseconds> bench("UPDATE SATAS REDIS");
     std::scoped_lock lock(rc_mutex);
 
     double pool_hr = 0;
-    if (update_flags & UPDATE_INTERVAL)
     {
-        for (const auto &[worker_name, worker_stats] : worker_stats_map)
+        // don't lock stats_mutex when awaiting replies as it's slow
+        // unnecessary
+        std::scoped_lock stats_lock(*stats_mutex);
+
+        for (auto &[worker_name, worker_stats] : worker_stats_map)
         {
             AppendIntervalStatsUpdate(worker_name, "worker", update_time_ms,
                                       worker_stats);
+            worker_stats.ResetInterval();
+            pool_hr += worker_stats.interval_hashrate;
         }
-    }
 
-    for (auto &[miner_addr, miner_stats] : miner_stats_map)
-    {
-        if (update_flags & UPDATE_INTERVAL)
+        for (auto &[miner_addr, miner_stats] : miner_stats_map)
         {
             AppendIntervalStatsUpdate(miner_addr, "miner", update_time_ms,
                                       miner_stats);
@@ -51,131 +76,51 @@ bool RedisManager::UpdateStats(worker_map worker_stats_map,
             AppendCommand("ZADD solver-index:hashrate %f %b",
                           miner_stats.interval_hashrate, miner_addr.data(),
                           miner_addr.size());
-            pool_hr += miner_stats.interval_hashrate;
-        }
-
-        if (update_flags & UPDATE_EFFORT)
-        {
-            AppendSetMinerEffort(coin_symbol, miner_addr, "pow",
-                                 miner_stats.round_effort_map[coin_symbol]);
+            miner_stats.ResetInterval();
         }
     }
 
-    if (update_flags & UPDATE_INTERVAL)
-    {
-        AppendTsAdd("pool_hashrate", update_time_ms, pool_hr);
-    }
-
-    if (update_flags & UPDATE_EFFORT)
-    {
-        AppendHset(fmt::format("{}:round:pow", COIN_SYMBOL), "total_effort",
-                   std::to_string(pool_hr));
-    }
+    AppendTsAdd("pool_hashrate", update_time_ms, pool_hr);
 
     return GetReplies();
 }
 
-bool RedisManager::LoadMinersAverageHashrate(miner_map &miner_stats_map)
+bool RedisManager::LoadAverageHashrateSum(
+    std::vector<std::pair<std::string, double>> &hashrate_sums,
+    std::string_view prefix)
 {
-    std::scoped_lock lock(rc_mutex);
+    int64_t time_now = GetCurrentTimeMs();
+    int64_t to = time_now - time_now % StatsManager::average_hashrate_interval_seconds * 1000 +
+                   StatsManager::average_hashrate_interval_seconds * 1000;
 
-    // auto now = GetCurrentTimeMs();
-    // // exactly same formula as updating stats
-    // int64_t from = now -
-    //                (now % (StatsManager::hashrate_interval_seconds * 1000)) -
-    //                (StatsManager::hashrate_interval_seconds * 1000);
-
-    // auto miners_reply =
-    //     (redisReply *)redisCommand(rc, "TS.MRANGE FILTER type=hashrate:average");
-
-    // size_t miner_count = 0;
-
-    // // either load everyone or no
-    // {
-    //     RedisTransaction load_tx(this);
-
-    //     miner_count = miners_reply->elements;
-    //     for (int i = 0; i < miner_count; i++)
-    //     {
-    //         std::string miner_addr(miners_reply->element[i]->str,
-    //                                miners_reply->element[i]->len);
-
-    //         // load round effort PoW
-    //         AppendCommand("HGET %b:round:pow:effort %b", coin_symbol.data(),
-    //                       coin_symbol.size(), miner_addr.data(),
-    //                       miner_addr.size());
-
-    //         // load sum of hashrate over last average period
-    //         AppendCommand(
-    //             "TS.RANGE hashrate:miner:%b %" PRIi64
-    //             " + AGGREGATION SUM %" PRIi64,
-    //             miner_addr.data(), miner_addr.size(), from,
-    //             StatsManager::average_hashrate_interval_seconds * 1000);
-
-    //         // reset worker count
-    //         AppendCommand("ZADD solver-index:worker-count 0 %b",
-    //                       miner_addr.data(), miner_addr.size());
-
-    //         AppendTsAdd(fmt::format("worker-count:{}", miner_addr), now, 0.f);
-    //     }
-    // }
-
-    // redisReply *reply;
-    // for (int i = 0; i < command_count; i++)
-    // {
-    //     if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
-    //     {
-    //         Logger::Log(LogType::Critical, LogField::StatsManager,
-    //                     "Failed to queue round_entries:pow get");
-    //         return false;
-    //     }
-
-    //     // we need to read the last response
-    //     if (i != command_count - 1)
-    //     {
-    //         freeReplyObject(reply);
-    //     }
-    // }
-    // command_count = 0;
-
-    // for (int i = 0; i < miner_count; i++)
-    // {
-    //     auto miner_addr = std::string(miners_reply->element[i]->str,
-    //                                   miners_reply->element[i]->len);
-
-    //     const double miner_effort = 0;
-    //     auto round_effort_reply = reply->element[i * 4];
-    //     if (round_effort_reply->type == REDIS_REPLY_STRING)
-    //     {
-    //         std::strtod(round_effort_reply->str, nullptr);
-    //     }
-
-    //     double sum_last_avg_interval = 0;
-    //     auto average_sum_reply = reply->element[i * 4 + 1];
-    //     if (average_sum_reply->elements &&
-    //         average_sum_reply->element[0]->elements)
-    //     {
-    //         sum_last_avg_interval = std::strtod(
-    //             average_sum_reply->element[0]->element[1]->str, nullptr);
-    //     }
-
-    //     miner_stats_map[miner_addr].round_effort_map[COIN_SYMBOL] =
-    //         miner_effort;
-    //     miner_stats_map[miner_addr].average_hashrate_sum +=
-    //         sum_last_avg_interval;
-
-    //     Logger::Log(LogType::Debug, LogField::StatsManager,
-    //                 "Loaded {} effort of {}, hashrate sum of {}", miner_addr,
-    //                 miner_effort, sum_last_avg_interval);
-    // }
-
-    // freeReplyObject(reply);
-    // freeReplyObject(miners_reply);
-    return true;
+    int64_t from = to - StatsManager::average_hashrate_interval_seconds * 1000;
+    TsAggregation aggregation{
+        .type = "SUM",
+        .time_bucket_ms =
+            StatsManager::average_hashrate_interval_seconds * 1000};
+    return TsMrange(hashrate_sums, prefix, "hashrate", from, to, &aggregation);
 }
 
-bool RedisManager::LoadMinersEfforts(const std::string &chain,
-                                     miner_map &miners_map)
+
+//TODO: 
+// bool RedisManager::ResetMinersWorkerCounts(miner_map &miner_stats_map,
+//                                            int64_t time_now)
+// {
+//     for (auto &[addr, _] : miner_stats_map)
+//     {
+//         // reset worker count
+//         AppendCommand("ZADD solver-index:worker-count 0 %b", addr.data(),
+//                       addr.size());
+
+//         AppendTsAdd(fmt::format("worker-count:{}", addr), time_now, 0.f);
+//     }
+
+//     return GetReplies();
+// }
+
+bool RedisManager::LoadMinersEfforts(
+    const std::string &chain,
+    std::vector<std::pair<std::string, double>> &efforts)
 {
     auto reply = (redisReply *)redisCommand(rc, "HGETALL %b:round:pow:effort",
                                             chain.data(), chain.size());
@@ -186,9 +131,68 @@ bool RedisManager::LoadMinersEfforts(const std::string &chain,
 
         double effort = std::strtod(reply->element[i + 1]->str, nullptr);
 
-        miners_map[addr].round_effort_map[chain] = effort;
+        efforts.emplace_back(addr, effort);
     }
 
     freeReplyObject(reply);
+    return true;
+}
+
+bool RedisManager::TsMrange(
+    std::vector<std::pair<std::string, double>> &last_averages,
+    std::string_view prefix, std::string_view type, int64_t from, int64_t to,
+    TsAggregation *aggregation)
+{
+    std::scoped_lock locl(rc_mutex);
+
+    std::string cmd_str;
+    if (aggregation)
+    {
+        cmd_str = fmt::format(
+            "TS.MRANGE {} {} AGGREGATION {} {} FILTER prefix={} type={}", from,
+            to, aggregation->type, aggregation->time_bucket_ms, prefix, type);
+    }
+    else
+    {
+        cmd_str = fmt::format("TS.MRANGE {} {} FILTER prefix={} type={}", from,
+                              to, prefix, type);
+    }
+
+    auto reply = (redisReply *)redisCommand(rc, cmd_str.c_str());
+
+    if (!reply) return false;
+
+    // we don't want empty elements
+    // last_averages.resize(reply->elements);
+    for (int i = 0; i < reply->elements; i++)
+    {
+        auto entry = reply->element[i];
+
+        // everything that can go wrong with the reply
+        if (entry->type != REDIS_REPLY_ARRAY || entry->elements < 3 ||
+            !entry->element[2]->elements ||
+            entry->element[2]->element[0]->type != REDIS_REPLY_ARRAY)
+        {
+            continue;
+        }
+
+        char *addr_start = std::strrchr(entry->element[0]->str, ':');
+
+        if (addr_start == nullptr)
+        {
+            continue;
+        }
+        addr_start++;  // skip ':'
+
+        std::string addr(
+            addr_start,
+            (entry->element[0]->str + entry->element[0]->len) - addr_start);
+
+        double hashrate = std::strtod(
+            entry->element[2]->element[0]->element[1]->str, nullptr);
+        // last_averages[i] = std::make_pair(addr, hashrate);
+        last_averages.emplace_back(addr, hashrate);
+    }
+
     return true;
 }

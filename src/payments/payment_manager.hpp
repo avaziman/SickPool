@@ -4,6 +4,7 @@
 #include "stats.hpp"
 
 #pragma pack(push, 1)
+
 struct RoundShare
 {
     double effort;
@@ -12,11 +13,13 @@ struct RoundShare
 };
 #pragma pack(pop)
 
+typedef std::vector<std::pair<std::string, RoundShare>> round_shares_t;
+
 class PaymentManager
 {
    public:
     static bool GetRewardsProp(
-        std::vector<std::pair<std::string, RoundShare>>& miner_shares,
+        round_shares_t& miner_shares,
         int64_t block_reward,
         const std::vector<std::pair<std::string, double>>& miner_efforts,
         double total_effort, double fee)

@@ -5,7 +5,7 @@ bool RedisManager::AddStakingPoints(std::string_view chain, int64_t duration_ms)
     std::scoped_lock lock(rc_mutex);
 
     auto stakers_reply = (redisReply *)redisCommand(
-        rc, "HGETALL %b:balance-mature", chain.data(), chain.size());
+        rc, "HGETALL %b:balance:mature", chain.data(), chain.size());
 
     redisReply *reply;
 
@@ -43,7 +43,7 @@ bool RedisManager::GetPosPoints(
     std::vector<std::pair<std::string, double>>& stakers, std::string_view chain)
 {
     auto stakers_reply = (redisReply *)redisCommand(
-        rc, "HGETALL %b:balance-mature", chain.data(), chain.size());
+        rc, "HGETALL %b:balance:mature", chain.data(), chain.size());
 
     if (!stakers_reply)
     {

@@ -22,17 +22,13 @@
 #include "static_config/config.hpp"
 #include "stats/stats.hpp"
 
-#define UPDATE_EFFORT 0b1
-#define UPDATE_INTERVAL 0b01
-#define UPDATE_DIFFICULTY 0b001
-
 class RedisManager;
 class RoundManager;
 // update manager?
 class StatsManager
 {
    public:
-    StatsManager(RedisManager* redis_manager, DifficultyManager* diff_manager,
+    StatsManager(RedisManager* redis_manager, DifficultyManager* diff_manager, RoundManager* round_manager,
                  int hr_interval, int effort_interval, int avg_hr_interval,
                  int diff_adjust_seconds, int hashrate_ttl);
 
@@ -40,9 +36,8 @@ class StatsManager
     // ) worker hashrate
     // ) miner hashrate
     // ) pool hashrate
-    // ) staker points
     void Start();
-    bool LoadEffortHashrate();
+    bool LoadAvgHashrateSums();
     void AddShare(const std::string& worker_full, const std::string& miner_addr,
                   const double diff);
     bool AddWorker(const std::string& address, const std::string& worker_full,
@@ -50,10 +45,10 @@ class StatsManager
     void PopWorker(const std::string& worker, const std::string& address);
     void GetMiningEffortsReset(std::vector<std::pair<std::string, double>>& efforts, const std::string& chain);
 
-    void ResetRoundEfforts(const std::string& chain);
     // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
 
-    bool UpdateStats(int64_t update_time_ms, uint8_t update_flags);
+    bool UpdateIntervalStats(int64_t update_time_ms);
+    bool UpdateEffortStats(int64_t update_time_ms);
 
     static int hashrate_interval_seconds;
     static int effort_interval_seconds;
@@ -69,8 +64,6 @@ class StatsManager
     std::mutex stats_map_mutex;
     // worker -> stats
     worker_map worker_stats_map;
-    // miner -> stats
-    miner_map miner_stats_map;
 };
 
 #endif

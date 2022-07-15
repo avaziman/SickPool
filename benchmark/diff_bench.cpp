@@ -14,7 +14,7 @@ static void BM_BitsToDiff(benchmark::State& state)
 {
     for (auto _ : state)
     {
-        difficulty(rand());
+        BitsToDiff(rand());
     }
 }
 

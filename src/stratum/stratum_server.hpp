@@ -55,7 +55,8 @@ class StratumServer
     DaemonManager daemon_manager;
     JobManager job_manager;
     SubmissionManager submission_manager;
-    RoundManager round_manager;
+    RoundManager round_manager_pow;
+    RoundManager round_manager_pos;
     DifficultyManager diff_manager;
 
     std::vector<std::unique_ptr<StratumClient>> clients;

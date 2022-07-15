@@ -1,26 +1,29 @@
 #include "round_manager.hpp"
 
-bool RoundManager::ClosePowRound(const BlockSubmission* submission, double fee)
-{
-    std::vector<std::pair<std::string, double>> efforts;
-    stats_manager->GetMiningEffortsReset(
-        efforts,
-        std::string((char*)submission->chain, sizeof(submission->chain)));
+// bool RoundManager::ClosePowRound(const BlockSubmission* submission, double
+// fee)
+// {
+//     // std::vector<std::pair<std::string, double>> efforts;
+//     // stats_manager->GetMiningEffortsReset(
+//     //     efforts,
+//     //     std::string((char*)submission->chain, sizeof(submission->chain)));
 
-    return CloseRound(efforts, false, submission, fee);
-}
-bool RoundManager::ClosePosRound(const BlockSubmission* submission, double fee)
-{
-    std::vector<std::pair<std::string, double>> efforts;
-    redis_manager->GetPosPoints(
-        efforts,
-        std::string((char*)submission->chain, sizeof(submission->chain)));
+//     // return CloseRound(efforts, false, submission, fee);
+//     return false;
+// }
+// bool RoundManager::ClosePosRound(const BlockSubmission* submission, double
+// fee)
+// {
+//     std::vector<std::pair<std::string, double>> efforts;
+//     redis_manager->GetPosPoints(
+//         efforts,
+//         std::string((char*)submission->chain, sizeof(submission->chain)));
 
-    return CloseRound(efforts, true, submission, fee);
-}
+//     return CloseRound(efforts, true, submission, fee);
+// }
 
 bool RoundManager::CloseRound(
-    const std::vector<std::pair<std::string, double>>& efforts, bool is_pos,
+    const std::vector<std::pair<std::string, double>>& efforts,
     const BlockSubmission* submission, double fee)
 {
     std::scoped_lock round_lock(round_map_mutex);
@@ -29,7 +32,7 @@ bool RoundManager::CloseRound(
         std::string((char*)submission->chain, sizeof(submission->chain));
     Round& round = rounds_map[chain];
 
-    std::vector<std::pair<std::string, RoundShare>> round_shares;
+    round_shares_t round_shares;
     PaymentManager::GetRewardsProp(round_shares, submission->block_reward,
                                    efforts, round.total_effort, fee);
 
@@ -38,6 +41,7 @@ bool RoundManager::CloseRound(
 
     std::string type = is_pos ? "pos" : "pow";
 
+    // transaction all of this
     if (!redis_manager->AddBlockSubmission(submission))
     {
         Logger::Log(LogType::Critical, LogField::RoundManager,
@@ -69,7 +73,8 @@ bool RoundManager::CloseRound(
     return true;
 }
 
-void RoundManager::AddRoundEffort(const std::string& chain, double effort)
+void RoundManager::AddRoundShare(const std::string& chain,
+                                 const std::string& miner, const double effort)
 {
     std::scoped_lock round_lock(round_map_mutex);
 
@@ -84,6 +89,12 @@ Round RoundManager::GetChainRound(const std::string& chain)
 
 void RoundManager::LoadCurrentRound()
 {
+    if (!LoadEfforts())
+    {
+        Logger::Log(LogType::Critical, LogField::StatsManager,
+                    "Failed to load current round efforts!");
+    }
+    
     auto chain = std::string(COIN_SYMBOL);
     double total_effort = redis_manager->GetRoundEffort(chain, "pow");
     int64_t round_start = redis_manager->GetRoundTime(chain, "pow");
@@ -93,14 +104,56 @@ void RoundManager::LoadCurrentRound()
         round_start = GetCurrentTimeMs();
 
         redis_manager->SetRoundStartTime(chain, "pow", round_start);
-        redis_manager->SetRoundEffort(chain, "pow", total_effort);
+        // reset round effort if we are starting it now hadn't started
+        redis_manager->AppendSetMinerEffort(chain, TOTAL_EFFORT_KEY, "pow", 0);
     }
 
     auto round = &rounds_map[chain];
     round->round_start_ms = round_start;
     round->total_effort = total_effort;
 
-    Logger::Log(LogType::Info, LogField::StatsManager,
+    Logger::Log(LogType::Info, LogField::RoundManager,
                 "Loaded pow round chain: {}, effort of: {}, started at: {}",
                 chain, round->total_effort, round->round_start_ms);
+}
+
+void RoundManager::ResetRoundEfforts(const std::string& chain)
+{
+    std::scoped_lock lock(round_map_mutex);
+
+    for (auto& [miner, effort] : efforts_map)
+    {
+        effort[chain] = 0;
+    }
+}
+
+bool RoundManager::UpdateEffortStats(int64_t update_time_ms)
+{
+    // (with mutex)
+    const double total_effort =
+        GetChainRound(COIN_SYMBOL).total_effort;
+
+    return redis_manager->UpdateEffortStats(efforts_map, total_effort,
+                                            &round_map_mutex);
+}
+
+bool RoundManager::LoadEfforts()
+{
+    std::vector<std::pair<std::string, double>> vec;
+
+    bool res = redis_manager->LoadMinersEfforts(COIN_SYMBOL, vec);
+
+    for (const auto& [addr, effort] : vec)
+    {
+        // don't load total and estimated effort
+        if (addr.starts_with("$"))
+        {
+            continue;
+        }
+
+        efforts_map[addr][COIN_SYMBOL] = effort;
+        Logger::Log(LogType::Info, LogField::StatsManager,
+                    "Loaded miner effort for miner {} of {}", addr, effort);
+    }
+    return res;
 }

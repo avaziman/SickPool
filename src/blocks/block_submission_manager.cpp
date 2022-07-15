@@ -85,22 +85,59 @@ bool SubmissionManager::AddImmatureBlock(
     std::unique_ptr<BlockSubmission> submission, const double pow_fee)
 {
     std::scoped_lock lock(blocks_lock);
-    redis_manager->IncrBlockCount();
-    block_number++;
 
     if (submission->block_type == BlockType::POW)
     {
-        round_manager->ClosePowRound(submission.get(), pow_fee);
+        // round_manager->CloseRound(submission.get(), pow_fee);
     }
     else if (submission->block_type == BlockType::POS)
     {
-        round_manager->ClosePosRound(submission.get(), pow_fee);
+        std::vector<std::pair<std::string, double>> efforts;
+        redis_manager->GetPosPoints(
+            efforts,
+            std::string((char*)submission->chain, sizeof(submission->chain)));
+        round_manager->CloseRound(efforts, submission.get(), pow_fee);
     }
+
+    redis_manager->IncrBlockCount();
+    block_number++;
+
+    Logger::Log(
+        LogType::Info, LogField::SubmissionManager,
+        "Added new block submission: \n"
+        "┌{0:─^{12}}┐\n"
+        "│{1: ^{12}}│\n"
+        "│{2: <{12}}│\n"
+        "│{3: <{12}}│\n"
+        "│{4: <{12}}│\n"
+        "│{5: <{12}}│\n"
+        "│{6: <{12}}│\n"
+        "│{7: <{12}}│\n"
+        "│{8: <{12}}│\n"
+        "│{9: <{12}}│\n"
+        "│{10: <{12}}│\n"
+        "│{11: <{12}}│\n"
+        "└{0:─^{12}}┘\n",
+        "", fmt::format("Block Submission #{}", submission->number),
+        fmt::format("Type: {}", (int)submission->block_type),
+        fmt::format("Reward: {}", submission->block_reward),
+        fmt::format("Found time: {}", submission->time_ms),
+        fmt::format("Duration (ms): {}", submission->duration_ms),
+        fmt::format("Height: {}", submission->height),
+        fmt::format("Difficulty: {}", submission->difficulty),
+        fmt::format("Effort percent: {}", submission->effort_percent),
+        fmt::format("Miner: {}",
+                    std::string_view((char*)submission->miner, ADDRESS_LEN)),
+        fmt::format("Worker: {}",
+                    std::string((char*)submission->worker, MAX_WORKER_NAME_LEN)
+                        .c_str()),
+        fmt::format("Hash: {}", std::string_view((char*)submission->hashHex,
+                                                 HASH_SIZE_HEX)),
+        70);
 
     Logger::Log(LogType::Info, LogField::SubmissionManager,
                 "Closed round for block submission no {} (immature).",
                 submission->number);
-
     immature_block_submissions.push_back(std::move(submission));
 
     return true;

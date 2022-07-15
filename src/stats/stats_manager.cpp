@@ -7,10 +7,13 @@ int StatsManager::hashrate_ttl_seconds;
 int StatsManager::diff_adjust_seconds;
 
 StatsManager::StatsManager(RedisManager* redis_manager,
-                           DifficultyManager* diff_manager, int hr_interval,
+                           DifficultyManager* diff_manager,
+                           RoundManager* round_manager, int hr_interval,
                            int effort_interval, int avg_hr_interval,
                            int diff_adjust_seconds, int hashrate_ttl)
-    : redis_manager(redis_manager), diff_manager(diff_manager)
+    : redis_manager(redis_manager),
+      diff_manager(diff_manager),
+      round_manager(round_manager)
 {
     StatsManager::hashrate_interval_seconds = hr_interval;
     StatsManager::effort_interval_seconds = effort_interval;
@@ -18,13 +21,15 @@ StatsManager::StatsManager(RedisManager* redis_manager,
     StatsManager::diff_adjust_seconds = diff_adjust_seconds;
     StatsManager::hashrate_ttl_seconds = hashrate_ttl;
 
-    if (!LoadEffortHashrate())
+    if (!LoadAvgHashrateSums())
     {
         Logger::Log(LogType::Critical, LogField::StatsManager,
-                    "Failed to load current round!");
+                    "Failed to load hashrate sums!");
     }
+    // TODO:
+    //  redis_manager->ResetMinersWorkerCounts(miner_stats_map,
+    //  GetCurrentTimeMs());
 }
-
 void StatsManager::Start()
 {
     using namespace std::chrono;
@@ -50,51 +55,62 @@ void StatsManager::Start()
 
         int64_t next_update = std::min(
             {next_interval_update, next_effort_update, next_diff_update});
+        int64_t update_time_ms = next_update * 1000;
 
-        uint8_t update_flags;
+        std::this_thread::sleep_until(system_clock::from_time_t(next_update));
 
         if (next_update == next_interval_update)
         {
             next_interval_update += hashrate_interval_seconds;
-            update_flags |= UPDATE_INTERVAL;
+            UpdateIntervalStats(update_time_ms);
         }
 
         // possible that both need to be updated at the same time
         if (next_update == next_effort_update)
         {
             next_effort_update += effort_interval_seconds;
-            update_flags |= UPDATE_EFFORT;
+            round_manager->UpdateEffortStats(update_time_ms);
         }
 
         if (next_update == next_diff_update)
         {
             next_diff_update += diff_adjust_seconds;
-            update_flags |= UPDATE_DIFFICULTY;
-
             diff_manager->Adjust(diff_adjust_seconds);
         }
 
-        std::this_thread::sleep_until(system_clock::from_time_t(next_update));
         auto startChrono = system_clock::now();
-
-        int64_t update_time_ms = next_update * 1000;
-        UpdateStats(update_time_ms, update_flags);
 
         auto endChrono = system_clock::now();
         auto duration = duration_cast<microseconds>(endChrono - startChrono);
     }
 }
 
-bool StatsManager::UpdateStats(int64_t update_time_ms, uint8_t update_flags)
+bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 {
-    std::scoped_lock lock(stats_map_mutex);
-    Logger::Log(LogType::Info, LogField::StatsManager,
-                "Updating stats for {} miners, {} workers, is_interval: {}",
-                miner_stats_map.size(), worker_stats_map.size(),
-                update_flags & UPDATE_INTERVAL);
+    using namespace std::string_view_literals;
+    worker_map miner_stats_map;
 
-    if (update_flags & UPDATE_INTERVAL)
+    Logger::Log(LogType::Info, LogField::StatsManager,
+                "Updating interval stats for, {} workers",
+                worker_stats_map.size());
+
+    const int64_t remove_time =
+        update_time_ms - average_hashrate_interval_seconds * 1000;
+
+    std::vector<std::pair<std::string, double>> remove_worker_hashrates;
+    bool res = redis_manager->TsMrange(remove_worker_hashrates, "worker"sv,
+                                       "hashrate"sv, remove_time, remove_time);
+
     {
+        // only lock after receiving the hashrates to remove
+        // to avoid unnecessary locking
+        std::scoped_lock lock(stats_map_mutex);
+
+        for (auto& [worker, worker_hr] : remove_worker_hashrates)
+        {
+            worker_stats_map[worker].average_hashrate_sum -= worker_hr;
+        }
+
         for (auto& [worker, ws] : worker_stats_map)
         {
             ws.interval_hashrate =
@@ -116,17 +132,15 @@ bool StatsManager::UpdateStats(int64_t update_time_ms, uint8_t update_flags)
                                    hashrate_interval_seconds);
 
             auto& miner_stats = miner_stats_map[addr];
+            miner_stats.average_hashrate_sum += ws.average_hashrate_sum;
             miner_stats.current_interval_effort += ws.current_interval_effort;
             miner_stats.interval_valid_shares += ws.interval_valid_shares;
             miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
             miner_stats.interval_stale_shares += ws.interval_stale_shares;
         }
-    }
-    if (update_flags & UPDATE_INTERVAL)
-    {
+
         for (auto& [miner_addr, miner_ws] : miner_stats_map)
         {
-            // miner round entry
             miner_ws.interval_hashrate = miner_ws.current_interval_effort /
                                          (double)hashrate_interval_seconds;
 
@@ -139,24 +153,30 @@ bool StatsManager::UpdateStats(int64_t update_time_ms, uint8_t update_flags)
                  hashrate_interval_seconds);
         }
     }
-
-    return redis_manager->UpdateStats(worker_stats_map, miner_stats_map,
-                                      update_time_ms, update_flags);
+    return redis_manager->UpdateIntervalStats(worker_stats_map, miner_stats_map,
+                                              &stats_map_mutex, update_time_ms);
 }
 
-bool StatsManager::LoadEffortHashrate()
+bool StatsManager::LoadAvgHashrateSums()
 {
-    return redis_manager->LoadMinersAverageHashrate(miner_stats_map);
-}
+    std::vector<std::pair<std::string, double>> vec;
+    bool res = redis_manager->LoadAverageHashrateSum(vec, "worker");
 
-void StatsManager::ResetRoundEfforts(const std::string& chain)
-{
-    std::scoped_lock lock(stats_map_mutex);
-
-    for (auto& miner : miner_stats_map)
+    if (!res)
     {
-        miner.second.ResetEffort(chain);
+        Logger::Log(LogType::Critical, LogField::StatsManager,
+                    "Failed to load average hashrate sum!");
+        return false;
     }
+
+    for (const auto& [worker, avg_hr_sum] : vec)
+    {
+        worker_stats_map[worker].average_hashrate_sum = avg_hr_sum;
+        Logger::Log(LogType::Info, LogField::StatsManager,
+                    "Loaded worker hashrate sum for {} of {}", worker,
+                    avg_hr_sum);
+    }
+    return true;
 }
 
 void StatsManager::AddShare(const std::string& worker_full,
@@ -165,7 +185,6 @@ void StatsManager::AddShare(const std::string& worker_full,
     std::scoped_lock lock(stats_map_mutex);
     // both must exist, as we added in AddWorker
     WorkerStats* worker_stats = &worker_stats_map[worker_full];
-    MinerStats* miner_stats = &miner_stats_map[miner_addr];
 
     if (diff == static_cast<double>(BadDiff::STALE_SHARE_DIFF))
     {
@@ -179,8 +198,6 @@ void StatsManager::AddShare(const std::string& worker_full,
     {
         worker_stats->interval_valid_shares++;
         worker_stats->current_interval_effort += diff;
-
-        miner_stats->round_effort_map[COIN_SYMBOL] += diff;
     }
 }
 
@@ -193,17 +210,18 @@ bool StatsManager::AddWorker(const std::string& address,
 
     // (will be true on restart too, as we don't reload worker stats)
     bool newWorker = !worker_stats_map.contains(worker_full);
-    bool newMiner = !miner_stats_map.contains(address);
+    // bool newMiner = !miner_stats_map.contains(address); TODO: call round
+    // manager
+    bool newMiner = true;
     bool returning_worker = !worker_stats_map[worker_full].connection_count;
 
     // 100% new, as we loaded all existing miners
-    if (newMiner)
-    {
-        Logger::Log(LogType::Info, LogField::StatsManager,
-                    "New miner has spawned: {}", address);
-    }
-
-    // worker has been disconnected and came back, add him again
+    // if (newMiner)
+    // {
+    //     Logger::Log(LogType::Info, LogField::StatsManager,
+    //                 "New miner has spawned: {}", address);
+    // }
+    // todo: split add worker and add miner
     if (redis_manager->AddWorker(address, worker_full, idTag, curtime,
                                  newWorker, newMiner))
     {
@@ -217,7 +235,6 @@ bool StatsManager::AddWorker(const std::string& address,
         return false;
     }
 
-    miner_stats_map[address].worker_count++;
     worker_stats_map[worker_full].connection_count++;
 
     return true;
@@ -229,33 +246,14 @@ void StatsManager::PopWorker(const std::string& worker_full,
     std::scoped_lock stats_lock(stats_map_mutex);
 
     int con_count = (--worker_stats_map[worker_full].connection_count);
-    // dont remove from the umap in case they join back, so their progress is
-    // saved
+    // dont remove from the umap in case they join back, so their progress
+    // is saved
     if (con_count == 0)
     {
         redis_manager->PopWorker(address);
-        miner_stats_map[address].worker_count--;
     }
 }
 
-void StatsManager::GetMiningEffortsReset(
-    std::vector<std::pair<std::string, double>>& efforts,
-    const std::string& chain_str)
-{
-    {
-        std::scoped_lock stats_lock(stats_map_mutex);
-
-        std::transform(miner_stats_map.begin(), miner_stats_map.end(),
-                       std::back_inserter(efforts),
-                       [&](auto& obj) {
-                           return std::make_pair(
-                               obj.first,
-                               obj.second.round_effort_map[chain_str]);
-                       });
-    }
-    ResetRoundEfforts(chain_str);
-}
-
-// TODO: idea: since writing all shares on all pbaas is expensive every 10 sec,
-// just write to primary and to side chains write every 5 mins
+// TODO: idea: since writing all shares on all pbaas is expensive every 10
+// sec, just write to primary and to side chains write every 5 mins
 // TODO: check that ts indeed exists

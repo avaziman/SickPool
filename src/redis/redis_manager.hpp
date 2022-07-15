@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "round_manager.hpp"
+#include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
 #include "logger.hpp"
 #include "payments/payment_manager.hpp"
@@ -19,8 +21,17 @@
 #include "stats/stats.hpp"
 #include "stats/stats_manager.hpp"
 
+#define TOTAL_EFFORT_KEY "$total"
+#define ESTIMATED_EFFORT_KEY "$estimated"
+
 #define xstr(s) str(s)
 #define STRM(s) #s
+
+struct TsAggregation
+{
+    std::string type;
+    int64_t time_bucket_ms;
+};
 
 class RedisTransaction;
 class RedisManager
@@ -55,24 +66,43 @@ class RedisManager
                         double effort);
     int64_t GetRoundTime(std::string_view chain, std::string_view type);
     double GetRoundEffort(std::string_view chain, std::string_view type);
+    bool SetMinerEffort(std::string_view chain, std::string_view miner,
+                        std::string_view type, double effort);
     void AppendSetMinerEffort(std::string_view chain, std::string_view miner,
                               std::string_view type, double effort);
-    void AppendSetRoundEffort(std::string_view chain, std::string_view type,
-                              double effort);
     bool ResetRoundEfforts(std::string_view chain, std::string_view type);
-    bool AddRoundShares(
-        std::string_view chain, const BlockSubmission *submission,
-        const std::vector<std::pair<std::string, RoundShare>> &miner_shares);
+    bool AddRoundShares(std::string_view chain,
+                        const BlockSubmission *submission,
+                        const round_shares_t &miner_shares);
+    // bool ResetMinersWorkerCounts(miner_map &miner_stats_map, int64_t time_now);
+
+    bool CloseRound(std::string_view chain, std::string_view type,
+                    const BlockSubmission *submission,
+                    round_shares_t round_shares, int64_t time_ms);
 
     /* stats */
-    bool LoadMinersAverageHashrate(miner_map &miner_stats_map);
-    bool LoadMinersEfforts(const std::string& chain, miner_map &miner_stats_map);
-    bool UpdateStats(worker_map worker_stats, miner_map miner_stats,
-                     int64_t update_time_ms, uint8_t update_flags);
+    bool LoadAverageHashrateSum(
+        std::vector<std::pair<std::string, double>> &hashrate_sums,
+        std::string_view prefix);
+
+    bool LoadMinersEfforts(
+        const std::string &chain,
+        std::vector<std::pair<std::string, double>> &efforts);
+
+    bool UpdateEffortStats(efforts_map_t &miner_stats_map,
+                           const double total_effort, std::mutex *stats_mutex);
+
+    bool UpdateIntervalStats(worker_map &worker_stats_map,
+                             worker_map &miner_stats_map,
+                             std::mutex *stats_mutex, int64_t update_time_ms);
+    bool TsMrange(std::vector<std::pair<std::string, double>> &last_averages,
+                  std::string_view prefix, std::string_view type, int64_t from,
+                  int64_t to, TsAggregation *aggregation = nullptr);
 
     /* pos */
     bool AddStakingPoints(std::string_view chain, int64_t duration_ms);
-    bool GetPosPoints(std::vector<std::pair<std::string, double>> &stakers, std::string_view chain);
+    bool GetPosPoints(std::vector<std::pair<std::string, double>> &stakers,
+                      std::string_view chain);
 
     void ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
                        int64_t reward, uint32_t height,
@@ -90,7 +120,6 @@ class RedisManager
    private:
     redisContext *rc;
     std::mutex rc_mutex;
-    std::string coin_symbol;
     int command_count = 0;
 
     template <typename... Args>

@@ -17,7 +17,7 @@ redis.register_function(
 )
 
 -- key 1 -> block index key
--- O(N * M), n = number of blocks, m = number of attribute for block
+-- O(N), n = number of blocks
 -- GET takes the most time
 redis.register_function(
     "getblocksbyindex",
@@ -52,7 +52,7 @@ redis.register_function(
         local totalResults = redis.call("ZCARD", indexKey)
         local requestedAmount = ARGV[2] - ARGV[1] + 1
 
-        local props = {"hashrate", "balance", "join-time", "worker-count"}
+        local props = {"hashrate", "mature-balance", "join-time", "worker-count"}
         local propsArrs = {{}, {}, {}, {}}
         local resAmount = math.min(totalResults, requestedAmount)
         

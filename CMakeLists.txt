@@ -12,8 +12,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_BUILD_TYPE "Release")
-# set(CMAKE_BUILD_TYPE "Debug")
+# set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Debug")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     # -g3 maximum debugging information
@@ -21,7 +21,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(SIMDJSON_DEVELOPMENT_CHECKS)
 else()
     # Makes the executable run the fastest on host cpu and enable optimizations
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3 -Ofast")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3")
 endif()
 
 include(FetchContent)
@@ -51,11 +51,20 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
+# FetchContent_Declare(
+#     benchmark
+#     GIT_REPOSITORY https://github.com/google/benchmark.git
+#     GIT_TAG tags/v1.6.1
+#     GIT_SHALLOW TRUE
+# )
+# FetchContent_MakeAvailable(benchmark)
+
 # include_directories(lib/rapidjson/include)
 add_subdirectory(src)
 
 add_subdirectory(stratum_notifier)
 # add_subdirectory(benchmark)
 add_subdirectory(tests)
+
 add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME_CORE})

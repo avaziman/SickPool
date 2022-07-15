@@ -4,7 +4,9 @@ StratumServer::StratumServer(const CoinConfig &conf)
     : coin_config(conf),
       redis_manager("127.0.0.1", (int)conf.redis_port),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
-      stats_manager(&redis_manager, &diff_manager,
+      round_manager_pow(&redis_manager, false),
+      round_manager_pos(&redis_manager, true),
+      stats_manager(&redis_manager, &diff_manager, &round_manager_pow,
                     (int)coin_config.hashrate_interval_seconds,
                     (int)coin_config.effort_interval_seconds,
                     (int)coin_config.average_hashrate_interval_seconds,
@@ -12,8 +14,7 @@ StratumServer::StratumServer(const CoinConfig &conf)
                     (int)coin_config.hashrate_ttl_seconds),
       daemon_manager(coin_config.rpcs),
       job_manager(&daemon_manager, coin_config.pool_addr),
-      round_manager(&redis_manager, &stats_manager),
-      submission_manager(&redis_manager, &daemon_manager, &round_manager)
+      submission_manager(&redis_manager, &daemon_manager, &round_manager_pow)
 {
     auto error = httpParser.allocate(MAX_HTTP_REQ_SIZE, MAX_HTTP_JSON_DEPTH);
     if (error != simdjson::SUCCESS)
@@ -170,7 +171,7 @@ void StratumServer::HandleSocket(int conn_fd)
     std::size_t total = 0;
     std::size_t reqLen = 0;
     std::size_t nextReqLen = 0;
-    std::size_t recvRes = 0;
+    ssize_t recvRes = 0;  // signed size_t, can return -1
     bool isBuffMaxed = false;
 
     while (true)
@@ -186,7 +187,9 @@ void StratumServer::HandleSocket(int conn_fd)
         } while (reqEnd == nullptr && recvRes && !isBuffMaxed);
 
         // exit loop, miner disconnected
-        if (!recvRes)
+        // res = 0, graceful disconnect
+        // res = -1, error occured
+        if (!recvRes || recvRes == -1)
         {
             stats_manager.PopWorker(cli_ptr->GetFullWorkerName(),
                                     cli_ptr->GetAddress());
@@ -200,7 +203,7 @@ void StratumServer::HandleSocket(int conn_fd)
 
             Logger::Log(LogType::Info, LogField::Stratum,
                         "Client disconnected. res: {}, errno: {}", recvRes,
-                        errno);
+                        (int)errno);
             break;
         }
         // std::cout << total << std::endl;
@@ -209,7 +212,7 @@ void StratumServer::HandleSocket(int conn_fd)
         if (isBuffMaxed && !reqEnd)
         {
             Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Request too big. {}", std::string_view(buffer, total));
+                        "Request too big. {}", buffer);
 
             total = 0;
             continue;
@@ -340,8 +343,8 @@ void StratumServer::HandleBlockNotify()
     submission_manager.CheckImmatureSubmissions();
     redis_manager.AddNetworkHr(chain, curtimeMs, newJob->GetTargetDiff());
 
-    redis_manager.SetRoundEstimatedEffort(chain, "pow",
-                                          newJob->GetEstimatedShares());
+    redis_manager.SetMinerEffort(chain, ESTIMATED_EFFORT_KEY, "pow",
+                                 newJob->GetEstimatedShares());
     // TODO: combine all redis functions one new block to one pipelined
 
     Benchmark<std::chrono::microseconds> ben("WORK GEN");
@@ -465,6 +468,8 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
 
     std::string_view validationType;
     std::string_view coinbaseTxId;
+    int confirmations;
+    uint32_t height;
     try
     {
         ondemand::document doc = httpParser.iterate(
@@ -472,6 +477,8 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
 
         ondemand::object res = doc["result"].get_object();
         validationType = res["validationtype"];
+        confirmations = res["confirmations"].get_int64();
+        height = res["height"].get_int64();
         coinbaseTxId = (*res["tx"].get_array().begin()).get_string();
     }
     catch (const simdjson_error &err)
@@ -499,6 +506,19 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
     //  block is PoS (twice),
     // the txid is ours (got its value),
     // the txid is indeed the coinbase tx
+
+    Round round = round_manager_pow.GetChainRound(chain);
+    const auto time = GetCurrentTimeMs();
+    const int64_t duration_ms = time - round.round_start_ms;
+    const double effort_percent = 0;//TODO:
+
+    auto submission = std::make_unique<BlockSubmission>(
+        0, BlockType::POS, value, time, duration_ms, height,
+        SubmissionManager::block_number, 0, effort_percent);
+
+    memcpy(submission->chain, chain.data(), chain.size());
+    memcpy(submission->miner, coin_config.pool_addr.data(), ADDRESS_LEN);
+    memset(submission->worker, 0, sizeof(submission->worker));
 
     Logger::Log(LogType::Info, LogField::Stratum, "Found PoS Block! hash: {}",
                 block_hash);
@@ -721,7 +741,7 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
 void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 {
     int64_t time = GetCurrentTimeMs();
-    Benchmark<std::chrono::microseconds> share_bench("Share process");
+    // Benchmark<std::chrono::microseconds> share_bench("Share process");
     auto start = TIME_NOW();
 
     ShareResult share_res;
@@ -733,7 +753,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     // > possible that a timeseries wasn't created yet, so don't add shares
     if (share_res.code != ShareCode::UNAUTHORIZED_WORKER)
     {
-        round_manager.AddRoundEffort(COIN_SYMBOL, share_res.difficulty);
+        round_manager_pow.AddRoundShare(COIN_SYMBOL, cli->GetAddress(), share_res.difficulty);
         stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
                                share_res.difficulty);
     }
@@ -753,11 +773,11 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 
             const int confirmations = 0;
             const std::string_view worker_full(cli->GetFullWorkerName());
-            const auto chainRound = round_manager.GetChainRound(chain);
+            const auto chainRound = round_manager_pow.GetChainRound(chain);
             const auto type = BlockType::POW;
             const int64_t duration_ms = time - chainRound.round_start_ms;
             const double effort_percent =
-                chainRound.total_effort / job->GetEstimatedShares();
+                (chainRound.total_effort / job->GetEstimatedShares()) * 100.f;
 
             auto submission = std::make_unique<BlockSubmission>(
                 confirmations, type, job->GetBlockReward(), time, duration_ms,
@@ -766,8 +786,8 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 
             memcpy(submission->chain, chain.data(), chain.size());
             memcpy(submission->miner, worker_full.data(), ADDRESS_LEN);
-            memcpy(submission->worker, worker_full.data() + ADDRESS_LEN,
-                   worker_full.size() - ADDRESS_LEN);
+            memcpy(submission->worker, worker_full.data() + ADDRESS_LEN + 1,
+                   worker_full.size() - (ADDRESS_LEN + 1));
             Hexlify((char *)submission->hashHex, share_res.hash_bytes.data(),
                     HASH_SIZE);
             ReverseHex((char *)submission->hashHex, (char *)submission->hashHex,

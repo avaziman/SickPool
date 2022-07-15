@@ -70,27 +70,5 @@ static void BM_HashBH(benchmark::State& state)
     }
 }
 
-#define A "AAA"
-#define B "BBB"
-static void BM_StrConcat(benchmark::State& state)
-{
-    for (auto _ : state)
-    {
-        auto c = A B;
-    }
-}
-
-static void BM_StrConcat2(benchmark::State& state)
-{
-    for (auto _ : state)
-    {   
-        char a[7] = "AAA";
-        auto b = "BBB";
-        strcat(a, b);
-    }
-}
-
-BENCHMARK(BM_StrConcat);
-BENCHMARK(BM_StrConcat2);
 BENCHMARK(BM_HashBH);
 // BENCHMARK_MAIN();

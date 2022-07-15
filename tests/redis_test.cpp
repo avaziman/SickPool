@@ -46,7 +46,7 @@ TEST_F(RedisTest, AddBlockSubmission)
     memcpy(submission.miner, miner.data(), ADDRESS_LEN);
     memcpy(submission.worker, worker.data(), worker.size());
     memcpy(submission.chain, chain, strlen(chain));
-    
+
     bool res = redis_manager.AddBlockSubmission(&submission);
 
     ASSERT_TRUE(res);
@@ -113,12 +113,12 @@ TEST_F(RedisTest, UpdateImmatureRewardsConfirmed)
     ASSERT_TRUE(res);
 
     redisReply* reply = (redisReply*)redisCommand(
-        rc, "HGET %s:balance-immature %s", chain, addr.c_str());
+        rc, "HGET %s:balance:immature %s", chain, addr.c_str());
 
     // no immature balance
     ASSERT_STREQ(reply->str, "0");
 
-    reply = (redisReply*)redisCommand(rc, "HGET %s:balance-mature %s", chain,
+    reply = (redisReply*)redisCommand(rc, "HGET %s:balance:mature %s", chain,
                                       addr.c_str());
 
     // exactly same mature balance
@@ -126,7 +126,7 @@ TEST_F(RedisTest, UpdateImmatureRewardsConfirmed)
                  std::to_string(miner_shares[0].second.reward).c_str());
 
     // clean up
-    redisCommand(rc, "DEL %s:balance-mature %s", chain, addr.c_str());
+    redisCommand(rc, "DEL %s:balance:mature %s", chain, addr.c_str());
 }
 
 TEST_F(RedisTest, UpdateImmatureRewardsOrphaned)
@@ -144,19 +144,19 @@ TEST_F(RedisTest, UpdateImmatureRewardsOrphaned)
     ASSERT_TRUE(res);
 
     redisReply* reply = (redisReply*)redisCommand(
-        rc, "HGET %s:balance-immature %s", chain, addr.c_str());
+        rc, "HGET %s:balance:immature %s", chain, addr.c_str());
 
     // no immature balance
     ASSERT_STREQ(reply->str, "0");
 
-    reply = (redisReply*)redisCommand(rc, "HGET %s:balance-mature %s", chain,
+    reply = (redisReply*)redisCommand(rc, "HGET %s:balance:mature %s", chain,
                                       addr.c_str());
 
     // no mature balance
     ASSERT_STREQ(reply->str, "0");
 
     // clean up
-    redisCommand(rc, "DEL %s:balance-mature %s", chain, addr.c_str());
+    redisCommand(rc, "DEL %s:balance:mature %s", chain, addr.c_str());
 }
 
 TEST_F(RedisTest, AddStakingPoints)
@@ -188,3 +188,30 @@ TEST_F(RedisTest, TsCreate)
     // clean up
     redisCommand(rc, "DEL TS_CREATE_TEST");
 }
+
+// TEST_F(RedisTest, UpdateStats)
+// {
+//     worker_map worker_stats_map = {
+//         {"GTEST_ADDR.worker", WorkerStats{10, 20, 5, 10, 20}}};
+
+//     miner_map miner_stats_map = {
+//         {"GTEST_ADDR", MinerStats{10, 20, 5, 10, 20}}};
+
+//     std::mutex mutex;
+
+//     bool res = redis_manager.UpdateEffortStats(miner_stats_map, 100, &mutex);
+
+//     ASSERT_TRUE(res);
+// }
+
+// TEST_F(RedisTest, GetHashrateAt)
+// {
+//     using namespace std::string_literals;
+//     std::vector<std::pair<std::string, double>> hashrates;
+//     bool res = redis_manager.GetHashratesAt(hashrates, "miner", 0);
+
+//     ASSERT_TRUE(res);
+
+//     ASSERT_EQ(hashrates[0].first, "GTEST_ADDR");
+//     ASSERT_EQ(hashrates[0].second, 20);
+// }

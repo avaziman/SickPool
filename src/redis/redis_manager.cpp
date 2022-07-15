@@ -126,7 +126,7 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
             RoundShare *miner_share = (RoundShare *)reply->element[i + 1]->str;
 
             // if a block has been orphaned only remove the immature
-            AppendCommand("HINCRBY %b:balance-immature %b -%" PRId64,
+            AppendCommand("HINCRBY %b:balance:immature %b -%" PRId64,
                           chain.data(), chain.size(), addr.data(), addr.size(),
                           miner_share->reward);
 
@@ -135,7 +135,7 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
                 miner_share->reward = 0;
             }
 
-            AppendCommand("HINCRBY %b:balance-mature %b %" PRId64, chain.data(),
+            AppendCommand("HINCRBY %b:balance:mature %b %" PRId64, chain.data(),
                           chain.size(), addr.data(), addr.size(),
                           miner_share->reward);
             matured_funds += miner_share->reward;
@@ -188,7 +188,8 @@ void RedisManager::AppendTsCreate(
         command_str.append(fmt::format(" {} {}", key, val));
     }
 
-    AppendCommand(command_str.c_str(), key_name.data(), key_name.size(), retention);
+    AppendCommand(command_str.c_str(), key_name.data(), key_name.size(),
+                  retention);
 }
 
 void RedisManager::AppendTsAdd(std::string_view key_name, int64_t time,
@@ -217,12 +218,19 @@ bool RedisManager::AddWorker(std::string_view address,
 
             AppendTsCreate(fmt::format("worker-count:{}", address),
                            StatsManager::hashrate_ttl_seconds * 1000,
-                           {{"type"sv, "worker-count"sv}});
+                           {{"type"sv, "worker-count"sv},
+                            {"address", address},
+                            {"id", idTag}});
+                            
+            // reset worker count
+            AppendTsAdd(fmt::format("worker-count:{}", address),
+                        GetCurrentTimeMs(), 0);
 
-            // reset all indexes of new miner
-            AppendCommand("ZADD solver-index:join-time %f %b", (double)curtime,
+            // don't override if it exists
+            AppendCommand("ZADD solver-index:join-time NX %f %b", (double)curtime,
                           address.data(), address.size());
 
+            // reset all indexes of new miner
             for (auto index :
                  {"worker-count"sv, "hashrate"sv, "mature-balance"sv})
             {
@@ -230,8 +238,16 @@ bool RedisManager::AddWorker(std::string_view address,
                               index.size(), address.data(), address.size());
             }
 
-            AppendCommand("RPUSH round_entries:pow:%b {\"effort:\":0}",
-                          address.data(), address.size());
+            // set balance to 0 only if the key doesn't exist (it shouldn't)
+            AppendCommand("HSETNX %b:balance:mature %b 0", chain.data(),
+                          chain.size(), address.data(), address.size());
+
+            AppendCommand("HSETNX %b:balance:immature %b 0", chain.data(),
+                          chain.size(), address.data(), address.size());
+
+            // set round effort to 0
+            AppendSetMinerEffort(chain, TOTAL_EFFORT_KEY, "pow", 0);
+            AppendSetMinerEffort(chain, TOTAL_EFFORT_KEY, "pos", 0);
 
             AppendCreateStatsTs(address, idTag, "miner"sv);
         }
