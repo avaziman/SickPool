@@ -26,9 +26,6 @@ StatsManager::StatsManager(RedisManager* redis_manager,
         Logger::Log(LogType::Critical, LogField::StatsManager,
                     "Failed to load hashrate sums!");
     }
-    // TODO:
-    //  redis_manager->ResetMinersWorkerCounts(miner_stats_map,
-    //  GetCurrentTimeMs());
 }
 void StatsManager::Start()
 {
@@ -209,21 +206,19 @@ bool StatsManager::AddWorker(const std::string& address,
     std::scoped_lock stats_db_lock(stats_map_mutex);
 
     // (will be true on restart too, as we don't reload worker stats)
-    bool newWorker = !worker_stats_map.contains(worker_full);
-    // bool newMiner = !miner_stats_map.contains(address); TODO: call round
-    // manager
-    bool newMiner = true;
-    bool returning_worker = !worker_stats_map[worker_full].connection_count;
+    bool new_worker = !worker_stats_map.contains(worker_full);
+    bool new_miner = round_manager->IsMinerIn(address);
+    bool returning_worker = !new_worker && !worker_stats_map[worker_full].connection_count;
 
     // 100% new, as we loaded all existing miners
-    // if (newMiner)
-    // {
-    //     Logger::Log(LogType::Info, LogField::StatsManager,
-    //                 "New miner has spawned: {}", address);
-    // }
+    if (new_miner)
+    {
+        Logger::Log(LogType::Info, LogField::StatsManager,
+                    "New miner has spawned: {}", address);
+    }
     // todo: split add worker and add miner
-    if (redis_manager->AddWorker(address, worker_full, idTag, curtime,
-                                 newWorker, newMiner))
+    if (redis_manager->AddNewWorker(address, worker_full, idTag, curtime,
+                                 new_worker, new_miner))
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
                     "Worker {} added to database.", worker_full);

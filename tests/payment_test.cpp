@@ -7,10 +7,10 @@ TEST(Payment, CalculateRewardsProp)
     double total_effort = 5000;
     std::string chain = "GTEST";
 
-    std::vector<std::pair<std::string, double>> miners;
-    miners.emplace_back("x", 1000);
-    miners.emplace_back("y", 2000);
-    miners.emplace_back("z", 2000);
+    efforts_map_t miners;
+    miners.emplace("x", 1000);
+    miners.emplace("y", 2000);
+    miners.emplace("z", 2000);
 
     std::vector<std::pair<std::string, RoundShare>> shares;
     PaymentManager::GetRewardsProp(shares, 10e8, miners, total_effort,

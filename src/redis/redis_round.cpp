@@ -28,7 +28,8 @@ double RedisManager::GetRoundEffort(std::string_view chain,
 {
     std::scoped_lock lock(rc_mutex);
 
-    return hgetd(fmt::format("{}:round:{}:efforts", chain, type), TOTAL_EFFORT_KEY);
+    return hgetd(fmt::format("{}:round:{}:efforts", chain, type),
+                 TOTAL_EFFORT_KEY);
 }
 
 bool RedisManager::SetRoundStartTime(std::string_view chain,
@@ -36,42 +37,52 @@ bool RedisManager::SetRoundStartTime(std::string_view chain,
 {
     std::scoped_lock lock(rc_mutex);
 
-    return hset(fmt::format("{}:round:{}", chain, type), "start",
-                std::to_string(val));
-}
+    AppendSetRoundStartTime(chain, type, val);
 
-
-// reset effort of miners + total round effort
-bool RedisManager::ResetRoundEfforts(std::string_view chain,
-                                     std::string_view type)
-{
-    std::scoped_lock lock(rc_mutex);
-
-    AppendCommand("UNLINK %s", fmt::format("{}:round:{}:effort", chain, type).c_str());
     return GetReplies();
 }
 
-bool RedisManager::AddRoundShares(
-    std::string_view chain, const BlockSubmission *submission,
-    const round_shares_t &miner_shares)
+void RedisManager::AppendSetRoundStartTime(std::string_view chain,
+                                           std::string_view type, int64_t val)
+{
+    hset(fmt::format("{}:round:{}", chain, type), "start", std::to_string(val));
+}
+
+void RedisManager::AppendAddRoundShares(std::string_view chain,
+                                        const BlockSubmission *submission,
+                                        const round_shares_t &miner_shares)
 {
     std::scoped_lock lock(rc_mutex);
 
     uint32_t height = submission->height;
 
-    // redis transaction, so either all balances are added or none
+    for (const auto &miner_share : miner_shares)
     {
+        AppendCommand("HSET immature-rewards:%u %b %b", submission->number,
+                      miner_share.first.data(), miner_share.first.size(),
+                      &miner_share.second, sizeof(RoundShare));
+
+        AppendCommand("HINCRBY %b:balance:immature %b %" PRId64, chain.data(),
+                      chain.size(), miner_share.first.data(),
+                      miner_share.first.size(), miner_share.second.reward);
+    }
+}
+
+bool RedisManager::CloseRound(std::string_view chain, std::string_view type,
+                              const BlockSubmission *submission,
+                              round_shares_t round_shares, int64_t time_ms)
+{
+    {
+        // either close everything about the round or nothing
         RedisTransaction close_round_tx(this);
+        AppendAddBlockSubmission(submission);
+        AppendAddRoundShares(chain, submission, round_shares);
+        AppendSetRoundStartTime(chain, type, time_ms);
 
-        for (const auto &miner_share : miner_shares)
+        // reset miners efforts
+        for (auto &[addr, _] : round_shares)
         {
-            AppendCommand("HSET immature-rewards:%u %b %b", submission->number,
-                          miner_share.first.data(), miner_share.first.size(),
-                          &miner_share.second, sizeof(RoundShare));
-
-            AppendCommand("HINCRBY %b:balance:immature %b %" PRId64,
-                          chain.data(), chain.size(), miner_share.first.data(),
-                          miner_share.first.size(), miner_share.second.reward);
+            AppendSetMinerEffort(chain, addr, type, 0);
         }
     }
 

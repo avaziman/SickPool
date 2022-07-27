@@ -38,6 +38,3 @@ struct ShareResult
 };
 
 #endif
-//TODO:
-// add round_start redis key, load it at startup for duration, update on round close
-//add confirmations left field for block submission decr with bitfield

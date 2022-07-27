@@ -10,12 +10,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "round_manager.hpp"
 #include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
 #include "logger.hpp"
 #include "payments/payment_manager.hpp"
 #include "redis_transaction.hpp"
+#include "round_manager.hpp"
 #include "shares/share.hpp"
 #include "static_config/config.hpp"
 #include "stats/stats.hpp"
@@ -42,7 +42,7 @@ class RedisManager
     RedisManager(std::string ip, int port);
 
     /* block */
-    bool AddBlockSubmission(const BlockSubmission *submission);
+    void AppendAddBlockSubmission(const BlockSubmission *submission);
     bool UpdateBlockConfirmations(std::string_view block_id,
                                   int32_t confirmations);
     bool IncrBlockCount();
@@ -51,7 +51,7 @@ class RedisManager
                                int64_t matured_time, bool matured);
 
     /* stats */
-    bool AddWorker(std::string_view address, std::string_view worker_full,
+    bool AddNewWorker(std::string_view address, std::string_view worker_full,
                    std::string_view idTag, int64_t curtime, bool newWorker,
                    bool newMiner);
 
@@ -71,23 +71,26 @@ class RedisManager
     void AppendSetMinerEffort(std::string_view chain, std::string_view miner,
                               std::string_view type, double effort);
     bool ResetRoundEfforts(std::string_view chain, std::string_view type);
-    bool AddRoundShares(std::string_view chain,
-                        const BlockSubmission *submission,
-                        const round_shares_t &miner_shares);
-    // bool ResetMinersWorkerCounts(miner_map &miner_stats_map, int64_t time_now);
+    void AppendAddRoundShares(std::string_view chain,
+                              const BlockSubmission *submission,
+                              const round_shares_t &miner_shares);
+    bool ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
+                                 int64_t time_now);
 
     bool CloseRound(std::string_view chain, std::string_view type,
                     const BlockSubmission *submission,
                     round_shares_t round_shares, int64_t time_ms);
 
+    void AppendSetRoundStartTime(std::string_view chain, std::string_view type,
+                                 int64_t val);
     /* stats */
     bool LoadAverageHashrateSum(
         std::vector<std::pair<std::string, double>> &hashrate_sums,
         std::string_view prefix);
 
     bool LoadMinersEfforts(
-        const std::string &chain,
-        std::vector<std::pair<std::string, double>> &efforts);
+        std::string_view chain, std::string_view type,
+        efforts_map_t &efforts);
 
     bool UpdateEffortStats(efforts_map_t &miner_stats_map,
                            const double total_effort, std::mutex *stats_mutex);
@@ -175,5 +178,3 @@ class RedisManager
 };
 
 #endif
-// TODO: onwalletnotify check if its pending block submission maybe check
-// coinbase too and add it to block submission

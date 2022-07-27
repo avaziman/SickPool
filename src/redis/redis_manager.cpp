@@ -199,7 +199,7 @@ void RedisManager::AppendTsAdd(std::string_view key_name, int64_t time,
                   time, value);
 }
 
-bool RedisManager::AddWorker(std::string_view address,
+bool RedisManager::AddNewWorker(std::string_view address,
                              std::string_view worker_full,
                              std::string_view idTag, int64_t curtime,
                              bool newWorker, bool newMiner)

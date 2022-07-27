@@ -15,15 +15,19 @@ class SubmissionManager
    public:
     SubmissionManager(RedisManager* redis_manager,
                       DaemonManager* daemon_manager,
-                      RoundManager* stats_manager)
+                      RoundManager* round_manager_pow,
+                      RoundManager* round_manager_pos)
         : redis_manager(redis_manager),
           daemon_manager(daemon_manager),
-          round_manager(stats_manager)
+          round_manager_pow(round_manager_pow),
+          round_manager_pos(round_manager_pos)
     {
         SubmissionManager::block_number = redis_manager->GetBlockNumber();
         Logger::Log(LogType::Info, LogField::SubmissionManager,
                     "Submission manager started, block number: {}",
                     block_number);
+
+        last_matured_time = GetCurrentTimeMs();
     }
 
     inline bool TrySubmit(const std::string_view chain,
@@ -58,7 +62,8 @@ class SubmissionManager
     std::mutex blocks_lock;
     RedisManager* redis_manager;
     DaemonManager* daemon_manager;
-    RoundManager* round_manager;
+    RoundManager* round_manager_pow;
+    RoundManager* round_manager_pos;
 
     simdjson::ondemand::parser httpParser;
 
@@ -68,4 +73,4 @@ class SubmissionManager
 
 #endif
 
-// TODO: wrap all rpc methods we use
+// TODO: load all immature blocks

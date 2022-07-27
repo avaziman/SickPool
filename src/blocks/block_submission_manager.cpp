@@ -41,9 +41,11 @@ void SubmissionManager::CheckImmatureSubmissions()
             std::string_view(std::to_string(submission->number)),
             confirmations);
 
-        int submissions_ago = block_number - submission->number;
+        Logger::Log(LogType::Info, LogField::Stratum,
+                    "Block {} has {} confirmations", hashHex, confirmations);
 
         int64_t confirmation_time = GetCurrentTimeMs();
+
         if (confirmations > BLOCK_MATURITY)
         {
             Logger::Log(LogType::Info, LogField::Stratum,
@@ -55,7 +57,7 @@ void SubmissionManager::CheckImmatureSubmissions()
                 redis_manager->AddStakingPoints(chain, duration_ms);
             }
 
-            redis_manager->UpdateImmatureRewards(chain, submissions_ago,
+            redis_manager->UpdateImmatureRewards(chain, submission->number,
                                                  confirmation_time, true);
 
             immature_block_submissions.erase(
@@ -75,12 +77,9 @@ void SubmissionManager::CheckImmatureSubmissions()
                 immature_block_submissions.begin() + i);
             i--;
         }
-        Logger::Log(LogType::Info, LogField::Stratum,
-                    "Block {} has {} confirmations", hashHex, confirmations);
     }
 }
 
-// TODO: LOCKS
 bool SubmissionManager::AddImmatureBlock(
     std::unique_ptr<BlockSubmission> submission, const double pow_fee)
 {
@@ -88,15 +87,11 @@ bool SubmissionManager::AddImmatureBlock(
 
     if (submission->block_type == BlockType::POW)
     {
-        // round_manager->CloseRound(submission.get(), pow_fee);
+        round_manager_pow->CloseRound(submission.get(), pow_fee);
     }
     else if (submission->block_type == BlockType::POS)
     {
-        std::vector<std::pair<std::string, double>> efforts;
-        redis_manager->GetPosPoints(
-            efforts,
-            std::string((char*)submission->chain, sizeof(submission->chain)));
-        round_manager->CloseRound(efforts, submission.get(), pow_fee);
+        round_manager_pos->CloseRound(submission.get(), pow_fee);
     }
 
     redis_manager->IncrBlockCount();

@@ -8,10 +8,10 @@ const job_t* JobManager::GetNewJob()
 
     if (resCode != 200)
     {
-        Logger::Log(
-            LogType::Critical, LogField::JobManager,
-            "Failed to get block template, http code: {}, response: {}",
-            resCode, json);
+        Logger::Log(LogType::Critical, LogField::JobManager,
+                    "Failed to get block template, http code: {}, response: {}",
+                    strerror(resCode), json);
+                    //TODO: make sock err negative maybe http positive to diffrinciate
         return nullptr;
     }
 

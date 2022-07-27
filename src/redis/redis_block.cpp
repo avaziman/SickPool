@@ -3,7 +3,7 @@
 
 #include "redis_manager.hpp"
 
-bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
+void RedisManager::AppendAddBlockSubmission(const BlockSubmission *submission)
 {
     std::scoped_lock lock(rc_mutex);
 
@@ -47,8 +47,6 @@ bool RedisManager::AddBlockSubmission(const BlockSubmission *submission)
         AppendTsAdd(chain + ":round_effort_percent", submission->time_ms,
                     submission->effort_percent);
     }
-
-    return GetReplies();
 }
 
 bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,

@@ -11,7 +11,7 @@
 class DifficultyManager
 {
    public:
-    DifficultyManager(std::vector<std::unique_ptr<StratumClient>>* clients,
+    DifficultyManager(std::unordered_map<int, std::unique_ptr<StratumClient>>* clients,
                       std::mutex* clients_mutex, double targetSharesRate)
         : clients(clients),
           clients_mutex(clients_mutex),
@@ -22,7 +22,7 @@ class DifficultyManager
     void Adjust(const int passed_seconds)
     {
         std::scoped_lock lock(*clients_mutex);
-        for (auto& client : *clients)
+        for (auto& [_, client] : *clients)
         {
             const double current_diff = client->GetDifficulty();
             const double minute_rate =
@@ -51,7 +51,7 @@ class DifficultyManager
 
    private:
     double target_share_rate;
-    std::vector<std::unique_ptr<StratumClient>>* clients;
+    std::unordered_map<int, std::unique_ptr<StratumClient>>* clients;
     std::mutex* clients_mutex;
 };
 

@@ -1,6 +1,8 @@
 #ifndef STRATUM_SERVER_HPP_
 #define STRATUM_SERVER_HPP_
+#include <fcntl.h>
 #include <simdjson.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 
 #include <any>
@@ -10,26 +12,29 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include "benchmark.hpp"
 
 #include "../sock_addr.hpp"
-#include "stats_manager.hpp"
-#include "coin_config.hpp"
+#include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
+#include "blocks/block_submission_manager.hpp"
+#include "coin_config.hpp"
 #include "control/control_server.hpp"
 #include "jobs/job_manager.hpp"
+#include "jobs/verus_job.hpp"
 #include "redis/redis_manager.hpp"
 #include "shares/share_processor.hpp"
 #include "static_config/config.hpp"
+#include "stats_manager.hpp"
 #include "stratum_client.hpp"
-#include "blocks/block_submission_manager.hpp"
-#include "jobs/verus_job.hpp"
 
 #define MAX_HTTP_REQ_SIZE (MAX_BLOCK_SIZE * 2)
 #define MAX_HTTP_JSON_DEPTH 3
 
 #define SOCK_TIMEOUT 5
 #define MIN_PERIOD_SECONDS 20
+#define MAX_CONNECTIONS 1e5
+#define MAX_CONNECTION_EVENTS 10
+#define EPOLL_TIMEOUT -1
 
 class StratumServer
 {
@@ -37,14 +42,12 @@ class StratumServer
     StratumServer(const CoinConfig& conf);
     ~StratumServer();
     void StartListening();
-    
 
    private:
     CoinConfig coin_config;
     std::string chain{"VRSCTEST"};
 
-    int sockfd;
-    struct sockaddr_in addr;
+    int listening_fd;
 
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(MAX_HTTP_REQ_SIZE);
@@ -59,7 +62,7 @@ class StratumServer
     RoundManager round_manager_pos;
     DifficultyManager diff_manager;
 
-    std::vector<std::unique_ptr<StratumClient>> clients;
+    std::unordered_map<int, std::unique_ptr<StratumClient>> clients;
 
     std::mutex jobs_mutex;
     std::mutex clients_mutex;
@@ -70,7 +73,8 @@ class StratumServer
 
     void Listen();
     void HandleSocket(int sockfd);
-    void HandleReq(StratumClient* cli, char buffer[], std::size_t reqSize);
+    void HandleReq(StratumClient* cli, WorkerContext* wc,
+                   std::string_view req);
     void HandleBlockNotify();
     void HandleWalletNotify(WalletNotify* wal_notify);
 
@@ -78,10 +82,11 @@ class StratumServer
                          simdjson::ondemand::array& params) const;
     void HandleAuthorize(StratumClient* cli, int id,
                          simdjson::ondemand::array& params);
-    void HandleSubmit(StratumClient* cli, int id,
+    void HandleSubmit(StratumClient* cli, WorkerContext* wc, int id,
                       simdjson::ondemand::array& params);
 
-    void HandleShare(StratumClient* cli, int id, Share& share);
+    void HandleReadySocket(int sockfd, WorkerContext *wc);
+    void HandleShare(StratumClient* cli, WorkerContext* wc, int id, Share& share);
     void SendReject(const StratumClient* cli, int id, int error,
                     const char* msg) const;
     void SendAccept(const StratumClient* cli, int id) const;
@@ -89,9 +94,15 @@ class StratumServer
     void UpdateDifficulty(StratumClient* cli);
 
     void BroadcastJob(const StratumClient* cli, const Job* job) const;
+    int AcceptConnection(int epfd, int listen_fd, sockaddr_in* addr,
+                         socklen_t* addr_size);
+    int CreateListeningSock(int epfd);
+    void ServiceSockets(int epfd, int listener_fd);
+    void AddClient(int sockfd);
+    StratumClient* GetClient(int sockfd);
 
     inline std::size_t SendRaw(int sock, const char* data,
-                                       std::size_t len) const
+                               std::size_t len) const
     {
         // dont send sigpipe
         return send(sock, data, len, MSG_NOSIGNAL);

@@ -16,7 +16,7 @@ class DaemonManager
             rpcs.emplace_back(config.host, config.auth);
         }
     }
-    // TODO: make this like printf for readability
+    
     template <typename... T>
     int SendRpcReq(std::string& result, int id, const char* method,
                    T... params)

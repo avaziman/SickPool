@@ -52,7 +52,8 @@ typedef std::unordered_map<std::string, WorkerStats>
 typedef std::unordered_map<std::string, Round>
     round_map_t;
 
-typedef std::unordered_map<std::string, std::unordered_map<std::string, double>>
+// miner -> effort
+typedef std::unordered_map<std::string, double>
     efforts_map_t;
 
 #endif

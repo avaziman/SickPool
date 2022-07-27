@@ -33,10 +33,10 @@ bool RedisManager::UpdateEffortStats(efforts_map_t &miner_stats_map,
 
     {
         std::scoped_lock stats_lock(*stats_mutex);
-        for (auto &[miner_addr, miner_stats] : miner_stats_map)
+        for (auto &[miner_addr, miner_effort] : miner_stats_map)
         {
             AppendSetMinerEffort(COIN_SYMBOL, miner_addr, "pow",
-                                 miner_stats[COIN_SYMBOL]);
+                                 miner_effort);
         }
 
         AppendSetMinerEffort(COIN_SYMBOL, TOTAL_EFFORT_KEY, "pow",
@@ -102,28 +102,27 @@ bool RedisManager::LoadAverageHashrateSum(
 }
 
 
-//TODO: 
-// bool RedisManager::ResetMinersWorkerCounts(miner_map &miner_stats_map,
-//                                            int64_t time_now)
-// {
-//     for (auto &[addr, _] : miner_stats_map)
-//     {
-//         // reset worker count
-//         AppendCommand("ZADD solver-index:worker-count 0 %b", addr.data(),
-//                       addr.size());
+bool RedisManager::ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
+                                           int64_t time_now)
+{
+    for (auto &[addr, _] : miner_stats_map)
+    {
+        // reset worker count
+        AppendCommand("ZADD solver-index:worker-count 0 %b", addr.data(),
+                      addr.size());
 
-//         AppendTsAdd(fmt::format("worker-count:{}", addr), time_now, 0.f);
-//     }
+        AppendTsAdd(fmt::format("worker-count:{}", addr), time_now, 0.f);
+    }
 
-//     return GetReplies();
-// }
+    return GetReplies();
+}
 
 bool RedisManager::LoadMinersEfforts(
-    const std::string &chain,
-    std::vector<std::pair<std::string, double>> &efforts)
+    std::string_view chain, std::string_view type,
+    efforts_map_t &efforts)
 {
-    auto reply = (redisReply *)redisCommand(rc, "HGETALL %b:round:pow:effort",
-                                            chain.data(), chain.size());
+    auto reply = (redisReply *)redisCommand(rc, "HGETALL %b:round:%b:effort",
+                                            chain.data(), chain.size(), type.data(), type.size());
 
     for (int i = 0; i < reply->elements; i += 2)
     {
@@ -131,7 +130,7 @@ bool RedisManager::LoadMinersEfforts(
 
         double effort = std::strtod(reply->element[i + 1]->str, nullptr);
 
-        efforts.emplace_back(addr, effort);
+        efforts[addr] = effort;
     }
 
     freeReplyObject(reply);

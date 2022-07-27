@@ -4,8 +4,8 @@ StratumServer::StratumServer(const CoinConfig &conf)
     : coin_config(conf),
       redis_manager("127.0.0.1", (int)conf.redis_port),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
-      round_manager_pow(&redis_manager, false),
-      round_manager_pos(&redis_manager, true),
+      round_manager_pow(&redis_manager, "pow"),
+      round_manager_pos(&redis_manager, "pos"),
       stats_manager(&redis_manager, &diff_manager, &round_manager_pow,
                     (int)coin_config.hashrate_interval_seconds,
                     (int)coin_config.effort_interval_seconds,
@@ -14,7 +14,8 @@ StratumServer::StratumServer(const CoinConfig &conf)
                     (int)coin_config.hashrate_ttl_seconds),
       daemon_manager(coin_config.rpcs),
       job_manager(&daemon_manager, coin_config.pool_addr),
-      submission_manager(&redis_manager, &daemon_manager, &round_manager_pow)
+      submission_manager(&redis_manager, &daemon_manager, &round_manager_pow,
+                         &round_manager_pos)
 {
     auto error = httpParser.allocate(MAX_HTTP_REQ_SIZE, MAX_HTTP_JSON_DEPTH);
     if (error != simdjson::SUCCESS)
@@ -23,32 +24,6 @@ StratumServer::StratumServer(const CoinConfig &conf)
                     "Failed to allocate http parser buffer: {}",
                     simdjson::error_message(error));
         exit(EXIT_FAILURE);
-    }
-
-    int optval = 1;
-    // struct timeval timeout;
-    // timeout.tv_sec = coin_config.socket_recv_timeout_seconds;
-    // timeout.tv_usec = 0;
-
-    sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)))
-        throw std::runtime_error("Failed to set stratum socket options");
-
-    // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-    // sizeof(timeout)))
-    //     throw std::runtime_error("Failed to set stratum socket options");
-
-    if (sockfd == -1)
-        throw std::runtime_error("Failed to create stratum socket");
-
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(static_cast<uint16_t>(coin_config.stratum_port));
-
-    if (bind(sockfd, (const sockaddr *)&addr, sizeof(addr)) != 0)
-    {
-        throw std::runtime_error("Stratum server failed to bind to port " +
-                                 std::to_string(coin_config.stratum_port));
     }
 
     // init hash functions if needed
@@ -72,7 +47,7 @@ StratumServer::~StratumServer()
     // for (std::unique_ptr<StratumClient> cli : this->clients){
     //     close(cli.get()->GetSock());
     // }
-    close(this->sockfd);
+    close(listening_fd);
 }
 
 void StratumServer::HandleControlCommands()
@@ -105,10 +80,6 @@ void StratumServer::HandleControlCommand(ControlCommands cmd, char buff[])
 
 void StratumServer::StartListening()
 {
-    if (listen(this->sockfd, 1024) != 0)
-        throw std::runtime_error(
-            "Stratum server failed to enter listenning state.");
-
     HandleBlockNotify();
 
     std::thread listeningThread(&StratumServer::Listen, this);
@@ -118,129 +89,301 @@ void StratumServer::StartListening()
 void StratumServer::Listen()
 {
     Logger::Log(LogType::Info, LogField::Stratum,
-                "Started listenning on port: {}", ntohs(this->addr.sin_port));
+                "Started listenning on port: {}", coin_config.stratum_port);
+
+    int epoll_fd = epoll_create1(0);
+
+    if (epoll_fd == -1)
+    {
+        throw std::runtime_error(fmt::format(
+            "Failed to create epoll: {} -> {}.", errno, std::strerror(errno)));
+    }
+
+    // throws if goes wrong
+    int listener_fd = CreateListeningSock(epoll_fd);
+
+    if (listen(listener_fd, MAX_CONNECTIONS) == -1)
+        throw std::runtime_error(
+            "Stratum server failed to enter listenning state.");
+
+    // char ip_str[INET_ADDRSTRLEN];
+    // struct in_addr ip_addr = conn_addr.sin_addr;
+    // inet_ntop(AF_INET, &ip_addr, ip_str, sizeof(ip_str));
+
+    // Logger::Log(LogType::Info, LogField::Stratum,
+    //             "Tcp client connected, ip: {}, starting new thread...",
+    //             ip_str);
+    std::vector<std::thread> threads;
+
+    const auto worker_amount = std::thread::hardware_concurrency();
+    for (auto i = 0; i < worker_amount; i++)
+    {
+        threads.emplace_back(&StratumServer::ServiceSockets, this, epoll_fd,
+                             listener_fd);
+    }
+
+    for (auto &t : threads)
+    {
+        t.join();
+    }
+
+    // std::thread cliHandler(&StratumServer::HandleSocket, this, conn_fd);
+    // // SetHighPriorityThrea d(cliHandler);
+    // cliHandler.detach();
+}
+
+void StratumServer::ServiceSockets(int epoll_fd, int listener_fd)
+{
+    epoll_event events[MAX_CONNECTION_EVENTS];
+
+    WorkerContext wc;
+    struct sockaddr_in conn_addr;
+    socklen_t addr_len = sizeof(conn_addr);
+    int conn_fd;
+    int epoll_res;
+    int serviced_fd;
+    ssize_t recv_res;
+
+    Logger::Log(LogType::Info, LogField::Stratum,
+                "Starting servicing sockets on thread {}", gettid());
 
     while (true)
     {
-        int conn_fd;
-        struct sockaddr_in conn_addr;
-        socklen_t addr_len = sizeof(conn_addr);
-        conn_fd = accept(sockfd, (sockaddr *)&conn_addr, &addr_len);
+        epoll_res =
+            epoll_wait(epoll_fd, events, MAX_CONNECTION_EVENTS, EPOLL_TIMEOUT);
 
-        char ip_str[INET_ADDRSTRLEN];
-        struct in_addr ip_addr = conn_addr.sin_addr;
-        inet_ntop(AF_INET, &ip_addr, ip_str, sizeof(ip_str));
-
-        Logger::Log(LogType::Info, LogField::Stratum,
-                    "Tcp client connected, ip: {}, starting new thread...",
-                    ip_str);
-
-        if (conn_fd <= 0)
+        if (epoll_res == -1)
         {
-            Logger::Log(
-                LogType::Warn, LogField::Stratum,
-                "Invalid connecting socket accepted errno: {}. Ignoring...",
-                errno);
-            continue;
+            // TODO: think what to do here
+            throw std::runtime_error(
+                fmt::format("Failed to epoll_wait: {}", errno));
         }
 
-        std::thread cliHandler(&StratumServer::HandleSocket, this, conn_fd);
-        // SetHighPriorityThrea d(cliHandler);
-        cliHandler.detach();
+        for (int i = 0; i < epoll_res; i++)
+        {
+            serviced_fd = events[i].data.fd;
+
+            if (serviced_fd == listener_fd)
+            {
+                // new connection
+                conn_fd = AcceptConnection(epoll_fd, listener_fd, &conn_addr,
+                                           &addr_len);
+
+                if (conn_fd < 0)
+                {
+                    Logger::Log(LogType::Warn, LogField::Stratum,
+                                "Failed to accept connecting socket errno: {} "
+                                "-> errno: {}. ",
+                                conn_fd, errno);
+                    close(conn_fd);
+                    continue;
+                }
+
+                AddClient(conn_fd);
+            }
+            else
+            {
+                // new data ready to be read
+                HandleReadySocket(serviced_fd, &wc);
+            }
+        }
     }
+}
+
+void StratumServer::HandleReadySocket(int sockfd, WorkerContext *wc)
+{
+    StratumClient *cli = GetClient(sockfd);
+    std::size_t req_len;
+    std::size_t next_req_len;
+    ssize_t recv_res;
+    char *last_req_end;
+    char *req_end;
+    char *req_start;
+    char *buffer = cli->req_buff;
+
+    recv_res = recv(sockfd, cli->req_buff + cli->req_pos,
+                    REQ_BUFF_SIZE_REAL - cli->req_pos - 1, 0);
+
+    if (recv_res == -1)
+    {
+        if (errno == EWOULDBLOCK /*|| errno == EAGAIN*/)
+        {
+        }
+        return;
+    }
+    else if (recv_res == 0)
+    {
+        // TODO: print ip
+        Logger::Log(LogType::Info, LogField::Stratum, "Client disconnected.");
+        return;
+    }
+
+    cli->req_pos += recv_res;
+    buffer[cli->req_pos] = '\0';  // for strchr
+    req_end = std::strchr(buffer, '\n');
+
+    // there can be multiple messages in 1 recv
+    // {1}\n{2}\n
+    req_start = strchr(buffer, '{');  // should be first char
+    while (req_end != nullptr)
+    {
+        req_len = req_end - req_start;
+        HandleReq(cli, wc, std::string_view(req_start, req_len));
+
+        last_req_end = req_end;
+        req_start = strchr(req_end + 1, '{');
+        req_end = strchr(req_end + 1, '\n');
+    }
+
+    next_req_len =
+        cli->req_pos - (last_req_end - buffer + 1);  // don't inlucde \n
+    std::memmove(buffer, last_req_end + 1, next_req_len);
+    buffer[next_req_len] = '\0';
+
+    cli->req_pos = next_req_len;
+}
+
+int StratumServer::CreateListeningSock(int epfd)
+{
+    int optval = 1;
+
+    int listener_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+    if (listener_fd == -1)
+        throw std::runtime_error("Failed to create stratum socket");
+
+    if (setsockopt(listener_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
+                   sizeof(optval)) == -1)
+        throw std::runtime_error("Failed to set stratum socket options");
+
+    // struct timeval timeout;
+    // timeout.tv_sec = coin_config.socket_recv_timeout_seconds;
+    // timeout.tv_usec = 0;
+    // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+    // sizeof(timeout)) == -1)
+    //     throw std::runtime_error("Failed to set stratum socket options");
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(static_cast<uint16_t>(coin_config.stratum_port));
+
+    if (bind(listener_fd, (const sockaddr *)&addr, sizeof(addr)) == -1)
+    {
+        throw std::runtime_error(
+            fmt::format("Stratum server failed to bind to port: {}",
+                        coin_config.stratum_port));
+    }
+
+    epoll_event listener_ev;
+    listener_ev.events = EPOLLIN | EPOLLET;
+    listener_ev.data.fd = listener_fd;
+
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, listener_fd, &listener_ev) == -1)
+    {
+        throw std::runtime_error(
+            fmt::format("Failed to add listener socket to epoll set: {} -> {}",
+                        errno, std::strerror(errno)));
+    }
+
+    return listener_fd;
+}
+
+int StratumServer::AcceptConnection(int epfd, int listener_fd,
+                                    sockaddr_in *addr, socklen_t *addr_size)
+{
+    epoll_event conn_ev;
+    int flags = O_NONBLOCK;
+    int conn_fd = accept4(listener_fd, (sockaddr *)addr, addr_size, flags);
+
+    if (conn_fd == -1)
+    {
+        return -1;
+    }
+
+    conn_ev.data.fd = conn_fd;
+    conn_ev.events = EPOLLIN | EPOLLET;
+
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, conn_fd, &conn_ev) == -1)
+    {
+        return -2;
+    }
+
+    return conn_fd;
 }
 
 void StratumServer::HandleSocket(int conn_fd)
 {
-    auto client = std::make_unique<StratumClient>(conn_fd, GetCurrentTimeMs(),
-                                                  coin_config.default_diff);
-    auto cli_ptr = client.get();
+    // auto client = std::make_unique<StratumClient>(conn_fd,
+    // GetCurrentTimeMs(),
+    //                                               coin_config.default_diff);
+    // auto cli_ptr = client.get();
 
-    {
-        std::scoped_lock cli_lock(clients_mutex);
-        // client will be null after move, so assign the new ref to it
-        this->clients.push_back(std::move(client));
-        // client is moved, do not use
-    }
+    // {
+    //     std::scoped_lock cli_lock(clients_mutex);
+    //     // client will be null after move, so assign the new ref to it
+    //     this->clients.(std::move(client));
+    //     // client is moved, do not use
+    // }
 
     // simdjson requires some extra bytes, so don't write to the last bytes
-    char buffer[REQ_BUFF_SIZE];
-    char *reqEnd = nullptr;
-    char *reqStart = nullptr;
-    const char *lastReqEnd = nullptr;
-    std::size_t total = 0;
-    std::size_t reqLen = 0;
-    std::size_t nextReqLen = 0;
-    ssize_t recvRes = 0;  // signed size_t, can return -1
-    bool isBuffMaxed = false;
+    // char buffer[REQ_BUFF_SIZE];
+    // char *reqEnd = nullptr;
+    // char *reqStart = nullptr;
+    // const char *lastReqEnd = nullptr;
+    // std::size_t total = 0;
+    // std::size_t reqLen = 0;
+    // std::size_t nextReqLen = 0;
+    // ssize_t recvRes = 0;  // signed size_t, can return -1
+    // bool isBuffMaxed = false;
 
-    while (true)
-    {
-        do
-        {
-            recvRes = recv(conn_fd, buffer + total,
-                           REQ_BUFF_SIZE_REAL - total - 1, 0);
-            total += recvRes;
-            buffer[total] = '\0';  // for strchr
-            reqEnd = std::strchr(buffer, '\n');
-            isBuffMaxed = total >= REQ_BUFF_SIZE_REAL;
-        } while (reqEnd == nullptr && recvRes && !isBuffMaxed);
+    // while (true)
+    // {
+    //     do
+    //     {
+    //         recvRes = recv(conn_fd, buffer + total,
+    //                        REQ_BUFF_SIZE_REAL - total - 1, 0);
+    //         total += recvRes;
+    //         buffer[total] = '\0';  // for strchr
+    //         reqEnd = std::strchr(buffer, '\n');
+    //         isBuffMaxed = total >= REQ_BUFF_SIZE_REAL;
+    //     } while (reqEnd == nullptr && recvRes && !isBuffMaxed);
 
-        // exit loop, miner disconnected
-        // res = 0, graceful disconnect
-        // res = -1, error occured
-        if (!recvRes || recvRes == -1)
-        {
-            stats_manager.PopWorker(cli_ptr->GetFullWorkerName(),
-                                    cli_ptr->GetAddress());
-            close(cli_ptr->GetSock());
+    //     // exit loop, miner disconnected
+    //     // res = 0, graceful disconnect
+    //     // res = -1, error occured
+    //     if (!recvRes || recvRes == -1)
+    //     {
+    //         stats_manager.PopWorker(cli_ptr->GetFullWorkerName(),
+    //                                 cli_ptr->GetAddress());
+    //         close(cli_ptr->GetSock());
 
-            {
-                std::scoped_lock cli_lock(clients_mutex);
-                clients.erase(
-                    std::find(clients.begin(), clients.end(), client));
-            }
+    //         {
+    //             std::scoped_lock cli_lock(clients_mutex);
+    //             clients.erase(
+    //                 std::find(clients.begin(), clients.end(), client));
+    //         }
 
-            Logger::Log(LogType::Info, LogField::Stratum,
-                        "Client disconnected. res: {}, errno: {}", recvRes,
-                        (int)errno);
-            break;
-        }
-        // std::cout << total << std::endl;
-        // std::cout << std::string_view(buffer, total) << std::endl;
+    //         Logger::Log(LogType::Info, LogField::Stratum,
+    //                     "Client disconnected. res: {}, errno: {}", recvRes,
+    //                     (int)errno);
+    //         break;
+    //     }
+    //     // std::cout << total << std::endl;
+    //     // std::cout << std::string_view(buffer, total) << std::endl;
 
-        if (isBuffMaxed && !reqEnd)
-        {
-            Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Request too big. {}", buffer);
+    //     if (isBuffMaxed && !reqEnd)
+    //     {
+    //         Logger::Log(LogType::Critical, LogField::Stratum,
+    //                     "Request too big. {}", buffer);
 
-            total = 0;
-            continue;
-        }
-
-        // there can be multiple messages in 1 recv
-        // {1}\n{2}
-        reqStart = strchr(buffer, '{');
-        while (reqEnd != nullptr)
-        {
-            reqLen = reqEnd - reqStart;
-            HandleReq(cli_ptr, reqStart, reqLen);
-
-            lastReqEnd = reqEnd;
-            reqStart = strchr(reqEnd + 1, '{');
-            reqEnd = strchr(reqEnd + 1, '\n');
-        }
-
-        nextReqLen = total - (lastReqEnd - buffer + 1);  // don't inlucde \n
-        std::memmove(buffer, lastReqEnd + 1, nextReqLen);
-        buffer[nextReqLen] = '\0';
-
-        total = nextReqLen;
-    }
+    //         total = 0;
+    //         continue;
+    //     }
+    // }
 }
 
-void StratumServer::HandleReq(StratumClient *cli, char *buffer,
-                              std::size_t reqSize)
+void StratumServer::HandleReq(StratumClient *cli, WorkerContext *wc,
+                              std::string_view req)
 {
     int id = 0;
     std::string_view method;
@@ -252,8 +395,8 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer,
     simdjson::ondemand::document doc;
     try
     {
-        doc = cli->GetParser()->iterate(buffer, reqSize,
-                                        reqSize + simdjson::SIMDJSON_PADDING);
+        doc = wc->json_parser.iterate(req.data(), req.size(),
+                                      req.size() + simdjson::SIMDJSON_PADDING);
 
         simdjson::ondemand::object req = doc.get_object();
         id = static_cast<int>(req["id"].get_int64());
@@ -265,7 +408,7 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer,
         SendReject(cli, id, (int)ShareCode::UNKNOWN, "Bad request");
         Logger::Log(LogType::Error, LogField::Stratum,
                     "Request JSON parse error: {}\nRequest: {}\n", err.what(),
-                    std::string_view(buffer, reqSize));
+                    req);
         return;
     }
     auto end = std::chrono::steady_clock::now();
@@ -276,7 +419,7 @@ void StratumServer::HandleReq(StratumClient *cli, char *buffer,
 
     if (method == "mining.submit")
     {
-        HandleSubmit(cli, id, params);
+        HandleSubmit(cli, wc, id, params);
     }
     else if (method == "mining.subscribe")
     {
@@ -315,7 +458,7 @@ void StratumServer::HandleBlockNotify()
     // save it to process round
     {
         std::scoped_lock clients_lock(clients_mutex);
-        for (auto &cli : clients)
+        for (auto &[sock, cli] : clients)
         {
             // (*it)->SetDifficulty(1000000, curtimeMs);
             // (*it)->SetDifficulty(job->GetTargetDiff(), curtimeMs);
@@ -326,8 +469,8 @@ void StratumServer::HandleBlockNotify()
                 UpdateDifficulty(cli.get());
             }
             BroadcastJob(cli.get(), newJob);
-            cli->ResetShareSet();
         }
+        // TODO: reset shares
     }
 
     // in case of a crash without shares, we need to update round start time
@@ -378,16 +521,18 @@ void StratumServer::HandleBlockNotify()
 void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
 {
     using namespace simdjson;
-    /// TODO: exception handle this and everything like this
     std::string_view block_hash(wal_notify->block_hash,
                                 sizeof(wal_notify->block_hash));
     std::string_view tx_id(wal_notify->txid, sizeof(wal_notify->txid));
     std::string_view address(wal_notify->wallet_address,
-                             wal_notify->wallet_address);
+                             sizeof(wal_notify->wallet_address));
 
     auto bhash256 = UintToArith256(uint256S(block_hash.data()));
     double bhashDiff = BitsToDiff(bhash256.GetCompact());
     double pow_diff = job_manager.GetLastJob()->GetTargetDiff();
+
+    Logger::Log(LogType::Info, LogField::Stratum,
+                "Received PoS TxId: {}, block hash: {}", tx_id, block_hash);
 
     if (bhashDiff >= pow_diff)
     {
@@ -401,9 +546,6 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
                     address, block_hash);
         return;
     }
-
-    Logger::Log(LogType::Info, LogField::Stratum,
-                "Received PoS TxId: {}, block hash: {}", tx_id, block_hash);
 
     // now make sure we actually staked the PoS block and not just received a tx
     // inside one.
@@ -507,10 +649,11 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
     // the txid is ours (got its value),
     // the txid is indeed the coinbase tx
 
-    Round round = round_manager_pow.GetChainRound(chain);
+    Round round = round_manager_pos.GetChainRound(chain);
     const auto time = GetCurrentTimeMs();
     const int64_t duration_ms = time - round.round_start_ms;
-    const double effort_percent = 0;//TODO:
+    const double effort_percent =
+        round.total_effort / round.estimated_effort * 100.f;  // TODO:
 
     auto submission = std::make_unique<BlockSubmission>(
         0, BlockType::POS, value, time, duration_ms, height,
@@ -520,8 +663,11 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
     memcpy(submission->miner, coin_config.pool_addr.data(), ADDRESS_LEN);
     memset(submission->worker, 0, sizeof(submission->worker));
 
-    Logger::Log(LogType::Info, LogField::Stratum, "Found PoS Block! hash: {}",
-                block_hash);
+    submission_manager.AddImmatureBlock(std::move(submission),
+                                        coin_config.pos_fee);
+
+    Logger::Log(LogType::Info, LogField::Stratum,
+                "Added immature PoS Block! hash: {}", block_hash);
 }
 
 void StratumServer::HandleSubscribe(const StratumClient *cli, int id,
@@ -713,7 +859,7 @@ void StratumServer::HandleAuthorize(StratumClient *cli, int id,
 }
 
 // https://zips.z.cash/zip-0301#mining-submit
-void StratumServer::HandleSubmit(StratumClient *cli, int id,
+void StratumServer::HandleSubmit(StratumClient *cli, WorkerContext *wc, int id,
                                  simdjson::ondemand::array &params)
 {
     // parsing takes 0-1 us
@@ -735,10 +881,11 @@ void StratumServer::HandleSubmit(StratumClient *cli, int id,
         return;
     }
 
-    HandleShare(cli, id, share);
+    HandleShare(cli, wc, id, share);
 }
 
-void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
+void StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc, int id,
+                                Share &share)
 {
     int64_t time = GetCurrentTimeMs();
     // Benchmark<std::chrono::microseconds> share_bench("Share process");
@@ -747,13 +894,14 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
     ShareResult share_res;
     const job_t *job = job_manager.GetJob(share.jobId);
 
-    ShareProcessor::Process(*cli, job, share, share_res, time);
+    ShareProcessor::Process(cli, wc, job, share, share_res, time);
 
     // > add share stats before submission to have accurate effort (its fast)
     // > possible that a timeseries wasn't created yet, so don't add shares
     if (share_res.code != ShareCode::UNAUTHORIZED_WORKER)
     {
-        round_manager_pow.AddRoundShare(COIN_SYMBOL, cli->GetAddress(), share_res.difficulty);
+        round_manager_pow.AddRoundShare(COIN_SYMBOL, cli->GetAddress(),
+                                        share_res.difficulty);
         stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
                                share_res.difficulty);
     }
@@ -765,7 +913,7 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
             std::size_t blockSize = job->GetBlockSize();
             char blockData[blockSize];
 
-            job->GetBlockHex(cli->GetBlockheaderBuff(), blockData);
+            job->GetBlockHex(wc->block_header, blockData);
 
             // submit ASAP
             auto block_hex = std::string_view(blockData, blockSize);
@@ -811,10 +959,10 @@ void StratumServer::HandleShare(StratumClient *cli, int id, Share &share)
 
     auto end = TIME_NOW();
 
-    // Logger::Log(LogType::Debug, LogField::Stratum,
-    //             "Share processed in {}us, diff: {}, res: {}",
-    //             std::chrono::duration_cast<std::chrono::microseconds>(end -
-    //             start).count(), share_res.difficulty, (int)share_res.code);
+    Logger::Log(LogType::Debug, LogField::Stratum,
+                "Share processed in {}us, diff: {}, res: {}",
+                std::chrono::duration_cast<std::chrono::microseconds>(end -
+                start).count(), share_res.difficulty, (int)share_res.code);
 }
 
 void StratumServer::SendReject(const StratumClient *cli, int id, int err,
@@ -861,4 +1009,19 @@ void StratumServer::BroadcastJob(const StratumClient *cli, const Job *job) const
     // auto res =
     auto notifyMsg = job->GetNotifyMessage();
     SendRaw(cli->GetSock(), notifyMsg.data(), notifyMsg.size());
+}
+
+void StratumServer::AddClient(int sockfd)
+{
+    std::unique_lock l(clients_mutex);
+    auto client = std::make_unique<StratumClient>(sockfd, GetCurrentTimeMs(),
+                                                  coin_config.default_diff);
+
+    clients.emplace(sockfd, std::move(client));
+}
+
+StratumClient *StratumServer::GetClient(int sockfd)
+{
+    std::unique_lock l(clients_mutex);
+    return clients[sockfd].get();
 }

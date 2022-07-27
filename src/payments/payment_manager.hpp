@@ -2,6 +2,7 @@
 #define PAYMENT_MANAGER_HPP
 #include "logger.hpp"
 #include "stats.hpp"
+#include "config.hpp"
 
 #pragma pack(push, 1)
 
@@ -21,7 +22,7 @@ class PaymentManager
     static bool GetRewardsProp(
         round_shares_t& miner_shares,
         int64_t block_reward,
-        const std::vector<std::pair<std::string, double>>& miner_efforts,
+        efforts_map_t& miner_efforts,
         double total_effort, double fee)
     {
         int64_t substracted_reward = static_cast<int64_t>(
@@ -41,7 +42,7 @@ class PaymentManager
             round_share.effort = effort;
             round_share.share = round_share.effort / total_effort;
             round_share.reward =
-                static_cast<int64_t>(round_share.share * substracted_reward);
+                static_cast<int64_t>(round_share.share * static_cast<double>(substracted_reward));
             miner_shares.emplace_back(addr, round_share);
 
             Logger::Log(LogType::Info, LogField::PaymentManager,

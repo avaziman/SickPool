@@ -26,13 +26,11 @@ class StratumClient
     bool GetIsPendingDiff() const { return is_pending_diff; }
     uint32_t GetShareCount() const { return share_count; }
     int64_t GetLastAdjusted() const { return last_adjusted; }
-    uint8_t* GetBlockheaderBuff() { return block_header; }
     std::string_view GetExtraNonce() const { return extra_nonce_str; }
 
     // make sting_view when unordered map supports it
     const std::string& GetAddress() const { return address; }
     const std::string& GetFullWorkerName() const { return worker_full; }
-    simdjson::ondemand::parser* GetParser() { return &parser; }
 
     void SetPendingDifficulty(double diff)
     {
@@ -82,16 +80,10 @@ class StratumClient
     void SetAuthorized()
     {
         is_authorized = true;
-        share_uset = std::unordered_set<uint32_t>();
-
-#if POW_ALGO == POW_ALGO_VERUSHASH
-        this->verusHasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
-#endif
     }
+    char req_buff[REQ_BUFF_SIZE];
+    std::size_t req_pos = 0;
 
-#if POW_ALGO == POW_ALGO_VERUSHASH
-    CVerusHashV2* GetHasher() { return &verusHasher; }
-#endif
    private:
     static uint32_t extra_nonce_counter;
 
@@ -113,23 +105,10 @@ class StratumClient
 
     std::mutex shares_mutex;
 
-    // each parser can only process one request at a time,
-    // so we need a parser per client
-    simdjson::ondemand::parser parser =
-        simdjson::ondemand::parser(REQ_BUFF_SIZE);
-
-    // needs to be thread-specific to allow simultanious processing
-    uint8_t block_header[BLOCK_HEADER_SIZE];
-
     // for O(1) duplicate search
     // at the cost of a bit of memory, but much faster!
     std::unordered_set<uint32_t> share_uset;
 
-    // the hasher is thread-specific
-    // so we need to store it in client so we only need to init once
-#if POW_ALGO == POW_ALGO_VERUSHASH
-    CVerusHashV2 verusHasher;
-#endif
 };
 
 #endif

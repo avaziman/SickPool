@@ -11,10 +11,17 @@
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
 
+struct WorkerContext{
+    uint8_t block_header[BLOCK_HEADER_SIZE];
+    CVerusHashV2 hasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
+    simdjson::ondemand::parser json_parser;
+};
+
 class ShareProcessor
 {
    public:
-    inline static void Process(StratumClient& cli, const job_t* job,
+    inline static void Process(StratumClient* cli,
+                               WorkerContext* wc, const job_t* job,
                                const Share& share, ShareResult& result,
                                int64_t curTime)
     {
@@ -25,14 +32,14 @@ class ShareProcessor
             return;
         }
 
-        uint8_t* headerData = cli.GetBlockheaderBuff();
-
-        if (!cli.GetIsAuthorized())
+        if (!cli->GetIsAuthorized())
         {
             result.code = ShareCode::UNAUTHORIZED_WORKER;
             result.message = "Unauthorized worker";
             return;
         }
+
+        uint8_t* headerData = wc->block_header;
 
         // veirfy params before even hashing
         // convert share time to uint32 (fast)
@@ -53,13 +60,13 @@ class ShareProcessor
             return;
         }
 
-        job->GetHeaderData(headerData, share.time, cli.GetExtraNonce(),
+        job->GetHeaderData(headerData, share.time, cli->GetExtraNonce(),
                            share.nonce2, share.solution);
 
 #if POW_ALGO == POW_ALGO_VERUSHASH
         // takes about 6-8 microseconds vs 8-12 on snomp
         HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
-                                   BLOCK_HEADER_SIZE, cli.GetHasher());
+                                   BLOCK_HEADER_SIZE, &wc->hasher);
 #endif
         uint256 hash(result.hash_bytes);
         // arith_uint256 hashArith = UintToArith256(hash);
@@ -68,7 +75,7 @@ class ShareProcessor
         // convert to uint32, (this will lose data)
         auto shareEnd = static_cast<uint32_t>(hash.GetCheapHash());
 
-        if (!cli.SetLastShare(shareEnd, curTime))
+        if (!cli->SetLastShare(shareEnd, curTime))
         {
             result.code = ShareCode::DUPLICATE_SHARE;
             result.message = "Duplicate share";
@@ -84,7 +91,7 @@ class ShareProcessor
             result.code = ShareCode::VALID_BLOCK;
             return;
         }
-        else if (result.difficulty / cli.GetDifficulty() < 1)  // allow 5% below
+        else if (result.difficulty / cli->GetDifficulty() < 1)  // allow 5% below
         {
             result.code = ShareCode::LOW_DIFFICULTY_SHARE;
             result.message =
