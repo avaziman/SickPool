@@ -155,8 +155,20 @@ void StratumServer::ServiceSockets(int epoll_fd, int listener_fd)
         if (epoll_res == -1)
         {
             // TODO: think what to do here
-            throw std::runtime_error(
-                fmt::format("Failed to epoll_wait: {}", errno));
+            if (errno == EBADF || errno == EFAULT || errno == EINVAL)
+            {
+                throw std::runtime_error(
+                    fmt::format("Failed to epoll_wait: {} -> {}", errno,
+                                std::strerror(errno)));
+            }
+            else
+            {
+                // EINTR
+                Logger::Log(LogType::Error, LogField::Stratum,
+                            "Failed to epoll_wait: {} -> {}", errno,
+                            std::strerror(errno));
+                continue;
+            }
         }
 
         for (int i = 0; i < epoll_res; i++)
@@ -209,12 +221,18 @@ void StratumServer::HandleReadySocket(int sockfd, WorkerContext *wc)
         if (errno == EWOULDBLOCK /*|| errno == EAGAIN*/)
         {
         }
+        Logger::Log(LogType::Warn, LogField::Stratum,
+                    "Client disconnected because of socket error: {} -> {}.",
+                    errno, std::strerror(errno));
+        close(sockfd);
+
         return;
     }
     else if (recv_res == 0)
     {
         // TODO: print ip
         Logger::Log(LogType::Info, LogField::Stratum, "Client disconnected.");
+        close(sockfd);
         return;
     }
 
@@ -224,8 +242,8 @@ void StratumServer::HandleReadySocket(int sockfd, WorkerContext *wc)
 
     // there can be multiple messages in 1 recv
     // {1}\n{2}\n
-    req_start = strchr(buffer, '{');  // should be first char
-    while (req_end != nullptr)
+    req_start = strchr(buffer, '{');  // "should" be first char
+    while (req_start && req_end)
     {
         req_len = req_end - req_start;
         HandleReq(cli, wc, std::string_view(req_start, req_len));
@@ -235,13 +253,18 @@ void StratumServer::HandleReadySocket(int sockfd, WorkerContext *wc)
         req_end = strchr(req_end + 1, '\n');
     }
 
-    next_req_len =
-        cli->req_pos - (last_req_end - buffer + 1);  // don't inlucde \n
-    std::memmove(buffer, last_req_end + 1, next_req_len);
-    buffer[next_req_len] = '\0';
+    // if we haven't received a full request then don't touch the buffer
+    if (req_end && req_start)
+    {
+        next_req_len =
+            cli->req_pos - (last_req_end - buffer + 1);  // don't inlucde \n
+        std::memmove(buffer, last_req_end + 1, next_req_len);
+        buffer[next_req_len] = '\0';
 
-    cli->req_pos = next_req_len;
+        cli->req_pos = next_req_len;
+    }
 }
+// TODO: test buffer too little
 
 int StratumServer::CreateListeningSock(int epfd)
 {
@@ -385,7 +408,7 @@ void StratumServer::HandleSocket(int conn_fd)
 void StratumServer::HandleReq(StratumClient *cli, WorkerContext *wc,
                               std::string_view req)
 {
-    int id = 0;
+n    int id = 0;
     std::string_view method;
     simdjson::ondemand::array params;
 
@@ -959,10 +982,12 @@ void StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc, int id,
 
     auto end = TIME_NOW();
 
-    Logger::Log(LogType::Debug, LogField::Stratum,
-                "Share processed in {}us, diff: {}, res: {}",
-                std::chrono::duration_cast<std::chrono::microseconds>(end -
-                start).count(), share_res.difficulty, (int)share_res.code);
+    Logger::Log(
+        LogType::Debug, LogField::Stratum,
+        "Share processed in {}us, diff: {}, res: {}",
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+            .count(),
+        share_res.difficulty, (int)share_res.code);
 }
 
 void StratumServer::SendReject(const StratumClient *cli, int id, int err,
