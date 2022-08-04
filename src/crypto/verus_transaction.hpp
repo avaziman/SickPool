@@ -20,7 +20,7 @@ class VerusTransaction : public Transaction
     {
     }
 
-    std::vector<unsigned char> GetBytes() override
+    void GetBytes(std::vector<unsigned char>& bytes) override
     {
         uint64_t vinVarIntVal = vin.size();
         char vinVarIntLen = VarInt(vinVarIntVal);
@@ -30,7 +30,7 @@ class VerusTransaction : public Transaction
 
         tx_len += 4 * 4 + 11 + vinVarIntLen + voutVarIntLen;
         // bytes.resize(tx_len);
-        std::vector<unsigned char> bytes(tx_len);
+        bytes.resize(tx_len);
 
         int ver = version | (is_overwintered << 31);
         WriteData(bytes.data(), &ver, 4);
@@ -72,7 +72,6 @@ class VerusTransaction : public Transaction
         //     std::cout << std::hex << std::setfill('0') << std::setw(2)
         //               << (int)bytes[i];
         // std::cout << std::endl;
-        return bytes;
     }
 
     // since PBAAS_ACTIVATE

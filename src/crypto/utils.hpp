@@ -36,16 +36,15 @@ inline int fast_atoi(const char* str, int size)
     return val;
 }
 
-inline void SetHighPriorityThread(std::thread& thr)
+inline int SetHighPriorityThread(std::thread& thr)
 {
     struct sched_param param;
     int maxPriority;
 
     param.sched_priority = sched_get_priority_max(SCHED_FIFO);
     int res = pthread_setschedparam(thr.native_handle(), SCHED_FIFO, &param);
-    // if (res != 0)
-    //     std::cerr << "Failed to set thread priority to realtime! (need admin)"
-    //               << std::endl;
+    
+    return res;
 }
 
 inline void ReverseHex(char* dest, const char* input, uint32_t size)
@@ -290,30 +289,6 @@ inline int64_t GetDailyTimestamp()
     return time * 1000;
 }
 
-// static double BitsToDiff(int64_t nBits)
-// {
-//     // from chain params
-
-//     int nShift = (nBits >> 24) & 0xff;
-//     int nShiftAmount = (DIFF1_BITS >> 24) & 0xff;
-
-//     double dDiff =
-//         (double)(DIFF1_BITS & 0x00ffffff) / (double)(nBits & 0x00ffffff);
-//     while (nShift < nShiftAmount)
-//     {
-//         dDiff *= 256.0;
-//         nShift++;
-//     }
-
-//     while (nShift > nShiftAmount)
-//     {
-//         nShift--;
-//         dDiff /= 256.0;
-//     }
-
-//     return dDiff;
-// }
-
 // https://bitcoin.stackexchange.com/questions/30467/what-are-the-equations-to-convert-between-bits-and-difficulty
 static uint32_t DiffToBits(double difficulty)
 {
@@ -337,12 +312,5 @@ static uint32_t DiffToBits(double difficulty)
     uint32_t bits = (size << 24) | word;
     return bits;
 }
-// static std::string DiffToTarget(double diff)
-// {
-//     uint64_t t = 0x0000ffff00000000 / 1;
-
-//     arith_uint256 arith256;
-//     return arith256.SetCompact(t).GetHex();
-// }
 
 #endif

@@ -51,19 +51,19 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-# FetchContent_Declare(
-#     benchmark
-#     GIT_REPOSITORY https://github.com/google/benchmark.git
-#     GIT_TAG tags/v1.6.1
-#     GIT_SHALLOW TRUE
-# )
-# FetchContent_MakeAvailable(benchmark)
+FetchContent_Declare(
+    benchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG tags/v1.6.1
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(benchmark)
 
 # include_directories(lib/rapidjson/include)
 add_subdirectory(src)
 
 add_subdirectory(stratum_notifier)
-# add_subdirectory(benchmark)
+add_subdirectory(benchmark)
 add_subdirectory(tests)
 
 add_executable(${PROJECT_NAME} src/main.cpp)

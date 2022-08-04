@@ -36,14 +36,14 @@ class StatsManager
     // ) worker hashrate
     // ) miner hashrate
     // ) pool hashrate
-    void Start();
+    void Start(std::stop_token st);
     bool LoadAvgHashrateSums();
     void AddShare(const std::string& worker_full, const std::string& miner_addr,
                   const double diff);
     bool AddWorker(const std::string& address, const std::string& worker_full,
-                   const std::string& idTag, std::time_t curtime);
+                   const std::string& idTag,
+                   std::string_view script_pub_key, std::time_t curtime);
     void PopWorker(const std::string& worker, const std::string& address);
-    void GetMiningEffortsReset(std::vector<std::pair<std::string, double>>& efforts, const std::string& chain);
 
     // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
 

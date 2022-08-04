@@ -12,8 +12,8 @@ void SubmissionManager::CheckImmatureSubmissions()
     for (int i = 0; i < immature_block_submissions.size(); i++)
     {
         const auto& submission = immature_block_submissions[i];
-        auto hashHex = std::string_view((char*)submission->hashHex,
-                                        sizeof(submission->hashHex));
+        auto hashHex = std::string_view((char*)submission->hash_hex,
+                                        sizeof(submission->hash_hex));
         auto chain = std::string_view((char*)submission->chain,
                                       sizeof(submission->chain));
 
@@ -59,6 +59,9 @@ void SubmissionManager::CheckImmatureSubmissions()
 
             redis_manager->UpdateImmatureRewards(chain, submission->number,
                                                  confirmation_time, true);
+            payment_manager->AddMatureBlock(submission->number,
+                                            (char*)submission->hash_hex,
+                                            confirmation_time, submission->block_reward);
 
             immature_block_submissions.erase(
                 immature_block_submissions.begin() + i);
@@ -81,7 +84,7 @@ void SubmissionManager::CheckImmatureSubmissions()
 }
 
 bool SubmissionManager::AddImmatureBlock(
-    std::unique_ptr<BlockSubmission> submission, const double pow_fee)
+    std::unique_ptr<ExtendedSubmission> submission, const double pow_fee)
 {
     std::scoped_lock lock(blocks_lock);
 
@@ -93,8 +96,8 @@ bool SubmissionManager::AddImmatureBlock(
     {
         round_manager_pos->CloseRound(submission.get(), pow_fee);
     }
-
-    redis_manager->IncrBlockCount();
+    //TODO: incrblockcount somewhere
+    // redis_manager->IncrBlockCount();
     block_number++;
 
     Logger::Log(
@@ -126,7 +129,7 @@ bool SubmissionManager::AddImmatureBlock(
         fmt::format("Worker: {}",
                     std::string((char*)submission->worker, MAX_WORKER_NAME_LEN)
                         .c_str()),
-        fmt::format("Hash: {}", std::string_view((char*)submission->hashHex,
+        fmt::format("Hash: {}", std::string_view((char*)submission->hash_hex,
                                                  HASH_SIZE_HEX)),
         70);
 

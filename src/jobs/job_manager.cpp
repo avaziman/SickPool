@@ -111,7 +111,7 @@ TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
     VerusTransaction coinbaseTx =
         GetCoinbaseTx(value, height, locktime, rpc_coinbase);
 
-    res.data = coinbaseTx.GetBytes();
+    coinbaseTx.GetBytes(res.data);
     HashWrapper::SHA256d(res.hash, res.data.data(), res.data.size());
     res.fee = 0;
     return res;

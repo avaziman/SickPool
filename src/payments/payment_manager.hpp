@@ -1,58 +1,46 @@
 #ifndef PAYMENT_MANAGER_HPP
 #define PAYMENT_MANAGER_HPP
-#include "logger.hpp"
-#include "stats.hpp"
+#include <deque>
+#include <unordered_map>
+
 #include "config.hpp"
+#include "round_share.hpp"
+#include "daemon_manager.hpp"
+#include "logger.hpp"
+#include "round_manager.hpp"
+#include "stats.hpp"
+#include "redis_manager.hpp"
+#include "verus_transaction.hpp"
 
-#pragma pack(push, 1)
-
-struct RoundShare
-{
-    double effort;
-    double share;
-    int64_t reward;
-};
-#pragma pack(pop)
-
-typedef std::vector<std::pair<std::string, RoundShare>> round_shares_t;
+class RoundManager;
+class RedisManager;
 
 class PaymentManager
 {
    public:
-    static bool GetRewardsProp(
-        round_shares_t& miner_shares,
-        int64_t block_reward,
-        efforts_map_t& miner_efforts,
-        double total_effort, double fee)
-    {
-        int64_t substracted_reward = static_cast<int64_t>(
-            static_cast<double>(block_reward) * (1.f - fee));
+    PaymentManager(const std::string& pool_addr, int payout_age_s, int64_t minimum_payout_threshold);
+    static bool GetRewardsProp(round_shares_t& miner_shares,
+                               int64_t block_reward,
+                               efforts_map_t& miner_efforts,
+                               double total_effort, double fee);
+    bool CheckAgingRewards(RoundManager* redis_manager, int64_t time_now);
 
-        if (total_effort == 0)
-        {
-            Logger::Log(LogType::Critical, LogField::PaymentManager,
-                        "Round effort is 0!");
-            return false;
-        }
-        // miner_shares.resize(miners.size());
+    void AddMatureBlock(uint32_t block_id, const char* coinbase_txid,
+                        int64_t mature_time_ms, int64_t reward);
 
-        for (auto& [addr, effort] : miner_efforts)
-        {
-            RoundShare round_share;
-            round_share.effort = effort;
-            round_share.share = round_share.effort / total_effort;
-            round_share.reward =
-                static_cast<int64_t>(round_share.share * static_cast<double>(substracted_reward));
-            miner_shares.emplace_back(addr, round_share);
+    void AppendAgedRewards(
+        const AgingBlock& aged_block,
+        const std::vector<std::pair<std::string, RewardInfo>>& rewards);
+    static int payout_age_seconds;
+    static int64_t minimum_payout_threshold;
 
-            Logger::Log(LogType::Info, LogField::PaymentManager,
-                        "Miner round share: {}, effort: {}, share: {}, reward: "
-                        "{}, total effort: {}",
-                        addr, round_share.effort, round_share.share,
-                        round_share.reward, total_effort);
-        }
-
-        return true;
-    }
+    VerusTransaction tx = VerusTransaction(TXVERSION, 0, true, TXVERSION_GROUP);
+   private:
+    RedisManager* redis_manager;
+    std::string pool_addr;
+    // block id -> block height, maturity time, pending to be paid
+    std::unordered_map<std::string, PendingPayment> pending_payments;
+    std::deque<AgingBlock> aging_blocks;
+    simdjson::ondemand::parser parser;
 };
 #endif

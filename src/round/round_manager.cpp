@@ -1,27 +1,5 @@
 #include "round_manager.hpp"
 
-// bool RoundManager::ClosePowRound(const BlockSubmission* submission, double
-// fee)
-// {
-//     // std::vector<std::pair<std::string, double>> efforts;
-//     // stats_manager->GetMiningEffortsReset(
-//     //     efforts,
-//     //     std::string((char*)submission->chain, sizeof(submission->chain)));
-
-//     // return CloseRound(efforts, false, submission, fee);
-//     return false;
-// }
-// bool RoundManager::ClosePosRound(const BlockSubmission* submission, double
-// fee)
-// {
-//     std::vector<std::pair<std::string, double>> efforts;
-//     redis_manager->GetPosPoints(
-//         efforts,
-//         std::string((char*)submission->chain, sizeof(submission->chain)));
-
-//     return CloseRound(efforts, true, submission, fee);
-// }
-
 RoundManager::RoundManager(RedisManager* rm, const std::string& round_type)
     : redis_manager(rm), round_type(round_type)
 {
@@ -31,22 +9,19 @@ RoundManager::RoundManager(RedisManager* rm, const std::string& round_type)
                     "Failed to load current round!");
     }
 
-    if (!redis_manager->ResetMinersWorkerCounts(efforts_map, GetCurrentTimeMs()))
+    if (!redis_manager->ResetMinersWorkerCounts(efforts_map,
+                                                GetCurrentTimeMs()))
     {
         Logger::Log(LogType::Critical, LogField::RoundManager,
                     "Failed to reset worker counts!");
     }
-
 }
 
-bool RoundManager::CloseRound(
-    const BlockSubmission* submission, double fee)
+bool RoundManager::CloseRound(const ExtendedSubmission* submission, double fee)
 {
     std::scoped_lock round_lock(round_map_mutex);
 
-    std::string chain =
-        std::string((char*)submission->chain, sizeof(submission->chain));
-    Round& round = rounds_map[chain];
+    Round& round = rounds_map[std::string(submission->chain_sv.data())];
 
     round_shares_t round_shares;
     PaymentManager::GetRewardsProp(round_shares, submission->block_reward,
@@ -55,9 +30,10 @@ bool RoundManager::CloseRound(
     round.round_start_ms = submission->time_ms;
     round.total_effort = 0;
 
-    ResetRoundEfforts(chain);
+    ResetRoundEfforts();
 
-    return redis_manager->CloseRound(chain, round_type, submission, round_shares,
+    return redis_manager->CloseRound(submission->chain_sv, round_type,
+                                     submission, round_shares,
                                      submission->time_ms);
 }
 
@@ -86,30 +62,39 @@ bool RoundManager::LoadCurrentRound()
     }
 
     auto chain = std::string(COIN_SYMBOL);
-    double total_effort = redis_manager->GetRoundEffort(chain, "pow");
-    int64_t round_start = redis_manager->GetRoundTime(chain, "pow");
 
-    if (round_start == 0)
+    auto rnd = &rounds_map[chain];
+    redis_manager->LoadCurrentRound(chain, round_type, rnd);
+
+    if (rnd->round_start_ms == 0)
     {
-        round_start = GetCurrentTimeMs();
+        rnd->round_start_ms = GetCurrentTimeMs();
 
-        redis_manager->SetRoundStartTime(chain, "pow", round_start);
+        // append commands are not locking but since its before threads are
+        // starting its ok set round start time
+        redis_manager->AppendSetMinerEffort(chain,
+                                            RedisManager::ROUND_START_TIME_KEY,
+                                            round_type, rnd->round_start_ms);
         // reset round effort if we are starting it now hadn't started
-        redis_manager->SetMinerEffort(chain, TOTAL_EFFORT_KEY, "pow", 0);
+        redis_manager->AppendSetMinerEffort(
+            chain, RedisManager::TOTAL_EFFORT_KEY, round_type, 0);
+
+        if (!redis_manager->GetReplies())
+        {
+            Logger::Log(LogType::Critical, LogField::RoundManager,
+                        "Failed to reset round effort and start time");
+            return false;
+        }
     }
 
-    auto round = &rounds_map[chain];
-    round->round_start_ms = round_start;
-    round->total_effort = total_effort;
-
     Logger::Log(LogType::Info, LogField::RoundManager,
-                "Loaded round chain: {}, effort of: {}, started at: {}",
-                chain, round->total_effort, round->round_start_ms);
+                "Loaded round chain: {}, effort of: {}, started at: {}", chain,
+                rnd->total_effort, rnd->round_start_ms);
     return true;
 }
 
 // already mutexed when called
-void RoundManager::ResetRoundEfforts(const std::string& chain)
+void RoundManager::ResetRoundEfforts()
 {
     for (auto& [miner, effort] : efforts_map)
     {
@@ -128,7 +113,8 @@ bool RoundManager::UpdateEffortStats(int64_t update_time_ms)
 
 bool RoundManager::LoadEfforts()
 {
-    bool res = redis_manager->LoadMinersEfforts(COIN_SYMBOL, round_type, efforts_map);
+    bool res =
+        redis_manager->LoadMinersEfforts(COIN_SYMBOL, round_type, efforts_map);
 
     auto it = efforts_map.begin();
 
@@ -136,25 +122,37 @@ bool RoundManager::LoadEfforts()
     for (auto& [addr, effort] : efforts_map)
     {
         // remove special effort keys such as $total and $estimated
-        if(addr.length() != ADDRESS_LEN){
+        if (addr.length() != ADDRESS_LEN)
+        {
             to_remove.emplace_back(addr);
         }
         else
         {
             Logger::Log(LogType::Info, LogField::StatsManager,
-                        "Loaded {} effort for address {} of {}", round_type, addr, effort);
+                        "Loaded {} effort for address {} of {}", round_type,
+                        addr, effort);
         }
     }
 
-    for (const auto& remove : to_remove){
+    for (const auto& remove : to_remove)
+    {
         efforts_map.erase(remove);
     }
 
     return res;
 }
 
-bool RoundManager::IsMinerIn(const std::string& addr){
+bool RoundManager::IsMinerIn(const std::string& addr)
+{
     std::scoped_lock lock(efforts_map_mutex);
     return efforts_map.contains(addr);
 }
-//TODO: make this only for signular chain 
+// TODO: make this only for signular chain
+
+bool RoundManager::LoadMatureRewards(
+    std::vector<std::pair<std::string, RewardInfo>>& rewards,
+    uint32_t block_num)
+{
+    return redis_manager->LoadMatureRewards(rewards, efforts_map,
+                                            &efforts_map_mutex, block_num);
+}

@@ -7,7 +7,7 @@
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/verus_transaction.hpp"
 #include "../daemon/daemon_rpc.hpp"
-#include "../logger.hpp"
+#include "logger.hpp"
 #include "./job.hpp"
 #include "./verus_job.hpp"
 #include "block_template.hpp"

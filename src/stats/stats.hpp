@@ -56,4 +56,5 @@ typedef std::unordered_map<std::string, Round>
 typedef std::unordered_map<std::string, double>
     efforts_map_t;
 
+
 #endif

@@ -3,11 +3,12 @@
 
 #include <mutex>
 
-#include "block_submission.hpp"
 #include "payment_manager.hpp"
+#include "block_submission.hpp"
 #include "round.hpp"
 #include "redis_manager.hpp"
 #include "stats_manager.hpp"
+#include "round_share.hpp"
 
 class StatsManager;
 class RedisManager;
@@ -19,9 +20,10 @@ class RoundManager
     bool LoadCurrentRound();
     void AddRoundShare(const std::string& chain, const std::string& miner, const double effort);
     Round GetChainRound(const std::string& chain);
-    bool CloseRound(const BlockSubmission* submission, double fee);
-    void ResetRoundEfforts(const std::string& chain);
+    bool CloseRound(const ExtendedSubmission* submission, double fee);
+    void ResetRoundEfforts();
 
+    bool LoadMatureRewards(std::vector<std::pair<std::string, RewardInfo>>& rewards, uint32_t block_num);
     bool IsMinerIn(const std::string& addr);
 
     bool UpdateEffortStats(int64_t update_time_ms);

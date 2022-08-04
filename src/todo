@@ -1,13 +1,32 @@
 todo:
-pos
-load workers for stats
-fix bug where connection is not handled
-make async sockets
-show share rate and share difficulty for each workers
-show personal luck
 
+LoadMatureRewards on startup
+pos
+show share rate and share difficulty for each workers
+load immature blocks on startup
+fix difficulty manager
+setting to not show everyone ur profile
+adjust to staking age
+write health check??
+write tests to payments
+use sovler index immature balance instead of ...
+
+create a id address map use it intead of doesaddressexist
+
+commit fix to verus about not being able to pass 0 as expiryheight in createrawtransaction
+optimize coinbase generation by only generating it once and only changing the height afterwards (minimum effort)
+
+get rid of hash of chain balances use per miner instead hash
+
+later:
+show personal luck
+check if we own pool address
 done
 
+wrap daemon rpc commands then use --!getblock to get the txid of the block reward to use it to send the rewardsd
+fix bug where connection is not handled
+make async sockets
+load workers for stats
 reset ws
 diff manager
 maturity thing

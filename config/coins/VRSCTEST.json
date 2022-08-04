@@ -17,6 +17,8 @@
     "diff_adjust_seconds": 300,
     "hashrate_ttl": 86400,
     "socket_recv_timeout_seconds": 3,
+    "payment_interval_seconds": 0,
+    "min_payout_threshold": 1,
     "rpcs": [
         {
             "hostf": "127.0.0.1:27486",

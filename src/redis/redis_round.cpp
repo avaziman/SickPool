@@ -1,83 +1,77 @@
 #include "redis_manager.hpp"
 
-bool RedisManager::SetMinerEffort(std::string_view chain,
-                                  std::string_view miner, std::string_view type,
-                                  double effort)
-{
-    AppendSetMinerEffort(chain, miner, type, effort);
-    return GetReplies();
-}
-
 void RedisManager::AppendSetMinerEffort(std::string_view chain,
                                         std::string_view miner,
                                         std::string_view type, double effort)
 {
-    AppendHset(fmt::format("{}:round:{}:effort", chain, type), miner,
+    AppendHset(fmt::format("{}:{}:{}", chain, type, ROUND_EFFORT_KEY), miner,
                std::to_string(effort));
 }
-int64_t RedisManager::GetRoundTime(std::string_view chain,
-                                   std::string_view type)
+
+void RedisManager::LoadCurrentRound(std::string_view chain, std::string_view type, Round *rnd)
 {
-    std::scoped_lock lock(rc_mutex);
+    std::string round_effort_key =
+        fmt::format("{}:{}:{}", chain, type, ROUND_EFFORT_KEY);
 
-    return hgeti(fmt::format("{}:round:{}", chain, type), "start");
-}
+    std::string total_effort_str = hget(
+        round_effort_key,
+        TOTAL_EFFORT_KEY);
 
-double RedisManager::GetRoundEffort(std::string_view chain,
-                                    std::string_view type)
-{
-    std::scoped_lock lock(rc_mutex);
+    std::string start_time_str = hget(
+        round_effort_key,
+        ROUND_START_TIME_KEY);
 
-    return hgetd(fmt::format("{}:round:{}:efforts", chain, type),
-                 TOTAL_EFFORT_KEY);
-}
+    std::string estimated_effort_str =
+        hget(round_effort_key, ESTIMATED_EFFORT_KEY);
 
-bool RedisManager::SetRoundStartTime(std::string_view chain,
-                                     std::string_view type, int64_t val)
-{
-    std::scoped_lock lock(rc_mutex);
-
-    AppendSetRoundStartTime(chain, type, val);
-
-    return GetReplies();
-}
-
-void RedisManager::AppendSetRoundStartTime(std::string_view chain,
-                                           std::string_view type, int64_t val)
-{
-    hset(fmt::format("{}:round:{}", chain, type), "start", std::to_string(val));
+    rnd->round_start_ms = strtoll(start_time_str.c_str(), nullptr, 10);
+    rnd->estimated_effort = strtod(estimated_effort_str.c_str(), nullptr);
+    rnd->total_effort = strtod(total_effort_str.c_str(), nullptr);
 }
 
 void RedisManager::AppendAddRoundShares(std::string_view chain,
                                         const BlockSubmission *submission,
                                         const round_shares_t &miner_shares)
 {
+    using namespace std::string_view_literals;
+
     std::scoped_lock lock(rc_mutex);
 
     uint32_t height = submission->height;
 
-    for (const auto &miner_share : miner_shares)
+    for (const auto &[addr, round_share] : miner_shares)
     {
-        AppendCommand("HSET immature-rewards:%u %b %b", submission->number,
-                      miner_share.first.data(), miner_share.first.size(),
-                      &miner_share.second, sizeof(RoundShare));
+        AppendCommand({"HSET"sv,
+                       fmt::format("immature-rewards:{}", submission->number),
+                       std::to_string(submission->number), addr,
+                       std::string_view((char *)&round_share,
+                                        sizeof(RoundShare))});
 
-        AppendCommand("HINCRBY %b:balance:immature %b %" PRId64, chain.data(),
-                      chain.size(), miner_share.first.data(),
-                      miner_share.first.size(), miner_share.second.reward);
+        AppendCommand({
+            "HINCRYBY"sv,
+            fmt::format("solver:{}", addr),
+            std::to_string(round_share.reward)
+        });
     }
 }
 
 bool RedisManager::CloseRound(std::string_view chain, std::string_view type,
-                              const BlockSubmission *submission,
+                              const ExtendedSubmission *submission,
                               round_shares_t round_shares, int64_t time_ms)
 {
+    using namespace std::string_view_literals;
+
     {
         // either close everything about the round or nothing
         RedisTransaction close_round_tx(this);
+
+        AppendCommand({"INCR"sv, BLOCK_NUMBER_KEY});
         AppendAddBlockSubmission(submission);
         AppendAddRoundShares(chain, submission, round_shares);
-        AppendSetRoundStartTime(chain, type, time_ms);
+        // set round start time
+        AppendSetMinerEffort(chain, ROUND_START_TIME_KEY, type, time_ms);
+        // reset round total effort
+        AppendSetMinerEffort(chain, TOTAL_EFFORT_KEY, type, 0);
 
         // reset miners efforts
         for (auto &[addr, _] : round_shares)

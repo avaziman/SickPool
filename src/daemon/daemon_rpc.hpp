@@ -66,7 +66,7 @@ class DaemonRpc
             auto params_vec = std::vector{params...};
             for (int i = 0; i < params_vec.size(); i++)
             {
-                std::any& param = params_vec[i];
+                const std::any& param = params_vec[i];
 
                 if (param.type() == typeid(std::string_view))
                 {

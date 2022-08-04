@@ -1,23 +1,11 @@
 #ifndef LOGGER_HPP_
 #define LOGGER_HPP_
 
+#include <mutex>
 #include <fmt/color.h>
 #include <fmt/format.h>
 
 #include <cstdio>
-
-enum ColorCode
-{
-    FG_RED = 31,
-    FG_GREEN = 32,
-    FG_YELLOW = 33,
-    FG_BLUE = 34,
-    FG_DEFAULT = 39,
-    BG_RED = 41,
-    BG_GREEN = 42,
-    BG_BLUE = 44,
-    BG_DEFAULT = 49
-};
 
 enum LogType
 {
@@ -81,10 +69,13 @@ inline const char* ToString(LogField v)
 class Logger
 {
    public:
+    static std::mutex log_mutex;
+
     template <typename... T>
     static void Log(LogType type, LogField field,
                     fmt::format_string<T...> message, T&&... args)
     {
+        std::scoped_lock lock(log_mutex);
         const char* field_str = ToString(field);
         switch (type)
         {

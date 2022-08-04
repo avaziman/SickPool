@@ -93,6 +93,9 @@ class VerusJob : public Job
          GetId().data(), revVer, prevBlockRevHex, merkleRootHex,
          finalSRootRevHex, (uint32_t)revMinTime, bitsUint,
          BoolToCstring(clean), bTemplate.solution.data());
+
+        memcpy(coinbase_tx_id, bTemplate.txList.transactions[0].dataHex.data(),
+               HASH_SIZE);
     }
 
     void GetHeaderData(uint8_t* buff, std::string_view time,
@@ -122,6 +125,7 @@ class VerusJob : public Job
         Unhexlify(buff + pos, sol.data(),
                   (SOLUTION_LENGTH_SIZE + SOLUTION_SIZE) * 2);
     }
+    uint8_t coinbase_tx_id[HASH_SIZE];
 
    private:
     // uint8_t staticHeaderData[BLOCK_HEADER_STATIC_SIZE];

@@ -40,11 +40,11 @@ struct Input
 {
     OutPoint previous_output;
     std::vector<unsigned char> signature_script;
+    // supposed to be used for replacement, set to UINT32_MAX to mark as final
     uint32_t sequence;
 
     uint64_t sig_compact_val;
     char sig_compact_len;
-    // supposed to be used for replacement, set to UINT32_MAX to mark as final
 };
 
 class Transaction
@@ -57,26 +57,21 @@ class Transaction
     std::vector<Output> vout;
     uint32_t lock_time;
 
-    void GetP2PKHScript(std::string_view toAddress, std::vector<unsigned char> &res) const
+    void GetP2PKHScript(std::string_view toAddress,
+                        std::vector<unsigned char>& res) const
     {
         std::vector<unsigned char> vchRet;
         // TODO: implement base58 decode for string_view
         bool decRes = DecodeBase58(std::string(toAddress), vchRet);
 
-        res.resize(P2PKH_SCRIPT_SIZE);
-        res[0] = OP_DUP;
-        res[1] = OP_HASH160;
-        res[2] = PUBKEYHASH_BYTES_LEN;
-        for (int i = 0; i < PUBKEYHASH_BYTES_LEN; i++) res[3 + i] = vchRet[i + 1];
-        res[2 + PUBKEYHASH_BYTES_LEN + 1] = OP_EQUALVERIFY;
-        res[2 + PUBKEYHASH_BYTES_LEN + 2] = OP_CHECKSIG;
+        res.reserve(P2PKH_SCRIPT_SIZE);
 
-        // res.push_back(OP_DUP);
-        // res.push_back(OP_HASH160);
-        // res.push_back(PUBKEYHASH_BYTES_LEN);
-        // res.insert(res.end(), vchRet.begin(), vchRet.begin() + 20);
-        // res.push_back(OP_EQUALVERIFY);
-        // res.push_back(OP_CHECKSIG);
+        res.push_back(OP_DUP);
+        res.push_back(OP_HASH160);
+        res.push_back(PUBKEYHASH_BYTES_LEN);
+        res.insert(res.end(), vchRet.begin(), vchRet.begin() + 20);
+        res.push_back(OP_EQUALVERIFY);
+        res.push_back(OP_CHECKSIG);
     }
 
    public:
@@ -84,11 +79,12 @@ class Transaction
         : version(ver), lock_time(locktime)
     {
     }
-    
-    std::vector<Output>* GetOutputs() { return &vout; }
 
-    void AddInput(unsigned char* prevTxId, uint32_t prevIndex,
-                  std::vector<unsigned char> signature, uint32_t sequence)
+    std::vector<Output>* GetOutputs() { return &vout; }
+    int GetTxLen() const { return tx_len; }
+
+    void AddInput(const uint8_t* prevTxId, uint32_t prevIndex,
+                  std::vector<uint8_t> signature, uint32_t sequence)
     {
         Input input;
         OutPoint point;
@@ -106,7 +102,8 @@ class Transaction
         input.sig_compact_len = varIntLen;
 
         vin.push_back(input);
-        tx_len += varIntLen + input.signature_script.size() + sizeof(OutPoint) + sizeof(sequence);
+        tx_len += varIntLen + input.signature_script.size() + sizeof(OutPoint) +
+                  sizeof(sequence);
     }
 
     // standard p2pkh transaction
@@ -126,9 +123,26 @@ class Transaction
         tx_len += varIntLen + output.pk_script.size() + sizeof(output.value);
     }
 
+    void AddOutput(const std::vector<uint8_t>& script_pub_key, int64_t value)
+    {
+        Output output;
+        output.value = value;
+
+        output.pk_script = script_pub_key;
+
+        uint64_t varIntVal = output.pk_script.size();
+        char varIntLen = VarInt(varIntVal);
+
+        output.script_compact_val = varIntVal;
+        output.script_compact_len = varIntLen;
+
+        vout.push_back(output);
+        tx_len += varIntLen + output.pk_script.size() + sizeof(output.value);
+    }
+
     // std::string GetCoinbase1() { return coinbase1; }
     // std::string GetCoinbase2() { return coinbase2; }
 
-    virtual std::vector<unsigned char> GetBytes() = 0;
+    virtual void GetBytes(std::vector<uint8_t>& bytes) = 0;
 };
 #endif

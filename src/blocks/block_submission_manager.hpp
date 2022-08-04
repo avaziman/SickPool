@@ -15,6 +15,7 @@ class SubmissionManager
    public:
     SubmissionManager(RedisManager* redis_manager,
                       DaemonManager* daemon_manager,
+                      PaymentManager* payment_manager,
                       RoundManager* round_manager_pow,
                       RoundManager* round_manager_pos)
         : redis_manager(redis_manager),
@@ -22,7 +23,8 @@ class SubmissionManager
           round_manager_pow(round_manager_pow),
           round_manager_pos(round_manager_pos)
     {
-        SubmissionManager::block_number = redis_manager->GetBlockNumber();
+        // SubmissionManager::block_number = redis_manager->GetBlockNumber();
+        SubmissionManager::block_number = 0;
         Logger::Log(LogType::Info, LogField::SubmissionManager,
                     "Submission manager started, block number: {}",
                     block_number);
@@ -45,7 +47,7 @@ class SubmissionManager
         return added;
     }
 
-    bool AddImmatureBlock(std::unique_ptr<BlockSubmission> submission,
+    bool AddImmatureBlock(std::unique_ptr<ExtendedSubmission> submission,
                           double pow_fee);
 
     void CheckImmatureSubmissions();
@@ -62,13 +64,14 @@ class SubmissionManager
     std::mutex blocks_lock;
     RedisManager* redis_manager;
     DaemonManager* daemon_manager;
+    PaymentManager* payment_manager;
     RoundManager* round_manager_pow;
     RoundManager* round_manager_pos;
 
     simdjson::ondemand::parser httpParser;
 
     // pointer as it is not assignable for erase
-    std::vector<std::unique_ptr<BlockSubmission>> immature_block_submissions;
+    std::vector<std::unique_ptr<ExtendedSubmission>> immature_block_submissions;
 };
 
 #endif

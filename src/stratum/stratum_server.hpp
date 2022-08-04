@@ -4,6 +4,7 @@
 #include <simdjson.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <functional>
 
 #include <any>
 #include <chrono>
@@ -34,7 +35,8 @@
 #define MIN_PERIOD_SECONDS 20
 #define MAX_CONNECTIONS 1e5
 #define MAX_CONNECTION_EVENTS 10
-#define EPOLL_TIMEOUT -1
+#define EPOLL_TIMEOUT 1 //ms
+#define RETRIES 10
 
 class StratumServer
 {
@@ -42,6 +44,7 @@ class StratumServer
     StratumServer(const CoinConfig& conf);
     ~StratumServer();
     void StartListening();
+    void Stop();
 
    private:
     CoinConfig coin_config;
@@ -52,15 +55,21 @@ class StratumServer
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(MAX_HTTP_REQ_SIZE);
 
+    std::jthread control_thread;
+    std::jthread stats_thread;
+    std::vector<std::jthread> processing_threads;
+
     ControlServer control_server;
     RedisManager redis_manager;
     StatsManager stats_manager;
     DaemonManager daemon_manager;
     JobManager job_manager;
     SubmissionManager submission_manager;
+    DifficultyManager diff_manager;
+    PaymentManager payment_manager;
+
     RoundManager round_manager_pow;
     RoundManager round_manager_pos;
-    DifficultyManager diff_manager;
 
     std::unordered_map<int, std::unique_ptr<StratumClient>> clients;
 
@@ -68,11 +77,10 @@ class StratumServer
     std::mutex clients_mutex;
     std::mutex redis_mutex;
 
-    void HandleControlCommands();
+    void HandleControlCommands(std::stop_token st);
     void HandleControlCommand(ControlCommands cmd, char* buff);
 
     void Listen();
-    void HandleSocket(int sockfd);
     void HandleReq(StratumClient* cli, WorkerContext* wc,
                    std::string_view req);
     void HandleBlockNotify();
@@ -97,7 +105,7 @@ class StratumServer
     int AcceptConnection(int epfd, int listen_fd, sockaddr_in* addr,
                          socklen_t* addr_size);
     int CreateListeningSock(int epfd);
-    void ServiceSockets(int epfd, int listener_fd);
+    void ServiceSockets(std::stop_token st, int epfd, int listener_fd);
     void AddClient(int sockfd);
     StratumClient* GetClient(int sockfd);
 

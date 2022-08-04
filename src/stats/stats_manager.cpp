@@ -27,7 +27,7 @@ StatsManager::StatsManager(RedisManager* redis_manager,
                     "Failed to load hashrate sums!");
     }
 }
-void StatsManager::Start()
+void StatsManager::Start(std::stop_token st)
 {
     using namespace std::chrono;
 
@@ -45,7 +45,7 @@ void StatsManager::Start()
     int64_t next_diff_update =
         now - (now % diff_adjust_seconds) + diff_adjust_seconds;
 
-    while (true)
+    while (!st.stop_requested())
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
                     "Next stats update in: {}", next_effort_update);
@@ -200,34 +200,49 @@ void StatsManager::AddShare(const std::string& worker_full,
 
 bool StatsManager::AddWorker(const std::string& address,
                              const std::string& worker_full,
-                             const std::string& idTag, int64_t curtime)
+                             const std::string& idTag, 
+                             std::string_view script_pub_key,
+                             int64_t curtime)
 {
     using namespace std::literals;
     std::scoped_lock stats_db_lock(stats_map_mutex);
 
-    // (will be true on restart too, as we don't reload worker stats)
     bool new_worker = !worker_stats_map.contains(worker_full);
     bool new_miner = round_manager->IsMinerIn(address);
-    bool returning_worker = !new_worker && !worker_stats_map[worker_full].connection_count;
+    bool returning_worker =
+        !new_worker && !worker_stats_map[worker_full].connection_count;
 
     // 100% new, as we loaded all existing miners
     if (new_miner)
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
                     "New miner has spawned: {}", address);
+        if (redis_manager->AddNewMiner(address, worker_full, idTag, script_pub_key, curtime))
+        {
+            Logger::Log(LogType::Info, LogField::StatsManager,
+                        "Miner {} added to database.", address);
+        }
+        else
+        {
+            Logger::Log(LogType::Critical, LogField::StatsManager,
+                        "Failed to add Miner {} to database.", address);
+            return false;
+        }
     }
     // todo: split add worker and add miner
-    if (redis_manager->AddNewWorker(address, worker_full, idTag, curtime,
-                                 new_worker, new_miner))
+    if (new_worker)
     {
-        Logger::Log(LogType::Info, LogField::StatsManager,
-                    "Worker {} added to database.", worker_full);
-    }
-    else
-    {
-        Logger::Log(LogType::Critical, LogField::StatsManager,
-                    "Failed to add worker {} to database.", worker_full);
-        return false;
+        if (redis_manager->AddNewWorker(address, worker_full, idTag))
+        {
+            Logger::Log(LogType::Info, LogField::StatsManager,
+                        "Worker {} added to database.", worker_full);
+        }
+        else
+        {
+            Logger::Log(LogType::Critical, LogField::StatsManager,
+                        "Failed to add worker {} to database.", worker_full);
+            return false;
+        }
     }
 
     worker_stats_map[worker_full].connection_count++;

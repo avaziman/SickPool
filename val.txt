@@ -1,0 +1,27 @@
+==208195== Memcheck, a memory error detector
+==208195== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==208195== Using Valgrind-3.15.0 and LibVEX; rerun with -h for copyright info
+==208195== Command: ./build/SickPool ./config/coins/VRSCTEST.json
+==208195== Parent PID: 137771
+==208195== 
+==208195== 
+==208195== Process terminating with default action of signal 2 (SIGINT)
+==208195==    at 0x488FCD7: __pthread_clockjoin_ex (pthread_join_common.c:145)
+==208195==    by 0x4983916: std::thread::join() (in /usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.29)
+==208195==    by 0x16A3C1: StratumServer::StartListening() (stratum_server.cpp:90)
+==208195==    by 0x113D95: main (main.cpp:67)
+==208195== 
+==208195== HEAP SUMMARY:
+==208195==     in use at exit: 23,031,621 bytes in 162 blocks
+==208195==   total heap usage: 430 allocs, 268 frees, 23,163,278 bytes allocated
+==208195== 
+==208195== LEAK SUMMARY:
+==208195==    definitely lost: 128 bytes in 2 blocks
+==208195==    indirectly lost: 0 bytes in 0 blocks
+==208195==      possibly lost: 6,210 bytes in 21 blocks
+==208195==    still reachable: 23,025,283 bytes in 139 blocks
+==208195==         suppressed: 0 bytes in 0 blocks
+==208195== Rerun with --leak-check=full to see details of leaked memory
+==208195== 
+==208195== For lists of detected and suppressed errors, rerun with: -s
+==208195== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)

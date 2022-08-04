@@ -10,11 +10,13 @@ file(GLOB SRC_FILES
     "jobs/*.cpp"
     "redis/*.cpp"
     "round/*.cpp"
+    "payments/*.cpp"
+    "logger/*.cpp"
 )
 
 add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
 
-set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments)
+set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger)
 target_include_directories(${PROJECT_NAME_CORE} ${SICKPOOL_INCLUDE})
 
 find_library(HIREDIS_LIB hiredis)

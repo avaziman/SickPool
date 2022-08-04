@@ -83,6 +83,7 @@ class StratumClient
     }
     char req_buff[REQ_BUFF_SIZE];
     std::size_t req_pos = 0;
+    std::mutex req_processing_mutex;
 
    private:
     static uint32_t extra_nonce_counter;

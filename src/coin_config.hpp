@@ -26,5 +26,7 @@ struct CoinConfig
     int64_t hashrate_ttl_seconds;
     int64_t diff_adjust_seconds;
     int64_t socket_recv_timeout_seconds;
+    int64_t payment_interval_seconds;
+    int64_t min_payout_threshold;
 };
 #endif

@@ -21,12 +21,11 @@
 #include "stats/stats.hpp"
 #include "stats/stats_manager.hpp"
 
-#define TOTAL_EFFORT_KEY "$total"
-#define ESTIMATED_EFFORT_KEY "$estimated"
-
 #define xstr(s) str(s)
 #define STRM(s) #s
 
+typedef std::unique_ptr<redisReply, std::function<void(redisReply *)>>
+    redis_unique_ptr;
 struct TsAggregation
 {
     std::string type;
@@ -39,38 +38,33 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    RedisManager(std::string ip, int port);
+    RedisManager(const std::string& ip, int port);
+    ~RedisManager();
 
     /* block */
-    void AppendAddBlockSubmission(const BlockSubmission *submission);
+
+    void AppendAddBlockSubmission(const ExtendedSubmission *submission);
     bool UpdateBlockConfirmations(std::string_view block_id,
                                   int32_t confirmations);
-    bool IncrBlockCount();
-    uint32_t GetBlockNumber();
+
     bool UpdateImmatureRewards(std::string_view chain, uint32_t block_num,
                                int64_t matured_time, bool matured);
 
     /* stats */
+    bool AddNewMiner(std::string_view address, std::string_view worker_full,
+                     std::string_view idTag, std::string_view script_pub_key,
+                     int64_t curtime);
     bool AddNewWorker(std::string_view address, std::string_view worker_full,
-                   std::string_view idTag, int64_t curtime, bool newWorker,
-                   bool newMiner);
-
+                      std::string_view id_tag);
     bool PopWorker(std::string_view address);
 
     /* round */
-    bool SetRoundEstimatedEffort(std::string_view chain, std::string_view type,
-                                 double effort);
-    bool SetRoundStartTime(std::string_view chain, std::string_view type,
-                           int64_t time);
-    bool SetRoundEffort(std::string_view chain, std::string_view type,
-                        double effort);
-    int64_t GetRoundTime(std::string_view chain, std::string_view type);
-    double GetRoundEffort(std::string_view chain, std::string_view type);
-    bool SetMinerEffort(std::string_view chain, std::string_view miner,
-                        std::string_view type, double effort);
+    bool LoadMatureRewards(
+        std::vector<std::pair<std::string, RewardInfo>> &rewards,
+        const efforts_map_t &efforts, std::mutex *efforts_mutex,
+        uint32_t block_num);
     void AppendSetMinerEffort(std::string_view chain, std::string_view miner,
                               std::string_view type, double effort);
-    bool ResetRoundEfforts(std::string_view chain, std::string_view type);
     void AppendAddRoundShares(std::string_view chain,
                               const BlockSubmission *submission,
                               const round_shares_t &miner_shares);
@@ -78,19 +72,16 @@ class RedisManager
                                  int64_t time_now);
 
     bool CloseRound(std::string_view chain, std::string_view type,
-                    const BlockSubmission *submission,
+                    const ExtendedSubmission *submission,
                     round_shares_t round_shares, int64_t time_ms);
 
-    void AppendSetRoundStartTime(std::string_view chain, std::string_view type,
-                                 int64_t val);
     /* stats */
     bool LoadAverageHashrateSum(
         std::vector<std::pair<std::string, double>> &hashrate_sums,
         std::string_view prefix);
 
-    bool LoadMinersEfforts(
-        std::string_view chain, std::string_view type,
-        efforts_map_t &efforts);
+    bool LoadMinersEfforts(std::string_view chain, std::string_view type,
+                           efforts_map_t &efforts);
 
     bool UpdateEffortStats(efforts_map_t &miner_stats_map,
                            const double total_effort, std::mutex *stats_mutex);
@@ -100,45 +91,26 @@ class RedisManager
                              std::mutex *stats_mutex, int64_t update_time_ms);
     bool TsMrange(std::vector<std::pair<std::string, double>> &last_averages,
                   std::string_view prefix, std::string_view type, int64_t from,
-                  int64_t to, TsAggregation *aggregation = nullptr);
+                  int64_t to, const TsAggregation *aggregation = nullptr);
 
     /* pos */
     bool AddStakingPoints(std::string_view chain, int64_t duration_ms);
     bool GetPosPoints(std::vector<std::pair<std::string, double>> &stakers,
                       std::string_view chain);
 
-    void ClosePoSRound(int64_t roundStartMs, int64_t foundTimeMs,
-                       int64_t reward, uint32_t height,
-                       const double totalEffort, const double fee);
-    // void UpdatePoS(uint64_t from, uint64_t maturity);
-
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
     int AddNetworkHr(std::string_view chain, int64_t time, double hr);
-    bool TsCreate(
-        std::string_view key_name, int retention,
-        std::initializer_list<std::tuple<std::string_view, std::string_view>>
-            labels);
+    std::string hget(std::string_view key, std::string_view field);
 
-   private:
-    redisContext *rc;
-    std::mutex rc_mutex;
-    int command_count = 0;
+    void LoadCurrentRound(std::string_view chain, std::string_view type,
+                          Round *rnd);
 
-    template <typename... Args>
-    void AppendCommand(const char *str, Args... args)
-    {
-        // std::cout << command_count << "cnt: "  << str << std::endl;
-        redisAppendCommand(rc, str, args...);
-        command_count++;
-    }
-
-    inline bool GetReplies()
+    inline bool GetReplies(redis_unique_ptr *last_reply = nullptr)
     {
         redisReply *reply;
         bool res = true;
-        // std::cout << "clear " << command_count << std::endl;
-        for (int i = 0; i < command_count; i++)
+        for (int i = 0; i < command_count - 1; i++)
         {
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
             {
@@ -146,10 +118,86 @@ class RedisManager
                             "Failed to get reply: {}", rc->errstr);
                 res = false;
             }
+
             freeReplyObject(reply);
         }
+
+        if (command_count > 0 && redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        {
+            Logger::Log(LogType::Critical, LogField::Redis,
+                        "Failed to get reply: {}", rc->errstr);
+            res = false;
+        }
+
+        if (last_reply)
+        {
+            *last_reply = redis_unique_ptr(reply, freeReplyObject);
+        }
+        else if (command_count > 0)
+        {
+            freeReplyObject(reply);
+        }
+
         command_count = 0;
         return res;
+    }
+
+    static constexpr int ROUND_SHARES_LIMIT = 100;
+    static constexpr std::string_view POW_KEY = "pow";
+    static constexpr std::string_view BLOCK_NUMBER_KEY = "block-number";
+    static constexpr std::string_view ADDRESS_MAP_KEY = "address-map";
+    static constexpr std::string_view PAYOUT_THRESHOLD_KEY = "payout-threshold";
+    static constexpr std::string_view IDENTITY_KEY = "identity";
+    static constexpr std::string_view HASHRATE_KEY = "join-time";
+    static constexpr std::string_view JOIN_TIME_KEY = "join-time";
+    static constexpr std::string_view WORKER_COUNT_KEY = "worker-count";
+    static constexpr std::string_view MATURE_BALANCE_KEY = "mature-balance";
+    static constexpr std::string_view IMMATURE_BALANCE_KEY = "immature-balance";
+    static constexpr std::string_view SCRIPT_PUB_KEY_KEY = "script-pub-key";
+    static constexpr std::string_view ROUND_EFFORT_KEY = "round-effort";
+    static constexpr std::string_view TOTAL_EFFORT_KEY = "$total";
+    static constexpr std::string_view ESTIMATED_EFFORT_KEY = "$estimated";
+    static constexpr std::string_view ROUND_START_TIME_KEY = "$estimated";
+
+   private:
+    redisContext *rc;
+    int command_count = 0;
+    std::mutex rc_mutex;
+
+    void AppendCommand(std::initializer_list<std::string_view> args)
+    {
+        using namespace std::string_literals;
+        const size_t argc = args.size();
+        const char *argv[argc];
+        size_t args_len[argc];
+        int i = 0;
+
+        for (const auto &arg : args)
+        {
+            args_len[i] = arg.size();
+            argv[i] = arg.data();
+            i++;
+        }
+
+        std::string prefixed_key;
+        if (argc > 1)
+        {
+            prefixed_key = std::string(COIN_SYMBOL) + ":"s + std::string(argv[1]);
+            // add coin prefix to the all keys
+            argv[1] = prefixed_key.c_str();
+            args_len[1] = prefixed_key.size();
+        }
+
+        redisAppendCommandArgv(rc, argc, argv, args_len);
+        command_count++;
+    }
+
+    redis_unique_ptr Command(std::initializer_list<std::string_view> args)
+    {
+        AppendCommand(args);
+        redis_unique_ptr rptr;
+        bool res = GetReplies(&rptr);
+        return rptr;
     }
 
     bool hset(std::string_view key, std::string_view field,
@@ -157,18 +205,9 @@ class RedisManager
     void AppendHset(std::string_view key, std::string_view field,
                     std::string_view val);
 
-    int64_t hgeti(std::string_view key, std::string_view field);
-
-    double hgetd(std::string_view key, std::string_view field);
-
     void AppendUpdateWorkerCount(std::string_view address, int amount);
     void AppendCreateStatsTs(std::string_view addrOrWorker, std::string_view id,
                              std::string_view prefix);
-    void AppendTsCreate(
-        std::string_view key_name, int retention,
-        std::initializer_list<std::tuple<std::string_view, std::string_view>>
-            labels);
-
     void AppendTsAdd(std::string_view key_name, int64_t time, double value);
 
     void AppendIntervalStatsUpdate(std::string_view addr,

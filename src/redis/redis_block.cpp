@@ -3,12 +3,17 @@
 
 #include "redis_manager.hpp"
 
-void RedisManager::AppendAddBlockSubmission(const BlockSubmission *submission)
+void RedisManager::AppendAddBlockSubmission(
+    const ExtendedSubmission *submission)
 {
+    using namespace std::string_view_literals;
+
     std::scoped_lock lock(rc_mutex);
 
     uint32_t block_id = submission->number;
     auto chain = std::string((char *)submission->chain);
+    std::string block_id_str = std::to_string(block_id);
+    std::string_view block_id_sv(block_id_str);
 
     {
         RedisTransaction add_block_tx(this);
@@ -16,33 +21,41 @@ void RedisManager::AppendAddBlockSubmission(const BlockSubmission *submission)
         // serialize the block submission to save space and net
         // bandwidth, as the indexes are added manually anyway no need for
         // hash
-        AppendCommand("SET block:%u %b", block_id, submission,
-                      sizeof(BlockSubmission));
+        AppendCommand(
+            {"SET"sv, fmt::format("block:{}", block_id),
+             std::string_view((char *)submission, sizeof(BlockSubmission))});
         /* sortable indexes */
         // block no. and block time will always be same order
         // so only one index is required to sort by either of them
         // (block num value is smaller)
-        AppendCommand("ZADD block-index:number %f %u",
-                      (double)submission->number, block_id);
+        AppendCommand({"ZADD"sv, "block-index:number",
+                       std::to_string(submission->number), block_id_sv});
 
-        AppendCommand("ZADD block-index:reward %f %u",
-                      (double)submission->block_reward, block_id);
+        AppendCommand({"ZADD"sv, "block-index:reward",
+                       std::to_string(submission->block_reward), block_id_sv});
 
-        AppendCommand("ZADD block-index:difficulty %f %u",
-                      submission->difficulty, block_id);
+        AppendCommand({"ZADD"sv, "block-index:difficulty",
+                       std::to_string(submission->difficulty), block_id_sv});
 
-        AppendCommand("ZADD block-index:effort %f %u",
-                      submission->effort_percent, block_id);
+        AppendCommand({"ZADD"sv, "block-index:effort",
+                       std::to_string(submission->effort_percent),
+                       block_id_sv});
 
-        AppendCommand("ZADD block-index:duration %f %u",
-                      (double)submission->duration_ms, block_id);
+        AppendCommand({"ZADD"sv, "block-index:duration",
+                       std::to_string(submission->duration_ms), block_id_sv});
+
         /* non-sortable indexes */
-        AppendCommand("SADD block-index:chain:%s %u", chain.c_str(), block_id);
+        AppendCommand(
+            {"SADD"sv,
+             fmt::format("block-index:chain:{}", submission->chain_sv),
+             block_id_sv});
 
-        AppendCommand("SADD block-index:type:PoW %u", block_id);
+        AppendCommand({"SADD"sv, "block-index:type:PoW", block_id_sv});
 
-        AppendCommand("SADD block-index:solver:%b %u", submission->miner,
-                      sizeof(submission->miner), block_id);
+        AppendCommand(
+            {"SADD"sv,
+             fmt::format("block-index:solver:{}", submission->miner_sv),
+             block_id_sv});
 
         AppendTsAdd(chain + ":round_effort_percent", submission->time_ms,
                     submission->effort_percent);
@@ -52,10 +65,12 @@ void RedisManager::AppendAddBlockSubmission(const BlockSubmission *submission)
 bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,
                                             int32_t confirmations)
 {
+    using namespace std::string_view_literals;
     std::scoped_lock lock(rc_mutex);
     // redis bitfield uses be so gotta swap em
-    return redisCommand(rc, "BITFIELD block:%b SET i32 0 %d", block_id.data(),
-                        block_id.size(), bswap_32(confirmations)) == nullptr;
+    return Command({"BITFIELD"sv, fmt::format("block:{}", block_id), "SET"sv, "i32"sv,
+                    "0"sv, std::to_string(bswap_32(confirmations))})
+               .get() == nullptr;
 }
 
 #endif

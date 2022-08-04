@@ -1,3 +1,5 @@
+#include <signal.h>
+
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -21,10 +23,26 @@
 
 void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg);
 
+StratumServer *stratum_server_ptr;
+
+void SigintHandler(int sig)
+{
+    Logger::Log(LogType::Info, LogField::Config, "Enter password:");
+    // std::string pass;
+    // std::cin >> pass;
+
+    // if(pass == "1234"){
+        Logger::Log(LogType::Info, LogField::Config, "Stopping stratum server...");
+
+        stratum_server_ptr->Stop();
+    // }
+}
+
 int main(int argc, char** argv)
 {
     // std::cout << std::hex
-    //           << UintToArith256(uint256S("00000000000184c09e98da047ab3260fca551"
+    //           <<
+    //           UintToArith256(uint256S("00000000000184c09e98da047ab3260fca551"
     //                                      "c8c476551b63140d99b634aea2d"))
     //                  .GetCompact();
     // std::cout << "Block Submission Size: " << sizeof(BlockSubmission);
@@ -35,6 +53,12 @@ int main(int argc, char** argv)
                 COIN_SYMBOL);
 
     Logger::Log(LogType::Info, LogField::Config, "Loading dynamic config...");
+
+    if (signal(SIGINT, SigintHandler) == SIG_ERR)
+    {
+        Logger::Log(LogType::Error, LogField::Config,
+                    "Failed to register SIGINT...");
+    }
 
     CoinConfig coinConfig;
     try
@@ -63,8 +87,9 @@ int main(int argc, char** argv)
         Logger::Log(LogType::Info, LogField::Config, "Effort retention: {}s",
                     coinConfig.effort_interval_seconds);
 
-        StratumServer stratumServer(coinConfig);
-        stratumServer.StartListening();
+        StratumServer stratum_server(coinConfig);
+        stratum_server_ptr = &stratum_server;
+        stratum_server.StartListening();
     }
     catch (std::runtime_error e)
     {
@@ -128,6 +153,9 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
     AssignJson("default_diff", cnfg.default_diff, configDoc);
     AssignJson("target_shares_rate", cnfg.target_shares_rate, configDoc);
     AssignJson("pool_addr", cnfg.pool_addr, configDoc);
+    AssignJson("payment_interval_seconds", cnfg.payment_interval_seconds,
+               configDoc);
+    AssignJson("min_payout_threshold", cnfg.min_payout_threshold, configDoc);
 
     try
     {
