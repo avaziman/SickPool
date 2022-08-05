@@ -29,10 +29,9 @@ class VerusTransaction : public Transaction
         char voutVarIntLen = VarInt(voutVarIntVal);
 
         tx_len += 4 * 4 + 11 + vinVarIntLen + voutVarIntLen;
-        // bytes.resize(tx_len);
         bytes.resize(tx_len);
 
-        int ver = version | (is_overwintered << 31);
+        const int ver = version | (is_overwintered << 31);
         WriteData(bytes.data(), &ver, 4);
         WriteData(bytes.data(), &version_groupid, 4);
 

@@ -1,86 +1,52 @@
-// #include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
-// #include <cstring>
-// #include <vector>
+#include <cstring>
+#include <vector>
 
-// #include "../src/crypto/hash_wrapper.hpp"
-// #include "../src/crypto/merkle_tree.hpp"
-// #include "../src/crypto/utils.hpp"
+#include "../src/crypto/hash_wrapper.hpp"
+#include "../src/crypto/merkle_tree.hpp"
+#include "../src/crypto/utils.hpp"
 
-// TEST(MerkleRootTest, SHA256MerkleRoot1Tx)
-// {
-//     HashWrapper::InitSHA256();
-//     // VRSC block #1:
-//     // 027e3758c3a65b12aa1046462b486d0a63bfa1beae327897f56c5cfb7daaae71
-//     char tx[] =
-//         "0100000001000000000000000000000000000000000000000000000000000000000000"
-//         "0000ffffffff03510101ffffffff01a0ab9200000000002321032718b2f8a8ea206db7"
-//         "a16428e99f7dcac1337a3a75c92631baee895f3239e5b6ac3072025b";
+using namespace std::string_literals;
 
-//     const int txSize = (sizeof(tx) - 1);
-//     unsigned char txBytes[txSize / 2];
-//     Unhexlify(txBytes, tx, txSize);
+TEST(MerkleRootTest, SHA256MerkleRoot1Tx)
+{
+    HashWrapper::InitSHA256();
+    // VRSC block #1:
+    // 000007b2d09d316ca1763b8922c769aabc898043274849ce64e147fa91d023cb
+    TransactionData tx1(
+        "a735a8adebc861f966aef4649ef884e218aed32979be66ada1ddd149fef79eab"s);
 
-//     std::vector<unsigned char> txVec(txBytes, txBytes + txSize / 2);
-//     std::vector<std::vector<unsigned char>> txs = {txVec};
+    std::vector<TransactionData> vec{tx1};
 
-//     unsigned char result[32];
-//     MerkleTree::CalcRoot(txs, result);
+    uint8_t result[HASH_SIZE];
+    MerkleTree::CalcRoot(result, vec);
 
-//     char resultHex[64];
-//     Hexlify(resultHex, result, 32);
+    // merkle root should be same as hash of single tx
+    ASSERT_EQ(std::memcmp(result, tx1.hash, HASH_SIZE), 0);
+}
 
-//     char resVeresed[] =
-//         "ab9ef7fe49d1dda1ad66be7929d3ae18e284f89e64f4ae66f961c8ebada835a7";
+TEST(MerkleRootTest, SHA256MerkleRoot2Tx)
+{
+    HashWrapper::InitSHA256();
+    // VRSC block #1000000:
+    // 473194b1e3301c0fac3b89ab100aedefb7c790aa9255f2e95be9da71bdb91050
+    TransactionData tx1(
+        "baa658081ea730e0e591a29c914133d4370cb76365118ac7077c3a864b9235b7"s);
 
-//     ASSERT_EQ(std::memcmp(resultHex, resVeresed, 64), 0);
-// }
+    TransactionData tx2(
+        "7a9dee91d6faf67f18bea275db221b5d68f94e655710da1297dd8896d53176b3"s);
 
-// TEST(MerkleRootTest, SHA256MerkleRoot2Tx)
-// {
-//     HashWrapper::InitSHA256();
-//     // VRSC block #1000000:
-//     // 473194b1e3301c0fac3b89ab100aedefb7c790aa9255f2e95be9da71bdb91050
-//     char tx1[] =
-//         "0400008085202f89010000000000000000000000000000000000000000000000000000"
-//         "000000000000ffffffff060340420f0101ffffffff0100180d8f00000000c32ea22c80"
-//         "20f17e0de592f8812d42cfe996da67a9ec4ee56ac667edfaba47e0fa0401b625c08103"
-//         "1210008203000401cc4c90040101010221022ec0fa3cb4d36a646138e02e91570b2424"
-//         "69f7ea325bb07205048d40183745a42103166b7813a4855a88e9ef7340a692ef3c2dec"
-//         "edfdc2c7563ec79537e89667d9352009d06c734c420d2fa63cac0c379629b4573cd555"
-//         "33629a51d2fe519d15d0fbe220ec77b5e38d43b195caf66f68d25ff38d886262f5d2fe"
-//         "bcb1c0cb207fdfc30ed90440420f0075727cb35e00000000000000000000000000000"
-//         "0";
+    const std::vector<TransactionData> txs{tx1, tx2};
 
-//     char tx2[] =
-//         "0400008085202f8901898fa27eb5d2d495e9269c11c9e138c853054ab7a644c3d85ac8"
-//         "49fd4d6cdfd7000000006a4730440220705bf400b43ae421b65667397baa96535f300c"
-//         "dc6a1a7d61351881c20826e17702206be03c46aa90098071c405e9cd7920867283769a"
-//         "3e9e2e0b226e576080227c690121022ec0fa3cb4d36a646138e02e91570b242469f7ea"
-//         "325bb07205048d40183745a4ffffffff0200b0eb0e0a0000001976a91445ce0a71d39a"
-//         "824181442a9979e44a38b900baeb88ac00000000000000004f6a4c4c5203b6ca0e0340"
-//         "420f20ec77b5e38d43b195caf66f68d25ff38d886262f5d2febcb1c0cb207fdfc30ed9"
-//         "21022ec0fa3cb4d36a646138e02e91570b242469f7ea325bb07205048d40183745a400"
-//         "000000a4420f000000000000000000000000";
+    uint8_t result[HASH_SIZE];
+    MerkleTree::CalcRoot(result, txs);
+    std::reverse(result, result + sizeof(result));
 
-//     unsigned char txBytes1[sizeof(tx1) / 2];
-//     Unhexlify(txBytes1, tx1, sizeof(tx1));
+    uint8_t expected[] = {0xe8, 0x34, 0x98, 0x24, 0x64, 0x4d, 0x9c, 0x4b,
+                          0x13, 0x87, 0x3a, 0x97, 0xad, 0xdb, 0x0f, 0x4f,
+                          0x2a, 0xc9, 0x94, 0x6b, 0x0d, 0x04, 0x7c, 0xda,
+                          0xb2, 0x7d, 0x31, 0x07, 0x06, 0x86, 0x34, 0xb7};
 
-//     unsigned char txBytes2[sizeof(tx2) / 2];
-//     Unhexlify(txBytes2, tx2, sizeof(tx2));
-
-//     std::vector<unsigned char> txVec1(txBytes1, txBytes1 + sizeof(txBytes1));
-//     std::vector<unsigned char> txVec2(txBytes2, txBytes2 + sizeof(txBytes2));
-//     std::vector<std::vector<unsigned char>> txs = {txVec1, txVec2};
-
-//     unsigned char result[32];
-//     MerkleTree::CalcRoot(txs, result);
-
-//     char resultHex[64];
-//     Hexlify(resultHex, result, 32);
-
-//     char resVeresed[] =
-//         "b734860607317db2da7c040d6b94c92a4f0fdbad973a87134b9c4d64249834e8";
-
-//     ASSERT_EQ(std::memcmp(resultHex, resVeresed, 64), 0);
-// }
+    ASSERT_EQ(std::memcmp(result, expected, HASH_SIZE), 0);
+}

@@ -23,7 +23,8 @@ class RoundManager
     bool CloseRound(const ExtendedSubmission* submission, double fee);
     void ResetRoundEfforts();
 
-    bool LoadMatureRewards(std::vector<std::pair<std::string, RewardInfo>>& rewards, uint32_t block_num);
+    bool LoadUnpaidRewards(std::vector<std::pair<std::string, PayeeInfo>>& rewards);
+
     bool IsMinerIn(const std::string& addr);
 
     bool UpdateEffortStats(int64_t update_time_ms);

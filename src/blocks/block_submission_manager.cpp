@@ -30,7 +30,7 @@ void SubmissionManager::CheckImmatureSubmissions()
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Info, LogField::Stratum,
+            Logger::Log(LogType::Info, LogField::SubmissionManager,
                         "Failed to get confirmations for block {}, parse "
                         "error: {}, http code: {}",
                         hashHex, err.what(), res);
@@ -41,14 +41,14 @@ void SubmissionManager::CheckImmatureSubmissions()
             std::string_view(std::to_string(submission->number)),
             confirmations);
 
-        Logger::Log(LogType::Info, LogField::Stratum,
+        Logger::Log(LogType::Info, LogField::SubmissionManager,
                     "Block {} has {} confirmations", hashHex, confirmations);
 
         int64_t confirmation_time = GetCurrentTimeMs();
 
         if (confirmations > BLOCK_MATURITY)
         {
-            Logger::Log(LogType::Info, LogField::Stratum,
+            Logger::Log(LogType::Info, LogField::SubmissionManager,
                         "Block {} has matured!", hashHex);
 
             if (last_matured_time)
@@ -59,9 +59,6 @@ void SubmissionManager::CheckImmatureSubmissions()
 
             redis_manager->UpdateImmatureRewards(chain, submission->number,
                                                  confirmation_time, true);
-            payment_manager->AddMatureBlock(submission->number,
-                                            (char*)submission->hash_hex,
-                                            confirmation_time, submission->block_reward);
 
             immature_block_submissions.erase(
                 immature_block_submissions.begin() + i);
@@ -71,7 +68,7 @@ void SubmissionManager::CheckImmatureSubmissions()
         }
         else if (confirmations == -1)
         {
-            Logger::Log(LogType::Info, LogField::Stratum,
+            Logger::Log(LogType::Info, LogField::SubmissionManager,
                         "Block {} has been orphaned! :(", hashHex);
 
             redis_manager->UpdateImmatureRewards(chain, submission->number,
@@ -88,7 +85,8 @@ bool SubmissionManager::AddImmatureBlock(
 {
     std::scoped_lock lock(blocks_lock);
 
-    if (submission->block_type == BlockType::POW)
+    if (submission->block_type == BlockType::POW ||
+        submission->block_type == BlockType::POW_PAYMENT)
     {
         round_manager_pow->CloseRound(submission.get(), pow_fee);
     }
@@ -96,8 +94,8 @@ bool SubmissionManager::AddImmatureBlock(
     {
         round_manager_pos->CloseRound(submission.get(), pow_fee);
     }
-    //TODO: incrblockcount somewhere
-    // redis_manager->IncrBlockCount();
+    // TODO: incrblockcount somewhere
+    //  redis_manager->IncrBlockCount();
     block_number++;
 
     Logger::Log(
@@ -182,7 +180,7 @@ bool SubmissionManager::SubmitBlock(std::string_view block_hex)
             if (result == "inconclusive")
             {
                 Logger::Log(
-                    LogType::Warn, LogField::Stratum,
+                    LogType::Warn, LogField::SubmissionManager,
                     "Submitted inconclusive block, waiting for result...");
                 return true;
             }

@@ -43,6 +43,22 @@ struct GetIdentityRes
     std::string_view name;
 };
 
+struct FundRawTransactionRes
+{
+    simdjson::ondemand::document doc;
+
+    std::string_view hex;
+    int changepos;
+    double fee;
+};
+
+struct SignRawTransactionRes
+{
+    simdjson::ondemand::document doc;
+
+    std::string_view hex;
+    bool complete;
+};
 class DaemonManager
 {
    public:
@@ -52,6 +68,79 @@ class DaemonManager
         {
             rpcs.emplace_back(config.host, config.auth);
         }
+    }
+
+    bool SignRawTransaction(SignRawTransactionRes& sign_res,
+                            simdjson::ondemand::parser& parser,
+                            std::string_view raw_tx)
+    {
+        using namespace simdjson;
+
+        std::string result_body;
+        int res_code = SendRpcReq<std::any>(result_body, 1, "signrawtransaction",
+                                            std::any(raw_tx));
+
+        if (res_code != 200)
+        {
+            return false;
+        }
+
+        ondemand::object res;
+        try
+        {
+            sign_res.doc = parser.iterate(
+                result_body.data(), result_body.size(), result_body.capacity());
+
+            res = sign_res.doc["result"].get_object();
+
+            sign_res.hex = res["hex"].get_string();
+            sign_res.complete = res["complete"].get_bool();
+        }
+        catch (const simdjson_error& err)
+        {
+            Logger::Log(LogType::Critical, LogField::Stratum,
+                        "Failed to signrawtransaction: {}", err.what());
+            return false;
+        }
+
+        return true;
+    }
+
+    bool FundRawTransaction(FundRawTransactionRes& fund_res,
+                            simdjson::ondemand::parser& parser,
+                            std::string_view raw_tx)
+    {
+        using namespace simdjson;
+
+        std::string result_body;
+        int res_code =
+            SendRpcReq<std::any>(result_body, 1, "fundrawtransaction", std::any(raw_tx));
+
+        if (res_code != 200)
+        {
+            return false;
+        }
+
+        ondemand::object res;
+        try
+        {
+            fund_res.doc = parser.iterate(result_body.data(), result_body.size(),
+                                        result_body.capacity());
+
+            res = fund_res.doc["result"].get_object();
+
+            fund_res.hex = res["hex"].get_string();
+            fund_res.changepos = res["changepos"].get_int64();
+            fund_res.fee = res["fee"].get_double();
+        }
+        catch (const simdjson_error& err)
+        {
+            Logger::Log(LogType::Critical, LogField::Stratum,
+                        "Failed to fundrawtransaction: {}", err.what());
+            return false;
+        }
+
+        return true;
     }
 
     bool GetIdentity(GetIdentityRes& id_res, simdjson::ondemand::parser& parser,

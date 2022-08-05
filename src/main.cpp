@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 
         StratumServer stratum_server(coinConfig);
         stratum_server_ptr = &stratum_server;
-        stratum_server.StartListening();
+        stratum_server.Listen();
     }
     catch (std::runtime_error e)
     {

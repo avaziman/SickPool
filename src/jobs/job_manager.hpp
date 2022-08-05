@@ -11,13 +11,16 @@
 #include "./job.hpp"
 #include "./verus_job.hpp"
 #include "block_template.hpp"
+#include "payment_manager.hpp"
 #include "daemon_manager.hpp"
 
 class JobManager
 {
    public:
-    JobManager(DaemonManager* daemon_manager, const std::string& pool_addr)
-        : daemon_manager(daemon_manager), pool_addr(pool_addr)
+    JobManager(DaemonManager* daemon_manager, PaymentManager* payment_manager,
+               const std::string& pool_addr)
+        : daemon_manager(daemon_manager),
+          payment_manager(payment_manager), pool_addr(pool_addr)
     {
     }
 
@@ -43,6 +46,7 @@ class JobManager
     // multiple jobs can use the same block template, (append transactions only)
 
     DaemonManager* daemon_manager;
+    PaymentManager* payment_manager;
 
     std::mutex jobs_mutex;
     // unordered map is not thread safe for modifying and accessing different

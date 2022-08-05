@@ -3,29 +3,68 @@
 
 #include <ctime>
 #include <string_view>
+#include <algorithm>
 #include <vector>
+
+#include "utils.hpp"
+#include "hash_wrapper.hpp"
 #include "static_config/config.hpp"
 
 struct TransactionData
 {
-    std::string_view dataHex;
-    std::vector<unsigned char> data;
-    unsigned char hash[32];
+   public:
+    // TransactionData(std::string_view data_hex) : data_hex(data_hex)
+    // {
+    //     data.resize(data_hex.size() / 2);
+    //     Unhexlify(data.data(), data_hex.data(), data_hex.size());
+
+    //     HashWrapper::SHA256d(hash, data.data(), data.size());
+    // }
+
+    TransactionData(std::string_view data_hex, std::string_view hash_hex)
+        : data_hex(data_hex)
+    {
+        data.resize(data_hex.size() / 2);
+        Unhexlify(data.data(), data_hex.data(), data_hex.size());
+
+        Unhexlify(hash, hash_hex.data(), hash_hex.size());
+        std::reverse(hash, hash + sizeof(hash));
+    }
+
+    // for test only
+    TransactionData(std::string hashs){
+        Unhexlify(hash, hashs.data(), hashs.size());
+        std::reverse(hash, hash + sizeof(hash));
+    }
+
+    TransactionData() = default;
+
+    std::string_view data_hex;
+    std::vector<uint8_t> data;
+    uint8_t hash[HASH_SIZE];
     double fee;
 };
 
-struct TransactionDataList{
-    std::vector<TransactionData> transactions{1};
+struct TransactionDataList
+{
+    std::vector<TransactionData> transactions;
     std::size_t byteCount = 0;
 
-    TransactionDataList() = default;
+    TransactionDataList() { 
+        // null td to be replaced by coinbase
+        TransactionData td;
+        memset(&td, 0, sizeof(td));
+        transactions.push_back(td);
+    }
 
-    void AddCoinbaseTxData(const TransactionData& td) { 
+    void AddCoinbaseTxData(const TransactionData& td)
+    {
         std::size_t txSize = td.data.size();
         byteCount += txSize;
 
         // if there is no space for coinbase transaction, remove other txs
-        while (byteCount + BLOCK_HEADER_SIZE + 2 > MAX_BLOCK_SIZE){
+        while (byteCount + BLOCK_HEADER_SIZE + 2 > MAX_BLOCK_SIZE)
+        {
             byteCount -= transactions.back().data.size();
             transactions.pop_back();
         }
@@ -38,7 +77,8 @@ struct TransactionDataList{
         std::size_t txSize = td.data.size();
 
         // 2 bytes for tx count (max 65k)
-        if (byteCount + txSize + BLOCK_HEADER_SIZE + 2 > MAX_BLOCK_SIZE) return false;
+        if (byteCount + txSize + BLOCK_HEADER_SIZE + 2 > MAX_BLOCK_SIZE)
+            return false;
 
         // keep space for coinbase
         transactions.insert(transactions.begin() + 1, td);
@@ -51,7 +91,7 @@ struct TransactionDataList{
 // in the order they appear in the rpc response
 struct BlockTemplate
 {
-    BlockTemplate() : txList(){}
+    BlockTemplate() : txList() {}
     int32_t version;
     std::string_view prevBlockHash;
     std::string_view finalsRootHash;

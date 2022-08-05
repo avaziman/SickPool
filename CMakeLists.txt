@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_BUILD_TYPE "Debug")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -50,21 +50,20 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(googletest)
+add_subdirectory(tests)
 
-FetchContent_Declare(
-    benchmark
-    GIT_REPOSITORY https://github.com/google/benchmark.git
-    GIT_TAG tags/v1.6.1
-    GIT_SHALLOW TRUE
-)
-FetchContent_MakeAvailable(benchmark)
+# FetchContent_Declare(
+#     benchmark
+#     GIT_REPOSITORY https://github.com/google/benchmark.git
+#     GIT_TAG tags/v1.6.1
+#     GIT_SHALLOW TRUE
+# )
+# FetchContent_MakeAvailable(benchmark)
+# add_subdirectory(benchmark)
 
-# include_directories(lib/rapidjson/include)
 add_subdirectory(src)
 
-add_subdirectory(stratum_notifier)
-add_subdirectory(benchmark)
-add_subdirectory(tests)
+# add_subdirectory(stratum_notifier)
 
 add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME_CORE})

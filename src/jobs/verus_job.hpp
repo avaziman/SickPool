@@ -32,8 +32,8 @@ class VerusJob : public Job
 {
    public:
     VerusJob(const std::string& jobId, const BlockTemplate& bTemplate,
-             bool clean = true)
-        : Job(jobId, bTemplate)
+             bool is_payment, bool clean = true)
+        : Job(jobId, bTemplate, is_payment)
     {
         char merkleRootHex[MERKLE_ROOT_SIZE * 2];
 
@@ -59,8 +59,8 @@ class VerusJob : public Job
 
         // hashes are given in LE, no need to reverse
 
-        MerkleTree::CalcRoot(bTemplate.txList.transactions,
-                             staticHeaderData + written);
+        MerkleTree::CalcRoot(
+            staticHeaderData + written, bTemplate.txList.transactions);
 
         // we need the hexlified merkle root for the notification message
         Hexlify(merkleRootHex, staticHeaderData + written, MERKLE_ROOT_SIZE);
@@ -94,7 +94,7 @@ class VerusJob : public Job
          finalSRootRevHex, (uint32_t)revMinTime, bitsUint,
          BoolToCstring(clean), bTemplate.solution.data());
 
-        memcpy(coinbase_tx_id, bTemplate.txList.transactions[0].dataHex.data(),
+        memcpy(coinbase_tx_id, bTemplate.txList.transactions[0].data_hex.data(),
                HASH_SIZE);
     }
 

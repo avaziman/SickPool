@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 
+#include "block_template.hpp"
 #include "merkle_tree.hpp"
 #include "utils.hpp"
-#include "block_template.hpp"
 
 #define EXTRANONCE_SIZE 4
 #define VERSION_SIZE 4
@@ -32,11 +32,13 @@
 class Job
 {
    public:
-    Job(const std::string& jobId, const BlockTemplate& bTemplate)
+    Job(const std::string& jobId, const BlockTemplate& bTemplate,
+        bool is_payment)
         : jobId(jobId),
           blockReward(bTemplate.coinbaseValue),
           minTime(bTemplate.minTime),
-          height(bTemplate.height)
+          height(bTemplate.height),
+          is_payment(is_payment)
     //   target()
     {
         // target.SetHex(std::string(bTemplate.target));
@@ -53,9 +55,9 @@ class Job
         std::size_t written = txAmountByteLength * 2;
         for (const auto& txData : bTemplate.txList.transactions)
         {
-            memcpy(txsHex.data() + written, txData.dataHex.data(),
-                   txData.dataHex.size());
-            written += txData.dataHex.size();
+            memcpy(txsHex.data() + written, txData.data_hex.data(),
+                   txData.data_hex.size());
+            written += txData.data_hex.size();
         }
 
         // Logger::Log(LogType::Debug, LogField::JobManager, "tx hex: %.*s",
@@ -83,10 +85,14 @@ class Job
         return (BLOCK_HEADER_SIZE * 2) + (int)txsHex.size();
     }
     std::string_view GetId() const { return std::string_view(jobId); }
-    std::string_view GetNotifyMessage() const { return std::string_view(notifyBuff, notifyBuffSize); }
+    std::string_view GetNotifyMessage() const
+    {
+        return std::string_view(notifyBuff, notifyBuffSize);
+    }
     int64_t GetMinTime() const { return minTime; }
     double GetTargetDiff() const { return targetDiff; }
     double GetEstimatedShares() const { return expectedShares; }
+    bool GetIsPayment() const { return is_payment; }
     // arith_uint256* GetTarget() { return &target; }
 
    protected:
@@ -107,5 +113,6 @@ class Job
 
     const int64_t minTime;
     const uint32_t height;
+    const bool is_payment;
 };
 #endif

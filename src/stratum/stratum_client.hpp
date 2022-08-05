@@ -1,6 +1,7 @@
 #ifndef STRATUM_CLIENT_HPP_
 #define STRATUM_CLIENT_HPP_
 #include <simdjson.h>
+#include <sys/socket.h>
 
 #include <cstring>
 #include <memory>
@@ -17,7 +18,7 @@
 class StratumClient
 {
    public:
-    StratumClient(const int sock, const int64_t time, const double diff);
+    StratumClient(const int sock, const std::string& ip, const int64_t time, const double diff);
 
     int GetSock() const { return sockfd; }
     double GetDifficulty() const { return current_diff; }
@@ -27,6 +28,7 @@ class StratumClient
     uint32_t GetShareCount() const { return share_count; }
     int64_t GetLastAdjusted() const { return last_adjusted; }
     std::string_view GetExtraNonce() const { return extra_nonce_str; }
+    std::string_view GetIp() const { return ip; }
 
     // make sting_view when unordered map supports it
     const std::string& GetAddress() const { return address; }
@@ -83,7 +85,7 @@ class StratumClient
     }
     char req_buff[REQ_BUFF_SIZE];
     std::size_t req_pos = 0;
-    std::mutex req_processing_mutex;
+    std::mutex epoll_mutex;
 
    private:
     static uint32_t extra_nonce_counter;
@@ -103,6 +105,7 @@ class StratumClient
     std::string extra_nonce_str;
     std::string worker_full;
     std::string address;
+    std::string ip;
 
     std::mutex shares_mutex;
 

@@ -38,7 +38,7 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    RedisManager(const std::string& ip, int port);
+    RedisManager(const std::string &ip, int port);
     ~RedisManager();
 
     /* block */
@@ -59,10 +59,9 @@ class RedisManager
     bool PopWorker(std::string_view address);
 
     /* round */
-    bool LoadMatureRewards(
-        std::vector<std::pair<std::string, RewardInfo>> &rewards,
-        const efforts_map_t &efforts, std::mutex *efforts_mutex,
-        uint32_t block_num);
+    bool LoadUnpaidRewards(
+        std::vector<std::pair<std::string, PayeeInfo>> &rewards,
+        const efforts_map_t &efforts, std::mutex *efforts_mutex);
     void AppendSetMinerEffort(std::string_view chain, std::string_view miner,
                               std::string_view type, double effort);
     void AppendAddRoundShares(std::string_view chain,
@@ -182,7 +181,8 @@ class RedisManager
         std::string prefixed_key;
         if (argc > 1)
         {
-            prefixed_key = std::string(COIN_SYMBOL) + ":"s + std::string(argv[1]);
+            prefixed_key =
+                std::string(COIN_SYMBOL) + ":"s + std::string(argv[1]);
             // add coin prefix to the all keys
             argv[1] = prefixed_key.c_str();
             args_len[1] = prefixed_key.size();

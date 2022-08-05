@@ -11,7 +11,7 @@ const job_t* JobManager::GetNewJob()
         Logger::Log(LogType::Critical, LogField::JobManager,
                     "Failed to get block template, http code: {}, response: {}",
                     strerror(resCode), json);
-                    //TODO: make sock err negative maybe http positive to diffrinciate
+        // TODO: make sock err negative maybe http positive to diffrinciate
         return nullptr;
     }
 
@@ -39,30 +39,56 @@ const job_t* JobManager::GetNewJob(const std::string& json_template)
         // can't iterate after we get the string_view
         ondemand::array txs = res["transactions"].get_array();
 
-        // for (auto tx : txs)
-        // {
-        //     TransactionData td;
-        //     std::string_view txHashHex;
-        //     td.dataHex = tx["data"].get_string();
-        //     txHashHex = tx["hash"].get_string();
-        //     td.fee = tx["fee"].get_double();
+        int64_t additional_fee = 0;
+        bool includes_payment = payment_manager->payment_tx.total_paid > 0;
 
-        //     std::cout << "tx data: " << td.dataHex << std::endl;
+        if (includes_payment)
+        {
+            std::string& payment_hash_hex =
+                payment_manager->payment_tx.tx_hash_hex;
 
-        //     int txSize = td.dataHex.size() / 2;
-        //     td.data = std::vector<unsigned char>(txSize);
-        //     Unhexlify(td.data.data(), td.dataHex.data(), td.dataHex.size());
-        //     Unhexlify(td.hash, txHashHex.data(), txHashHex.size()); // hash
-        //     is reversed std::reverse(td.hash, td.hash + 32);
+            if (!payment_hash_hex.empty() &&
+                payment_hash_hex == blockTemplate.prevBlockHash)
+            {
+                payment_manager->payment_included = true;
+            }
+            else
+            {
+                // either we have yet to create jobs with this payment or a
+                // block with this payment was orphaned.
+                TransactionData td(payment_hash_hex);
+                payment_hash_hex.reserve(HASH_SIZE_HEX);
+                Hexlify(payment_hash_hex.data(), td.hash, HASH_SIZE_HEX);
 
-        //     if (!blockTemplate.txList.AddTxData(td))
-        //     {
-        //         Logger::Log(LogType::Warn, LogField::JobManager,
-        //                     "Block template is full! block size is %d bytes",
-        //                     blockTemplate.txList.byteCount);
-        //         break;
-        //     }
-        // }
+                blockTemplate.txList.AddTxData(td);
+                additional_fee +=
+                    static_cast<int64_t>(payment_manager->payment_tx.fee * 1e8);
+            }
+        }
+
+        for (auto tx : txs)
+        {
+            std::string_view tx_data_hex =  tx["data"].get_string();
+            std::string_view tx_hash_hex = tx["hash"].get_string();
+            TransactionData td(tx_data_hex, tx_hash_hex);
+            td.fee = tx["fee"].get_double();
+
+            // std::cout << "tx data: " << td.data_hex << std::endl;
+
+            int txSize = td.data_hex.size() / 2;
+            td.data = std::vector<unsigned char>(txSize);
+            Unhexlify(td.data.data(), td.data_hex.data(), td.data_hex.size());
+            Unhexlify(td.hash, tx_hash_hex.data(), tx_hash_hex.size());  // hash
+            // is reversed std::reverse(td.hash, td.hash + 32);
+
+            if (!blockTemplate.txList.AddTxData(td))
+            {
+                Logger::Log(LogType::Warn, LogField::JobManager,
+                            "Block template is full! block size is {} bytes",
+                            blockTemplate.txList.byteCount);
+                break;
+            }
+        }
 
         blockTemplate.coinbase_hex = res["coinbasetxn"]["data"].get_string();
         blockTemplate.coinbaseValue =
@@ -74,19 +100,20 @@ const job_t* JobManager::GetNewJob(const std::string& json_template)
         blockTemplate.height = static_cast<uint32_t>(res["height"].get_int64());
 
         TransactionData coinbaseTx = GetCoinbaseTxData(
-            blockTemplate.coinbaseValue, blockTemplate.height,
+            blockTemplate.coinbaseValue + additional_fee, blockTemplate.height,
             blockTemplate.minTime, blockTemplate.coinbase_hex);
 
         // we need to hexlify here otherwise hex will be garbage
         char coinbaseHex[coinbaseTx.data.size() * 2];
         Hexlify(coinbaseHex, coinbaseTx.data.data(), coinbaseTx.data.size());
-        coinbaseTx.dataHex = std::string_view(coinbaseHex, sizeof(coinbaseHex));
+        coinbaseTx.data_hex =
+            std::string_view(coinbaseHex, sizeof(coinbaseHex));
         blockTemplate.txList.AddCoinbaseTxData(coinbaseTx);
 
         std::string jobIdHex(8, '0');
         ToHex(jobIdHex.data(), job_count);
 
-        job_t job(jobIdHex, blockTemplate);
+        job_t job(jobIdHex, blockTemplate, includes_payment);
 
         last_job_id_hex = jobIdHex;
         job_count++;

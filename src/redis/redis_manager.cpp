@@ -151,9 +151,9 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
     return GetReplies();
 }
 
-bool RedisManager::LoadMatureRewards(
-    std::vector<std::pair<std::string, RewardInfo>> &rewards,
-    const efforts_map_t &efforts, std::mutex *efforts_mutex, uint32_t block_num)
+bool RedisManager::LoadUnpaidRewards(
+    std::vector<std::pair<std::string, PayeeInfo>> &rewards,
+    const efforts_map_t &efforts, std::mutex *efforts_mutex)
 {
     using namespace std::string_view_literals;
 
@@ -165,10 +165,8 @@ bool RedisManager::LoadMatureRewards(
 
         for (const auto &[addr, _] : efforts)
         {
-            AppendCommand({"HGET"sv, fmt::format("mature-rewards:{}", addr),
-                           std::to_string(block_num)});
-            AppendCommand({"HGET"sv, fmt::format("solver:{}", addr),
-                           PAYOUT_THRESHOLD_KEY});
+            AppendCommand({"HMGET"sv, fmt::format("solver:{}", addr),
+                           MATURE_BALANCE_KEY, PAYOUT_THRESHOLD_KEY, SCRIPT_PUB_KEY_KEY});
             rewards.emplace_back(addr, 0);
         }
     }
@@ -176,12 +174,19 @@ bool RedisManager::LoadMatureRewards(
     redis_unique_ptr reply;
     if (!GetReplies(&reply)) return false;
 
-    for (int i = 0; i < reply->elements; i += 2)
+    for (int i = 0; i < reply->elements; i += 3)
     {
-        rewards[i].second.reward =
+        rewards[i].second.amount =
             std::strtoll(reply->element[i]->str, nullptr, 10);
+
         rewards[i].second.settings.threshold =
             std::strtoll(reply->element[i + 1]->str, nullptr, 10);
+
+        const auto script_len = reply->element[i + 2]->len;
+
+        rewards[i].second.script_pub_key.reserve(script_len / 2);
+        Unhexlify(rewards[i].second.script_pub_key.data(), reply->element[i + 2]->str,
+                  script_len * 2);
     }
     return true;
 }

@@ -149,10 +149,9 @@ bool RoundManager::IsMinerIn(const std::string& addr)
 }
 // TODO: make this only for signular chain
 
-bool RoundManager::LoadMatureRewards(
-    std::vector<std::pair<std::string, RewardInfo>>& rewards,
-    uint32_t block_num)
+bool RoundManager::LoadUnpaidRewards(
+    std::vector<std::pair<std::string, PayeeInfo>>& rewards)
 {
-    return redis_manager->LoadMatureRewards(rewards, efforts_map,
-                                            &efforts_map_mutex, block_num);
+    return redis_manager->LoadUnpaidRewards(rewards, efforts_map,
+                                            &efforts_map_mutex);
 }

@@ -23,24 +23,28 @@ class PaymentManager
                                int64_t block_reward,
                                efforts_map_t& miner_efforts,
                                double total_effort, double fee);
-    bool CheckAgingRewards(RoundManager* redis_manager, int64_t time_now);
+    bool GeneratePayout(RoundManager* round_manager,
+                        int64_t time_now);
 
-    void AddMatureBlock(uint32_t block_id, const char* coinbase_txid,
-                        int64_t mature_time_ms, int64_t reward);
+    void GeneratePayoutTx(
+        std::vector<uint8_t>& bytes,
+        const std::vector<std::pair<std::string, PayeeInfo>>& rewards);
 
-    void AppendAgedRewards(
-        const AgingBlock& aged_block,
-        const std::vector<std::pair<std::string, RewardInfo>>& rewards);
     static int payout_age_seconds;
     static int64_t minimum_payout_threshold;
 
+    bool payment_included = false;
+    PaymentTx payment_tx;
     VerusTransaction tx = VerusTransaction(TXVERSION, 0, true, TXVERSION_GROUP);
+
+    void CheckPayment();
+
    private:
+    void ResetPayment();
     RedisManager* redis_manager;
+    DaemonManager* daemon_manager;
     std::string pool_addr;
     // block id -> block height, maturity time, pending to be paid
-    std::unordered_map<std::string, PendingPayment> pending_payments;
-    std::deque<AgingBlock> aging_blocks;
     simdjson::ondemand::parser parser;
-};
+    };
 #endif

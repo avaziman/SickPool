@@ -47,92 +47,81 @@ bool PaymentManager::GetRewardsProp(round_shares_t& miner_shares,
 }
 
 // returns true if new rewards have aged and ready to be paid
-bool PaymentManager::CheckAgingRewards(RoundManager* round_manager,
-                                       int64_t time_now_ms)
+bool PaymentManager::GeneratePayout(RoundManager* round_manager,
+                                    int64_t time_now_ms)
 {
     bool is_updated = false;
-    while (time_now_ms >
-           aging_blocks.back().matued_at_ms + payout_age_seconds * 1000)
+    is_updated = true;
+
+    // add new payments
+    std::vector<std::pair<std::string, PayeeInfo>> rewards;
+    round_manager->LoadUnpaidRewards(rewards);
+
+    std::vector<uint8_t> bytes;
+    GeneratePayoutTx(bytes, rewards);
+
+    char bytes_hex[bytes.size() * 2];
+    Hexlify(bytes_hex, bytes.data(), bytes.size());
+
+    FundRawTransactionRes fund_res;
+    if (!daemon_manager->FundRawTransaction(
+            fund_res, parser, std::string_view(bytes_hex, sizeof(bytes_hex))))
     {
-        is_updated = true;
-
-        auto aged_block = aging_blocks.back();
-
-        // add new payments
-        std::vector<std::pair<std::string, RewardInfo>> rewards;
-        round_manager->LoadMatureRewards(rewards, aged_block.id);
-
-        for (const auto& [addr, reward_info] : rewards)
-        {
-            auto it = pending_payments.find(addr);
-            if (it == pending_payments.end())
-            {
-                // load script
-                // std::string script_hex = redis_manager->hgets(
-                //     fmt::format("solver:{}", addr), SCRIPT_PUB_KEY_KEY);
-                PendingPayment pending_payment;
-                pending_payment.amount = 0;
-                // pending_payment.script_pub_key.resize(script_hex.size() / 2);
-                // Unhexlify(pending_payment.script_pub_key.data(),
-                //           script_hex.data(), script_hex.size());
-
-                it = pending_payments.emplace(addr, pending_payment).first;
-            }
-
-            pending_payments[addr].amount += reward_info.reward;
-        }
-        AppendAgedRewards(aged_block, rewards);
-
-        // tx.AddInput
-
-        aging_blocks.pop_back();
+        return false;
     }
+
+    payment_tx.raw_transaction_hex = fund_res.hex;
+
+    // tx.AddInput
+
     return is_updated;
 }
 
-void PaymentManager::AppendAgedRewards(
-    const AgingBlock& aged_block,
-    const std::vector<std::pair<std::string, RewardInfo>>& rewards)
+void PaymentManager::GeneratePayoutTx(
+    std::vector<uint8_t>& bytes,
+    const std::vector<std::pair<std::string, PayeeInfo>>& rewards)
 {
-    // coinbase index is always 0, leave unsigned, sign on daemon later...
-    tx.AddInput(aged_block.coinbase_txid, 0, std::vector<uint8_t>(),
-                UINT32_MAX);
+    // inputs will be added in fundrawtransaction
+    // change will be auto added in fundrawtransaction
 
-    int64_t total_spent = 0;
     for (auto& [addr, reward_info] : rewards)
     {
         // check if passed threshold
-        auto& pending_payment = pending_payments[addr];
-        if (pending_payment.amount < reward_info.settings.threshold ||
-            pending_payment.amount == 0)
+        if (reward_info.amount < reward_info.settings.threshold ||
+            reward_info.amount == 0)
         {
             continue;
         }
 
-        // leave 1000 bytes for coinbase tx and change
-        if (tx.GetTxLen() + 1000 > MAX_BLOCK_SIZE)
+        // leave 50000 bytes for funding inputs and change and other
+        // transactions in the block
+        if (tx.GetTxLen() + 50000 > MAX_BLOCK_SIZE)
         {
             break;
         }
 
-        tx.AddOutput(pending_payment.script_pub_key, pending_payment.amount);
+        payment_tx.rewards.emplace_back(addr, reward_info.amount);
+        tx.AddOutput(reward_info.script_pub_key, reward_info.amount);
 
-        total_spent += pending_payment.amount;
+        payment_tx.total_paid += reward_info.amount;
     }
-
-    int64_t change = aged_block.reward - total_spent;
-    tx.AddP2PKHOutput(pool_addr, change);
+    tx.GetBytes(bytes);
 }
 
-void PaymentManager::AddMatureBlock(uint32_t block_id,
-                                    const char* coinbase_txid,
-                                    int64_t mature_time_ms, int64_t reward)
+void PaymentManager::ResetPayment()
 {
-    AgingBlock block;
-    block.id = block_id;
-    block.matued_at_ms = mature_time_ms;
-    block.reward = reward;
-    memcpy(block.coinbase_txid, coinbase_txid, HASH_SIZE_HEX);
+    payment_tx.total_paid = 0;
+    payment_tx.raw_transaction_hex.clear();
+    payment_tx.rewards.clear();
+    payment_tx.tx_hash_hex.clear();
+    payment_included = false;
+}
 
-    aging_blocks.push_back(block);
+void PaymentManager::CheckPayment(){
+    if(payment_included){
+        Logger::Log(LogType::Info, LogField::PaymentManager,
+                    "Payment has been included in block!");
+                    
+        ResetPayment();
+    }
 }

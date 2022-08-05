@@ -43,7 +43,7 @@ class StratumServer
    public:
     StratumServer(const CoinConfig& conf);
     ~StratumServer();
-    void StartListening();
+    void Listen();
     void Stop();
 
    private:
@@ -80,7 +80,6 @@ class StratumServer
     void HandleControlCommands(std::stop_token st);
     void HandleControlCommand(ControlCommands cmd, char* buff);
 
-    void Listen();
     void HandleReq(StratumClient* cli, WorkerContext* wc,
                    std::string_view req);
     void HandleBlockNotify();
@@ -93,8 +92,10 @@ class StratumServer
     void HandleSubmit(StratumClient* cli, WorkerContext* wc, int id,
                       simdjson::ondemand::array& params);
 
-    void HandleReadySocket(int sockfd, WorkerContext *wc);
-    void HandleShare(StratumClient* cli, WorkerContext* wc, int id, Share& share);
+    void HandleNewConnection(int sockfd, int epoll_fd);
+    void HandleReadySocket(int sockfd, WorkerContext* wc);
+    void HandleShare(StratumClient* cli, WorkerContext* wc, int id,
+                     Share& share);
     void SendReject(const StratumClient* cli, int id, int error,
                     const char* msg) const;
     void SendAccept(const StratumClient* cli, int id) const;
@@ -102,18 +103,19 @@ class StratumServer
     void UpdateDifficulty(StratumClient* cli);
 
     void BroadcastJob(const StratumClient* cli, const Job* job) const;
-    int AcceptConnection(int epfd, int listen_fd, sockaddr_in* addr,
+    int AcceptConnection(sockaddr_in* addr,
                          socklen_t* addr_size);
     int CreateListeningSock(int epfd);
     void ServiceSockets(std::stop_token st, int epfd, int listener_fd);
-    void AddClient(int sockfd);
+    StratumClient* AddClient(int sockfd, const std::string& ip);
     StratumClient* GetClient(int sockfd);
+    void EraseClient(int sockfd, std::unique_lock<std::mutex> epoll_mutex);
 
     inline std::size_t SendRaw(int sock, const char* data,
                                std::size_t len) const
     {
         // dont send sigpipe
         return send(sock, data, len, MSG_NOSIGNAL);
-    }
-};
+        }
+    };
 #endif

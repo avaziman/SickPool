@@ -2,8 +2,9 @@
 
 uint32_t StratumClient::extra_nonce_counter = 0;
 
-StratumClient::StratumClient(const int sock, const int64_t time, const double diff)
+StratumClient::StratumClient(const int sock, const std::string& ip, const int64_t time, const double diff)
     : sockfd(sock),
+      ip(ip),
       connect_time(time),
       last_adjusted(time),
       last_share_time(time),
