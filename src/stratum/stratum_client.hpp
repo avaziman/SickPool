@@ -1,9 +1,11 @@
 #ifndef STRATUM_CLIENT_HPP_
 #define STRATUM_CLIENT_HPP_
+#include <fmt/core.h>
 #include <simdjson.h>
 #include <sys/socket.h>
 
 #include <cstring>
+#include <list>
 #include <memory>
 #include <set>
 #include <unordered_set>
@@ -13,14 +15,14 @@
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
 
-#define REQ_BUFF_SIZE (1024 * 32)
+#define REQ_BUFF_SIZE (1024 * 5)
 #define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - simdjson::SIMDJSON_PADDING)
 class StratumClient
 {
    public:
-    StratumClient(const int sock, const std::string& ip, const int64_t time, const double diff);
+    StratumClient(const int sock, const std::string& ip, const int64_t time,
+                  const double diff);
 
-    int GetSock() const { return sockfd; }
     double GetDifficulty() const { return current_diff; }
     double GetPendingDifficulty() const { return pending_diff; }
     bool GetIsAuthorized() const { return is_authorized; }
@@ -79,29 +81,28 @@ class StratumClient
         address = std::string(addr);
     }
 
-    void SetAuthorized()
-    {
-        is_authorized = true;
-    }
-    char req_buff[REQ_BUFF_SIZE];
+    void SetAuthorized() { is_authorized = true; }
+    char req_buff[REQ_BUFF_SIZE] /*= {0}*/;
     std::size_t req_pos = 0;
-    std::mutex epoll_mutex;
+    std::list<std::unique_ptr<StratumClient>>::iterator it;
+    bool disconnected = false;
+    int sock;
 
    private:
     static uint32_t extra_nonce_counter;
 
-    int sockfd;
     const int64_t connect_time;
     int64_t last_adjusted;
     int64_t last_share_time;
     uint32_t extra_nonce;
     uint32_t share_count = 0;
-    
+
     double current_diff;
     double pending_diff;
     bool is_authorized;
-    bool is_pending_diff;
+    bool is_pending_diff = false;
 
+    // std::string current_job_id;
     std::string extra_nonce_str;
     std::string worker_full;
     std::string address;
@@ -112,7 +113,6 @@ class StratumClient
     // for O(1) duplicate search
     // at the cost of a bit of memory, but much faster!
     std::unordered_set<uint32_t> share_uset;
-
 };
 
 #endif

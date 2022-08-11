@@ -96,7 +96,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
     std::vector<std::pair<std::string, double>> remove_worker_hashrates;
     bool res = redis_manager->TsMrange(remove_worker_hashrates, "worker"sv,
-                                       "hashrate"sv, remove_time, remove_time);
+                                       RedisManager::HASHRATE_KEY, remove_time, remove_time);
 
     {
         // only lock after receiving the hashrates to remove
@@ -208,7 +208,7 @@ bool StatsManager::AddWorker(const std::string& address,
     std::scoped_lock stats_db_lock(stats_map_mutex);
 
     bool new_worker = !worker_stats_map.contains(worker_full);
-    bool new_miner = round_manager->IsMinerIn(address);
+    bool new_miner = !round_manager->IsMinerIn(address);
     bool returning_worker =
         !new_worker && !worker_stats_map[worker_full].connection_count;
 

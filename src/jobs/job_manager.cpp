@@ -40,12 +40,12 @@ const job_t* JobManager::GetNewJob(const std::string& json_template)
         ondemand::array txs = res["transactions"].get_array();
 
         int64_t additional_fee = 0;
-        bool includes_payment = payment_manager->payment_tx.total_paid > 0;
-
+        bool includes_payment =
+            payment_manager->ShouldIncludePayment(blockTemplate.prevBlockHash);
         if (includes_payment)
         {
             std::string& payment_hash_hex =
-                payment_manager->payment_tx.tx_hash_hex;
+                payment_manager->pending_tx->info.tx_hash_hex;
 
             if (!payment_hash_hex.empty() &&
                 payment_hash_hex == blockTemplate.prevBlockHash)
@@ -61,14 +61,13 @@ const job_t* JobManager::GetNewJob(const std::string& json_template)
                 Hexlify(payment_hash_hex.data(), td.hash, HASH_SIZE_HEX);
 
                 blockTemplate.txList.AddTxData(td);
-                additional_fee +=
-                    static_cast<int64_t>(payment_manager->payment_tx.fee * 1e8);
+                additional_fee += payment_manager->pending_tx->info.fee;
             }
         }
 
         for (auto tx : txs)
         {
-            std::string_view tx_data_hex =  tx["data"].get_string();
+            std::string_view tx_data_hex = tx["data"].get_string();
             std::string_view tx_hash_hex = tx["hash"].get_string();
             TransactionData td(tx_data_hex, tx_hash_hex);
             td.fee = tx["fee"].get_double();
@@ -110,8 +109,7 @@ const job_t* JobManager::GetNewJob(const std::string& json_template)
             std::string_view(coinbaseHex, sizeof(coinbaseHex));
         blockTemplate.txList.AddCoinbaseTxData(coinbaseTx);
 
-        std::string jobIdHex(8, '0');
-        ToHex(jobIdHex.data(), job_count);
+        std::string jobIdHex = fmt::format("{:08x}", job_count);
 
         job_t job(jobIdHex, blockTemplate, includes_payment);
 

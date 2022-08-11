@@ -7,6 +7,6 @@
 #define COIN_SYMBOL "VRSC"
 #include "config_vrsc.hpp"
 #elif POOL_COIN == COIN_VRSCTEST
-#define COIN_SYMBOL "VRSCTEST"
+#define COIN_SYMBOL "VRSCTESTLOCAL"
 #include "config_vrsc.hpp"
 #endif

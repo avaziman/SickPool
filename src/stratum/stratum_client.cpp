@@ -3,7 +3,7 @@
 uint32_t StratumClient::extra_nonce_counter = 0;
 
 StratumClient::StratumClient(const int sock, const std::string& ip, const int64_t time, const double diff)
-    : sockfd(sock),
+    : sock(sock),
       ip(ip),
       connect_time(time),
       last_adjusted(time),
@@ -12,7 +12,5 @@ StratumClient::StratumClient(const int sock, const std::string& ip, const int64_
       pending_diff(diff)
 {
     extra_nonce = extra_nonce_counter++;
-    char buff[8];
-    ToHex(buff, extra_nonce);
-    extra_nonce_str = std::string(buff, sizeof(buff));
+    extra_nonce_str = fmt::format("{:08x}", extra_nonce);
 }

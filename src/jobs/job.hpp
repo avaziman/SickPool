@@ -10,7 +10,6 @@
 #include "merkle_tree.hpp"
 #include "utils.hpp"
 
-#define EXTRANONCE_SIZE 4
 #define VERSION_SIZE 4
 #define TIME_SIZE 4
 #define BITS_SIZE 4
@@ -20,6 +19,8 @@
 #define NONCE_SIZE HASH_SIZE
 #define SOLUTION_SIZE 1344
 #define SOLUTION_LENGTH_SIZE 3
+#define EXTRANONCE_SIZE 4
+#define NONCE2_SIZE (NONCE_SIZE - EXTRANONCE_SIZE)
 
 #define BLOCK_HEADER_STATIC_SIZE                                  \
     VERSION_SIZE           /* version */                          \

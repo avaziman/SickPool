@@ -16,11 +16,13 @@ RedisManager::RedisManager(const std::string &ip, int port)
     // AppendCommand({
     //     "round_effort_percent"sv,
     // });
-    AppendCommand({"TS.CREATE"sv, "pool:worker_count"sv});
-    AppendCommand({"TS.CREATE"sv, "pool:miner_count"sv});
-    AppendCommand({"TS.CREATE"sv, "pool:hashrate"sv, "RETENTION"sv,
-                   std::to_string(StatsManager::hashrate_ttl_seconds * 1000),
-                   "LABELS"sv, "type"sv, "pool-hashrate"sv});
+    AppendCommand(
+        {"TS.CREATE"sv, fmt::format("{}:{}", WORKER_COUNT_KEY, "pool")});
+    AppendCommand(
+        {"TS.CREATE"sv, fmt::format("{}:{}", MINER_COUNT_KEY, "pool")});
+    AppendCommand({"TS.CREATE"sv, fmt::format("{}:{}", HASHRATE_KEY, "pool"),
+                   "RETENTION"sv, "0"sv, "LABELS"sv, "type"sv,
+                   "pool-hashrate"sv});
 
     if (!GetReplies())
     {
@@ -83,8 +85,8 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
     using namespace std::string_literals;
     std::scoped_lock lock(rc_mutex);
 
-    auto reply =
-        Command({"HGETALL"sv, fmt::format("immature-rewards:{}", block_num)});
+    auto reply = Command(
+        {"HGETALL"sv, fmt::format("{}:{}", IMMATURE_REWARDS, block_num)});
 
     double matured_funds = 0;
     // either mature everything or nothing
@@ -101,9 +103,6 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
 
             // if a block has been orphaned only remove the immature
             // if there are sub chains add chain:
-            AppendCommand({"HINCRBY"sv,
-                           fmt::format("{}:balance:immature", chain), addr,
-                           std::to_string(miner_share->reward)});
 
             if (!matured)
             {
@@ -126,11 +125,12 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
             AppendCommand({"LTRIM"sv, mature_shares_key, "0"sv,
                            std::to_string(ROUND_SHARES_LIMIT)});
 
-            std::string_view reward_sv = std::to_string(miner_share->reward);
+            std::string reward_str = std::to_string(miner_share->reward);
+            std::string_view reward_sv(reward_str);
 
-            // used for payments
-            AppendCommand({"HSET"sv, fmt::format("mature-rewards:{}", addr),
-                           std::to_string(block_num), reward_sv});
+            // // used for payments
+            // AppendCommand({"HSET"sv, fmt::format("mature-rewards:{}", addr),
+            //                std::to_string(block_num), reward_sv});
 
             AppendCommand({"ZINCRBY"sv,
                            fmt::format("solver-index:{}", MATURE_BALANCE_KEY),
@@ -142,8 +142,9 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
             matured_funds += miner_share->reward;
         }
 
+        // we pushed it to mature round shares list
         AppendCommand(
-            {"UNLINK"sv, fmt::format("immature-rewards:{}", block_num)});
+            {"UNLINK"sv, fmt::format("{}:{}", IMMATURE_REWARDS, block_num)});
     }
 
     Logger::Log(LogType::Info, LogField::Redis, "{} funds have matured!",
@@ -166,7 +167,8 @@ bool RedisManager::LoadUnpaidRewards(
         for (const auto &[addr, _] : efforts)
         {
             AppendCommand({"HMGET"sv, fmt::format("solver:{}", addr),
-                           MATURE_BALANCE_KEY, PAYOUT_THRESHOLD_KEY, SCRIPT_PUB_KEY_KEY});
+                           MATURE_BALANCE_KEY, PAYOUT_THRESHOLD_KEY,
+                           SCRIPT_PUB_KEY_KEY});
             rewards.emplace_back(addr, 0);
         }
     }
@@ -185,8 +187,8 @@ bool RedisManager::LoadUnpaidRewards(
         const auto script_len = reply->element[i + 2]->len;
 
         rewards[i].second.script_pub_key.reserve(script_len / 2);
-        Unhexlify(rewards[i].second.script_pub_key.data(), reply->element[i + 2]->str,
-                  script_len * 2);
+        Unhexlify(rewards[i].second.script_pub_key.data(),
+                  reply->element[i + 2]->str, script_len * 2);
     }
     return true;
 }
@@ -199,6 +201,17 @@ void RedisManager::AppendTsAdd(std::string_view key_name, int64_t time,
         {"TS.ADD"sv, key_name, std::to_string(time), std::to_string(value)});
 }
 
+void RedisManager::AppendTsCreate(std::string_view key, std::string_view prefix,
+                                  std::string_view type,
+                                  std::string_view address, std::string_view id,
+                                  uint64_t retention_ms)
+{
+    using namespace std::string_view_literals;
+    AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
+                   std::to_string(retention_ms), "LABELS"sv, "type"sv, type,
+                   "prefix"sv, prefix, "address"sv, address, "identity"sv, id});
+}
+
 bool RedisManager::AddNewMiner(std::string_view address,
                                std::string_view worker_full,
                                std::string_view id_tag,
@@ -208,6 +221,11 @@ bool RedisManager::AddNewMiner(std::string_view address,
 
     std::scoped_lock lock(rc_mutex);
 
+    std::string addr_lowercase(address);
+    std::transform(addr_lowercase.begin(), addr_lowercase.end(),
+                   addr_lowercase.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+
     {
         RedisTransaction add_worker_tx(this);
 
@@ -215,16 +233,18 @@ bool RedisManager::AddNewMiner(std::string_view address,
         // miners
         auto chain = std::string_view(COIN_SYMBOL);
 
-        AppendCommand(
-            {"TS.CREATE"sv, fmt::format("worker-count:{}", address),
-             "RETENTION"sv,
-             std::to_string(StatsManager::hashrate_ttl_seconds * 1000),
-             "LABELS"sv, "type"sv, WORKER_COUNT_KEY, "address", address, "id",
-             id_tag});
+        // create worker count ts
+        AppendTsCreate(fmt::format("{}:{}", WORKER_COUNT_KEY, address),
+                       "miner"sv, WORKER_COUNT_KEY, address, id_tag,
+                       StatsManager::hashrate_ttl_seconds * 1000);
 
         // reset worker count
-        AppendTsAdd(fmt::format("worker-count:{}", address), GetCurrentTimeMs(),
+        AppendTsAdd(fmt::format("{}:{}", WORKER_COUNT_KEY, address), curtime,
                     0);
+
+        // add to pool miner counter
+        AppendCommand({"TS.INCRBY"sv,
+                       fmt::format("{}:{}", MINER_COUNT_KEY, "pool"), "1"sv});
 
         std::string_view curtime_sv = std::to_string(curtime);
         // don't override if it exists
@@ -245,6 +265,12 @@ bool RedisManager::AddNewMiner(std::string_view address,
                        std::to_string(PaymentManager::minimum_payout_threshold),
                        HASHRATE_KEY, "0"sv, MATURE_BALANCE_KEY, "0"sv,
                        IMMATURE_BALANCE_KEY, "0"sv, WORKER_COUNT_KEY, "0"sv});
+
+        AppendCommand({"HSET"sv, ADDRESS_MAP_KEY, addr_lowercase, address});
+        if (!id_tag.empty())
+        {
+            AppendCommand({"HSET"sv, ADDRESS_MAP_KEY, id_tag, address});
+        }
 
         // set round effort to 0
         AppendSetMinerEffort(chain, TOTAL_EFFORT_KEY, "pow", 0);
@@ -277,18 +303,21 @@ bool RedisManager::AddNewWorker(std::string_view address,
 void RedisManager::AppendUpdateWorkerCount(std::string_view address, int amount)
 {
     using namespace std::string_view_literals;
-    std::string_view amount_str = std::to_string(amount);
+    std::string amount_str = std::to_string(amount);
 
     AppendCommand({"ZINCRBY"sv,
                    fmt::format("solver-index:{}", WORKER_COUNT_KEY), address,
                    amount_str});
 
+    AppendCommand({"HINCRBY"sv, fmt::format("solver:{}", address),
+                   WORKER_COUNT_KEY, amount_str});
+
     AppendCommand({"TS.INCRBY"sv,
                    fmt::format("{}:{}", WORKER_COUNT_KEY, address),
                    amount_str});
 
-    AppendCommand({"HINCRBY"sv, fmt::format("solver:{}", address),
-                   WORKER_COUNT_KEY, amount_str});
+    AppendCommand({"TS.INCRBY"sv,
+                   fmt::format("{}:{}", WORKER_COUNT_KEY, "pool"), amount_str});
 }
 
 bool RedisManager::PopWorker(std::string_view address)
@@ -334,15 +363,12 @@ void RedisManager::AppendCreateStatsTs(std::string_view addrOrWorker,
 
     std::string_view address = addrOrWorker.substr(0, ADDRESS_LEN);
 
-    std::string_view retention_sv =
-        std::to_string(StatsManager::hashrate_ttl_seconds * 1000);
+    auto retention = StatsManager::hashrate_ttl_seconds * 1000;
 
-    for (auto key_type : {"hashrate"sv, "hashrate:average"sv, "shares:valid"sv,
+    for (auto key_type : {HASHRATE_KEY, "hashrate:average"sv, "shares:valid"sv,
                           "shares:stale"sv, "shares:invalid"sv})
     {
         auto key = fmt::format("{}:{}:{}", key_type, prefix, addrOrWorker);
-        AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv, retention_sv,
-                       "LABELS"sv, "type", key_type, "prefix", prefix,
-                       "address", address, "id", id});
+        AppendTsCreate(key, prefix, key_type, address, id, retention);
     }
 }

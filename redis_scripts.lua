@@ -16,9 +16,10 @@ redis.register_function(
     end
 )
 
--- key 1 -> block index key
--- O(N), n = number of blocks
--- GET takes the most time
+-- key 1  -> index key
+-- key 2  -> key prefix
+-- ARGV -> field used in ZRANGE
+-- O(N), n = number of keys
 redis.register_function(
     "getblocksbyindex",
     function(KEYS, ARGV)
@@ -30,7 +31,7 @@ redis.register_function(
         do
             table.insert(
                 result[2],
-                redis.call("GET", "block:"..index)
+                redis.call("GET", KEYS[2]..index)
             )
 
         end
@@ -39,48 +40,26 @@ redis.register_function(
     end
 )
 
--- keys[1] = name of the miner index prefix
--- keys[2] = name of the miner index (without prefix)
--- keys[3] = BYSCORE or REV
--- table.unpack in newer versions, (will cause error if table is nil)
+-- key 1  -> index key
+-- key 2  -> key prefix
+-- ARGV -> field used in ZRANGE
+-- O(N), n = number of keys
 redis.register_function(
     "getsolversbyindex",
     function(KEYS, ARGV)
-        local indexKey = KEYS[1]..KEYS[2]
-
-        local indexes = redis.call("ZRANGE", indexKey, unpack(ARGV)) -- used to be WITHSCORES
-        local totalResults = redis.call("ZCARD", indexKey)
-        local requestedAmount = ARGV[2] - ARGV[1] + 1
-
-        local props = {"hashrate", "mature-balance", "join-time", "worker-count"}
-        local propsArrs = {{}, {}, {}, {}}
-        local resAmount = math.min(totalResults, requestedAmount)
-        
-        for j, prop in ipairs(props)
-        do
-            -- if prop == KEYS[2]
-            -- then
-            --     for i = 2, resAmount * 2, 2
-            --     do
-            --         table.insert(propsArrs[j], indexes[i])
-            --     end
-            -- else 
-                propsArrs[j] = redis.call("ZMSCORE", KEYS[1]..prop, unpack(indexes))
-            -- end
-        end
+        local indexes = redis.call("ZRANGE", KEYS[1], unpack(ARGV))
+        local totalResults = redis.call("ZCARD", KEYS[1])
 
         local result = {totalResults, {}}
-        for i = 1, resAmount, 1
+        for _, index in ipairs(indexes) 
         do
-            table.insert(result[2], {indexes[i]}) -- indexes[i * 2 - 1]
+                
+            local solver = {index, unpack(redis.call("HMGET", KEYS[2]..index, "hashrate", "mature-balance", "join-time", "worker-count"))}
+            table.insert(
+                result[2],
+                solver
+            )
 
-            for j, prop in ipairs(props)
-            do 
-                table.insert(
-                    result[2][i],
-                    propsArrs[j][i]
-                )
-            end
         end
 
         return result

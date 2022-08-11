@@ -9,11 +9,12 @@
 #include "shares/share.hpp"
 #include "stats/round.hpp"
 
-enum BlockType : uint8_t
+enum class BlockType : uint8_t
 {
-    POW = 1,
-    POW_PAYMENT = 2,
-    POS = 3,
+    POW = 0b1,
+    POS = 0b10,
+    PAYMENT = 0b100,
+    POW_PAYMENT = POW | PAYMENT
 };
 
 #pragma pack(push, 1)
@@ -27,8 +28,7 @@ struct BlockSubmission
                     const int64_t time, const uint32_t number,
                     const double diff, const double effort_percent,
                     const uint8_t* hash)
-        : 
-          block_type(blocktype),
+        : block_type(blocktype),
           block_reward(reward),
           duration_ms(time - chain_round.round_start_ms),
           time_ms(time),

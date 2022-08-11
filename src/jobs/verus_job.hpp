@@ -118,10 +118,10 @@ class VerusJob : public Job
         // nonce2 pos
         pos += EXTRANONCE_SIZE;
         Unhexlify(buff + pos, nonce2.data(),
-                  (NONCE_SIZE - EXTRANONCE_SIZE) * 2);
+                  NONCE2_SIZE * 2);
 
         // solution pos
-        pos += (NONCE_SIZE - EXTRANONCE_SIZE);
+        pos += NONCE2_SIZE;
         Unhexlify(buff + pos, sol.data(),
                   (SOLUTION_LENGTH_SIZE + SOLUTION_SIZE) * 2);
     }

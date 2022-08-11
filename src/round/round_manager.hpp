@@ -18,8 +18,8 @@ class RoundManager
    public:
     RoundManager(RedisManager* rm, const std::string& round_type);
     bool LoadCurrentRound();
-    void AddRoundShare(const std::string& chain, const std::string& miner, const double effort);
-    Round GetChainRound(const std::string& chain);
+    void AddRoundShare(const std::string& miner, const double effort);
+    Round GetChainRound();
     bool CloseRound(const ExtendedSubmission* submission, double fee);
     void ResetRoundEfforts();
 
@@ -37,7 +37,7 @@ class RoundManager
     const std::string round_type;
 
     std::mutex round_map_mutex;
-    round_map_t rounds_map;
+    Round round;
 
     std::mutex efforts_map_mutex;
     efforts_map_t efforts_map;

@@ -42,7 +42,7 @@ void RedisManager::AppendAddRoundShares(std::string_view chain,
     for (const auto &[addr, round_share] : miner_shares)
     {
         AppendCommand({"HSET"sv,
-                       fmt::format("immature-rewards:{}", submission->number),
+                       fmt::format("{}:{}", IMMATURE_REWARDS, submission->number),
                        std::to_string(submission->number), addr,
                        std::string_view((char *)&round_share,
                                         sizeof(RoundShare))});
@@ -50,6 +50,7 @@ void RedisManager::AppendAddRoundShares(std::string_view chain,
         AppendCommand({
             "HINCRYBY"sv,
             fmt::format("solver:{}", addr),
+            IMMATURE_BALANCE_KEY,
             std::to_string(round_share.reward)
         });
     }

@@ -1,14 +1,17 @@
 #ifndef STRATUM_SERVER_HPP_
 #define STRATUM_SERVER_HPP_
 #include <fcntl.h>
+#include <netinet/tcp.h>
 #include <simdjson.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
-#include <functional>
 
+#include <iterator>
+#include <list>
 #include <any>
 #include <chrono>
 #include <deque>
+#include <functional>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -18,6 +21,7 @@
 #include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
 #include "blocks/block_submission_manager.hpp"
+#include "client_list.hpp"
 #include "coin_config.hpp"
 #include "control/control_server.hpp"
 #include "jobs/job_manager.hpp"
@@ -33,9 +37,9 @@
 
 #define SOCK_TIMEOUT 5
 #define MIN_PERIOD_SECONDS 20
-#define MAX_CONNECTIONS 1e5
+#define MAX_CONNECTIONS 32
 #define MAX_CONNECTION_EVENTS 10
-#define EPOLL_TIMEOUT 1 //ms
+#define EPOLL_TIMEOUT 1  // ms
 #define RETRIES 10
 
 class StratumServer
@@ -51,6 +55,7 @@ class StratumServer
     std::string chain{"VRSCTEST"};
 
     int listening_fd;
+    int epoll_fd;
 
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(MAX_HTTP_REQ_SIZE);
@@ -71,7 +76,9 @@ class StratumServer
     RoundManager round_manager_pow;
     RoundManager round_manager_pos;
 
-    std::unordered_map<int, std::unique_ptr<StratumClient>> clients;
+    // O(1) delete + insert + no invalidation, 
+    // saving the pointer in epoll gives us O(1) access!
+    std::list<std::unique_ptr<StratumClient>> clients;
 
     std::mutex jobs_mutex;
     std::mutex clients_mutex;
@@ -80,42 +87,50 @@ class StratumServer
     void HandleControlCommands(std::stop_token st);
     void HandleControlCommand(ControlCommands cmd, char* buff);
 
-    void HandleReq(StratumClient* cli, WorkerContext* wc,
-                   std::string_view req);
+    void HandleReq(StratumClient* cli, WorkerContext* wc, std::string_view req);
     void HandleBlockNotify();
     void HandleWalletNotify(WalletNotify* wal_notify);
 
-    void HandleSubscribe(const StratumClient* cli, int id,
+    void HandleSubscribe(StratumClient* cli, int id,
                          simdjson::ondemand::array& params) const;
     void HandleAuthorize(StratumClient* cli, int id,
                          simdjson::ondemand::array& params);
     void HandleSubmit(StratumClient* cli, WorkerContext* wc, int id,
                       simdjson::ondemand::array& params);
 
-    void HandleNewConnection(int sockfd, int epoll_fd);
-    void HandleReadySocket(int sockfd, WorkerContext* wc);
+    void HandleNewConnection();
+    void HandleReadableSocket(
+        std::list<std::unique_ptr<StratumClient>>::iterator* it, WorkerContext* wc);
     void HandleShare(StratumClient* cli, WorkerContext* wc, int id,
                      Share& share);
-    void SendReject(const StratumClient* cli, int id, int error,
+    void SendReject(StratumClient* cli, int id, int error,
                     const char* msg) const;
-    void SendAccept(const StratumClient* cli, int id) const;
+    void SendAccept(StratumClient* cli, int id) const;
 
     void UpdateDifficulty(StratumClient* cli);
 
-    void BroadcastJob(const StratumClient* cli, const Job* job) const;
-    int AcceptConnection(sockaddr_in* addr,
-                         socklen_t* addr_size);
-    int CreateListeningSock(int epfd);
-    void ServiceSockets(std::stop_token st, int epfd, int listener_fd);
-    StratumClient* AddClient(int sockfd, const std::string& ip);
-    StratumClient* GetClient(int sockfd);
-    void EraseClient(int sockfd, std::unique_lock<std::mutex> epoll_mutex);
+    void BroadcastJob(StratumClient* cli, const Job* job) const;
+    int AcceptConnection(sockaddr_in* addr, socklen_t* addr_size);
+    int CreateListeningSock();
+    void ServiceSockets(std::stop_token st);
+    std::list<std::unique_ptr<StratumClient>>::iterator* AddClient(
+        int sockfd, const std::string& ip);
+    void EraseClient(int sockfd,
+                     std::list<std::unique_ptr<StratumClient>>::iterator* it);
 
-    inline std::size_t SendRaw(int sock, const char* data,
+    inline std::size_t SendRaw(int& sock, const char* data,
                                std::size_t len) const
     {
         // dont send sigpipe
-        return send(sock, data, len, MSG_NOSIGNAL);
+        auto res = send(sock, data, len, MSG_NOSIGNAL);
+
+        if(res == -1){
+            Logger::Log(LogType::Error, LogField::Stratum,
+                        "Failed to send on sock fd {}, errno: {} -> {}", sock,
+                        errno, std::strerror(errno));
         }
-    };
+
+        return res;
+    }
+};
 #endif

@@ -12,6 +12,7 @@
 #include "verushash/verus_hash.h"
 
 struct WorkerContext{
+    uint32_t current_height;
     uint8_t block_header[BLOCK_HEADER_SIZE];
     CVerusHashV2 hasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
     simdjson::ondemand::parser json_parser;

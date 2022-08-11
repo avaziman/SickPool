@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "round_share.hpp"
 #include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
 #include "logger.hpp"
@@ -97,13 +98,15 @@ class RedisManager
     bool GetPosPoints(std::vector<std::pair<std::string, double>> &stakers,
                       std::string_view chain);
 
+    /* payout */
+    bool AddPayout(const PendingPayment* payment);
+
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
     int AddNetworkHr(std::string_view chain, int64_t time, double hr);
     std::string hget(std::string_view key, std::string_view field);
 
-    void LoadCurrentRound(std::string_view chain, std::string_view type,
-                          Round *rnd);
+    void LoadCurrentRound(std::string_view chain, std::string_view type, Round* rnd);
 
     inline bool GetReplies(redis_unique_ptr *last_reply = nullptr)
     {
@@ -144,19 +147,22 @@ class RedisManager
     static constexpr int ROUND_SHARES_LIMIT = 100;
     static constexpr std::string_view POW_KEY = "pow";
     static constexpr std::string_view BLOCK_NUMBER_KEY = "block-number";
+    static constexpr std::string_view PAYOUTS_KEY = "payouts";
     static constexpr std::string_view ADDRESS_MAP_KEY = "address-map";
     static constexpr std::string_view PAYOUT_THRESHOLD_KEY = "payout-threshold";
     static constexpr std::string_view IDENTITY_KEY = "identity";
-    static constexpr std::string_view HASHRATE_KEY = "join-time";
+    static constexpr std::string_view HASHRATE_KEY = "hashrate";
     static constexpr std::string_view JOIN_TIME_KEY = "join-time";
     static constexpr std::string_view WORKER_COUNT_KEY = "worker-count";
     static constexpr std::string_view MATURE_BALANCE_KEY = "mature-balance";
     static constexpr std::string_view IMMATURE_BALANCE_KEY = "immature-balance";
     static constexpr std::string_view SCRIPT_PUB_KEY_KEY = "script-pub-key";
     static constexpr std::string_view ROUND_EFFORT_KEY = "round-effort";
+    static constexpr std::string_view MINER_COUNT_KEY = "miner-count";
     static constexpr std::string_view TOTAL_EFFORT_KEY = "$total";
     static constexpr std::string_view ESTIMATED_EFFORT_KEY = "$estimated";
     static constexpr std::string_view ROUND_START_TIME_KEY = "$estimated";
+    static constexpr std::string_view IMMATURE_REWARDS = "immature-rewards";
 
    private:
     redisContext *rc;
@@ -184,7 +190,7 @@ class RedisManager
             prefixed_key =
                 std::string(COIN_SYMBOL) + ":"s + std::string(argv[1]);
             // add coin prefix to the all keys
-            argv[1] = prefixed_key.c_str();
+            argv[1] = prefixed_key.data();
             args_len[1] = prefixed_key.size();
         }
 
@@ -199,6 +205,10 @@ class RedisManager
         bool res = GetReplies(&rptr);
         return rptr;
     }
+
+    void AppendTsCreate(
+        std::string_view key, std::string_view prefix, std::string_view type,
+        std::string_view address, std::string_view id, uint64_t retention_ms);
 
     bool hset(std::string_view key, std::string_view field,
               std::string_view val);

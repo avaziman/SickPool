@@ -44,14 +44,13 @@ bool RedisManager::UpdateEffortStats(efforts_map_t &miner_stats_map,
 
     return GetReplies();
 }
-
+    
 bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
                                        worker_map &miner_stats_map,
                                        std::mutex *stats_mutex,
                                        int64_t update_time_ms)
 {
     using namespace std::string_view_literals;
-    Benchmark<std::chrono::microseconds> bench("UPDATE SATAS REDIS");
     std::scoped_lock lock(rc_mutex);
 
     double pool_hr = 0;
@@ -70,22 +69,22 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
 
         for (auto &[miner_addr, miner_stats] : miner_stats_map)
         {
-            std::string_view hr_sv =
+            std::string hr_str =
                 std::to_string(miner_stats.interval_hashrate);
 
             AppendIntervalStatsUpdate(miner_addr, "miner", update_time_ms,
                                       miner_stats);
 
             AppendCommand({"ZADD"sv, fmt::format("solver-index:", HASHRATE_KEY),
-                           hr_sv, miner_addr});
+                           hr_str, miner_addr});
 
-            AppendHset(fmt::format("solver:{}", HASHRATE_KEY), miner_addr,
-                       hr_sv);
+            AppendHset(fmt::format("solver:{}", miner_addr), HASHRATE_KEY,
+                       hr_str);
             miner_stats.ResetInterval();
         }
     }
 
-    AppendTsAdd("pool_hashrate", update_time_ms, pool_hr);
+    AppendTsAdd("hashrate:pool", update_time_ms, pool_hr);
 
     return GetReplies();
 }
@@ -105,7 +104,7 @@ bool RedisManager::LoadAverageHashrateSum(
         .type = "SUM",
         .time_bucket_ms =
             StatsManager::average_hashrate_interval_seconds * 1000};
-    return TsMrange(hashrate_sums, prefix, "hashrate", from, to, &aggregation);
+    return TsMrange(hashrate_sums, prefix, HASHRATE_KEY, from, to, &aggregation);
 }
 
 bool RedisManager::ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
@@ -159,21 +158,20 @@ bool RedisManager::TsMrange(
     redis_unique_ptr reply;
     if (aggregation)
     {
-        reply = Command({"TS.MRANGE"sv, std::to_string(from), std::to_string(to),
-                       "AGGREGATION"sv, aggregation->type,
-                       std::to_string(aggregation->time_bucket_ms), "FILTER",
-                       fmt::format("prefix={}", prefix),
-                       fmt::format("type={}", type)
+        reply = Command({"TS.MRANGE"sv, std::to_string(from),
+                         std::to_string(to), "AGGREGATION"sv, aggregation->type,
+                         std::to_string(aggregation->time_bucket_ms),
+                         "FILTER"sv, fmt::format("prefix={}", prefix),
+                         fmt::format("type={}", type)
 
         });
     }
     else
     {
-        reply = Command({"TS.MRANGE"sv, std::to_string(from), std::to_string(to),
-                       "FILTER", fmt::format("prefix={}", prefix),
-                       fmt::format("type={}", type)
-
-        });
+        reply =
+            Command({"TS.MRANGE"sv, std::to_string(from), std::to_string(to),
+                     "FILTER"sv, fmt::format("prefix={}", prefix),
+                     fmt::format("type={}", type)});
     }
 
     if (!reply.get()) return false;
