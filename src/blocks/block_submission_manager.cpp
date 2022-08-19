@@ -17,8 +17,8 @@ void SubmissionManager::CheckImmatureSubmissions()
         auto chain = std::string_view((char*)submission->chain,
                                       sizeof(submission->chain));
 
-        auto res = daemon_manager->SendRpcReq<std::any>(
-            resBody, 1, "getblockheader", std::any(hashHex));
+        auto res = daemon_manager->SendRpcReq(
+            resBody, 1, "getblockheader", DaemonRpc::GetParamsStr(hashHex));
 
         int32_t confirmations = -1;
         try
@@ -142,8 +142,8 @@ bool SubmissionManager::AddImmatureBlock(
 bool SubmissionManager::SubmitBlock(std::string_view block_hex)
 {
     std::string resultBody;
-    int resCode = daemon_manager->SendRpcReq<std::any>(
-        resultBody, 1, "submitblock", std::any(block_hex));
+    int resCode = daemon_manager->SendRpcReq(
+        resultBody, 1, "submitblock", DaemonRpc::GetParamsStr(block_hex));
 
     if (resCode != 200)
     {

@@ -2,6 +2,7 @@
 #define DAEMON_API_HPP_
 
 #include <arpa/inet.h>  //inet_ntop
+#include <fmt/core.h>
 #include <netinet/in.h>
 #include <simdjson.h>
 #include <sys/socket.h>
@@ -14,12 +15,12 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <variant>
 #include <vector>
-#include <fmt/core.h>
 
-#include "jsonify.hpp"
 #include "../sock_addr.hpp"
+#include "jsonify.hpp"
 
 #define HTTP_HEADER_SIZE (1024 * 16)
 
@@ -36,17 +37,51 @@ class DaemonRpc
         rpc_addr.sin_port = sock_addr.port;
     }
 
+    template <typename T>
+    static std::string ToJsonStr(T arg)
+    {
+        if constexpr (std::is_same_v<T, std::string_view>)
+        {
+            return fmt::format("\"{}\"", arg);
+        }
+        else if constexpr (std::is_integral_v<T>)
+        {
+            std::string str = std::to_string(arg);
+            return str;
+        }
+        else
+        {
+            throw std::runtime_error("Can't convert this type to json");
+        }
+    }
+
     template <typename... T>
-    int SendRequest(std::string& result, int id, const char* method,
-                    T... params) /*const*/
+    static std::string GetParamsStr(T&&... args)
+    {
+        std::string params_json = "[";
+
+        auto append = [&params_json](auto s)
+        {
+            params_json += ToJsonStr(s);
+            params_json.append(",");
+        };
+
+        (append(args), ...);
+
+        params_json[params_json.size() - 1] = ']';
+        return params_json;
+    }
+
+    int SendRequest(std::string& result, int id, std::string_view method,
+                    std::string_view params_json) /*const*/
     {
         // int errCode;
-        int resCode;
-        size_t bodySize;
-        size_t sendSize;
+        int res_code;
+        size_t body_size;
+        size_t send_size;
         size_t sent;
-        size_t contentLength;
-        size_t contentReceived;
+        size_t content_length;
+        size_t content_received;
 
         // initialize the socket
         sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -61,132 +96,96 @@ class DaemonRpc
             return errno;
         }
 
-        std::string params_json;
-
-        if constexpr (sizeof...(params) != 0)
-        {
-            auto params_vec = std::vector{params...};
-            for (int i = 0; i < params_vec.size(); i++)
-            {
-                const std::any& param = params_vec[i];
-
-                if (param.type() == typeid(std::string_view))
-                {
-                    auto param_sv = std::any_cast<std::string_view>(param);
-                    params_json.append("\"");
-                    params_json.append(param_sv);
-                    params_json.append("\"");
-                }
-                else if (param.type() == typeid(int))
-                {
-                    // std::any_cast<std::string_view>(param)
-                    std::string str = std::to_string(std::any_cast<int>(param));
-                    params_json.append(str);
-                }
-                // for sinovate, eh
-                else if (param.type() ==
-                         typeid(std::pair<std::string_view, std::string_view>))
-                {
-                    auto param_sv = std::any_cast<std::pair<std::string_view, std::string_view>>(param);
-
-                    params_json.append(fmt::format("{{\"{}\":[\"{}\"]}}", param_sv.first, param_sv.second));
-                }
-                // assert type is one of these when .type is constexpr
-
-                if (i != params_vec.size() - 1)
-                {
-                    params_json.append(",");
-                }
-            }
-        }
-
         // generate the http request
 
         std::size_t bodyLen = params_json.size() + 64;
         auto body = std::make_unique<char[]>(bodyLen);
 
-        bodySize = snprintf(body.get(), bodyLen,
-                            "{\"id\":%d,\"method\":\"%s\",\"params\":[%s]}", id,
-                            method, params_json.c_str());
+        body_size =
+            fmt::format_to_n(body.get(), bodyLen,
+                             "{{\"id\":{},\"method\":\"{}\",\"params\":{}}}",
+                             id, method, params_json)
+                .size;
 
-        const std::size_t sendBufferLen = bodySize + 256;
-        auto sendBuffer = std::make_unique<char[]>(bodySize + 256);
-        sendSize = snprintf(sendBuffer.get(), sendBufferLen,
-                            "POST / HTTP/1.1\r\n"
-                            "Host: %s\r\n"
-                            "Authorization: Basic %s\r\n"
-                            "Content-Type: application/json\r\n"
-                            "Content-Length: %ld\r\n\r\n"
-                            "%s\r\n\r\n",
-                            host_header.c_str(), auth_header.c_str(), bodySize,
-                            body.get());
+        const std::size_t send_buffer_len = body_size + 256;
+        auto send_buffer = std::make_unique<char[]>(body_size + 256);
+        send_size = fmt::format_to_n(send_buffer.get(), send_buffer_len,
+                                     "POST / HTTP/1.1\r\n"
+                                     "Host: {}\r\n"
+                                     "Authorization: Basic {}\r\n"
+                                     "Content-Type: application/json\r\n"
+                                     "Content-Length: {}\r\n\r\n"
+                                     "{}\r\n\r\n",
+                                     host_header, auth_header, body_size,
+                                     std::string_view(body.get(), body_size))
+                        .size;
 
-        sent = send(sockfd, (void*)sendBuffer.get(), sendSize, 0);
+        sent = send(sockfd, (void*)send_buffer.get(), send_size, 0);
 
         if (sent < 0) return -1;
 
         char headerBuff[HTTP_HEADER_SIZE];
 
-        int headerRecv = 0;
-        char* endOfHeader = nullptr;
+        int header_recv = 0;
+        char* end_of_header = nullptr;
         // receive http header (and potentially part or the whole body)
         do
         {
-            std::size_t recvRes = recv(sockfd, headerBuff + headerRecv,
-                                       HTTP_HEADER_SIZE - headerRecv, 0);
+            std::size_t recvRes = recv(sockfd, headerBuff + header_recv,
+                                       HTTP_HEADER_SIZE - header_recv, 0);
             if (recvRes <= 0)
             {
                 return errno;
             }
-            headerRecv += recvRes;
+            header_recv += recvRes;
             // for the response end check, gets overriden
-            headerBuff[headerRecv - 1] = '\0';
-        } while ((endOfHeader = std::strstr(headerBuff, "\r\n\r\n")) ==
+            headerBuff[header_recv - 1] = '\0';
+        } while ((end_of_header = std::strstr(headerBuff, "\r\n\r\n")) ==
                  nullptr);
 
-        endOfHeader += 4;
+        end_of_header += 4;
 
-        resCode = std::atoi(headerBuff + sizeof("HTTP/1.1 ") - 1);
+        res_code = std::atoi(headerBuff + sizeof("HTTP/1.1 ") - 1);
 
         // doens't include error message
-        contentLength = std::atoi(std::strstr(headerBuff, "Content-Length: ") +
-                                  sizeof("Content-Length: ") - 1);
-        contentReceived = headerRecv - (endOfHeader - headerBuff);
+        content_length = std::atoi(std::strstr(headerBuff, "Content-Length: ") +
+                                   sizeof("Content-Length: ") - 1);
+        content_received = header_recv - (end_of_header - headerBuff);
 
-        if (resCode != 200)
+        if (res_code != 200)
         {
             // if there was an error return the header instead the body as there
             // is none
-            result.resize(headerRecv);
-            memcpy(result.data(), headerBuff, headerRecv);
+            result.resize(header_recv);
+            memcpy(result.data(), headerBuff, header_recv);
             close(sockfd);
-            return resCode;
+            return res_code;
         }
 
         // simd json parser requires some extra bytes
-        result.reserve(contentLength + simdjson::SIMDJSON_PADDING);
-        result.resize(contentLength - 1);
+        result.reserve(content_length + simdjson::SIMDJSON_PADDING);
+        result.resize(content_length - 1);
 
         // sometimes we will get 404 message after the json
         // (its length not included in content-length)
-        contentReceived = std::min(contentReceived, contentLength);
-        memcpy(result.data(), endOfHeader, contentReceived);
+        content_received = std::min(content_received, content_length);
+        memcpy(result.data(), end_of_header, content_received);
 
         // receive http body if it wasn't already
-        while (contentReceived < contentLength)
+        while (content_received < content_length)
         {
             std::size_t recvRes =
-                recv(sockfd, result.data() + contentReceived - 1,
-                     contentLength - contentReceived, 0);
+                recv(sockfd, result.data() + content_received - 1,
+                     content_length - content_received, 0);
             if (recvRes <= 0)
             {
-                return resCode;
+                return res_code;
             }
-            contentReceived += recvRes;
+            content_received += recvRes;
         }
 
         close(sockfd);
-        return resCode;
+        return res_code;
     }
 
    private:

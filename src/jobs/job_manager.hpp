@@ -26,7 +26,7 @@ class JobManager
     }
 
     virtual const job_t* GetNewJob();
-    virtual const job_t* GetNewJob(const std::string& json_template);
+    virtual const job_t* GetNewJob(const std::string& json_template) = 0;
     
     inline const job_t* GetJob(std::string_view hexId)
     {
@@ -68,5 +68,11 @@ class JobManager
     TransactionData GetCoinbaseTxData(int64_t value, uint32_t height, int64_t,
                                       std::string_view rpc_coinbase);
 };
+
+#if COIN == VRSC
+#include "job_manager_vrsc.hpp"
+#elif COIN == SIN
+#include "job_manager_sin.hpp"
+#endif
 
 #endif

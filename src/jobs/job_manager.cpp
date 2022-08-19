@@ -1,10 +1,10 @@
 #include "job_manager.hpp"
 
-const job_t* JobManager::GetNewJob()
+const job_t* JobManager::   ()
 {
     using namespace simdjson;
     std::string json;
-    int resCode = daemon_manager->SendRpcReq<>(json, 1, "getblocktemplate");
+    int resCode = daemon_manager->SendRpcReq(json, 1, "getblocktemplate", DaemonRpc::GetParamsStr(4.2));
 
     if (resCode != 200)
     {

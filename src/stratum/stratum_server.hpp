@@ -48,11 +48,11 @@ class StratumServer : public Server<StratumClient>
     std::jthread stats_thread;
     std::vector<std::jthread> processing_threads;
 
+    job_manager_t job_manager;
     ControlServer control_server;
     RedisManager redis_manager;
     StatsManager stats_manager;
     DaemonManager daemon_manager;
-    JobManager job_manager;
     SubmissionManager submission_manager;
     DifficultyManager diff_manager;
     PaymentManager payment_manager;

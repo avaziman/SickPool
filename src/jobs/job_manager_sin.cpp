@@ -1,3 +1,5 @@
+#include "static_config.hpp"
+#if COIN == SIN
 #include "job_manager_sin.hpp"
 
 const job_t* JobManagerSin::GetNewJob(const std::string& json_template)
@@ -115,7 +117,7 @@ const job_t* JobManager::GetNewJob()
     using namespace std::string_view_literals;
 
     std::string json;
-    int resCode = daemon_manager->SendRpcReq(json, 1, "getblocktemplate", std::make_pair("rules"sv, "segwit"sv));
+    int resCode = daemon_manager->SendRpcReq(json, 1, "getblocktemplate"sv, "\"rules\":[\"segwit\"]"sv);
 
     if (resCode != 200)
     {
@@ -128,3 +130,4 @@ const job_t* JobManager::GetNewJob()
 
     return GetNewJob(json);
 }
+#endif

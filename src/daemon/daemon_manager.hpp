@@ -79,8 +79,8 @@ class DaemonManager
         using namespace std::string_view_literals;
 
         std::string result_body;
-        int res_code = SendRpcReq<std::any>(result_body, 1, "signrawtransaction",
-                                            std::any(raw_tx));
+        int res_code = SendRpcReq(result_body, 1, "signrawtransaction",
+                                            DaemonRpc::GetParamsStr(raw_tx));
 
         if (res_code != 200)
         {
@@ -116,7 +116,7 @@ class DaemonManager
 
         std::string result_body;
         int res_code =
-            SendRpcReq<std::any>(result_body, 1, "fundrawtransaction", std::any(raw_tx));
+            SendRpcReq(result_body, 1, "fundrawtransaction", DaemonRpc::GetParamsStr(raw_tx));
 
         if (res_code != 200)
         {
@@ -150,9 +150,11 @@ class DaemonManager
     {
         using namespace simdjson;
 
+
         std::string result_body;
-        int res_code = SendRpcReq<std::any>(result_body, 1, "getidentity",
-                                            std::any(addr));
+        int res_code =
+            SendRpcReq(result_body, 1, "getidentity",
+                                 DaemonRpc::GetParamsStr(addr));
 
         if (res_code != 200)
         {
@@ -187,8 +189,9 @@ class DaemonManager
         using namespace simdjson;
 
         std::string result_body;
-        int res_code = SendRpcReq<std::any>(result_body, 1, "validateaddress",
-                                            std::any(addr));
+        int res_code =
+            SendRpcReq(result_body, 1, "validateaddress",
+                                 DaemonRpc::GetParamsStr(addr));
 
         if (res_code != 200)
         {
@@ -228,8 +231,8 @@ class DaemonManager
         using namespace simdjson;
 
         std::string res_body;
-        int res_code =
-            SendRpcReq<std::any>(res_body, 1, "getblock", std::any(block));
+        int res_code = SendRpcReq(
+            res_body, 1, std::string_view("getblock"), DaemonRpc::GetParamsStr(block));
 
         if (res_code != 200)
         {
@@ -262,13 +265,12 @@ class DaemonManager
         return true;
     }
 
-    template <typename... T>
-    int SendRpcReq(std::string& result, int id, const char* method, T... params)
+    int SendRpcReq(std::string& result, int id, std::string_view method, std::string_view params = "[]")
     {
         std::lock_guard rpc_lock(this->rpc_mutex);
         for (DaemonRpc& rpc : rpcs)
         {
-            int res = rpc.SendRequest(result, id, method, params...);
+            int res = rpc.SendRequest(result, id, method, params);
             if (res != -1) return res;
         }
 

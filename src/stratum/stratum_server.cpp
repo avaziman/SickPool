@@ -169,7 +169,7 @@ void StratumServer::HandleBlockNotify()
     //         }
     //         BroadcastJob(cli, new_job);
     //     }
-        // TODO: reset shares
+    // TODO: reset shares
     // }
 
     payment_manager.UpdatePayouts(&round_manager_pow, curtime_ms);
@@ -252,9 +252,10 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
     std::string resBody;
     int64_t reward_value;
 
-    int resCode = daemon_manager.SendRpcReq<std::any>(
-        resBody, 1, "getrawtransaction", std::any(tx_id),
-        std::any(1));  // verboose
+    int resCode =
+        daemon_manager.SendRpcReq(resBody, 1, "getrawtransaction",
+                                  DaemonRpc::GetParamsStr(tx_id,
+                                                          1));  // verboose
 
     if (resCode != 200)
     {
@@ -428,7 +429,8 @@ void StratumServer::BroadcastJob(StratumClient *cli, const job_t *job) const
     SendRaw(cli->sock, notifyMsg.data(), notifyMsg.size());
 }
 
-void StratumServer::HandleConsumeable(con_it * it) {
+void StratumServer::HandleConsumeable(con_it *it)
+{
     static thread_local WorkerContext wc;
 
     Connection<StratumClient> *conn = (*it)->get();
@@ -440,7 +442,7 @@ void StratumServer::HandleConsumeable(con_it * it) {
     const char *last_req_end = nullptr;
     const char *req_start = nullptr;
     char *req_end = nullptr;
-    char *buffer = (char*)conn->req_buff;
+    char *buffer = (char *)conn->req_buff;
 
     req_end = std::strchr(buffer, '\n');
 
@@ -471,12 +473,14 @@ void StratumServer::HandleConsumeable(con_it * it) {
         last_req_end = nullptr;
     }
 }
-void StratumServer::HandleConnected(con_it *it) {
+void StratumServer::HandleConnected(con_it *it)
+{
     Connection<StratumClient> *conn = (*(*it)).get();
     conn->ptr = std::make_unique<StratumClient>(conn->sock, "", 0);
 }
 void StratumServer::HandleDisconnected(con_it *conn) {}
-// std::list<std::unique_ptr<StratumClient>>::iterator *StratumServer::AddClient(
+// std::list<std::unique_ptr<StratumClient>>::iterator
+// *StratumServer::AddClient(
 //     int sockfd, const std::string &ip)
 // {
 //     std::unique_lock l(clients_mutex);
