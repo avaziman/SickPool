@@ -1,5 +1,6 @@
 #ifndef JOB_HPP_
 #define JOB_HPP_
+
 #include <ctime>
 #include <iomanip>
 #include <sstream>
@@ -8,55 +9,35 @@
 
 #include "block_template.hpp"
 #include "merkle_tree.hpp"
+#include "static_config.hpp"
 #include "utils.hpp"
-
-#define VERSION_SIZE 4
-#define TIME_SIZE 4
-#define BITS_SIZE 4
-#define PREVHASH_SIZE HASH_SIZE
-#define MERKLE_ROOT_SIZE HASH_SIZE
-#define FINALSROOT_SIZE HASH_SIZE
-#define NONCE_SIZE HASH_SIZE
-#define SOLUTION_SIZE 1344
-#define SOLUTION_LENGTH_SIZE 3
-#define EXTRANONCE_SIZE 4
-#define NONCE2_SIZE (NONCE_SIZE - EXTRANONCE_SIZE)
-
-#define BLOCK_HEADER_STATIC_SIZE                                  \
-    VERSION_SIZE           /* version */                          \
-        + PREVHASH_SIZE    /* prevhash */                         \
-        + MERKLE_ROOT_SIZE /* merkle_root */                      \
-        + FINALSROOT_SIZE  /* final sapling root */               \
-        + TIME_SIZE        /* time, not static but we override */ \
-        + BITS_SIZE        /* bits */
 
 class Job
 {
    public:
     Job(const std::string& jobId, const BlockTemplate& bTemplate,
-        bool is_payment)
-        : jobId(jobId),
+        bool is_payment = false)
+        : job_id(jobId),
           blockReward(bTemplate.coinbaseValue),
-          minTime(bTemplate.minTime),
+          min_time(bTemplate.minTime),
           height(bTemplate.height),
           is_payment(is_payment)
-    //   target()
     {
         // target.SetHex(std::string(bTemplate.target));
 
-        txCount = bTemplate.txList.transactions.size();
-        txAmountByteValue = txCount;
+        tx_count = bTemplate.txList.transactions.size();
+        txAmountByteValue = tx_count;
 
         txAmountByteLength = VarInt(txAmountByteValue);
-        txsHex = std::vector<char>(
+        txs_Hex = std::vector<char>(
             (txAmountByteLength + bTemplate.txList.byteCount) * 2);
-        Hexlify(txsHex.data(), (unsigned char*)&txAmountByteValue,
+        Hexlify(txs_Hex.data(), (unsigned char*)&txAmountByteValue,
                 txAmountByteLength);
 
         std::size_t written = txAmountByteLength * 2;
         for (const auto& txData : bTemplate.txList.transactions)
         {
-            memcpy(txsHex.data() + written, txData.data_hex.data(),
+            memcpy(txs_Hex.data() + written, txData.data_hex.data(),
                    txData.data_hex.size());
             written += txData.data_hex.size();
         }
@@ -65,55 +46,51 @@ class Job
         //             txsHex.size(), txsHex.data());
     }
 
-    uint8_t* GetStaticHeaderData() { return this->staticHeaderData; }
 
     inline void GetBlockHex(const uint8_t* header, char* res) const
     {
         Hexlify(res, header, BLOCK_HEADER_SIZE);
-        memcpy(res + (BLOCK_HEADER_SIZE * 2), txsHex.data(), txsHex.size());
+        memcpy(res + (BLOCK_HEADER_SIZE * 2), txs_Hex.data(), txs_Hex.size());
     }
 
     int64_t GetBlockReward() const { return blockReward; }
-    // char* GetVersion() { return version; }
-    // char* GetPrevBlockhash() { return hashPrevBlock; }
-    // char* GetTime() { return nTime; }
-    // char* GetBits() { return nBits; }
-    uint8_t* GetPrevBlockHash() { return staticHeaderData + VERSION_SIZE; }
+    uint8_t* GetPrevBlockHash() { return static_header_data + VERSION_SIZE; }
     uint32_t GetHeight() const { return height; }
-    int GetTransactionCount() const { return txCount; }
+    size_t GetTransactionCount() const { return tx_count; }
     std::size_t GetBlockSize() const
     {
-        return (BLOCK_HEADER_SIZE * 2) + (int)txsHex.size();
+        return (BLOCK_HEADER_SIZE * 2) + txs_Hex.size();
     }
-    std::string_view GetId() const { return std::string_view(jobId); }
-    std::string_view GetNotifyMessage() const
-    {
-        return std::string_view(notifyBuff, notifyBuffSize);
-    }
-    int64_t GetMinTime() const { return minTime; }
-    double GetTargetDiff() const { return targetDiff; }
-    double GetEstimatedShares() const { return expectedShares; }
+    std::string_view GetId() const { return std::string_view(job_id); }
+    std::string_view GetNotifyMessage() const { return notify_buff_sv; }
+    int64_t GetMinTime() const { return min_time; }
+    double GetTargetDiff() const { return target_diff; }
+    double GetEstimatedShares() const { return expected_shares; }
     bool GetIsPayment() const { return is_payment; }
     // arith_uint256* GetTarget() { return &target; }
 
    protected:
-    const std::string jobId;
-    uint8_t staticHeaderData[BLOCK_HEADER_STATIC_SIZE];
-    char notifyBuff[MAX_NOTIFY_MESSAGE_SIZE];
-    std::size_t notifyBuffSize;
+    const std::string job_id;
+    uint8_t static_header_data[BLOCK_HEADER_STATIC_SIZE];
+    char notify_buff[MAX_NOTIFY_MESSAGE_SIZE];
+    std::string_view notify_buff_sv;
     const int64_t blockReward;
-    /*const*/ double targetDiff = 0;
-    /*const*/ double expectedShares = 0;
+    /*const*/ double target_diff = 0;
+    /*const*/ double expected_shares = 0;
 
    private:
     // arith_uint256 target;
-    std::vector<char> txsHex;
+    std::vector<char> txs_Hex;
     uint64_t txAmountByteValue;
     std::size_t txAmountByteLength;
-    std::size_t txCount;
+    std::size_t tx_count;
 
-    const int64_t minTime;
+    const int64_t min_time;
     const uint32_t height;
     const bool is_payment;
 };
+
+#if COIN == VRSC
+#include "job_vrsc.hpp"
+#endif
 #endif

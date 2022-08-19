@@ -14,9 +14,11 @@ file(GLOB SRC_FILES
     "logger/*.cpp"
 )
 
+message("SRC FILES: ${SRC_FILES}")
+
 add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
 
-set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger)
+set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger PUBLIC shares)
 target_include_directories(${PROJECT_NAME_CORE} ${SICKPOOL_INCLUDE})
 
 find_library(HIREDIS_LIB hiredis)

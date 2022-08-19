@@ -18,6 +18,9 @@ optimize coinbase generation by only generating it once and only changing the he
 
 get rid of hash of chain balances use per miner instead hash
 
+test with big blocks
+maybe make client list std::map with hashrate as score to notify most powerful miners on jobs first
+
 later:
 show personal luck
 check if we own pool address

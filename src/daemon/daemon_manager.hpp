@@ -6,6 +6,7 @@
 #include <tuple>
 #include <type_traits>
 
+#include <fmt/core.h>
 #include "../coin_config.hpp"
 #include "../daemon/daemon_rpc.hpp"
 #include "logger.hpp"
@@ -75,6 +76,7 @@ class DaemonManager
                             std::string_view raw_tx)
     {
         using namespace simdjson;
+        using namespace std::string_view_literals;
 
         std::string result_body;
         int res_code = SendRpcReq<std::any>(result_body, 1, "signrawtransaction",

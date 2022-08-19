@@ -30,10 +30,10 @@ void SubmissionManager::CheckImmatureSubmissions()
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Info, LogField::SubmissionManager,
-                        "Failed to get confirmations for block {}, parse "
-                        "error: {}, http code: {}",
-                        hashHex, err.what(), res);
+            // Logger::Log(LogType::Info, LogField::SubmissionManager,
+            //             "Failed to get confirmations for block {}, parse "
+            //             "error: {}, http code: {}",
+            //             hashHex, err.what(), res);
             continue;
         }
 
@@ -46,7 +46,7 @@ void SubmissionManager::CheckImmatureSubmissions()
 
         int64_t confirmation_time = GetCurrentTimeMs();
 
-        if (confirmations > BLOCK_MATURITY)
+        if (confirmations > COINBASE_MATURITY)
         {
             Logger::Log(LogType::Info, LogField::SubmissionManager,
                         "Block {} has matured!", hashHex);
@@ -189,8 +189,8 @@ bool SubmissionManager::SubmitBlock(std::string_view block_hex)
     }
     catch (const simdjson::simdjson_error& err)
     {
-        Logger::Log(LogType::Critical, LogField::SubmissionManager,
-                    "Submit block response parse error: {}", err.what());
+        // Logger::Log(LogType::Critical, LogField::SubmissionManager,
+        //             "Submit block response parse error: {}", err.what());
         return false;
     }
 

@@ -10,18 +10,14 @@
 #include <set>
 #include <unordered_set>
 
-#include "config.hpp"
 #include "hash_wrapper.hpp"
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
 
-#define REQ_BUFF_SIZE (1024 * 5)
-#define REQ_BUFF_SIZE_REAL (REQ_BUFF_SIZE - simdjson::SIMDJSON_PADDING)
 class StratumClient
 {
    public:
-    StratumClient(const int sock, const std::string& ip, const int64_t time,
-                  const double diff);
+    StratumClient(const int sock, const std::string& ip, const int64_t time);
 
     double GetDifficulty() const { return current_diff; }
     double GetPendingDifficulty() const { return pending_diff; }

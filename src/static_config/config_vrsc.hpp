@@ -1,35 +1,47 @@
-#ifndef CONFIG_HPP_
-#define CONFIG_HPP_
+#include "hash_algo.hpp"
+#define STRATUM_PROTOCOL_ZEC 1
 
-#define MAX_WORKER_NAME_LEN 16
-#define ADDRESS_LEN 34
+static constexpr uint32_t DIFF1_BITS = 0x200f0f0f;
 
-#define POW_ALGO_VERUSHASH 1
+// in bytes
+static constexpr uint32_t MAX_BLOCK_SIZE = 2000000;
+static constexpr uint32_t BLOCK_HEADER_SIZE = (140 + 3 + 1344);
+static constexpr uint32_t HASH_SIZE = 32;
+static constexpr uint32_t MAX_NOTIFY_MESSAGE_SIZE = (1024 * 4);
 
-/**
- * Maximum amount of time that a block timestamp is allowed to exceed the
- * current network-adjusted time before the block will be accepted.
- */
-#define MAX_FUTURE_BLOCK_TIME 60  // minute in to the future
+// in seconds
+static constexpr uint32_t MAX_FUTURE_BLOCK_TIME = 60;
 
-#define TXVERSION_GROUP 0x892f2085
-#define TXVERSION 4
+static constexpr uint32_t COINBASE_MATURITY = 100;
 
-#define POW_ALGO POW_ALGO_VERUSHASH
-// target: 0x0f0f0f0000000000000000000000000000000000000000000000000000000000
-#define DIFF1_BITS 0x200f0f0f
-#define MAX_BLOCK_SIZE 2000000  // bytes
-#define BLOCK_HEADER_SIZE (140 + 3 + 1344)
-#define HASH_SIZE 32
-#define HASH_SIZE_HEX (HASH_SIZE * 2)
-#define POW_BLOCK_TIME 60
-#define MAX_NOTIFY_MESSAGE_SIZE (1024 * 4)
+static constexpr HashAlgo HASH_ALGO = HashAlgo::VERUSHASH_V2b2;
 
-#define DEBUG 1
-#ifndef DEBUG
-#define BLOCK_MATURITY 100
-#else
-#define BLOCK_MATURITY 0
-#endif
+// tx
+static constexpr uint32_t TXVERSION_GROUP = 0x892f2085;
+static constexpr uint32_t TXVERSION = 4;
 
-#endif // CONFIG_HPP_
+static constexpr uint32_t ADDRESS_LEN = 34;
+static constexpr char ADDRESS_PREFIX = 'R';
+
+// encoded as in block header
+static constexpr uint32_t BLOCK_VERSION = 0x04000100;
+static constexpr uint32_t VERSION_SIZE = 4;
+static constexpr uint32_t TIME_SIZE = 4;
+static constexpr uint32_t BITS_SIZE = 4;
+static constexpr uint32_t PREVHASH_SIZE = HASH_SIZE;
+static constexpr uint32_t MERKLE_ROOT_SIZE = HASH_SIZE;
+static constexpr uint32_t NONCE_SIZE = HASH_SIZE;
+
+static constexpr uint32_t EXTRANONCE2_SIZE = NONCE_SIZE - EXTRANONCE_SIZE;
+
+static constexpr uint32_t FINALSROOT_SIZE = HASH_SIZE;
+static constexpr uint32_t SOLUTION_SIZE = 1344;
+static constexpr uint32_t SOLUTION_LENGTH_SIZE = 3;
+
+static constexpr uint32_t BLOCK_HEADER_STATIC_SIZE =
+    VERSION_SIZE       /* version */
+    + PREVHASH_SIZE    /* prevhash */
+    + MERKLE_ROOT_SIZE /* merkle_root */
+    + FINALSROOT_SIZE  /* final sapling root */
+    + TIME_SIZE        /* time, not static but we override */
+    + BITS_SIZE /* bits */;

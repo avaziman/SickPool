@@ -68,8 +68,8 @@ bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,
     using namespace std::string_view_literals;
     std::scoped_lock lock(rc_mutex);
     // redis bitfield uses be so gotta swap em
-    return Command({"BITFIELD"sv, fmt::format("block:{}", block_id), "SET"sv, "i32"sv,
-                    "0"sv, std::to_string(bswap_32(confirmations))})
+    return Command({"BITFIELD"sv, fmt::format("block:{}", block_id), "SET"sv,
+                    "i32"sv, "0"sv, std::to_string(bswap_32(confirmations))})
                .get() == nullptr;
 }
 

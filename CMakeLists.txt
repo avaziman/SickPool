@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.16.0)
 
-# set(CMAKE_C_COMPILER /usr/bin/clang-14)
-# set(CMAKE_CXX_COMPILER /usr/bin/clang-14)
-set(CMAKE_C_COMPILER /usr/bin/gcc)
-set(CMAKE_CXX_COMPILER /usr/bin/g++)
+# set(CMAKE_C_COMPILER /usr/bin/clang-15)
+# set(CMAKE_CXX_COMPILER /usr/bin/clang-15)
+# set(CMAKE_C_COMPILER /usr/bin/gcc)
+# set(CMAKE_CXX_COMPILER /usr/bin/g++)
+
+set(CMAKE_C_COMPILER /usr/bin/gcc-10)
+set(CMAKE_CXX_COMPILER /usr/bin/g++-10)
 
 project("SickPool" CXX C)
 set(PROJECT_NAME_CORE ${PROJECT_NAME}_core)
@@ -17,6 +20,7 @@ set(CMAKE_BUILD_TYPE "Debug")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     # -g3 maximum debugging information
+    message("DEBUG BUILD")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3")
     add_compile_definitions(SIMDJSON_DEVELOPMENT_CHECKS)
 else()

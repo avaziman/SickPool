@@ -3,7 +3,6 @@
 #include <deque>
 #include <unordered_map>
 
-#include "config.hpp"
 #include "daemon_manager.hpp"
 #include "logger.hpp"
 #include "redis_manager.hpp"

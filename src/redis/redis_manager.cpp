@@ -246,10 +246,10 @@ bool RedisManager::AddNewMiner(std::string_view address,
         AppendCommand({"TS.INCRBY"sv,
                        fmt::format("{}:{}", MINER_COUNT_KEY, "pool"), "1"sv});
 
-        std::string_view curtime_sv = std::to_string(curtime);
+        std::string curtime_str = std::to_string(curtime);
         // don't override if it exists
         AppendCommand({"ZADD"sv, fmt::format("solver-index:{}", JOIN_TIME_KEY),
-                       "NX", curtime_sv, address});
+                       "NX", curtime_str, address});
 
         // reset all indexes of new miner
         for (std::string_view index :
@@ -260,7 +260,7 @@ bool RedisManager::AddNewMiner(std::string_view address,
         }
 
         AppendCommand({"HSET"sv, fmt::format("solver:{}", address),
-                       IDENTITY_KEY, id_tag, JOIN_TIME_KEY, curtime_sv,
+                       IDENTITY_KEY, id_tag, JOIN_TIME_KEY, curtime_str,
                        SCRIPT_PUB_KEY_KEY, script_pub_key, PAYOUT_THRESHOLD_KEY,
                        std::to_string(PaymentManager::minimum_payout_threshold),
                        HASHRATE_KEY, "0"sv, MATURE_BALANCE_KEY, "0"sv,

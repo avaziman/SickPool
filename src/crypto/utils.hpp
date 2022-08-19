@@ -11,10 +11,11 @@
 #include <thread>
 #include <vector>
 
-#include "config.hpp"
 #include "verushash/arith_uint256.h"
 #include "verushash/endian.h"
 #include "verushash/uint256.h"
+#include "static_config/static_config.hpp"
+
 
 #define DIFF_US(end, start) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 #define TIME_NOW() std::chrono::steady_clock::now()
@@ -230,17 +231,28 @@ inline int intPow(int x, unsigned int p)
         return x * tmp * tmp;
 }
 
-inline double BitsToDiff(const unsigned bits)
+constexpr double BitsToDiff(const unsigned bits)
 {
-    const unsigned exponent_diff = 8 * (0x20 - ((bits >> 24) & 0xFF));
+    const unsigned exponent_diff = 8 * (DIFF1_EXPONENT - ((bits >> 24) & 0xFF));
     const double significand = bits & 0xFFFFFF;
-    return std::ldexp(0x0f0f0f / significand, exponent_diff);
+    return std::ldexp(DIFF1_COEFFICIENT / significand, exponent_diff);
+}
+
+constexpr uint64_t pow2(int power)
+{
+    // if (power == 0) return 1;
+
+    // return 2 * pow2(power - 1);
+
+    return (1ULL << power);
 }
 
 inline double GetExpectedHashes(const double diff)
 {
-    // return std::ldexp(diff / 0x0f0f0f, 24);
-    return diff * 17.00000101327902;  // 2^ 24 / 0x0f0f0f = 17...
+    constexpr uint64_t power = 256 - 8 * (DIFF1_EXPONENT - 3);
+    constexpr double hash_multiplier = static_cast<double>(pow2(power)) / DIFF1_COEFFICIENT;
+    return diff * hash_multiplier;
+    // for verus 2^ 24 / 0x0f0f0f = 17...
 }
 
 // ms
@@ -259,11 +271,11 @@ static uint32_t DiffToBits(double difficulty)
     for (shiftBytes = 1; true; shiftBytes++)
     {
         word =
-            ((DIFF1_BITS & 0x00FFFFFF) * pow(0x100, shiftBytes)) / difficulty;
+            (DIFF1_COEFFICIENT * pow(0x100, shiftBytes)) / difficulty;
         if (word >= 0xffff) break;
     }
     word &= 0xffffff;  // convert to int < 0xffffff
-    int size = (DIFF1_BITS >> 24) - shiftBytes;
+    int size = DIFF1_EXPONENT - shiftBytes;
     // the 0x00800000 bit denotes the sign, so if it is already set, divide the
     // mantissa by 0x100 and increase the size by a byte
     if (word & 0x800000)

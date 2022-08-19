@@ -8,7 +8,7 @@
 
 #include "utils.hpp"
 #include "hash_wrapper.hpp"
-#include "static_config/config.hpp"
+#include "static_config/static_config.hpp"
 
 struct TransactionData
 {
@@ -21,6 +21,11 @@ struct TransactionData
     //     HashWrapper::SHA256d(hash, data.data(), data.size());
     // }
 
+    std::string_view data_hex;
+    std::vector<uint8_t> data;
+    uint8_t hash[HASH_SIZE];
+    double fee;
+    
     TransactionData(std::string_view data_hex, std::string_view hash_hex)
         : data_hex(data_hex)
     {
@@ -38,11 +43,6 @@ struct TransactionData
     }
 
     TransactionData() = default;
-
-    std::string_view data_hex;
-    std::vector<uint8_t> data;
-    uint8_t hash[HASH_SIZE];
-    double fee;
 };
 
 struct TransactionDataList
@@ -86,6 +86,19 @@ struct TransactionDataList
 
         return true;
     }
+};
+
+// in the order they appear in the rpc response
+struct BlockTemplateSin
+{
+    int32_t version;
+    std::string_view prevBlockHash;
+    TransactionDataList txList;
+    int64_t coinbaseValue;
+    std::string_view target;
+    int64_t minTime;
+    std::string_view bits;
+    uint32_t height;
 };
 
 // in the order they appear in the rpc response

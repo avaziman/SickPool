@@ -5,9 +5,10 @@
 #include <cstring>
 #include <string>
 
-#include "jobs/verus_job.hpp"
+#include "static_config.hpp"
 #include "shares/share.hpp"
 #include "stats/round.hpp"
+#include "utils.hpp"
 
 enum class BlockType : uint8_t
 {

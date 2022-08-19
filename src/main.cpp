@@ -5,6 +5,8 @@
 #include <iostream>
 #include <string>
 
+#include "static_config.hpp"
+
 #include "crypto/base58.h"
 #include "crypto/hash_wrapper.hpp"
 #include "crypto/verus_transaction.hpp"
@@ -23,7 +25,7 @@
 
 void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg);
 
-StratumServer *stratum_server_ptr;
+stratum_server_t *stratum_server_ptr;
 
 void SigintHandler(int sig)
 {
@@ -40,6 +42,7 @@ void SigintHandler(int sig)
 
 int main(int argc, char** argv)
 {
+
     // std::cout << std::hex
     //           <<
     //           UintToArith256(uint256S("00000000000184c09e98da047ab3260fca551"
@@ -87,7 +90,7 @@ int main(int argc, char** argv)
         Logger::Log(LogType::Info, LogField::Config, "Effort retention: {}s",
                     coinConfig.effort_interval_seconds);
 
-        StratumServer stratum_server(coinConfig);
+        stratum_server_t stratum_server(coinConfig);
         stratum_server_ptr = &stratum_server;
         stratum_server.Listen();
     }

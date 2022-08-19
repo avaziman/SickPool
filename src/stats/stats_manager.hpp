@@ -19,7 +19,7 @@
 #include "redis/redis_manager.hpp"
 #include "round.hpp"
 #include "shares/share.hpp"
-#include "static_config/config.hpp"
+#include "static_config/static_config.hpp"
 #include "stats/stats.hpp"
 
 class RedisManager;
@@ -41,8 +41,8 @@ class StatsManager
     void AddShare(const std::string& worker_full, const std::string& miner_addr,
                   const double diff);
     bool AddWorker(const std::string& address, const std::string& worker_full,
-                   const std::string& idTag,
-                   std::string_view script_pub_key, std::time_t curtime);
+                   std::string_view script_pub_key, std::time_t curtime,
+                   const std::string& idTag = "");
     void PopWorker(const std::string& worker, const std::string& address);
 
     // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);

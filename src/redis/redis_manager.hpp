@@ -1,24 +1,25 @@
 #ifndef REDIS_MANAGER_HPP_
 #define REDIS_MANAGER_HPP_
+#include <byteswap.h>
 #include <fmt/format.h>
 #include <hiredis/hiredis.h>
 
 #include <chrono>
 #include <ctime>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <unordered_map>
 #include <vector>
 
-#include "round_share.hpp"
 #include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
 #include "logger.hpp"
 #include "payments/payment_manager.hpp"
 #include "redis_transaction.hpp"
-#include "round_manager.hpp"
+#include "round_share.hpp"
 #include "shares/share.hpp"
-#include "static_config/config.hpp"
+#include "static_config/static_config.hpp"
 #include "stats/stats.hpp"
 #include "stats/stats_manager.hpp"
 
@@ -188,7 +189,7 @@ class RedisManager
         if (argc > 1)
         {
             prefixed_key =
-                std::string(COIN_SYMBOL) + ":"s + std::string(argv[1]);
+            std::string(COIN_SYMBOL) + ":"s + std::string(argv[1]);
             // add coin prefix to the all keys
             argv[1] = prefixed_key.data();
             args_len[1] = prefixed_key.size();

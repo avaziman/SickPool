@@ -4,12 +4,13 @@
 
 #include <algorithm>
 
+#include "static_config.hpp"
+#include "share.hpp"
 #include "../crypto/hash_wrapper.hpp"
 #include "../crypto/verus_transaction.hpp"
 #include "../daemon/daemon_rpc.hpp"
 #include "logger.hpp"
 #include "./job.hpp"
-#include "./verus_job.hpp"
 #include "block_template.hpp"
 #include "payment_manager.hpp"
 #include "daemon_manager.hpp"
@@ -24,8 +25,8 @@ class JobManager
     {
     }
 
-    const job_t* GetNewJob();
-    const job_t* GetNewJob(const std::string& json_template);
+    virtual const job_t* GetNewJob();
+    virtual const job_t* GetNewJob(const std::string& json_template);
     
     inline const job_t* GetJob(std::string_view hexId)
     {
@@ -42,7 +43,7 @@ class JobManager
 
     inline const job_t* GetLastJob() { return GetJob(last_job_id_hex); }
 
-   private:
+   protected:
     // multiple jobs can use the same block template, (append transactions only)
 
     DaemonManager* daemon_manager;

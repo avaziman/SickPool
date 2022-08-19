@@ -121,7 +121,7 @@ bool RedisManager::ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
         AppendHset(fmt::format("solver:", addr), WORKER_COUNT_KEY, "0"sv);
 
         AppendTsAdd(fmt::format("{}:{}", WORKER_COUNT_KEY, addr), time_now,
-                    0.d);
+                    0);
     }
 
     return GetReplies();

@@ -1,17 +1,20 @@
 #include <fmt/format.h>
 
+#include <cassert>
 #include <chrono>
 #include <iostream>
 
-#include "jobs/job_manager.hpp"
-#include "jobs/verus_job.hpp"
-#include "logger.hpp"
+#include "static_config/static_config.hpp"
 #include "share.hpp"
+#include "jobs/job_manager.hpp"
+#include "logger.hpp"
 #include "stratum_client.hpp"
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
+#include "stratum_server.hpp"
 
-struct WorkerContext{
+struct WorkerContext
+{
     uint32_t current_height;
     uint8_t block_header[BLOCK_HEADER_SIZE];
     CVerusHashV2 hasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
@@ -21,54 +24,62 @@ struct WorkerContext{
 class ShareProcessor
 {
    public:
-    inline static void Process(StratumClient* cli,
-                               WorkerContext* wc, const job_t* job,
-                               const Share& share, ShareResult& result,
-                               int64_t curTime)
+    static inline bool VerifyShareParams(ShareResult& result, const job_t* job, std::string_view given_time,
+                                  const int64_t curtime)
     {
         if (job == nullptr)
         {
-            result.code = ShareCode::JOB_NOT_FOUND;
+            result.code = ResCode::JOB_NOT_FOUND;
             result.message = "Job not found";
-            return;
+            return false;
         }
 
-        if (!cli->GetIsAuthorized())
-        {
-            result.code = ShareCode::UNAUTHORIZED_WORKER;
-            result.message = "Unauthorized worker";
-            return;
-        }
-
-        uint8_t* headerData = wc->block_header;
-
-        // veirfy params before even hashing
-        // convert share time to uint32 (fast)
-        uint32_t shareTime = HexToUint(share.time.data(), share.time.size());
+        uint32_t shareTime = HexToUint(given_time.data(), given_time.size());
         shareTime = bswap_32(shareTime);  // swap to little endian
 
         int64_t minTime = job->GetMinTime();
-        int64_t maxTime = curTime / 1000 + MAX_FUTURE_BLOCK_TIME;
+        int64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
 
         if (shareTime < minTime || shareTime > maxTime)
         {
-            result.code = ShareCode::UNKNOWN;
+            result.code = ResCode::UNKNOWN;
             result.message =
                 "Invalid nTime "
                 "(min: " +
                 std::to_string(minTime) + ", max: " + std::to_string(maxTime) +
                 ", given: " + std::to_string(shareTime) + ")";
+            return false;
+        }
+
+        return true;
+    }
+    inline static void Process(ShareResult& result, StratumClient* cli,
+                               WorkerContext* wc, const job_t* job,
+                               const share_t& share, int64_t curTime)
+    {
+        // veirfy params before even hashing
+
+        if (!VerifyShareParams(result, job, share.time, curTime))
+        {
             return;
         }
+
+        uint8_t* headerData = wc->block_header;
 
         job->GetHeaderData(headerData, share.time, cli->GetExtraNonce(),
                            share.nonce2, share.solution);
 
-#if POW_ALGO == POW_ALGO_VERUSHASH
-        // takes about 6-8 microseconds vs 8-12 on snomp
-        HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
-                                   BLOCK_HEADER_SIZE, &wc->hasher);
-#endif
+        if constexpr (HASH_ALGO == HashAlgo::VERUSHASH_V2b2)
+        {
+            // takes about 6-8 microseconds vs 8-12 on snomp
+            HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
+                                       BLOCK_HEADER_SIZE, &wc->hasher);
+        }
+        else
+        {
+            throw std::runtime_error("Missing hash function");
+        }
+
         uint256 hash(result.hash_bytes);
         // arith_uint256 hashArith = UintToArith256(hash);
 
@@ -78,9 +89,10 @@ class ShareProcessor
 
         if (!cli->SetLastShare(shareEnd, curTime))
         {
-            result.code = ShareCode::DUPLICATE_SHARE;
+            result.code = ResCode::DUPLICATE_SHARE;
             result.message = "Duplicate share";
-            result.difficulty = static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
+            result.difficulty =
+                static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
             return;
         }
 
@@ -89,12 +101,13 @@ class ShareProcessor
         // if (hashArith >= *job->GetTarget())
         if (result.difficulty >= job->GetTargetDiff())
         {
-            result.code = ShareCode::VALID_BLOCK;
+            result.code = ResCode::VALID_BLOCK;
             return;
         }
-        else if (result.difficulty / cli->GetDifficulty() < 1)  // allow 5% below
+        else if (result.difficulty / cli->GetDifficulty() <
+                 1)  // allow 5% below
         {
-            result.code = ShareCode::LOW_DIFFICULTY_SHARE;
+            result.code = ResCode::LOW_DIFFICULTY_SHARE;
             result.message =
                 fmt::format("Low difficulty share of {}", result.difficulty);
             char blockHeaderHex[BLOCK_HEADER_SIZE * 2];
@@ -109,7 +122,7 @@ class ShareProcessor
             return;
         }
 
-        result.code = ShareCode::VALID_SHARE;
+        result.code = ResCode::VALID_SHARE;
         return;
     }
 };

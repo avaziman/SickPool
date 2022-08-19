@@ -96,7 +96,8 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
     std::vector<std::pair<std::string, double>> remove_worker_hashrates;
     bool res = redis_manager->TsMrange(remove_worker_hashrates, "worker"sv,
-                                       RedisManager::HASHRATE_KEY, remove_time, remove_time);
+                                       RedisManager::HASHRATE_KEY, remove_time,
+                                       remove_time);
 
     {
         // only lock after receiving the hashrates to remove
@@ -200,9 +201,8 @@ void StatsManager::AddShare(const std::string& worker_full,
 
 bool StatsManager::AddWorker(const std::string& address,
                              const std::string& worker_full,
-                             const std::string& idTag, 
-                             std::string_view script_pub_key,
-                             int64_t curtime)
+                             std::string_view script_pub_key, int64_t curtime,
+                             const std::string& idTag)
 {
     using namespace std::literals;
     std::scoped_lock stats_db_lock(stats_map_mutex);
@@ -217,7 +217,8 @@ bool StatsManager::AddWorker(const std::string& address,
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
                     "New miner has spawned: {}", address);
-        if (redis_manager->AddNewMiner(address, worker_full, idTag, script_pub_key, curtime))
+        if (redis_manager->AddNewMiner(address, worker_full, idTag,
+                                       script_pub_key, curtime))
         {
             Logger::Log(LogType::Info, LogField::StatsManager,
                         "Miner {} added to database.", address);

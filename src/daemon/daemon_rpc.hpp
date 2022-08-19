@@ -16,7 +16,9 @@
 #include <tuple>
 #include <variant>
 #include <vector>
+#include <fmt/core.h>
 
+#include "jsonify.hpp"
 #include "../sock_addr.hpp"
 
 #define HTTP_HEADER_SIZE (1024 * 16)
@@ -81,6 +83,14 @@ class DaemonRpc
                     std::string str = std::to_string(std::any_cast<int>(param));
                     params_json.append(str);
                 }
+                // for sinovate, eh
+                else if (param.type() ==
+                         typeid(std::pair<std::string_view, std::string_view>))
+                {
+                    auto param_sv = std::any_cast<std::pair<std::string_view, std::string_view>>(param);
+
+                    params_json.append(fmt::format("{{\"{}\":[\"{}\"]}}", param_sv.first, param_sv.second));
+                }
                 // assert type is one of these when .type is constexpr
 
                 if (i != params_vec.size() - 1)
@@ -143,8 +153,10 @@ class DaemonRpc
                                   sizeof("Content-Length: ") - 1);
         contentReceived = headerRecv - (endOfHeader - headerBuff);
 
-        if(resCode != 200){
-            // if there was an error return the header instead the body as there is none
+        if (resCode != 200)
+        {
+            // if there was an error return the header instead the body as there
+            // is none
             result.resize(headerRecv);
             memcpy(result.data(), headerBuff, headerRecv);
             close(sockfd);
@@ -163,8 +175,9 @@ class DaemonRpc
         // receive http body if it wasn't already
         while (contentReceived < contentLength)
         {
-            std::size_t recvRes = recv(sockfd, result.data() + contentReceived - 1,
-                                       contentLength - contentReceived, 0);
+            std::size_t recvRes =
+                recv(sockfd, result.data() + contentReceived - 1,
+                     contentLength - contentReceived, 0);
             if (recvRes <= 0)
             {
                 return resCode;

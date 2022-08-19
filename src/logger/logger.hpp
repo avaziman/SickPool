@@ -72,8 +72,8 @@ class Logger
     static std::mutex log_mutex;
 
     template <typename... T>
-    static void Log(LogType type, LogField field,
-                    fmt::format_string<T...> message, T&&... args)
+    static inline void Log(LogType type, LogField field,
+                          fmt::format_string<T...> message, T&&... args)
     {
         std::scoped_lock lock(log_mutex);
         const char* field_str = ToString(field);
