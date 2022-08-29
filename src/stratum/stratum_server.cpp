@@ -4,6 +4,7 @@ StratumServer::StratumServer(const CoinConfig &conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(conf),
       redis_manager("127.0.0.1", (int)conf.redis_port),
+      clients_mutex(),
       diff_manager(&clients_mutex, coin_config.target_shares_rate),
       round_manager_pow(&redis_manager, "pow"),
       round_manager_pos(&redis_manager, "pos"),
