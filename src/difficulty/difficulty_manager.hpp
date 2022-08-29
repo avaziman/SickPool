@@ -3,26 +3,29 @@
 
 #include <mutex>
 #include <thread>
+#include <map>
 #include <vector>
 
 #include "logger.hpp"
 #include "stratum_client.hpp"
+#include "connection.hpp"
 
 class DifficultyManager
 {
    public:
-    DifficultyManager(std::mutex* clients_mutex, double targetSharesRate)
-        :
-          clients_mutex(clients_mutex),
-          target_share_rate(targetSharesRate)
+    DifficultyManager(
+        std::map<Connection<StratumClient>*, double>* clients, std::mutex* clients_mutex,
+        double targetSharesRate)
+        : clients(clients), clients_mutex(clients_mutex), target_share_rate(targetSharesRate)
     {
     }
 
     void Adjust(const int passed_seconds)
     {
         std::scoped_lock lock(*clients_mutex);
-        for (auto& [_, client] : *clients)
+        for (auto& [conn, _] : *clients)
         {
+            StratumClient* client = conn->ptr.get();
             const double current_diff = client->GetDifficulty();
             const double minute_rate =
                 client->GetShareCount() / (passed_seconds / 60);
@@ -50,7 +53,7 @@ class DifficultyManager
 
    private:
     double target_share_rate;
-    std::unordered_map<int, std::unique_ptr<StratumClient>>* clients;
+    std::map<Connection<StratumClient>*, double>* clients;
     std::mutex* clients_mutex;
 };
 

@@ -95,7 +95,7 @@ class StratumClient
 
     double current_diff;
     double pending_diff;
-    bool is_authorized;
+    bool is_authorized = false;
     bool is_pending_diff = false;
 
     // std::string current_job_id;
