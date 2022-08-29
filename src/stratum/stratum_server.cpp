@@ -187,7 +187,8 @@ void StratumServer::HandleBlockNotify()
 
     submission_manager.CheckImmatureSubmissions();
 
-    redis_manager.SetNewBlockStats(chain, curtime_ms, net_est_hr);
+    redis_manager.SetNewBlockStats(chain, curtime_ms, net_est_hr,
+                                   new_job->GetEstimatedShares());
 
     Logger::Log(
         LogType::Info, LogField::JobManager,
@@ -402,11 +403,12 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
                     std::string_view(blockData, blockSize));
 
         const std::string_view worker_full(cli->GetFullWorkerName());
-        const auto chainRound = round_manager_pow.GetChainRound();
+        const auto chain_round = round_manager_pow.GetChainRound();
         const auto type =
             job->GetIsPayment() ? BlockType::POW_PAYMENT : BlockType::POW;
+        const double dur = time - chain_round.round_start_ms;
         const double effort_percent =
-            (chainRound.total_effort / job->GetEstimatedShares()) * 100.f;
+            (dur / 1000) / (job->GetEstimatedShares() / (chain_round.total_effort / (dur / 1000))) * 100.f;
 
         if constexpr (HASH_ALGO == HashAlgo::X25X)
         {
@@ -417,7 +419,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 
         auto submission = std::make_unique<ExtendedSubmission>(
             chain, worker_full, type, job->GetHeight(), job->GetBlockReward(),
-            chainRound, time, SubmissionManager::block_number,
+            chain_round, time, SubmissionManager::block_number,
             share_res.difficulty, effort_percent, share_res.hash_bytes.data(),
             job->coinbase_tx_id);
 

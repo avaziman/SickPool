@@ -71,7 +71,7 @@ class RedisManager
     void AppendAddRoundShares(std::string_view chain,
                               const BlockSubmission *submission,
                               const round_shares_t &miner_shares);
-    bool SetNewBlockStats(std::string_view chain, int64_t curtime, double net_hr);
+    bool SetNewBlockStats(std::string_view chain, int64_t curtime, double net_hr, double estimated_shares);
     bool ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
                                  int64_t time_now);
 
