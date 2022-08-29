@@ -3,6 +3,10 @@ todo:
 fix average
 check if miner exists from address map and remove him after being idle for 5 minutes same for worker
 
+script that:
+edits .conf file
+sets stratumnotifier 
+adds redis functions
 
 LoadMatureRewards on startup
 pos

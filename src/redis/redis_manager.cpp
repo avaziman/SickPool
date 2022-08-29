@@ -70,13 +70,20 @@ bool RedisManager::DoesAddressExist(std::string_view addrOrId,
     freeReplyObject(reply);
     return res;
 }
+bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t curtime_ms, double net_est_hr,
+                      double estimated_shares)
+{
+    AppendAddNetworkHr(chain, curtime_ms, net_est_hr);
+    AppendSetMinerEffort(chain, RedisManager::ESTIMATED_EFFORT_KEY, "pow",
+                         estimated_shares);
+}
 
-int RedisManager::AddNetworkHr(std::string_view chain, int64_t time, double hr)
+void RedisManager::AppendAddNetworkHr(std::string_view chain, int64_t time,
+                                      double hr)
 {
     std::scoped_lock lock(rc_mutex);
     std::string key = fmt::format("{}:{}", chain, NETWORK_HASHRATE_KEY);
     AppendTsAdd(std::string_view(key), time, hr);
-    return GetReplies();
 }
 
 bool RedisManager::UpdateImmatureRewards(std::string_view chain,

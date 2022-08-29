@@ -187,14 +187,8 @@ void StratumServer::HandleBlockNotify()
 
     submission_manager.CheckImmatureSubmissions();
 
-    redis_manager.AddNetworkHr(chain, curtime_ms, net_est_hr);
-
-    // TODO: think how to set estimted effort, DO NOT USE THIS, broken
-    // redis_manager.AppendSetMinerEffort(chain,
-    //                                    RedisManager::ESTIMATED_EFFORT_KEY,
-    //                                    "pow", new_job->GetEstimatedShares());
-    // redis_manager.GetReplies();
-    //  TODO: combine all redis functions one new block to one pipelined
+    redis_manager.SetNewBlockStats(chain, curtime_ms, net_est_hr,
+                                   new_job->GetEstimatedShares());
 
     Logger::Log(
         LogType::Info, LogField::JobManager,

@@ -71,6 +71,7 @@ class RedisManager
     void AppendAddRoundShares(std::string_view chain,
                               const BlockSubmission *submission,
                               const round_shares_t &miner_shares);
+    bool SetNewBlockStats(std::string_view chain, int64_t curtime, double net_hr, double estimated_shares);
     bool ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
                                  int64_t time_now);
 
@@ -106,7 +107,7 @@ class RedisManager
 
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
-    int AddNetworkHr(std::string_view chain, int64_t time, double hr);
+    void AppendAddNetworkHr(std::string_view chain, int64_t time, double hr);
 
     std::string hget(std::string_view key, std::string_view field);
 
@@ -169,10 +170,10 @@ class RedisManager
     static constexpr std::string_view IMMATURE_REWARDS = "immature-rewards";
     static constexpr std::string_view NETWORK_HASHRATE_KEY = "network-hashrate";
 
+    std::mutex rc_mutex;
    private:
     redisContext *rc;
     int command_count = 0;
-    std::mutex rc_mutex;
 
     void AppendCommand(std::initializer_list<std::string_view> args, bool add_coin = true)
     {

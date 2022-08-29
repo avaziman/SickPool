@@ -1,4 +1,4 @@
--- #!lua name=sickpool
+#!lua name=sickpool
 redis.register_function(
     "geteffortpow",
     function(KEYS)
