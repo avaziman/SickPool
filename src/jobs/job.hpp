@@ -24,7 +24,7 @@ class Job
           height(bTemplate.height),
           is_payment(is_payment),
           target_diff(BitsToDiff(bTemplate.bits)),
-          expected_shares(GetExpectedHashes(this->target_diff) * BLOCK_TIME),
+          expected_shares(GetExpectedHashes(this->target_diff)),
           tx_count(bTemplate.tx_list.transactions.size())
     {
         // target.SetHex(std::string(bTemplate.target));
