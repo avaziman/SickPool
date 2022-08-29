@@ -65,3 +65,16 @@ redis.register_function(
         return result
     end
 )
+
+-- ARG[1] - key
+-- ARG[2] - start
+-- ARG[3] - end
+redis.register_function(
+    "getpayouts",
+    function(KEYS, ARGV)
+        local results = redis.call("LRANGE", KEYS[1], KEYS[2], KEYS[3])
+        local totalResults = redis.call("LLEN", KEYS[1])
+
+        return {totalResults, results}
+    end
+)

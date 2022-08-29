@@ -20,6 +20,9 @@
 #define DIFF_US(end, start) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 #define TIME_NOW() std::chrono::steady_clock::now()
 
+#define unlikely(expr) (__builtin_expect(!!(expr), 0))
+#define likely(expr) (__builtin_expect(!!(expr), 1))
+
 inline int64_t GetCurrentTimeMs()
 {
     struct timeval time_now;
@@ -114,6 +117,15 @@ inline void Hexlify(char* dest, const unsigned char* src, size_t srcSize)
     }
 }
 
+inline void PrintHex(uint8_t* b, std::size_t size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        std::cout << std::hex << std::setfill('0') << std::setw(2) << int(b[i]);
+    }
+    std::cout << std::endl;
+}
+
 inline void Unhexlify(unsigned char* dest, const char* src, size_t size)
 {
     // each byte is 2 characters in hex
@@ -135,11 +147,16 @@ inline uint32_t FromHex(const char* str)
 }
 
 // from script.h
-inline std::vector<unsigned char> GenNumScript(const int64_t& value)
+inline std::vector<uint8_t> GenNumScript(const int64_t value)
 {
-    std::vector<unsigned char> result;
+    std::vector<uint8_t> result;
     const bool neg = value < 0;
     uint64_t absvalue = neg ? -value : value;
+
+    if(value == 0){
+        result.push_back(0);
+        return result;
+    }
 
     while (absvalue)
     {
@@ -251,6 +268,7 @@ inline double GetExpectedHashes(const double diff)
 {
     constexpr uint64_t power = 256 - 8 * (DIFF1_EXPONENT - 3);
     constexpr double hash_multiplier = static_cast<double>(pow2(power)) / DIFF1_COEFFICIENT;
+
     return diff * hash_multiplier;
     // for verus 2^ 24 / 0x0f0f0f = 17...
 }

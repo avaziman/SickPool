@@ -8,10 +8,8 @@ void RedisManager::AppendAddBlockSubmission(
 {
     using namespace std::string_view_literals;
 
-    std::scoped_lock lock(rc_mutex);
-
     uint32_t block_id = submission->number;
-    auto chain = std::string((char *)submission->chain);
+    auto chain = std::string(submission->chain_sv);
     std::string block_id_str = std::to_string(block_id);
     std::string_view block_id_sv(block_id_str);
 

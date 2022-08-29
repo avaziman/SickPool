@@ -4,7 +4,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "verus_transaction.hpp"
+#include "transaction.hpp"
+#include "block_template.hpp"
 
 typedef std::vector<std::pair<std::string, int64_t>> reward_map_t;
 
@@ -32,17 +33,17 @@ struct PayeeInfo
 
 struct PaymentInfo{
     int64_t total_paid = 0;
-    int64_t fee = 0;
     reward_map_t rewards;
     std::string raw_transaction_hex;
-    std::string tx_hash_hex;
+    char block_hash_hex[64];
 };
 
 struct PendingPayment
 {
-    PendingPayment(uint32_t id) : tx(TXVERSION, 0, true, TXVERSION_GROUP), id(id) {}
+    PendingPayment(uint32_t id) :  id(id) {}
     uint32_t id;
-    VerusTransaction tx;
+    TransactionData td;
+    transaction_t tx;
     PaymentInfo info;
 };
 

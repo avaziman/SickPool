@@ -1,10 +1,10 @@
 #include "job_manager.hpp"
 
-const job_t* JobManager::   ()
+const job_t* JobManager::GetNewJob()
 {
     using namespace simdjson;
     std::string json;
-    int resCode = daemon_manager->SendRpcReq(json, 1, "getblocktemplate", DaemonRpc::GetParamsStr(4.2));
+    int resCode = daemon_manager->SendRpcReq(json, 1, "getblocktemplate");
 
     if (resCode != 200)
     {
@@ -18,45 +18,38 @@ const job_t* JobManager::   ()
     return GetNewJob(json);
 }
 
-// doesnt include dataHex
-TransactionData JobManager::GetCoinbaseTxData(int64_t value, uint32_t height,
-                                              int64_t locktime,
-                                              std::string_view rpc_coinbase)
-{
-    TransactionData res;
-    VerusTransaction coinbaseTx =
-        GetCoinbaseTx(value, height, locktime, rpc_coinbase);
 
-    coinbaseTx.GetBytes(res.data);
-    HashWrapper::SHA256d(res.hash, res.data.data(), res.data.size());
-    res.fee = 0;
-    return res;
-}
-
-VerusTransaction JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
-                                           int64_t locktime,
-                                           std::string_view rpc_coinbase)
+transaction_t JobManager::GetCoinbaseTx(
+    int64_t value, uint32_t height,
+    const std::vector<Output>& extra_outputs)
 {
-    unsigned char prevTxIn[32] = {0};  // null last input
+    unsigned char prevTxIn[HASH_SIZE] = {0};  // null last input
     // unsigned int locktime = 0;         // null locktime (no locktime)
 
-    VerusTransaction coinbaseTx(TXVERSION, locktime, true, TXVERSION_GROUP);
+    transaction_t coinbaseTx;
     // add signature with height script and extra data
 
-    std::vector<unsigned char> heightScript = GenNumScript(height);
+    std::vector<uint8_t> heightScript = GenNumScript(height);
     const unsigned char heightScriptLen = heightScript.size();
 
+    
     std::vector<unsigned char> signature(1 + heightScriptLen +
-                                         coinbaseExtra.size());
+                                         coinbase_extra.size());
     signature[0] = heightScriptLen;
     // 1 = size of heightScript ^ it will never exceed 1 byte
     memcpy(signature.data() + 1, heightScript.data(), heightScriptLen);
-    memcpy(signature.data() + 1 + heightScriptLen, coinbaseExtra.data(),
-           coinbaseExtra.size());
+    memcpy(signature.data() + 1 + heightScriptLen, coinbase_extra.data(),
+           coinbase_extra.size());
 
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
     coinbaseTx.AddP2PKHOutput(pool_addr, value);
-#if POOL_COIN == COIN_VRSCTEST
+
+    for (auto output : extra_outputs)
+    {
+        coinbaseTx.vout.emplace_back(output);
+    }
+#if COIN == VRSCTEST
+//TODO: do this as extra output
     coinbaseTx.AddFeePoolOutput(
         rpc_coinbase);  // without this gives bad-blk-fees
 #endif

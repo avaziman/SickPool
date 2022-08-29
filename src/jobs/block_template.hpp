@@ -5,7 +5,7 @@
 #include <string_view>
 #include <algorithm>
 #include <vector>
-
+#include <span>
 #include "utils.hpp"
 #include "hash_wrapper.hpp"
 #include "static_config/static_config.hpp"
@@ -14,7 +14,7 @@ struct TransactionData
 {
    public:
     // TransactionData(std::string_view data_hex) : data_hex(data_hex)
-    // {
+    // {ini
     //     data.resize(data_hex.size() / 2);
     //     Unhexlify(data.data(), data_hex.data(), data_hex.size());
 
@@ -24,22 +24,29 @@ struct TransactionData
     std::string_view data_hex;
     std::vector<uint8_t> data;
     uint8_t hash[HASH_SIZE];
-    double fee;
-    
-    TransactionData(std::string_view data_hex, std::string_view hash_hex)
+    char hash_hex[HASH_SIZE_HEX];
+    int64_t fee = 0;
+
+    TransactionData(std::string_view data_hex, std::string_view hashhex)
         : data_hex(data_hex)
     {
         data.resize(data_hex.size() / 2);
         Unhexlify(data.data(), data_hex.data(), data_hex.size());
 
-        Unhexlify(hash, hash_hex.data(), hash_hex.size());
+        Unhexlify(hash, hashhex.data(), hashhex.size());
         std::reverse(hash, hash + sizeof(hash));
+
+        memcpy(hash_hex, hashhex.data(), HASH_SIZE_HEX);
     }
 
-    // for test only
-    TransactionData(std::string hashs){
-        Unhexlify(hash, hashs.data(), hashs.size());
+    TransactionData(std::string_view data_hex) : data_hex(data_hex){
+        data.resize(data_hex.size() / 2);
+        Unhexlify(data.data(), data_hex.data(), data_hex.size());
+
+        HashWrapper::SHA256d(hash, data.data(), data.size());
         std::reverse(hash, hash + sizeof(hash));
+        
+        Hexlify(hash_hex, hash, sizeof(hash));
     }
 
     TransactionData() = default;
@@ -88,34 +95,31 @@ struct TransactionDataList
     }
 };
 
-// in the order they appear in the rpc response
-struct BlockTemplateSin
+struct BlockTemplate
 {
     int32_t version;
-    std::string_view prevBlockHash;
-    TransactionDataList txList;
-    int64_t coinbaseValue;
-    std::string_view target;
-    int64_t minTime;
-    std::string_view bits;
+    std::string_view prev_block_hash;
+    TransactionDataList tx_list;
+    int64_t coinbase_value;
+    int64_t min_time;
+    uint32_t bits;
     uint32_t height;
 };
 
 // in the order they appear in the rpc response
-struct BlockTemplate
+struct BlockTemplateBtc : public BlockTemplate
 {
-    BlockTemplate() : txList() {}
-    int32_t version;
-    std::string_view prevBlockHash;
-    std::string_view finalsRootHash;
+    std::span<uint8_t> coinb1;
+    std::span<uint8_t> coinb2;
+};
+
+// in the order they appear in the rpc response
+struct BlockTemplateVrsc : public BlockTemplate
+{
+    std::string_view finals_root_hash;
     std::string_view solution;
-    TransactionDataList txList;
     std::string_view coinbase_hex;
-    int64_t coinbaseValue;
     std::string_view target;
-    int64_t minTime;
-    std::string_view bits;
-    uint32_t height;
 };
 
 #endif

@@ -34,19 +34,19 @@ template <typename T>
 class Server
 {
    public:
-    using con_it = std::list<std::unique_ptr<Connection<T>>>::iterator;
+    using connection_it = std::list<std::unique_ptr<Connection<T>>>::iterator;
 
     Server(int port);
     ~Server();
     void Service();
-    bool RearmSocket(con_it* it);
+    bool RearmSocket(connection_it* it);
     int AcceptConnection(sockaddr_in *addr, socklen_t *addr_size);
-    void EraseClient(con_it* it);
+    void EraseClient(connection_it* it);
     void HandleNewConnection();
 
-    virtual void HandleConsumeable(con_it* conn) = 0;
-    virtual void HandleConnected(con_it* conn) = 0;
-    virtual void HandleDisconnected(con_it* conn) = 0;
+    virtual void HandleConsumeable(connection_it* conn) = 0;
+    virtual void HandleConnected(connection_it* conn) = 0;
+    virtual void HandleDisconnected(connection_it* conn) = 0;
 
    private:
     std::mutex connections_mutex;
@@ -56,6 +56,6 @@ class Server
     int epoll_fd;
 
     void InitListeningSock(int port);
-    void HandleReadable(con_it* it);
+    void HandleReadable(connection_it* it);
 };
 #endif

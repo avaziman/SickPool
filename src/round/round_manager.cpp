@@ -60,6 +60,7 @@ bool RoundManager::LoadCurrentRound()
 
     auto chain = std::string(COIN_SYMBOL);
 
+    // no need mutex here
     redis_manager->LoadCurrentRound(chain, round_type, &round);
 
     if (round.round_start_ms == 0)
@@ -101,10 +102,11 @@ void RoundManager::ResetRoundEfforts()
 bool RoundManager::UpdateEffortStats(int64_t update_time_ms)
 {
     // (with mutex)
+    std::unique_lock round_lock(round_map_mutex);
     const double total_effort = round.total_effort;
 
     return redis_manager->UpdateEffortStats(efforts_map, total_effort,
-                                            &round_map_mutex);
+                                            std::move(round_lock));
 }
 
 bool RoundManager::LoadEfforts()

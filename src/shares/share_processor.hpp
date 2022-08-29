@@ -1,25 +1,20 @@
+#ifndef SHARE_PROCESSOR_HPP_
+#define SHARE_PROCESSOR_HPP_
 #include <fmt/format.h>
 
 #include <cassert>
 #include <chrono>
 #include <iostream>
+#include <memory>
 
-#include "static_config/static_config.hpp"
-#include "share.hpp"
 #include "jobs/job_manager.hpp"
 #include "logger.hpp"
+#include "share.hpp"
+#include "static_config/static_config.hpp"
 #include "stratum_client.hpp"
+#include "stratum_server.hpp"
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
-#include "stratum_server.hpp"
-
-struct WorkerContext
-{
-    uint32_t current_height;
-    uint8_t block_header[BLOCK_HEADER_SIZE];
-    CVerusHashV2 hasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
-    simdjson::ondemand::parser json_parser;
-};
 
 class ShareProcessor
 {
@@ -35,7 +30,10 @@ class ShareProcessor
         }
 
         uint32_t shareTime = HexToUint(given_time.data(), given_time.size());
+// in btc the value in not reversed
+#ifdef STRATUM_ZEC
         shareTime = bswap_32(shareTime);  // swap to little endian
+#endif
 
         int64_t minTime = job->GetMinTime();
         int64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
@@ -44,15 +42,14 @@ class ShareProcessor
         {
             result.code = ResCode::UNKNOWN;
             result.message =
-                "Invalid nTime "
-                "(min: " +
-                std::to_string(minTime) + ", max: " + std::to_string(maxTime) +
-                ", given: " + std::to_string(shareTime) + ")";
+                fmt::format("Invalid nTime (min: {}, max: {}, given: {})",
+                            minTime, maxTime, shareTime);
             return false;
         }
 
         return true;
     }
+
     inline static void Process(ShareResult& result, StratumClient* cli,
                                WorkerContext* wc, const job_t* job,
                                const share_t& share, int64_t curTime)
@@ -66,8 +63,10 @@ class ShareProcessor
 
         uint8_t* headerData = wc->block_header;
 
-        job->GetHeaderData(headerData, share.time, cli->GetExtraNonce(),
-                           share.nonce2, share.solution);
+        job->GetHeaderData(headerData, share, cli->GetExtraNonce());
+
+        // std::cout << "block header: " << std::endl;
+        // PrintHex(headerData, BLOCK_HEADER_SIZE);
 
         if constexpr (HASH_ALGO == HashAlgo::VERUSHASH_V2b2)
         {
@@ -75,12 +74,21 @@ class ShareProcessor
             HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
                                        BLOCK_HEADER_SIZE, &wc->hasher);
         }
+        else if constexpr (HASH_ALGO == HashAlgo::X25X)
+        {
+            HashWrapper::X25X(result.hash_bytes.data(), headerData,
+                              BLOCK_HEADER_SIZE);
+        }
         else
         {
             throw std::runtime_error("Missing hash function");
         }
 
         uint256 hash(result.hash_bytes);
+        // Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash:
+        // {}",
+        //             hash.GetHex());
+
         // arith_uint256 hashArith = UintToArith256(hash);
 
         // take from the end as first will have zeros
@@ -99,13 +107,13 @@ class ShareProcessor
         result.difficulty = BitsToDiff(UintToArith256(hash).GetCompact(false));
 
         // if (hashArith >= *job->GetTarget())
-        if (result.difficulty >= job->GetTargetDiff())
+        if (unlikely(result.difficulty >= job->GetTargetDiff()))
         {
             result.code = ResCode::VALID_BLOCK;
             return;
         }
-        else if (result.difficulty / cli->GetDifficulty() <
-                 1)  // allow 5% below
+        else if (unlikely(result.difficulty / cli->GetDifficulty() <
+                          1.))  // allow 5% below
         {
             result.code = ResCode::LOW_DIFFICULTY_SHARE;
             result.message =
@@ -114,10 +122,10 @@ class ShareProcessor
             Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
 
             // Logger::Log(LogType::Debug, LogField::ShareProcessor,
-            //             "Low difficulty share diff: %f, hash: %s",
+            //             "Low difficulty share diff: {}, hash: {}",
             //             result.Diff, hash.GetHex().c_str());
             // Logger::Log(LogType::Debug, LogField::ShareProcessor,
-            //             "Block header: %.*s", BLOCK_HEADER_SIZE * 2,
+            //             "Block header: {}", BLOCK_HEADER_SIZE * 2,
             // blockHeaderHex);
             return;
         }
@@ -126,3 +134,4 @@ class ShareProcessor
         return;
     }
 };
+#endif

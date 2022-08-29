@@ -17,7 +17,7 @@ bool RedisManager::AddPayout(const PendingPayment* payment)
             upayment.amount = reward;
             upayment.id = payment->id;
             upayment.time = curtime;
-            memcpy(upayment.hash_hex, payment->info.tx_hash_hex.data(),
+            memcpy(upayment.hash_hex, payment->td.hash_hex,
                    HASH_SIZE_HEX);
 
             AppendCommand({"ZINCRBY"sv,
@@ -29,16 +29,16 @@ bool RedisManager::AddPayout(const PendingPayment* payment)
 
             AppendCommand({"LPUSH"sv,
                            fmt::format("{}:{}", solver_key, PAYOUTS_KEY),
-                           reward_sv});
+                           std::string_view((char*)&upayment, sizeof(UserPayment))});
         }
 
         FinishedPayment finished;
-        memcpy(finished.hash_hex, payment->info.tx_hash_hex.data(),
+        memcpy(finished.hash_hex, payment->td.hash_hex,
                HASH_SIZE_HEX);
         finished.id = payment->id;
         finished.total_paid_amount = payment->info.total_paid;
         finished.time_ms = curtime;
-        finished.fee = payment->info.fee;
+        finished.fee = payment->td.fee;
         finished.total_payees = payment->info.rewards.size();
 
         AppendCommand(

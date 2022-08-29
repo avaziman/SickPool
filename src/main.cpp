@@ -9,7 +9,6 @@
 
 #include "crypto/base58.h"
 #include "crypto/hash_wrapper.hpp"
-#include "crypto/verus_transaction.hpp"
 #include "crypto/verushash/arith_uint256.h"
 #include "crypto/verushash/verus_hash.h"
 #include "daemon/daemon_rpc.hpp"
@@ -94,7 +93,7 @@ int main(int argc, char** argv)
         stratum_server_ptr = &stratum_server;
         stratum_server.Listen();
     }
-    catch (std::runtime_error e)
+    catch (const std::runtime_error& e)
     {
         Logger::Log(LogType::Critical, LogField::Config, "START-UP ERROR: {}.",
                     e.what());

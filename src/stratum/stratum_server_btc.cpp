@@ -1,3 +1,5 @@
+#include "static_config.hpp"
+
 #ifdef STRATUM_PROTOCOL_BTC
 #include "stratum_server_btc.hpp"
 
@@ -210,13 +212,13 @@ RpcResult StratumServerBtc::HandleSubmit(StratumClient *cli, WorkerContext *wc,
     {
         parse_error = "Bad job id.";
     }
-    else if (++it == end || (error = (*it).get_string().get(share.nonce2)) ||
-             share.nonce2.size() != EXTRANONCE2_SIZE * 2)
+    else if (++it == end || (error = (*it).get_string().get(share.extranonce2)) ||
+             share.extranonce2.size() != EXTRANONCE2_SIZE * 2)
     {
         parse_error = "Bad nonce2.";
     }
     else if (++it == end || (error = (*it).get_string().get(share.time)) ||
-             share.time.size() != JOBID_SIZE * 2)
+             share.time.size() != TIME_SIZE * 2)
     {
         parse_error = "Bad time.";
     }
@@ -242,7 +244,7 @@ void StratumServerBtc::UpdateDifficulty(StratumClient *cli)
     char request[512];
     int len = fmt::format_to_n(request, sizeof(request),
                                "{{\"id\":null,\"method\":\"mining.set_"
-                               "difficulty\",\"params\":[\"{}\"]}}\n",
+                               "difficulty\",\"params\":[{}]}}\n",
                                cli->GetDifficulty())
                   .size;
 

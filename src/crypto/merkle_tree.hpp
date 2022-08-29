@@ -14,38 +14,44 @@
 class MerkleTree
 {
    public:
-    static void CalcRoot(
-        uint8_t* res, const std::vector<TransactionData>& txsData)
+    // static void CalcRoot(
+    //     uint8_t* res, const std::vector<TransactionData>& txsData)
+    // {
+    //     std::vector<uint8_t> hashes;
+    //     uint32_t hash_count = txsData.size();
+
+    //     hashes.reserve(txsData.size() * HASH_SIZE);
+
+    //     for (int i = 0; i < hash_count; i++)
+    //     {
+    //         memcpy(hashes.data() + i * HASH_SIZE, txsData[i].hash, HASH_SIZE);
+    //     }
+
+    //     CalcRoot(res, hashes, hash_count);
+    // }
+
+    static void CalcRoot(uint8_t* res, std::vector<uint8_t>& hashes,
+                         std::size_t hash_count)
     {
-        std::vector<std::array<uint8_t, HASH_SIZE>> hashes(txsData.size());
-        for (int i = 0; i < hashes.size(); i++){
-            hashes[i] = std::to_array(txsData[i].hash);
-        }
-
-        while (hashes.size() > 1)
+        while (hash_count > 1)
         {
-            std::vector<std::array<unsigned char, HASH_SIZE>> temp;
-
-            for (int i = 0; i < hashes.size(); i += 2)
+            for (int i = 0; i < hash_count; i += 2)
             {
-                uint8_t combined[HASH_SIZE * 2];
-                uint8_t combinedHash[HASH_SIZE];
-
-                if (i >= hashes.size())
+                if (i + 1 == hash_count)
                 {
-                    hashes.push_back(hashes.back());
+                    hashes.reserve(hashes.size() + i * HASH_SIZE);
+                    memcpy(hashes.data() + i * HASH_SIZE,
+                           hashes.data() + (i - 1) * HASH_SIZE, HASH_SIZE);
                 }
 
-                memcpy(combined, hashes[i].data(), HASH_SIZE);
-                memcpy(combined + HASH_SIZE, hashes[i + 1].data(), HASH_SIZE);
-                HashWrapper::SHA256d(combinedHash, combined, sizeof(combined));
-
-                temp.push_back(std::to_array(combinedHash));
+                HashWrapper::SHA256d(hashes.data() + (i / 2) * HASH_SIZE,
+                                     hashes.data() + i * HASH_SIZE,
+                                     HASH_SIZE * 2);
             }
-            hashes = temp;
+            hash_count /= 2;
         }
 
-        memcpy(res, hashes[0].data(), HASH_SIZE);
+        memcpy(res, hashes.data(), HASH_SIZE);
     }
 };
 #endif

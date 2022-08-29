@@ -1,5 +1,5 @@
-#ifndef VERUS_JOB_HPP_
-#define VERUS_JOB_HPP_
+#ifndef JOB_VRSC_HPP_
+#define JOB_VRSC_HPP_
 #include <byteswap.h>
 #include <fmt/format.h>
 
@@ -11,56 +11,55 @@
 #include "block_template.hpp"
 #include "job.hpp"
 #include "static_config.hpp"
+#include "share.hpp"
 
-class VerusJob : public Job
+class JobVrsc : public Job
 {
    public:
-    VerusJob(const std::string& jobId, const BlockTemplate& bTemplate,
-             bool is_payment, bool clean = true)
+    JobVrsc(const std::string& jobId, const BlockTemplateVrsc& bTemplate,
+            bool is_payment, bool clean = true)
         : Job(jobId, bTemplate, is_payment)
     {
-        char merkleRootHex[MERKLE_ROOT_SIZE * 2];
+        char merkle_root_hex[MERKLE_ROOT_SIZE * 2];
 
         // difficulty is calculated from opposite byte encoding than in block
-        uint32_t bitsUint = HexToUint(bTemplate.bits.data(), BITS_SIZE * 2);
-        this->target_diff = BitsToDiff(bitsUint);
-        this->expected_shares = GetExpectedHashes(this->target_diff);
 
         // reverse all numbers for block encoding
+        char prev_block_rev_hex[PREVHASH_SIZE * 2];
+        char final_sroot_hash_hex[FINALSROOT_SIZE * 2];
 
-        char prevBlockRevHex[PREVHASH_SIZE * 2];
-        char finalSRootRevHex[FINALSROOT_SIZE * 2];
-
-        ReverseHex(prevBlockRevHex, bTemplate.prevBlockHash.data(),
+        ReverseHex(prev_block_rev_hex, bTemplate.prev_block_hash.data(),
                    PREVHASH_SIZE * 2);
-        ReverseHex(finalSRootRevHex, bTemplate.finalsRootHash.data(),
+        ReverseHex(final_sroot_hash_hex, bTemplate.finals_root_hash.data(),
                    FINALSROOT_SIZE * 2);
 
         // write header
 
         constexpr auto VERSION_OFFSET = 0;
         WriteStatic(VERSION_OFFSET, &bTemplate.version, VERSION_SIZE);
+        // *((uint32_t*)static_header_data[VERSION_OFFSET]) = BLOCK_VERSION;
 
         constexpr auto PREVHASH_OFFSET = VERSION_OFFSET + VERSION_SIZE;
-        WriteUnhexStatic(PREVHASH_OFFSET, prevBlockRevHex, PREVHASH_SIZE * 2);
+        WriteUnhexStatic(PREVHASH_OFFSET, prev_block_rev_hex,
+                         PREVHASH_SIZE * 2);
 
         // hashes are given in LE, no need to reverse
         constexpr auto MROOT_OFFSET = PREVHASH_OFFSET + PREVHASH_SIZE;
         MerkleTree::CalcRoot(static_header_data + MROOT_OFFSET,
-                             bTemplate.txList.transactions);
+                             bTemplate.tx_list.transactions);
 
         constexpr auto FSROOT_OFFSET = MROOT_OFFSET + MERKLE_ROOT_SIZE;
-        WriteUnhexStatic(FSROOT_OFFSET, finalSRootRevHex, FINALSROOT_SIZE * 2);
+        WriteUnhexStatic(FSROOT_OFFSET, final_sroot_hash_hex,
+                         FINALSROOT_SIZE * 2);
 
+        // not static
         constexpr auto TIME_OFFSET = FSROOT_OFFSET + FINALSROOT_SIZE;
-        WriteStatic(TIME_OFFSET, &bTemplate.minTime,
-              TIME_SIZE);  // we overwrite time later
 
         constexpr auto BITS_OFFSET = TIME_OFFSET + TIME_SIZE;
-        WriteStatic(BITS_OFFSET, &bitsUint, BITS_SIZE);
+        WriteStatic(BITS_OFFSET, &bTemplate.bits, BITS_SIZE);
 
         // we need the hexlified merkle root for the notification message
-        Hexlify(merkleRootHex, static_header_data + MROOT_OFFSET,
+        Hexlify(merkle_root_hex, static_header_data + MROOT_OFFSET,
                 MERKLE_ROOT_SIZE);
 
         // only write the sol size and 72 first bytes of sol
@@ -73,22 +72,30 @@ class VerusJob : public Job
         // only generating notify message once for efficiency
 
         // reverse all numbers for notify, they are written in correct order
-        int32_t revVer = bswap_32(bTemplate.version);
-        int64_t revMinTime = bswap_32(bTemplate.minTime);
-        bitsUint = bswap_32(bitsUint);
+        uint32_t ver_rev = bswap_32(bTemplate.version);
+        uint32_t min_time_rev = bswap_32(bTemplate.min_time);
+        uint32_t bits_rev = bswap_32(bTemplate.bits);
 
         size_t len =
-            snprintf(notify_buff, MAX_NOTIFY_MESSAGE_SIZE,
-                     "{\"id\":null,\"method\":\"mining.notify\",\"params\":"
-                     "[\"%.8s\",\"%08x\",\"%.64s\",\"%.64s\",\"%.64s\",\"%"
-                     "08x\",\"%08x\",%s,\"%.144s\"]}\n",
-                     GetId().data(), revVer, prevBlockRevHex, merkleRootHex,
-                     finalSRootRevHex, (uint32_t)revMinTime, bitsUint,
-                     BoolToCstring(clean), bTemplate.solution.data());
+            fmt::format_to_n(
+                notify_buff, MAX_NOTIFY_MESSAGE_SIZE,
+                "{{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+                "[\"{}\",\"{:08x}\",\"{}\",\"{}\",\"{}\",\"{"
+                ":08x}\",\"{:08x}\",{},\"{}\"]}}\n",
+                GetId(),  // job id
+                ver_rev,
+                std::string_view(prev_block_rev_hex,
+                                 sizeof(prev_block_rev_hex)),  // prev hash
+                std::string_view(merkle_root_hex,
+                                 sizeof(merkle_root_hex)),  // merkle root
+                std::string_view(final_sroot_hash_hex,
+                                 sizeof(final_sroot_hash_hex)),  // finals root
+                min_time_rev, bits_rev, clean, bTemplate.solution)
+                .size;
         notify_buff_sv = std::string_view(notify_buff, len);
 
-        memcpy(coinbase_tx_id, bTemplate.txList.transactions[0].data_hex.data(),
-               HASH_SIZE);
+        memcpy(coinbase_tx_id,
+               bTemplate.tx_list.transactions[0].data_hex.data(), HASH_SIZE);
     }
 
     template <typename T>
@@ -106,7 +113,6 @@ class VerusJob : public Job
     inline void WriteUnhex(uint8_t* dest, T* ptr, size_t size) const
     {
         Unhexlify(dest, ptr, size);
-
     }
 
     template <typename T>
@@ -115,16 +121,15 @@ class VerusJob : public Job
         WriteUnhex(static_header_data + offset, ptr, size);
     }
 
-    void GetHeaderData(uint8_t* buff, std::string_view time,
-                       std::string_view nonce1, std::string_view nonce2,
-                       std::string_view sol) const /* override */
+    void GetHeaderData(uint8_t* buff, const ShareZec& share,
+                       std::string_view nonce1) const override
     {
         memcpy(buff, this->static_header_data, BLOCK_HEADER_STATIC_SIZE);
 
         constexpr int time_pos =
             VERSION_SIZE + PREVHASH_SIZE + MERKLE_ROOT_SIZE + FINALSROOT_SIZE;
 
-        WriteUnhex(buff + time_pos, time.data(), TIME_SIZE * 2);
+        WriteUnhex(buff + time_pos, share.time.data(), TIME_SIZE * 2);
 
         constexpr int nonce1_pos =
             time_pos + TIME_SIZE +
@@ -133,16 +138,16 @@ class VerusJob : public Job
         WriteUnhex(buff + nonce1_pos, nonce1.data(), EXTRANONCE_SIZE * 2);
 
         constexpr int nonce2_pos = nonce1_pos + EXTRANONCE_SIZE;
-        WriteUnhex(buff + nonce2_pos, nonce2.data(), EXTRANONCE2_SIZE * 2);
+        WriteUnhex(buff + nonce2_pos, share.nonce2.data(), EXTRANONCE2_SIZE * 2);
 
         constexpr int solution_pos = nonce2_pos + EXTRANONCE2_SIZE;
-        WriteUnhex(buff + solution_pos, sol.data(),
+        WriteUnhex(buff + solution_pos, share.solution.data(),
                    (SOLUTION_LENGTH_SIZE + SOLUTION_SIZE) * 2);
     }
     uint8_t coinbase_tx_id[HASH_SIZE];
 
    private:
-    // uint8_t static_header_data[BLOCK_HEADER_STATIC_SIZE];
+
 
     // char* GetVersion() { return version; }
     // char* GetPrevBlockhash() { return hashPrevBlock; }
@@ -153,6 +158,6 @@ class VerusJob : public Job
     int written = 0;
 };
 
-using job_t = VerusJob;
+using job_t = JobVrsc;
 
 #endif

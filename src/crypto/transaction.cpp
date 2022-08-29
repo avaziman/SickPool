@@ -1,57 +1,53 @@
 #include "transaction.hpp"
 
 void Transaction::AddInput(const uint8_t* prevTxId, uint32_t prevIndex,
-              std::vector<uint8_t> signature, uint32_t sequence)
+                           const std::vector<uint8_t>& signature,
+                           uint32_t sequence)
 {
-    Input input;
     OutPoint point;
-    memcpy(point.txid_hash, prevTxId, 32);
+    memcpy(point.txid_hash, prevTxId, HASH_SIZE);
     point.index = prevIndex;
 
-    input.previous_output = point;
-    input.signature_script = signature;
-    input.sequence = sequence;
+    Input input(point, signature);
 
-    uint64_t varIntVal = signature.size();
-    char varIntLen = VarInt(varIntVal);
-
-    input.sig_compact_val = varIntVal;
-    input.sig_compact_len = varIntLen;
+    // uint64_t varIntVal = signature.size();
+    // char varIntLen = VarInt(varIntVal);
 
     vin.push_back(input);
-    tx_len += varIntLen + input.signature_script.size() + sizeof(OutPoint) +
+    // includes varint
+    tx_len += /*varIntLen +*/ input.signature_script.size() + sizeof(OutPoint) +
               sizeof(sequence);
 }
 
 void Transaction::AddP2PKHOutput(std::string_view toAddress, int64_t value)
 {
-    Output output;
-    output.value = value;
-    GetP2PKHScript(toAddress, output.pk_script);
+    std::vector<uint8_t> script;
+    GetP2PKHScript(toAddress, script);
 
-    uint64_t varIntVal = output.pk_script.size();
-    char varIntLen = VarInt(varIntVal);
+    Output output(value, script);
 
-    output.script_compact_val = varIntVal;
-    output.script_compact_len = varIntLen;
-
-    vout.push_back(output);
-    tx_len += varIntLen + output.pk_script.size() + sizeof(output.value);
+    AddOutput(output);
 }
 
-void Transaction::AddOutput(const std::vector<uint8_t>& script_pub_key, int64_t value)
+void Transaction::AddOutput(const std::vector<uint8_t>& script_pub_key,
+                            int64_t value)
 {
-    Output output;
-    output.value = value;
-
-    output.pk_script = script_pub_key;
-
-    uint64_t varIntVal = output.pk_script.size();
-    char varIntLen = VarInt(varIntVal);
-
-    output.script_compact_val = varIntVal;
-    output.script_compact_len = varIntLen;
+    Output output(value, script_pub_key);
 
     vout.push_back(output);
-    tx_len += varIntLen + output.pk_script.size() + sizeof(output.value);
+    // includes num script size
+    tx_len += output.pk_script.size() + sizeof(output.value);
+}
+
+void Transaction::SwitchOutput(int index, const Output& output){
+    tx_len -= vout[index].pk_script.size();
+    tx_len += output.pk_script.size();
+    vout[index] = output;
+}
+
+void Transaction::AddOutput(const Output& output)
+{
+    vout.push_back(output);
+    // includes num script size
+    tx_len += output.pk_script.size() + sizeof(output.value);
 }

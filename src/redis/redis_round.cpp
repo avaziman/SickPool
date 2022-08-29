@@ -35,17 +35,14 @@ void RedisManager::AppendAddRoundShares(std::string_view chain,
 {
     using namespace std::string_view_literals;
 
-    std::scoped_lock lock(rc_mutex);
-
     uint32_t height = submission->height;
 
     for (const auto &[addr, round_share] : miner_shares)
     {
-        AppendCommand({"HSET"sv,
-                       fmt::format("{}:{}", IMMATURE_REWARDS, submission->number),
-                       std::to_string(submission->number), addr,
-                       std::string_view((char *)&round_share,
-                                        sizeof(RoundShare))});
+        AppendCommand(
+            {"HSET"sv,
+             fmt::format("{}:{}", IMMATURE_REWARDS, submission->number), addr,
+             std::string_view((char *)&round_share, sizeof(RoundShare))});
 
         AppendCommand({
             "HINCRYBY"sv,
@@ -58,10 +55,11 @@ void RedisManager::AppendAddRoundShares(std::string_view chain,
 
 bool RedisManager::CloseRound(std::string_view chain, std::string_view type,
                               const ExtendedSubmission *submission,
-                              round_shares_t round_shares, int64_t time_ms)
+                              round_shares_t &round_shares, int64_t time_ms)
 {
     using namespace std::string_view_literals;
 
+    std::scoped_lock lock(rc_mutex);
     {
         // either close everything about the round or nothing
         RedisTransaction close_round_tx(this);

@@ -6,10 +6,12 @@
 #include <sstream>
 #include <string>
 
+#include "static_config.hpp"
 #include "verushash/uint256.h"
 #include "verushash/sha256.h"
 #include "verushash/verus_clhash.h"
 #include "verushash/verus_hash.h"
+#include "x25x/x25x.h"
 
 class HashWrapper
 {
@@ -29,7 +31,7 @@ class HashWrapper
     {
         // Make sure its initialized before this
 
-        unsigned char hash1[32];
+        unsigned char hash1[HASH_SIZE];
 
         csha256.Reset();
         csha256.Write(in, size);
@@ -39,6 +41,18 @@ class HashWrapper
 
         csha256.Write(hash1, sizeof(hash1));
         csha256.Finalize(dest);
+    }
+
+    inline static void X25X(unsigned char* dest, const unsigned char* in,
+                            int size = 80)
+    {
+        x25x_hash(dest, in, size);
+    }
+
+    inline static void X22I(unsigned char* dest, const unsigned char* in,
+                            int size = 80)
+    {
+        x22i_hash(dest, in);
     }
 
    private:

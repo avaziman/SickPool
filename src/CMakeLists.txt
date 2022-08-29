@@ -1,5 +1,6 @@
 # optimized hash function
 add_subdirectory(crypto/verushash)
+add_subdirectory(crypto/x25x)
 find_path(HIREDIS_HEADER hiredis)
 
 file(GLOB SRC_FILES
@@ -18,7 +19,7 @@ message("SRC FILES: ${SRC_FILES}")
 
 add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
 
-set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger PUBLIC shares)
+set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs)
 target_include_directories(${PROJECT_NAME_CORE} ${SICKPOOL_INCLUDE})
 
 find_library(HIREDIS_LIB hiredis)
@@ -31,4 +32,5 @@ target_link_libraries(
     simdjson
     fmt::fmt
     sickverushash
+    sickx25x
 )

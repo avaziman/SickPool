@@ -68,7 +68,7 @@ void Server<T>::Service()
 
         if (event.data.fd != listening_fd)
         {
-            auto *conn_it = (con_it *)(event.data.ptr);
+            auto *conn_it = (connection_it *)(event.data.ptr);
             int sockfd = (*conn_it)->get()->sock;
 
 
@@ -99,7 +99,7 @@ void Server<T>::Service()
 }
 
 template <class T>
-void Server<T>::HandleReadable(con_it *it)
+void Server<T>::HandleReadable(connection_it *it)
 {
     Connection<T> *conn = (*it)->get();
     const int sockfd = conn->sock;
@@ -164,7 +164,7 @@ void Server<T>::HandleNewConnection()
         return;
     }
 
-    con_it *conn_it = nullptr;
+    connection_it *conn_it = nullptr;
 
     {
         std::unique_lock lock(connections_mutex);
@@ -206,7 +206,7 @@ void Server<T>::HandleNewConnection()
 
 // ptr should point to struct that has Connection as its first member
 template <class T>
-bool Server<T>::RearmSocket(con_it *it)
+bool Server<T>::RearmSocket(connection_it *it)
 {
     Connection<T> *conn = (*it)->get();
     const int sockfd = conn->sock;
@@ -254,7 +254,7 @@ int Server<T>::AcceptConnection(sockaddr_in *addr, socklen_t *addr_size)
 }
 
 template <class T>
-void Server<T>::EraseClient(con_it *it)
+void Server<T>::EraseClient(connection_it *it)
 {
     const int sockfd = (*it)->get()->sock;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, sockfd, nullptr) == -1)

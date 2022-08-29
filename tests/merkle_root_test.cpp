@@ -14,16 +14,16 @@ TEST(MerkleRootTest, SHA256MerkleRoot1Tx)
     HashWrapper::InitSHA256();
     // VRSC block #1:
     // 000007b2d09d316ca1763b8922c769aabc898043274849ce64e147fa91d023cb
-    TransactionData tx1(
-        "a735a8adebc861f966aef4649ef884e218aed32979be66ada1ddd149fef79eab"s);
-
-    std::vector<TransactionData> vec{tx1};
+    std::vector<uint8_t> tx1 = {0xa7, 0x35, 0xa8, 0xad, 0xeb, 0xc8, 0x61, 0xf9,
+                                0x66, 0xae, 0xf4, 0x64, 0x9e, 0xf8, 0x84, 0xe2,
+                                0x18, 0xae, 0xd3, 0x29, 0x79, 0xbe, 0x66, 0xad,
+                                0xa1, 0xdd, 0xd1, 0x49, 0xfe, 0xf7, 0x9e, 0xab};
 
     uint8_t result[HASH_SIZE];
-    MerkleTree::CalcRoot(result, vec);
+    MerkleTree::CalcRoot(result, tx1, 1);
 
     // merkle root should be same as hash of single tx
-    ASSERT_EQ(std::memcmp(result, tx1.hash, HASH_SIZE), 0);
+    ASSERT_EQ(std::memcmp(result, tx1.data(), HASH_SIZE), 0);
 }
 
 TEST(MerkleRootTest, SHA256MerkleRoot2Tx)
@@ -31,16 +31,18 @@ TEST(MerkleRootTest, SHA256MerkleRoot2Tx)
     HashWrapper::InitSHA256();
     // VRSC block #1000000:
     // 473194b1e3301c0fac3b89ab100aedefb7c790aa9255f2e95be9da71bdb91050
-    TransactionData tx1(
-        "baa658081ea730e0e591a29c914133d4370cb76365118ac7077c3a864b9235b7"s);
+    auto tx1 =
+        "b735924b863a7c07c78a116563b70c37d43341919ca291e5e030a71e0858a6ba"s;
 
-    TransactionData tx2(
-        "7a9dee91d6faf67f18bea275db221b5d68f94e655710da1297dd8896d53176b3"s);
+    auto tx2 =
+        "b37631d59688dd9712da1057654ef9685d1b22db75a2be187ff6fad691ee9d7a"s;
 
-    const std::vector<TransactionData> txs{tx1, tx2};
+    std::vector<uint8_t> txs(tx1.size() + tx2.size());
+    Unhexlify(txs.data(), tx1.data(), tx1.size());
+    Unhexlify(txs.data() + HASH_SIZE, tx2.data(), tx2.size());
 
     uint8_t result[HASH_SIZE];
-    MerkleTree::CalcRoot(result, txs);
+    MerkleTree::CalcRoot(result, txs, 2);
     std::reverse(result, result + sizeof(result));
 
     uint8_t expected[] = {0xe8, 0x34, 0x98, 0x24, 0x64, 0x4d, 0x9c, 0x4b,

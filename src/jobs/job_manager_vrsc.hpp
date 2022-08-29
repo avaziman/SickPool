@@ -8,6 +8,9 @@ class JobManagerVrsc : public JobManager
    public:
     using JobManager::JobManager;
     using JobManager::GetNewJob;
+    // will be used when new transactions come on the same block
+    BlockTemplateVrsc blockTemplate;
+
     const job_t* GetNewJob(const std::string& json_template) override;
 };
 

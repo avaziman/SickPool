@@ -85,12 +85,12 @@ void StatsManager::Start(std::stop_token st)
 bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 {
     using namespace std::string_view_literals;
-    worker_map miner_stats_map;
 
-    Logger::Log(LogType::Info, LogField::StatsManager,
-                "Updating interval stats for, {} workers",
-                worker_stats_map.size());
+    // Logger::Log(LogType::Info, LogField::StatsManager,
+    //             "Updating interval stats for, {} workers",
+    //             worker_stats_map.size());
 
+    miner_map miner_stats_map;
     const int64_t remove_time =
         update_time_ms - average_hashrate_interval_seconds * 1000;
 
@@ -106,7 +106,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
         for (auto& [worker, worker_hr] : remove_worker_hashrates)
         {
-            worker_stats_map[worker].average_hashrate_sum -= worker_hr;
+            worker_stats_map[worker].average_hashrate_sum -= worker_hr; 
         }
 
         for (auto& [worker, ws] : worker_stats_map)
@@ -114,13 +114,15 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             ws.interval_hashrate =
                 ws.current_interval_effort / (double)hashrate_interval_seconds;
 
-            if (worker.size() < ADDRESS_LEN)
-            {
-                Logger::Log(LogType::Error, LogField::StatsManager,
-                            "Removing invalid worker name: {}", worker);
-                worker_stats_map.erase(worker);
-                continue;
-            }
+            //TODO: make sure it never gets here
+            // if (worker.size() < ADDRESS_LEN)
+            // {
+            //     //TODO: fix data race /bug here
+            //     Logger::Log(LogType::Error, LogField::StatsManager,
+            //                 "Removing invalid worker name: {}", worker);
+            //     worker_stats_map.erase(worker);
+            //     continue;
+            // }
             std::string addr = worker.substr(0, ADDRESS_LEN);
 
             ws.average_hashrate_sum += ws.interval_hashrate;
@@ -135,15 +137,14 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             miner_stats.interval_valid_shares += ws.interval_valid_shares;
             miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
             miner_stats.interval_stale_shares += ws.interval_stale_shares;
+
+            if (ws.interval_hashrate > 0) miner_stats.worker_count++;
         }
 
         for (auto& [miner_addr, miner_ws] : miner_stats_map)
         {
             miner_ws.interval_hashrate = miner_ws.current_interval_effort /
                                          (double)hashrate_interval_seconds;
-
-            // miner average hashrate
-            miner_ws.average_hashrate_sum += miner_ws.interval_hashrate;
 
             miner_ws.average_hashrate =
                 miner_ws.average_hashrate_sum /
@@ -212,12 +213,17 @@ bool StatsManager::AddWorker(const std::string& address,
     bool returning_worker =
         !new_worker && !worker_stats_map[worker_full].connection_count;
 
+    std::string addr_lowercase(address);
+    std::transform(addr_lowercase.begin(), addr_lowercase.end(),
+                   addr_lowercase.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+                   
     // 100% new, as we loaded all existing miners
     if (new_miner)
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
                     "New miner has spawned: {}", address);
-        if (redis_manager->AddNewMiner(address, worker_full, idTag,
+        if (redis_manager->AddNewMiner(address, addr_lowercase, worker_full, idTag,
                                        script_pub_key, curtime))
         {
             Logger::Log(LogType::Info, LogField::StatsManager,
@@ -230,10 +236,11 @@ bool StatsManager::AddWorker(const std::string& address,
             return false;
         }
     }
-    // todo: split add worker and add miner
-    if (new_worker)
+
+    if (new_worker || returning_worker)
     {
-        if (redis_manager->AddNewWorker(address, worker_full, idTag))
+        if (redis_manager->AddNewWorker(address,
+                                        addr_lowercase, worker_full, idTag))
         {
             Logger::Log(LogType::Info, LogField::StatsManager,
                         "Worker {} added to database.", worker_full);
@@ -259,10 +266,10 @@ void StatsManager::PopWorker(const std::string& worker_full,
     int con_count = (--worker_stats_map[worker_full].connection_count);
     // dont remove from the umap in case they join back, so their progress
     // is saved
-    if (con_count == 0)
-    {
-        redis_manager->PopWorker(address);
-    }
+    // if (con_count == 0)
+    // {
+    //     // redis_manager->PopWorker(address);
+    // }
 }
 
 // TODO: idea: since writing all shares on all pbaas is expensive every 10

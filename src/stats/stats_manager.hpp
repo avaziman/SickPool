@@ -42,7 +42,7 @@ class StatsManager
                   const double diff);
     bool AddWorker(const std::string& address, const std::string& worker_full,
                    std::string_view script_pub_key, std::time_t curtime,
-                   const std::string& idTag = "");
+                   const std::string& idTag = "null");
     void PopWorker(const std::string& worker, const std::string& address);
 
     // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
@@ -67,5 +67,4 @@ class StatsManager
 };
 
 #endif
-// TODO: on crash load all the stats from redis (round hash)
 // TODO: add another unordered map for stakers (non miners too!)

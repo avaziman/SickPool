@@ -9,7 +9,7 @@
 #include "round_manager.hpp"
 #include "round_share.hpp"
 #include "stats.hpp"
-#include "verus_transaction.hpp"
+#include "block_template.hpp"
 
 class RoundManager;
 class RedisManager;
@@ -17,7 +17,7 @@ class RedisManager;
 class PaymentManager
 {
    public:
-    PaymentManager(const std::string& pool_addr, int payout_age_s,
+    PaymentManager(RedisManager* rm, DaemonManager* dm, const std::string& pool_addr, int payout_age_s,
                    int64_t minimum_payout_threshold);
     static bool GetRewardsProp(round_shares_t& miner_shares,
                                int64_t block_reward,
@@ -37,10 +37,10 @@ class PaymentManager
     void UpdatePayouts(RoundManager* round_manager, int64_t curtime_ms);
 
    private:
-    void GeneratePayoutTx(
+    bool GeneratePayoutTx(
         std::vector<uint8_t>& bytes,
         const std::vector<std::pair<std::string, PayeeInfo>>& rewards);
-    void ResetPayment();
+    // void ResetPayment();
     RedisManager* redis_manager;
     DaemonManager* daemon_manager;
     std::string pool_addr;

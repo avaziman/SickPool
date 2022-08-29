@@ -37,22 +37,15 @@ class DaemonRpc
         rpc_addr.sin_port = sock_addr.port;
     }
 
-    template <typename T>
-    static std::string ToJsonStr(T arg)
+    static std::string ToJsonStr(int arg)
     {
-        if constexpr (std::is_same_v<T, std::string_view>)
-        {
-            return fmt::format("\"{}\"", arg);
-        }
-        else if constexpr (std::is_integral_v<T>)
-        {
-            std::string str = std::to_string(arg);
-            return str;
-        }
-        else
-        {
-            throw std::runtime_error("Can't convert this type to json");
-        }
+        std::string str = std::to_string(arg);
+        return str;
+    }
+
+    static std::string ToJsonStr(std::string_view arg)
+    {
+        return fmt::format("\"{}\"", arg);
     }
 
     template <typename... T>

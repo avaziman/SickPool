@@ -9,7 +9,7 @@
 #define VRSCTEST 4
 #define SIN 5
 
-#define COIN VRSC
+#define COIN SIN
 
 // general for pool
 static constexpr uint32_t MAX_WORKER_NAME_LEN = 16;

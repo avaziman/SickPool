@@ -25,4 +25,6 @@ class StratumServerBtc : public StratumServer
     void UpdateDifficulty(StratumClient* cli) override;
 };
 
+using stratum_server_t = StratumServerBtc;
+
 #endif

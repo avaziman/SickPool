@@ -34,7 +34,7 @@ struct ValidateAddressRes
     bool is_valid;
     std::string_view valid_addr;
     std::string_view script_pub_key;
-    bool is_mine;
+    // bool is_mine;
 };
 
 struct GetIdentityRes
@@ -71,16 +71,47 @@ class DaemonManager
         }
     }
 
-    bool SignRawTransaction(SignRawTransactionRes& sign_res,
-                            simdjson::ondemand::parser& parser,
-                            std::string_view raw_tx)
+    double GetNetworkHashPs(simdjson::ondemand::parser& parser)
     {
         using namespace simdjson;
         using namespace std::string_view_literals;
 
         std::string result_body;
-        int res_code = SendRpcReq(result_body, 1, "signrawtransaction",
-                                            DaemonRpc::GetParamsStr(raw_tx));
+        int res_code = SendRpcReq(result_body, 1, "getnetworkhashps");
+
+        if (res_code != 200)
+        {
+            return false;
+        }
+
+        ondemand::object res;
+        try
+        {
+            auto doc = parser.iterate(
+                result_body.data(), result_body.size(), result_body.capacity());
+
+            return doc["result"].get_double();
+        }
+        catch (const simdjson_error& err)
+        {
+            Logger::Log(LogType::Critical, LogField::Stratum,
+                        "Failed to getnetworkhashps: {}", err.what());
+            return 0;
+        }
+
+        return 0;
+    }
+
+    bool SignRawTransaction(SignRawTransactionRes& sign_res,
+                            simdjson::ondemand::parser& parser,
+                            std::string_view funded_tx)
+    {
+        using namespace simdjson;
+        using namespace std::string_view_literals;
+
+        std::string result_body;
+        int res_code = SendRpcReq(result_body, 1, "signrawtransactionwithwallet",
+                                  DaemonRpc::GetParamsStr(funded_tx));
 
         if (res_code != 200)
         {
@@ -110,13 +141,14 @@ class DaemonManager
 
     bool FundRawTransaction(FundRawTransactionRes& fund_res,
                             simdjson::ondemand::parser& parser,
-                            std::string_view raw_tx)
+                            std::string_view raw_tx, int fee_rate)
     {
         using namespace simdjson;
 
         std::string result_body;
-        int res_code =
-            SendRpcReq(result_body, 1, "fundrawtransaction", DaemonRpc::GetParamsStr(raw_tx));
+        std::string params =
+            fmt::format("[\"{}\",{{\"fee_rate\":{}}}]", raw_tx, fee_rate);
+        int res_code = SendRpcReq(result_body, 1, "fundrawtransaction", params);
 
         if (res_code != 200)
         {
@@ -210,7 +242,7 @@ class DaemonManager
 
             va_res.valid_addr = res["address"].get_string();
             va_res.script_pub_key = res["scriptPubKey"].get_string();
-            va_res.is_mine = res["ismine"].get_bool();
+            // va_res.is_mine = res["ismine"].get_bool();
         }
         catch (const simdjson_error& err)
         {
@@ -267,7 +299,7 @@ class DaemonManager
 
     int SendRpcReq(std::string& result, int id, std::string_view method, std::string_view params = "[]")
     {
-        std::lock_guard rpc_lock(this->rpc_mutex);
+        std::unique_lock rpc_lock(rpc_mutex);
         for (DaemonRpc& rpc : rpcs)
         {
             int res = rpc.SendRequest(result, id, method, params);

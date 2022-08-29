@@ -46,8 +46,15 @@ struct WorkerStats
     }
 };
 
+struct MinerStats : public WorkerStats
+{
+    uint32_t worker_count = 0;
+};
+
 typedef std::unordered_map<std::string, WorkerStats>
     worker_map;
+
+typedef std::unordered_map<std::string, MinerStats> miner_map;
 
 typedef std::unordered_map<std::string, Round>
     round_map_t;

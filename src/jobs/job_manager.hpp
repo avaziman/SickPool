@@ -7,9 +7,9 @@
 #include "static_config.hpp"
 #include "share.hpp"
 #include "../crypto/hash_wrapper.hpp"
-#include "../crypto/verus_transaction.hpp"
 #include "../daemon/daemon_rpc.hpp"
 #include "logger.hpp"
+#include "transaction.hpp"
 #include "./job.hpp"
 #include "block_template.hpp"
 #include "payment_manager.hpp"
@@ -33,9 +33,9 @@ class JobManager
         std::scoped_lock lock(jobs_mutex);
         for (const auto& job : jobs)
         {
-            if (job.GetId() == hexId)
+            if (job->GetId() == hexId)
             {
-                return &job;
+                return job.get();
             }
         }
         return nullptr;
@@ -52,21 +52,20 @@ class JobManager
     std::mutex jobs_mutex;
     // unordered map is not thread safe for modifying and accessing different
     // elements, but a vector is, so we use other optimization (save last job)
-    std::vector<job_t> jobs;
+    std::vector<std::unique_ptr<job_t>> jobs;
     uint32_t job_count = 0;
 
-    BlockTemplate blockTemplate;
     simdjson::ondemand::parser jsonParser;
 
+    static constexpr std::string_view coinbase_extra = "SickPool.io";
     std::string last_job_id_hex;
-    std::string coinbaseExtra = "SickPool is in the building.";
     std::string pool_addr;
 
-    VerusTransaction GetCoinbaseTx(int64_t value, uint32_t height, int64_t,
-                                   std::string_view rpc_coinbase);
+    virtual transaction_t GetCoinbaseTx(int64_t value, uint32_t height,
+                                const std::vector<Output>& extra_outputs);
 
-    TransactionData GetCoinbaseTxData(int64_t value, uint32_t height, int64_t,
-                                      std::string_view rpc_coinbase);
+    std::size_t GetCoinbaseTxData(TransactionData& res,
+                                              transaction_t& coinbaseTx);
 };
 
 #if COIN == VRSC

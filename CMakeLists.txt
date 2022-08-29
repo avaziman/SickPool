@@ -7,6 +7,8 @@ cmake_minimum_required(VERSION 3.16.0)
 
 set(CMAKE_C_COMPILER /usr/bin/gcc-10)
 set(CMAKE_CXX_COMPILER /usr/bin/g++-10)
+# set(CMAKE_C_COMPILER /usr/bin/gcc-12)
+# set(CMAKE_CXX_COMPILER /usr/bin/g++-12)
 
 project("SickPool" CXX C)
 set(PROJECT_NAME_CORE ${PROJECT_NAME}_core)
@@ -33,7 +35,7 @@ include(FetchContent)
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-    GIT_TAG tags/v2.1.0
+    GIT_TAG tags/v2.2.2
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(simdjson)
 
@@ -46,15 +48,7 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(fmt)
 
-# GoogleTest requires at least C++14
-# FetchContent_Declare(
-#     googletest
-#     GIT_REPOSITORY https://github.com/google/googletest.git
-#     GIT_TAG tags/v1.12.0
-#     GIT_SHALLOW TRUE
-# )
-# FetchContent_MakeAvailable(googletest)
-# add_subdirectory(tests)
+add_subdirectory(src)
 
 # FetchContent_Declare(
 #     benchmark
@@ -65,9 +59,18 @@ FetchContent_MakeAvailable(fmt)
 # FetchContent_MakeAvailable(benchmark)
 # add_subdirectory(benchmark)
 
-add_subdirectory(src)
+# GoogleTest requires at least C++14
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG tags/v1.12.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(googletest)
+add_subdirectory(tests)
 
-# add_subdirectory(stratum_notifier)
+add_subdirectory(stratum_notifier)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3")
 
 add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME_CORE})

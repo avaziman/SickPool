@@ -27,26 +27,24 @@ void RedisManager::AppendIntervalStatsUpdate(std::string_view addr,
 
 bool RedisManager::UpdateEffortStats(efforts_map_t &miner_stats_map,
                                      const double total_effort,
-                                     std::mutex *stats_mutex)
+                                     std::unique_lock<std::mutex> stats_mutex)
 {
     std::scoped_lock redis_lock(rc_mutex);
 
+    for (auto &[miner_addr, miner_effort] : miner_stats_map)
     {
-        std::scoped_lock stats_lock(*stats_mutex);
-        for (auto &[miner_addr, miner_effort] : miner_stats_map)
-        {
-            AppendSetMinerEffort(COIN_SYMBOL, miner_addr, "pow", miner_effort);
-        }
-
-        AppendSetMinerEffort(COIN_SYMBOL, TOTAL_EFFORT_KEY, "pow",
-                             total_effort);
+        AppendSetMinerEffort(COIN_SYMBOL, miner_addr, "pow", miner_effort);
     }
+
+    AppendSetMinerEffort(COIN_SYMBOL, TOTAL_EFFORT_KEY, "pow",
+                            total_effort);
+    stats_mutex.unlock();
 
     return GetReplies();
 }
     
 bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
-                                       worker_map &miner_stats_map,
+                                       miner_map &miner_stats_map,
                                        std::mutex *stats_mutex,
                                        int64_t update_time_ms)
 {
@@ -54,6 +52,9 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
     std::scoped_lock lock(rc_mutex);
 
     double pool_hr = 0;
+    uint32_t pool_worker_count = 0;
+    uint32_t pool_miner_count = 0;
+
     {
         // don't lock stats_mutex when awaiting replies as it's slow
         // unnecessary
@@ -63,6 +64,8 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
         {
             AppendIntervalStatsUpdate(worker_name, "worker", update_time_ms,
                                       worker_stats);
+            if (worker_stats.interval_hashrate > 0) pool_worker_count++;
+
             worker_stats.ResetInterval();
             pool_hr += worker_stats.interval_hashrate;
         }
@@ -80,11 +83,21 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
 
             AppendHset(fmt::format("solver:{}", miner_addr), HASHRATE_KEY,
                        hr_str);
+
+            AppendUpdateWorkerCount(miner_addr, miner_stats.worker_count,
+                                    update_time_ms);
+
+            if (miner_stats.interval_hashrate > 0) pool_miner_count++;
+
             miner_stats.ResetInterval();
         }
     }
 
     AppendTsAdd("hashrate:pool", update_time_ms, pool_hr);
+    AppendTsAdd(fmt::format("{}:{}", WORKER_COUNT_KEY, "pool"), update_time_ms,
+                pool_miner_count);
+    AppendTsAdd(fmt::format("{}:{}", MINER_COUNT_KEY, "pool"), update_time_ms,
+                pool_worker_count);
 
     return GetReplies();
 }
@@ -114,14 +127,7 @@ bool RedisManager::ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
     for (auto &[addr, _] : miner_stats_map)
     {
         // reset worker count
-        AppendCommand({"ZADD"sv,
-                       fmt::format("solver-index:{}", WORKER_COUNT_KEY), "0",
-                       addr});
-
-        AppendHset(fmt::format("solver:", addr), WORKER_COUNT_KEY, "0"sv);
-
-        AppendTsAdd(fmt::format("{}:{}", WORKER_COUNT_KEY, addr), time_now,
-                    0);
+        AppendUpdateWorkerCount(addr, 0, time_now);
     }
 
     return GetReplies();
@@ -158,20 +164,22 @@ bool RedisManager::TsMrange(
     redis_unique_ptr reply;
     if (aggregation)
     {
-        reply = Command({"TS.MRANGE"sv, std::to_string(from),
-                         std::to_string(to), "AGGREGATION"sv, aggregation->type,
-                         std::to_string(aggregation->time_bucket_ms),
-                         "FILTER"sv, fmt::format("prefix={}", prefix),
-                         fmt::format("type={}", type)
+        reply = Command(
+            {"TS.MRANGE"sv, std::to_string(from), std::to_string(to),
+             "AGGREGATION"sv, aggregation->type,
+             std::to_string(aggregation->time_bucket_ms), "FILTER"sv,
+             fmt::format("prefix={}", prefix), fmt::format("type={}", type)
 
-        });
+            },
+            false);
     }
     else
     {
         reply =
             Command({"TS.MRANGE"sv, std::to_string(from), std::to_string(to),
                      "FILTER"sv, fmt::format("prefix={}", prefix),
-                     fmt::format("type={}", type)});
+                     fmt::format("type={}", type)},
+                    false);
     }
 
     if (!reply.get()) return false;

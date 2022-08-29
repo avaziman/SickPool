@@ -13,6 +13,7 @@
 #include <vector>
 #include <map>
 
+#include "static_config/static_config.hpp"
 #include "connection.hpp"
 #include "../sock_addr.hpp"
 #include "benchmark.hpp"
@@ -22,11 +23,11 @@
 #include "jobs/job_manager.hpp"
 #include "redis/redis_manager.hpp"
 #include "shares/share_processor.hpp"
-#include "static_config/static_config.hpp"
 #include "stats_manager.hpp"
 #include "stratum_client.hpp"
 #include "server.hpp"
 #include "logger.hpp"
+
 
 class StratumServer : public Server<StratumClient>
 {
@@ -39,7 +40,7 @@ class StratumServer : public Server<StratumClient>
 
    protected:
     CoinConfig coin_config;
-    std::string chain{"VRSCTEST"};
+    std::string chain{COIN_SYMBOL};
 
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(HTTP_REQ_ALLOCATE);
@@ -67,7 +68,6 @@ class StratumServer : public Server<StratumClient>
 
     std::mutex jobs_mutex;
     std::mutex clients_mutex;
-    std::mutex redis_mutex;
 
     void HandleControlCommands(std::stop_token st);
     void HandleControlCommand(ControlCommands cmd, char* buff);
@@ -78,21 +78,19 @@ class StratumServer : public Server<StratumClient>
     void HandleWalletNotify(WalletNotify* wal_notify);
 
     RpcResult HandleShare(StratumClient* cli, WorkerContext* wc,
-                          ShareZec& share);
+                          share_t& share);
 
     virtual void UpdateDifficulty(StratumClient* cli) = 0;
 
     void BroadcastJob(StratumClient* cli, const job_t* job) const;
     int AcceptConnection(sockaddr_in* addr, socklen_t* addr_size);
     void InitListeningSock();
-    // std::list<std::unique_ptr<StratumClient>>::iterator* AddClient(
-    //     int sockfd, const std::string& ip);
     // void EraseClient(int sockfd,
     //                  std::list<std::unique_ptr<StratumClient>>::iterator* it);
     void ServiceSockets(std::stop_token st);
-    void HandleConsumeable(con_it* conn) override;
-    void HandleConnected(con_it* conn) override;
-    void HandleDisconnected(con_it* conn) override;
+    void HandleConsumeable(connection_it* conn) override;
+    void HandleConnected(connection_it* conn) override;
+    void HandleDisconnected(connection_it* conn) override;
 
     inline void SendRes(int sock, int req_id, const RpcResult& res)
     {
@@ -135,6 +133,8 @@ class StratumServer : public Server<StratumClient>
 
 #ifdef STRATUM_PROTOCOL_ZEC
 #include "stratum_server_zec.hpp"
+#elif STRATUM_PROTOCOL_BTC
+#include "stratum_server_btc.hpp"
 #endif
 
 #endif

@@ -9,16 +9,27 @@ void SubmissionManager::CheckImmatureSubmissions()
 
     std::string resBody;
 
+    Logger::Log(LogType::Info, LogField::SubmissionManager,
+                "Checking confirmations for {} blocks", immature_block_submissions.size());
+
     for (int i = 0; i < immature_block_submissions.size(); i++)
     {
         const auto& submission = immature_block_submissions[i];
         auto hashHex = std::string_view((char*)submission->hash_hex,
                                         sizeof(submission->hash_hex));
-        auto chain = std::string_view((char*)submission->chain,
-                                      sizeof(submission->chain));
+        auto chain = submission->chain_sv;
 
-        auto res = daemon_manager->SendRpcReq(
+        int res = daemon_manager->SendRpcReq(
             resBody, 1, "getblockheader", DaemonRpc::GetParamsStr(hashHex));
+
+        if (res != 200)
+        {
+            Logger::Log(LogType::Info, LogField::SubmissionManager,
+                        "Failed to get confirmations for block {}, parse "
+                        "error: {}, http code: {}",
+                        hashHex, resBody, res);
+            continue;
+        }
 
         int32_t confirmations = -1;
         try
@@ -30,10 +41,10 @@ void SubmissionManager::CheckImmatureSubmissions()
         }
         catch (const simdjson_error& err)
         {
-            // Logger::Log(LogType::Info, LogField::SubmissionManager,
-            //             "Failed to get confirmations for block {}, parse "
-            //             "error: {}, http code: {}",
-            //             hashHex, err.what(), res);
+            Logger::Log(LogType::Info, LogField::SubmissionManager,
+                        "Failed to get confirmations for block {}, parse "
+                        "error: {}",
+                        hashHex, err.what());
             continue;
         }
 
@@ -50,12 +61,13 @@ void SubmissionManager::CheckImmatureSubmissions()
         {
             Logger::Log(LogType::Info, LogField::SubmissionManager,
                         "Block {} has matured!", hashHex);
+            Logger::Log(LogType::Info, LogField::SubmissionManager,
+                        "Checking confirmations for {} blocks",
+                        immature_block_submissions.size());
 
-            if (last_matured_time)
-            {
-                int64_t duration_ms = confirmation_time - last_matured_time;
-                redis_manager->AddStakingPoints(chain, duration_ms);
-            }
+            //     int64_t duration_ms = confirmation_time - last_matured_time;
+            //     redis_manager->AddStakingPoints(chain, duration_ms);
+            // }
 
             redis_manager->UpdateImmatureRewards(chain, submission->number,
                                                  confirmation_time, true);

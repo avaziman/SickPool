@@ -19,6 +19,8 @@ static constexpr HashAlgo HASH_ALGO = HashAlgo::VERUSHASH_V2b2;
 // tx
 static constexpr uint32_t TXVERSION_GROUP = 0x892f2085;
 static constexpr uint32_t TXVERSION = 4;
+static constexpr bool TXOVERWINTERED = true;
+static constexpr uint32_t TXVERSION_HEADER = TXVERSION | (TXOVERWINTERED << 31);
 
 static constexpr uint32_t ADDRESS_LEN = 34;
 static constexpr char ADDRESS_PREFIX = 'R';
