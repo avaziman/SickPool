@@ -17,7 +17,7 @@
 class StratumClient
 {
    public:
-    StratumClient(const int sock, const std::string& ip, const int64_t time);
+    StratumClient(const int sock, const std::string& ip, const int64_t time, const double diff);
 
     double GetDifficulty() const { return current_diff; }
     double GetPendingDifficulty() const { return pending_diff; }

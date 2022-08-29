@@ -496,7 +496,7 @@ void StratumServer::HandleConsumeable(connection_it *it)
 void StratumServer::HandleConnected(connection_it *it)
 {
     Connection<StratumClient> *conn = (*(*it)).get();
-    conn->ptr = std::make_unique<StratumClient>(conn->sock, "", 0);
+    conn->ptr = std::make_unique<StratumClient>(conn->sock, "", 0, coin_config.default_diff);
     std::scoped_lock lock(clients_mutex);
     clients.emplace(conn, 0);
 }
