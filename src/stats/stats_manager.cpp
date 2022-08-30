@@ -195,8 +195,10 @@ void StatsManager::AddShare(const std::string& worker_full,
     }
     else
     {
+        const double expected_shares = GetExpectedHashes(diff);
+
         worker_stats->interval_valid_shares++;
-        worker_stats->current_interval_effort += diff;
+        worker_stats->current_interval_effort += expected_shares;
     }
 }
 

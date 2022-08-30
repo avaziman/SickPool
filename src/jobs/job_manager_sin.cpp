@@ -137,8 +137,14 @@ const job_t* JobManagerSin::GetNewJob(const std::string& json_template)
         last_job_id_hex = jobIdHex;
         job_count++;
 
-        std::scoped_lock jobs_lock(jobs_mutex);
-        jobs.clear();
+        std::unique_lock<std::shared_mutex> jobs_lock(jobs_mutex);
+        while (jobs.size())
+        {
+            // incase a job is being used
+            auto remove_job = std::move(jobs.back());
+            std::unique_lock job_lock(remove_job->job_mutex);
+            jobs.pop_back();
+        }
 
         jobs.emplace_back(std::move(job));
         return jobs.back().get();

@@ -1,0 +1,6 @@
+==108809== Memcheck, a memory error detector
+==108809== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==108809== Using Valgrind-3.18.1 and LibVEX; rerun with -h for copyright info
+==108809== Command: ./build/SickPool ./config/coins/SIN.json
+==108809== Parent PID: 60568
+==108809== 

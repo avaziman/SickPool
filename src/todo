@@ -8,6 +8,8 @@ edits .conf file
 sets stratumnotifier 
 adds redis functions
 
+fix no immature balance, 
+fix invalid mining notify (bad payment tx?)
 LoadMatureRewards on startup
 pos
 show share rate and share difficulty for each workers

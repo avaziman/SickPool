@@ -70,18 +70,21 @@ bool RedisManager::DoesAddressExist(std::string_view addrOrId,
     freeReplyObject(reply);
     return res;
 }
-bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t curtime_ms, double net_est_hr,
-                      double estimated_shares)
+
+bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t curtime_ms,
+                                    double net_est_hr, double estimated_shares)
 {
+    std::scoped_lock lock(rc_mutex);
+
     AppendAddNetworkHr(chain, curtime_ms, net_est_hr);
     AppendSetMinerEffort(chain, RedisManager::ESTIMATED_EFFORT_KEY, "pow",
                          estimated_shares);
+    return GetReplies();
 }
 
 void RedisManager::AppendAddNetworkHr(std::string_view chain, int64_t time,
                                       double hr)
 {
-    std::scoped_lock lock(rc_mutex);
     std::string key = fmt::format("{}:{}", chain, NETWORK_HASHRATE_KEY);
     AppendTsAdd(std::string_view(key), time, hr);
 }
@@ -174,7 +177,6 @@ bool RedisManager::LoadUnpaidRewards(
         std::scoped_lock lock(*efforts_mutex);
 
         rewards.reserve(efforts.size());
-        
 
         for (const auto &[addr, _] : efforts)
         {
@@ -322,9 +324,8 @@ void RedisManager::AppendUpdateWorkerCount(std::string_view address, int amount,
     using namespace std::string_view_literals;
     std::string amount_str = std::to_string(amount);
 
-    AppendCommand({"ZADD"sv,
-                   fmt::format("solver-index:{}", WORKER_COUNT_KEY), address,
-                   amount_str});
+    AppendCommand({"ZADD"sv, fmt::format("solver-index:{}", WORKER_COUNT_KEY),
+                   address, amount_str});
 
     AppendCommand({"HSET"sv, fmt::format("solver:{}", address),
                    WORKER_COUNT_KEY, amount_str});

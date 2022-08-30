@@ -8,18 +8,15 @@ void RedisManager::AppendSetMinerEffort(std::string_view chain,
                std::to_string(effort));
 }
 
-void RedisManager::LoadCurrentRound(std::string_view chain, std::string_view type, Round *rnd)
+void RedisManager::LoadCurrentRound(std::string_view chain,
+                                    std::string_view type, Round *rnd)
 {
     std::string round_effort_key =
         fmt::format("{}:{}:{}", chain, type, ROUND_EFFORT_KEY);
 
-    std::string total_effort_str = hget(
-        round_effort_key,
-        TOTAL_EFFORT_KEY);
+    std::string total_effort_str = hget(round_effort_key, TOTAL_EFFORT_KEY);
 
-    std::string start_time_str = hget(
-        round_effort_key,
-        ROUND_START_TIME_KEY);
+    std::string start_time_str = hget(round_effort_key, ROUND_START_TIME_KEY);
 
     std::string estimated_effort_str =
         hget(round_effort_key, ESTIMATED_EFFORT_KEY);
@@ -44,12 +41,9 @@ void RedisManager::AppendAddRoundShares(std::string_view chain,
              fmt::format("{}:{}", IMMATURE_REWARDS, submission->number), addr,
              std::string_view((char *)&round_share, sizeof(RoundShare))});
 
-        AppendCommand({
-            "HINCRYBY"sv,
-            fmt::format("solver:{}", addr),
-            IMMATURE_BALANCE_KEY,
-            std::to_string(round_share.reward)
-        });
+        AppendCommand({"HINCRYBY"sv, fmt::format("solver:{}", addr),
+                       IMMATURE_BALANCE_KEY,
+                       std::to_string(round_share.reward)});
     }
 }
 

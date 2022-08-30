@@ -78,7 +78,7 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
             AppendIntervalStatsUpdate(miner_addr, "miner", update_time_ms,
                                       miner_stats);
 
-            AppendCommand({"ZADD"sv, fmt::format("solver-index:", HASHRATE_KEY),
+            AppendCommand({"ZADD"sv, fmt::format("solver-index:{}", HASHRATE_KEY),
                            hr_str, miner_addr});
 
             AppendHset(fmt::format("solver:{}", miner_addr), HASHRATE_KEY,

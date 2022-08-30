@@ -44,7 +44,7 @@ class DifficultyManager
                     LogType::Debug, LogField::DiffManager,
                     "Adjusted difficulty for {} from {} to {}, share rate: {}",
                     client->GetFullWorkerName(), current_diff, new_diff,
-                    target_share_rate);
+                    minute_rate);
             }
         }
     }

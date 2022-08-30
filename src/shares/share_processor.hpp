@@ -22,12 +22,6 @@ class ShareProcessor
     static inline bool VerifyShareParams(ShareResult& result, const job_t* job, std::string_view given_time,
                                   const int64_t curtime)
     {
-        if (job == nullptr)
-        {
-            result.code = ResCode::JOB_NOT_FOUND;
-            result.message = "Job not found";
-            return false;
-        }
 
         uint32_t shareTime = HexToUint(given_time.data(), given_time.size());
 // in btc the value in not reversed
@@ -44,6 +38,7 @@ class ShareProcessor
             result.message =
                 fmt::format("Invalid nTime (min: {}, max: {}, given: {})",
                             minTime, maxTime, shareTime);
+            result.difficulty = static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
             return false;
         }
 

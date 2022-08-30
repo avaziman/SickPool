@@ -6,6 +6,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <shared_mutex>
 
 #include "block_template.hpp"
 #include "merkle_tree.hpp"
@@ -68,10 +69,11 @@ class Job
     int64_t GetMinTime() const { return min_time; }
     double GetTargetDiff() const { return target_diff; }
     double GetEstimatedShares() const { return expected_shares; }
-    bool GetIsPayment() const { return is_payment; }
     // arith_uint256* GetTarget() { return &target; }
     virtual void GetHeaderData(uint8_t* buff, const share_t& share,
                        std::string_view nonce1) const = 0;
+    const bool is_payment;
+    mutable std::shared_mutex job_mutex;
 
    protected:
     const std::string job_id;
@@ -91,7 +93,6 @@ class Job
 
     const int64_t min_time;
     const uint32_t height;
-    const bool is_payment;
 };
 
 #if COIN == VRSC

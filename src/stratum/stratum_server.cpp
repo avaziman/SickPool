@@ -356,30 +356,31 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     auto start = TIME_NOW();
 
     ShareResult share_res;
+    RpcResult rpc_res(ResCode::OK);
     const job_t *job = job_manager.GetJob(share.jobId);
+    // to make sure the job isn't removed while we are using it,
+    // and at the same time allow multiple threads to use same job
+    std::shared_lock<std::shared_mutex> job_read_lock;
 
-    ShareProcessor::Process(share_res, cli, wc, job, share, time);
-
-    // > add share stats before submission to have accurate effort (its fast)
-    // > possible that a timeseries wasn't created yet, so don't add shares
-    // already authorized here
-    const double expected_shares = GetExpectedHashes(share_res.difficulty);
-    round_manager_pow.AddRoundShare(cli->GetAddress(), expected_shares);
-    stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
-                           expected_shares);
-    // share_res.code = ResCode::VALID_BLOCK;
-
-    auto end = TIME_NOW();
-
-    Logger::Log(
-        LogType::Debug, LogField::Stratum,
-        "Share processed in {}us, diff: {}, shares: {}, res: {}",
-        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-            .count(),
-        share_res.difficulty, expected_shares, (int)share_res.code);
+    if (job == nullptr)
+    {
+        share_res.code = ResCode::JOB_NOT_FOUND;
+        share_res.message = "Job not found";
+        share_res.difficulty = static_cast<double>(BadDiff::STALE_SHARE_DIFF);
+    }
+    else
+    {
+        job_read_lock = std::shared_lock<std::shared_mutex>(job->job_mutex);
+        ShareProcessor::Process(share_res, cli, wc, job, share, time);
+    }
 
     if (unlikely(share_res.code == ResCode::VALID_BLOCK))
     {
+        // > add share stats before submission to have accurate effort (its
+        // fast)
+        round_manager_pow.AddRoundShare(cli->GetAddress(),
+                                        share_res.difficulty);
+
         std::size_t blockSize = job->GetBlockSizeHex();
         char blockData[blockSize];
 
@@ -390,7 +391,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
                          share.extranonce2);
 #endif
 
-        if (job->GetIsPayment())
+        if (job->is_payment)
         {
             payment_manager.payment_included = true;
         }
@@ -399,16 +400,20 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
         auto block_hex = std::string_view(blockData, blockSize);
         submission_manager.TrySubmit(chain, block_hex);
 
+        // possible that we will get new block notification before we are done
+        // here and remove the job
         Logger::Log(LogType::Info, LogField::StatsManager, "Block hex: {}",
                     std::string_view(blockData, blockSize));
 
         const std::string_view worker_full(cli->GetFullWorkerName());
         const auto chain_round = round_manager_pow.GetChainRound();
         const auto type =
-            job->GetIsPayment() ? BlockType::POW_PAYMENT : BlockType::POW;
+            job->is_payment ? BlockType::POW_PAYMENT : BlockType::POW;
         const double dur = time - chain_round.round_start_ms;
         const double effort_percent =
-            (dur / 1000) / (job->GetEstimatedShares() / (chain_round.total_effort / (dur / 1000))) * 100.f;
+            (dur / 1000) /
+            (job->GetTargetDiff() / (chain_round.total_effort / (dur / 1000))) *
+            100.f;
 
         if constexpr (HASH_ALGO == HashAlgo::X25X)
         {
@@ -425,18 +430,33 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 
         submission_manager.AddImmatureBlock(std::move(submission),
                                             coin_config.pow_fee);
-        return RpcResult(ResCode::OK);
     }
-
-    if (likely(share_res.code == ResCode::VALID_SHARE))
+    else if (likely(share_res.code == ResCode::VALID_SHARE))
     {
-        return RpcResult(ResCode::OK);
+        round_manager_pow.AddRoundShare(cli->GetAddress(),
+                                        share_res.difficulty);
+    }
+    else
+    {
+        Logger::Log(LogType::Warn, LogField::Stratum,
+                    "Received bad share for job id: {}", share.jobId);
+
+        rpc_res = RpcResult(share_res.code, share_res.message);
     }
 
-    Logger::Log(LogType::Warn, LogField::Stratum,
-                "Received bad share for job id: {}", share.jobId);
+    stats_manager.AddShare(cli->GetFullWorkerName(), cli->GetAddress(),
+                           share_res.difficulty);
 
-    return RpcResult(share_res.code, share_res.message);
+    auto end = TIME_NOW();
+
+    Logger::Log(
+        LogType::Debug, LogField::Stratum,
+        "Share processed in {}us, diff: {}, res: {}",
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+            .count(),
+        share_res.difficulty, (int)share_res.code);
+
+    return rpc_res;
 }
 
 void StratumServer::BroadcastJob(StratumClient *cli, const job_t *job) const
@@ -493,7 +513,8 @@ void StratumServer::HandleConsumeable(connection_it *it)
 void StratumServer::HandleConnected(connection_it *it)
 {
     Connection<StratumClient> *conn = (*(*it)).get();
-    conn->ptr = std::make_unique<StratumClient>(conn->sock, "", 0, coin_config.default_diff);
+    conn->ptr = std::make_unique<StratumClient>(conn->sock, "", 0,
+                                                coin_config.default_diff);
     std::scoped_lock lock(clients_mutex);
     clients.emplace(conn, 0);
 }

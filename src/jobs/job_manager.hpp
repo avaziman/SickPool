@@ -28,9 +28,10 @@ class JobManager
     virtual const job_t* GetNewJob();
     virtual const job_t* GetNewJob(const std::string& json_template) = 0;
     
+    // allow concurrect reading while not being modified
     inline const job_t* GetJob(std::string_view hexId)
     {
-        std::scoped_lock lock(jobs_mutex);
+        std::shared_lock <std::shared_mutex> lock(jobs_mutex);
         for (const auto& job : jobs)
         {
             if (job->GetId() == hexId)
@@ -49,7 +50,7 @@ class JobManager
     DaemonManager* daemon_manager;
     PaymentManager* payment_manager;
 
-    std::mutex jobs_mutex;
+    std::shared_mutex jobs_mutex;
     // unordered map is not thread safe for modifying and accessing different
     // elements, but a vector is, so we use other optimization (save last job)
     std::vector<std::unique_ptr<job_t>> jobs;
