@@ -3,7 +3,7 @@
 #ifdef STRATUM_PROTOCOL_BTC
 #include "stratum_server_btc.hpp"
 
-void StratumServerBtc::HandleReq(StratumClient *cli, WorkerContext *wc,
+void StratumServerBtc::HandleReq(StratumClient* cli, WorkerContext *wc,
                                  std::string_view req)
 {
     int id = 0;

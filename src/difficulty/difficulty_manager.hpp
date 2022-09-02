@@ -1,7 +1,7 @@
 #ifndef DIFFICULTY_MANAGER_HPP_
 #define DIFFICULTY_MANAGER_HPP_
 
-#include <mutex>
+#include <shared_mutex>
 #include <thread>
 #include <map>
 #include <vector>
@@ -14,7 +14,7 @@ class DifficultyManager
 {
    public:
     DifficultyManager(
-        std::map<Connection<StratumClient>*, double>* clients, std::mutex* clients_mutex,
+        std::map<std::shared_ptr<Connection<StratumClient>>, double>* clients, std::shared_mutex* clients_mutex,
         double targetSharesRate)
         : clients(clients), clients_mutex(clients_mutex), target_share_rate(targetSharesRate)
     {
@@ -22,7 +22,7 @@ class DifficultyManager
 
     void Adjust(const int passed_seconds)
     {
-        std::scoped_lock lock(*clients_mutex);
+        std::shared_lock read_lock(*clients_mutex);
         for (auto& [conn, _] : *clients)
         {
             StratumClient* client = conn->ptr.get();
@@ -53,8 +53,8 @@ class DifficultyManager
 
    private:
     double target_share_rate;
-    std::map<Connection<StratumClient>*, double>* clients;
-    std::mutex* clients_mutex;
+    std::map<std::shared_ptr<Connection<StratumClient>>, double>* clients;
+    std::shared_mutex* clients_mutex;
 };
 
 #endif

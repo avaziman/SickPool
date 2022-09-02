@@ -1,3 +1,4 @@
+add_custom_target(bench)
 include_directories(../src/stratum)
 
 get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)

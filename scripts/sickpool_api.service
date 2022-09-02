@@ -1,0 +1,14 @@
+[Unit]
+Description=Production stratum server
+WorkingDirectory=~/stratum/
+ExecStart=./Api
+
+After=network.target
+After=redis-server
+Restart=always
+
+[Service]
+User=sickpool
+
+[Install]
+WantedBy=multi-user.target

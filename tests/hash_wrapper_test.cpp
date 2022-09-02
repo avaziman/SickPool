@@ -1,10 +1,10 @@
-#include "crypto/hash_wrapper.hpp"
+#include "hash_wrapper.hpp"
+#include "utils.hpp"
 
 #include <gtest/gtest.h>
 
 #include <string>
 
-#include "../src/crypto/utils.hpp"
 
 TEST(HashWrapperTest, VerusHash2_2)
 {

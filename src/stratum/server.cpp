@@ -101,7 +101,7 @@ void Server<T>::Service()
 template <class T>
 void Server<T>::HandleReadable(connection_it *it)
 {
-    Connection<T> *conn = (*it)->get();
+    std::shared_ptr<Connection<T>> conn = *(*it);
     const int sockfd = conn->sock;
     std::string ip(conn->ip);
     ssize_t recv_res = 0;
@@ -169,7 +169,7 @@ void Server<T>::HandleNewConnection()
     {
         std::unique_lock lock(connections_mutex);
         connections.emplace_back(
-            std::make_unique<Connection<T>>(conn_fd, conn_addr.sin_addr));
+            std::make_shared<Connection<T>>(conn_fd, conn_addr.sin_addr));
         connections.back()->it = --connections.end();
 
         conn_it = &connections.back()->it;

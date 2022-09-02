@@ -18,8 +18,8 @@ struct Connection {
     int sock;
     size_t req_pos = 0;
     char req_buff[REQ_BUFF_SIZE];
-    std::unique_ptr<T> ptr;
-    std::list<std::unique_ptr<Connection>>::iterator it;
+    std::shared_ptr<T> ptr;
+    std::list<std::shared_ptr<Connection>>::iterator it;
     std::string ip;
 };
 

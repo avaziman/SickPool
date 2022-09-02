@@ -34,7 +34,7 @@ template <typename T>
 class Server
 {
    public:
-    using connection_it = std::list<std::unique_ptr<Connection<T>>>::iterator;
+    using connection_it = std::list<std::shared_ptr<Connection<T>>>::iterator;
 
     Server(int port);
     ~Server();
@@ -50,7 +50,7 @@ class Server
 
    private:
     std::mutex connections_mutex;
-    std::list<std::unique_ptr<Connection<T>>> connections;
+    std::list<std::shared_ptr<Connection<T>>> connections;
 
     int listening_fd;
     int epoll_fd;

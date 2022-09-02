@@ -64,10 +64,9 @@ class StratumServer : public Server<StratumClient>
     // O(log n) delete + insert
     // saving the pointer in epoll gives us O(1) access!
     // allows us to sort connections by hashrate to minimize loss
-    std::map<Connection<StratumClient>*, double> clients;
+    std::map<std::shared_ptr<Connection<StratumClient>>, double> clients;
+    std::shared_mutex clients_mutex;
 
-    std::mutex jobs_mutex;
-    std::mutex clients_mutex;
 
     void HandleControlCommands(std::stop_token st);
     void HandleControlCommand(ControlCommands cmd, char* buff);

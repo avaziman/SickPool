@@ -1,0 +1,14 @@
+[Unit]
+Description=Production pool api server
+WorkingDirectory=~/Api/
+ExecStart=./SickPoolApi
+
+After=network.target
+After=redis-server
+Restart=always
+
+[Service]
+User=sickpool
+
+[Install]
+WantedBy=multi-user.target

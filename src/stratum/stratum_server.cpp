@@ -162,7 +162,7 @@ void StratumServer::HandleBlockNotify()
 
     // save it to process round
     {
-        std::scoped_lock clients_lock(clients_mutex);
+        std::shared_lock clients_read_lock(clients_mutex);
         for (auto &[con, _] : clients)
         {
             auto cli = con->ptr.get();
@@ -348,8 +348,8 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
                 "Added immature PoS Block! hash: {}", block_hash);
 }
 
-RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
-                                     share_t &share)
+RpcResult StratumServer::HandleShare(StratumClient* cli,
+                                     WorkerContext *wc, share_t &share)
 {
     int64_t time = GetCurrentTimeMs();
     // Benchmark<std::chrono::microseconds> share_bench("Share process");
@@ -361,7 +361,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     // to make sure the job isn't removed while we are using it,
     // and at the same time allow multiple threads to use same job
     std::shared_lock<std::shared_mutex> job_read_lock;
-
+    std::this_thread::sleep_for(std::chrono::seconds(3));
     if (job == nullptr)
     {
         share_res.code = ResCode::JOB_NOT_FOUND;
@@ -400,11 +400,10 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
         auto block_hex = std::string_view(blockData, blockSize);
         submission_manager.TrySubmit(chain, block_hex);
 
-        // possible that we will get new block notification before we are done
-        // here and remove the job
         Logger::Log(LogType::Info, LogField::StatsManager, "Block hex: {}",
                     std::string_view(blockData, blockSize));
 
+        // job will remain safe thanks to the lock.
         const std::string_view worker_full(cli->GetFullWorkerName());
         const auto chain_round = round_manager_pow.GetChainRound();
         const auto type =
@@ -466,11 +465,13 @@ void StratumServer::BroadcastJob(StratumClient *cli, const job_t *job) const
     SendRaw(cli->sock, notifyMsg.data(), notifyMsg.size());
 }
 
+// the shared pointer makes sure the client won't be freed as long as we are processing it
+
 void StratumServer::HandleConsumeable(connection_it *it)
 {
     static thread_local WorkerContext wc;
 
-    Connection<StratumClient> *conn = (*it)->get();
+    std::shared_ptr<Connection<StratumClient>> conn = *(*it);
     const auto sockfd = conn->sock;
 
     // bigger than 0
@@ -512,41 +513,24 @@ void StratumServer::HandleConsumeable(connection_it *it)
 }
 void StratumServer::HandleConnected(connection_it *it)
 {
-    Connection<StratumClient> *conn = (*(*it)).get();
-    conn->ptr = std::make_unique<StratumClient>(conn->sock, "", 0,
+    std::shared_ptr<Connection<StratumClient>> conn = *(*it);
+    conn->ptr = std::make_shared<StratumClient>(conn->sock, "", 0,
                                                 coin_config.default_diff);
-    std::scoped_lock lock(clients_mutex);
+    std::unique_lock lock(clients_mutex);
     clients.emplace(conn, 0);
 }
+
 void StratumServer::HandleDisconnected(connection_it *conn)
 {
-    StratumClient *cli = (*(*conn))->ptr.get();
-    stats_manager.PopWorker(cli->GetFullWorkerName(), cli->GetAddress());
-    std::scoped_lock lock(clients_mutex);
-    clients.erase((*conn)->get());
+    std::shared_ptr<Connection<StratumClient>> conn_ptr = (*(*conn));
+    auto sock = conn_ptr->sock;
+    stats_manager.PopWorker(conn_ptr->ptr->GetFullWorkerName(),
+                            conn_ptr->ptr->GetAddress());
+    std::unique_lock lock(clients_mutex);
+    clients.erase(conn_ptr);
+
+    Logger::Log(LogType::Info, LogField::StatsManager,
+                "Stratum client disconnected. sock: {}", sock);
 }
 
-// void StratumServer::EraseClient(
-//     int sockfd, std::list<std::unique_ptr<StratumClient>>::iterator *it)
-// {
-//     if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, sockfd, nullptr) == -1)
-//     {
-//         Logger::Log(LogType::Warn, LogField::Stratum,
-//                     "Failed to remove socket {} from epoll list errno: {} "
-//                     "-> errno: {}. ",
-//                     sockfd, errno, std::strerror(errno));
-//     }
-//     if (close(sockfd) == -1)
-//     {
-//         Logger::Log(LogType::Warn, LogField::Stratum,
-//                     "Failed to close socket {} errno: {} "
-//                     "-> errno: {}. ",
-//                     sockfd, errno, std::strerror(errno));
-//     }
-
-//     std::unique_lock l(clients_mutex);
-//     clients.erase(*it);
-// }
-
-// TODO: switch unordered map to linked list
 // TODO: add EPOLLERR, EPOLLHUP
