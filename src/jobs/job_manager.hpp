@@ -10,7 +10,7 @@
 #include "../daemon/daemon_rpc.hpp"
 #include "logger.hpp"
 #include "transaction.hpp"
-#include "./job.hpp"
+#include "job.hpp"
 #include "block_template.hpp"
 #include "payment_manager.hpp"
 #include "daemon_manager.hpp"

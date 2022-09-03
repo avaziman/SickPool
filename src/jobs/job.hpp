@@ -58,7 +58,6 @@ class Job
 
     int64_t GetBlockReward() const { return blockReward; }
     uint8_t* GetPrevBlockHash() { return static_header_data + VERSION_SIZE; }
-    uint32_t GetHeight() const { return height; }
     size_t GetTransactionCount() const { return tx_count; }
     std::size_t GetBlockSizeHex() const
     {
@@ -66,13 +65,15 @@ class Job
     }
     std::string_view GetId() const { return std::string_view(job_id); }
     std::string_view GetNotifyMessage() const { return notify_buff_sv; }
-    int64_t GetMinTime() const { return min_time; }
-    double GetTargetDiff() const { return target_diff; }
-    double GetEstimatedShares() const { return expected_shares; }
     // arith_uint256* GetTarget() { return &target; }
     virtual void GetHeaderData(uint8_t* buff, const share_t& share,
                        std::string_view nonce1) const = 0;
+                       
     const bool is_payment;
+    const uint32_t height;
+    const int64_t min_time;
+    const double target_diff;
+    const double expected_shares;
     mutable std::shared_mutex job_mutex;
 
    protected:
@@ -81,8 +82,6 @@ class Job
     char notify_buff[MAX_NOTIFY_MESSAGE_SIZE];
     std::string_view notify_buff_sv;
     const int64_t blockReward;
-    const double target_diff = 0;
-    const double expected_shares = 0;
     std::size_t tx_vi_length;
     std::vector<char> txs_hex;
     const std::size_t tx_count;
@@ -91,8 +90,6 @@ class Job
     // arith_uint256 target;
     uint64_t txAmountByteValue;
 
-    const int64_t min_time;
-    const uint32_t height;
 };
 
 #if COIN == VRSC

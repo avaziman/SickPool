@@ -183,12 +183,12 @@ void StratumServer::HandleBlockNotify()
     payment_manager.UpdatePayouts(&round_manager_pow, curtime_ms);
 
     // the estimated share amount is supposed to be meet at block time
-    const double net_est_hr = new_job->GetEstimatedShares() / BLOCK_TIME;
+    const double net_est_hr = new_job->expected_shares / BLOCK_TIME;
 
     submission_manager.CheckImmatureSubmissions();
 
     redis_manager.SetNewBlockStats(chain, curtime_ms, net_est_hr,
-                                   new_job->GetEstimatedShares());
+                                   new_job->expected_shares);
 
     Logger::Log(
         LogType::Info, LogField::JobManager,
@@ -204,10 +204,10 @@ void StratumServer::HandleBlockNotify()
         "│{8: <{9}}│\n"
         "└{0:─^{9}}┘\n",
         "", fmt::format("Job #{}", new_job->GetId()),
-        fmt::format("Height: {}", new_job->GetHeight()),
-        fmt::format("Min time: {}", new_job->GetMinTime()),
-        fmt::format("Difficulty: {}", new_job->GetTargetDiff()),
-        fmt::format("Est. shares: {}", new_job->GetEstimatedShares()),
+        fmt::format("Height: {}", new_job->height),
+        fmt::format("Min time: {}", new_job->min_time),
+        fmt::format("Difficulty: {}", new_job->target_diff),
+        fmt::format("Est. shares: {}", new_job->expected_shares),
         fmt::format("Block reward: {}", new_job->GetBlockReward()),
         fmt::format("Transaction count: {}", new_job->GetTransactionCount()),
         fmt::format("Block size: {}", new_job->GetBlockSizeHex()), 40);
@@ -227,7 +227,7 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
 
     auto bhash256 = UintToArith256(uint256S(block_hash.data()));
     double bhashDiff = BitsToDiff(bhash256.GetCompact());
-    double pow_diff = job_manager.GetLastJob()->GetTargetDiff();
+    double pow_diff = job_manager.GetLastJob()->target_diff;
 
     Logger::Log(LogType::Info, LogField::Stratum,
                 "Received PoS TxId: {}, block hash: {}", tx_id, block_hash);
@@ -411,7 +411,7 @@ RpcResult StratumServer::HandleShare(StratumClient* cli,
         const double dur = time - chain_round.round_start_ms;
         const double effort_percent =
             (dur / 1000) /
-            (job->GetTargetDiff() / (chain_round.total_effort / (dur / 1000))) *
+            (job->target_diff / (chain_round.total_effort / (dur / 1000))) *
             100.f;
 
         if constexpr (HASH_ALGO == HashAlgo::X25X)
@@ -422,7 +422,7 @@ RpcResult StratumServer::HandleShare(StratumClient* cli,
         }
 
         auto submission = std::make_unique<ExtendedSubmission>(
-            chain, worker_full, type, job->GetHeight(), job->GetBlockReward(),
+            chain, worker_full, type, job->height, job->GetBlockReward(),
             chain_round, time, SubmissionManager::block_number,
             share_res.difficulty, effort_percent, share_res.hash_bytes.data(),
             job->coinbase_tx_id);

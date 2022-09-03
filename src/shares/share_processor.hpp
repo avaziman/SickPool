@@ -29,7 +29,7 @@ class ShareProcessor
         shareTime = bswap_32(shareTime);  // swap to little endian
 #endif
 
-        int64_t minTime = job->GetMinTime();
+        int64_t minTime = job->min_time;
         int64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
 
         if (shareTime < minTime || shareTime > maxTime)
@@ -102,7 +102,7 @@ class ShareProcessor
         result.difficulty = BitsToDiff(UintToArith256(hash).GetCompact(false));
 
         // if (hashArith >= *job->GetTarget())
-        if (unlikely(result.difficulty >= job->GetTargetDiff()))
+        if (unlikely(result.difficulty >= job->target_diff))
         {
             result.code = ResCode::VALID_BLOCK;
             return;
