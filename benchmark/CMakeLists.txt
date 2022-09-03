@@ -1,12 +1,10 @@
 add_custom_target(bench)
-include_directories(../src/stratum)
 
-get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
+# get_filename_component(PARENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
 
 set(PROJECT_NAME_BENCH ${PROJECT_NAME}_bench)
 
 add_executable(${PROJECT_NAME_BENCH}
-
     # ${SRC_FILES}
     # redis_bench.cpp
     submit.cpp
