@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23.2)
+cmake_minimum_required(VERSION 3.18)
 enable_testing()
 set(PROJECT_NAME_TESTS ${PROJECT_NAME}_tests)
 
