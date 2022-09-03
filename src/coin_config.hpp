@@ -1,28 +1,32 @@
 #ifndef COIN_CONFIG_HPP
 #define COIN_CONFIG_HPP
+#include <string_view>
+#include <vector>
 
-struct RpcConfig
-{
+struct RpcConfig{
     std::string host;
     std::string auth;
 };
 
 struct CoinConfig
 {
-    std::string name;
-    std::string symbol;
-    std::string algo;
-
-    u_short stratum_port;
-
+    std::string pool_addr;
     double pow_fee;
     double pos_fee;
-
     double default_diff;
+    double target_shares_rate;
+    int64_t stratum_port;
+    int64_t control_port;
+    int64_t redis_port;
+    std::vector<RpcConfig> rpcs;
 
-    RpcConfig rpcs[4];
-
-    std::string pool_addr;
-    std::string redis_host;
+    int64_t hashrate_interval_seconds;
+    int64_t effort_interval_seconds;
+    int64_t average_hashrate_interval_seconds;  
+    int64_t hashrate_ttl_seconds;
+    int64_t diff_adjust_seconds;
+    int64_t socket_recv_timeout_seconds;
+    int64_t payment_interval_seconds;
+    int64_t min_payout_threshold;
 };
 #endif

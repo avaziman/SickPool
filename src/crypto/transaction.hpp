@@ -10,88 +10,156 @@
 #include "base58.h"
 #include "utils.hpp"
 
-#define PUBKEYHASH_BYTES 20
+#define PUBKEYHASH_BYTES_LEN 20
+#define P2PKH_SCRIPT_SIZE (PUBKEYHASH_BYTES_LEN + 5)
 
 #define OP_DUP 0x76
 #define OP_HASH160 0xa9
 #define OP_EQUALVERIFY 0x88
 #define OP_CHECKSIG 0xac
-#define OP_CRYPTOCONDITION = 0xfc
+#define OP_CRYPTOCONDITION 0xfc
 
-    // the specific part of a specific output list in a transaction (txid +
-    // index)
-    struct OutPoint
+// the specific part of a specific output list in a transaction (txid +
+// index)
+struct OutPoint
 {
-    std::string hash;  // txid
+    unsigned char txid_hash[32];  // txid
     uint32_t index;
 };
 
 struct Output
 {
     int64_t value;  // number of satoshis
-    std::string pk_script;
+    std::vector<uint8_t> pk_script;
+
+    template <typename T>
+    Output(int64_t val, T script) : value(val)
+    {
+        SetScript(script);
+    }
+
+    Output(){
+        // empty (reserved)
+    }
+
+    void SetScript(std::string_view hex)
+    {
+        auto byte_count = hex.size() / 2;
+        auto num_script = GenNumScript(byte_count);
+        pk_script.resize(byte_count + num_script.size());
+
+        memcpy(pk_script.data(), num_script.data(), num_script.size());
+        Unhexlify(pk_script.data() + num_script.size(), hex.data(), hex.size());
+    }
+
+    void SetScript(const std::vector<uint8_t>& script)
+    {
+        auto byte_count = script.size();
+        auto num_script = GenNumScript(byte_count);
+        pk_script.resize(byte_count + num_script.size());
+
+        memcpy(pk_script.data(), num_script.data(), num_script.size());
+        memcpy(pk_script.data() + num_script.size(), script.data(),
+               script.size());
+    }
 };
 
 struct Input
 {
     OutPoint previous_output;
-    std::string signature_script;
-    uint32_t sequence;
+    std::vector<uint8_t> signature_script;
     // supposed to be used for replacement, set to UINT32_MAX to mark as final
+    uint32_t sequence;
+
+    template <typename T>
+    Input(OutPoint prev_outpoint, T sig, uint32_t seq = UINT32_MAX)
+        : previous_output(prev_outpoint), sequence(seq)
+    {
+        SetSignatureScript(sig);
+    }
+
+    void SetSignatureScript(std::string_view hex)
+    {
+        auto byte_count = hex.size() / 2;
+        auto num_script = GenNumScript(byte_count);
+        signature_script.resize(byte_count + num_script.size());
+
+        memcpy(signature_script.data(), num_script.data(), num_script.size());
+        Unhexlify(signature_script.data() + num_script.size(), hex.data(),
+                  hex.size());
+    }
+
+    void SetSignatureScript(const std::vector<uint8_t>& sig)
+    {
+        auto byte_count = sig.size();
+        auto num_script = GenNumScript(byte_count);
+        signature_script.resize(byte_count + num_script.size());
+
+        memcpy(signature_script.data(), num_script.data(), num_script.size());
+        memcpy(signature_script.data() + num_script.size(), sig.data(),
+               sig.size());
+    }
 };
 
 class Transaction
 {
    protected:
-    int32_t version;
-    std::vector<Input> vin;
-    std::vector<Output> vout;
+    int tx_len = 0;
+    // std::vector<unsigned char> bytes;
+    // std::vector<Input> vin;
+    // std::vector<Output> vout;
     uint32_t lock_time;
 
-    std::string GetScript(std::string toAddress)
+    template <typename T>
+    inline void WriteData(unsigned char* bytes, T* val, int size)
     {
-        std::vector<unsigned char> vchRet;
-        bool res = DecodeBase58(toAddress, vchRet);
-
-        std::stringstream script;
-        script << std::hex << OP_DUP << OP_HASH160;
-
-        script << std::hex << std::setfill('0') << std::setw(2)
-               << PUBKEYHASH_BYTES;
-
-        for (int i = 1; i <= PUBKEYHASH_BYTES; i++)
-            script << std::hex << std::setfill('0') << std::setw(2)
-                   << int(vchRet[i]);
-
-        script << std::hex << OP_EQUALVERIFY << OP_CHECKSIG;
-        return script.str();
+        memcpy(bytes + written, val, size);
+        written += size;
     }
+
+    int written = 0;
 
    public:
-    Transaction(int32_t ver, uint32_t locktime) : version(ver) , lock_time(locktime){}
-    void AddInput(std::string prevTxid, uint32_t prevIndex, std::string signature, uint32_t sequence) {
-        Input input;
-        OutPoint point;
-        point.hash = prevTxid;
-        point.index = prevIndex;
-        input.previous_output = point;
-        input.signature_script = signature;
-        input.sequence = sequence;
-        vin.push_back(input);
+    Transaction(uint32_t locktime = 0x00000000) : lock_time(locktime) {}
+
+    static void GetP2PKHScript(std::string_view toAddress,
+                               std::vector<unsigned char>& res)
+    {
+        std::vector<unsigned char> vchRet;
+        // TODO: implement base58 decode for string_view
+        bool decRes = DecodeBase58(std::string(toAddress), vchRet);
+
+        res.reserve(P2PKH_SCRIPT_SIZE);
+
+        res.push_back(OP_DUP);
+        res.push_back(OP_HASH160);
+        res.push_back(PUBKEYHASH_BYTES_LEN);
+        res.insert(res.end(), ++vchRet.begin(), ++vchRet.begin() + PUBKEYHASH_BYTES_LEN);
+        res.push_back(OP_EQUALVERIFY);
+        res.push_back(OP_CHECKSIG);
     }
+
+    // std::vector<Output>* GetOutputs() { return &vout; }
+    int GetTxLen() const { return tx_len; }
+
+    void AddInput(const uint8_t* prevTxId, uint32_t prevIndex,
+                  const std::vector<uint8_t>& signature, uint32_t sequence);
 
     // standard p2pkh transaction
-    void AddStdOutput(std::string toAddress, int64_t value)
-    {
-        Output output;
-        output.value = value;
-        output.pk_script = GetScript(toAddress);
-        vout.push_back(output);
-    }
+    void AddP2PKHOutput(std::string_view toAddress, int64_t value);
 
-    // std::string GetCoinbase1() { return coinbase1; }
-    // std::string GetCoinbase2() { return coinbase2; }
+    void SwitchOutput(int index, const Output& output);
+    void AddOutput(const std::vector<uint8_t>& script_pub_key, int64_t value);
+    void AddOutput(const Output& output);
+    // virtual void GetBytes(std::vector<uint8_t>& bytes);
+    // TODO: make public func
+    std::vector<Output> vout;
+    std::vector<Input> vin;
+    };
 
-    virtual std::string GetHex() = 0;
-};
+#if COIN == VRSC
+#include "transaction_vrsc.hpp"
+#elif COIN == SIN
+#include "transaction_btc.hpp"
+#endif
 #endif

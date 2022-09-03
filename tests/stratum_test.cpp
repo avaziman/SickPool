@@ -1,19 +1,27 @@
 // #include <gtest/gtest.h>
 
-// #ifdef _WIN32
-// #include <winsock2.h>
-// #endif
-
+// #include <string>
 // #include "sock_addr.hpp"
 // #include "stratum/stratum_server.hpp"
 // #include "stratum_test.hpp"
+// #include <simdjson.h>
+// #include "../src/coin_static_config/config.hpp"
+
+// #define PORT 4444
 
 // StratumServer* stratumServ;
-// SOCKET sockfd;
+// int sockfd;
+// using namespace simdjson;
 
 // TEST_F(StratumTest, Init)
 // {
-//     stratumServ = new StratumServer(htonl(INADDR_ANY), htons(4444));
+//     CoinConfig coinConfig;
+//     coinConfig.algo = "verushash";
+//     coinConfig.stratum_port = 4444;
+//     coinConfig.default_diff = 0;
+//     coinConfig.redis_host = "127.0.0.1:6379";
+
+//     stratumServ = new StratumServer(coinConfig);
 //     ASSERT_NO_THROW();
 // }
 
@@ -27,24 +35,27 @@
 // {
 //     sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-//     ASSERT_NE(sockfd, INVALID_SOCKET);
+//     ASSERT_NE(sockfd, -1);
 
 //     sockaddr_in addr;
 //     addr.sin_family = AF_INET;
-//     addr.sin_addr.S_un.S_addr = htonl(INADDR_LOOPBACK);
-//     addr.sin_port = htons(4444);
+//     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+//     addr.sin_port = htons(PORT);
 
 //     int res = connect(sockfd, (const sockaddr*)&addr, sizeof(addr));
-//     int err = WSAGetLastError();
 //     ASSERT_EQ(res, 0);
 // }
 
 // TEST_F(StratumTest, Subscribe)
 // {
-//     char buffer[2048];
-//     GetReqBuffer(buffer, 3, "mining.subscribe", {"SicMiner/6.9"});
+//     // session id, host, host port = null
+//     char buffer[256] = "{\"id\":1,\"method\":\"method.subsribe\",params:[\"miner1.0\",null, null, null]}\n";
+
 //     int res = send(sockfd, buffer, sizeof(buffer), 0);
 
 //     char recvBuffer[1024];
 //     recv(sockfd, recvBuffer, sizeof(recvBuffer), 0);
+
+//     ondemand::parser parser;
+//     // char[] expected = "{"id": 1, "result": ["SESSION_ID", "NONCE_1"], "error": null}\n"
 // }

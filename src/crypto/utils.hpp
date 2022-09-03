@@ -1,24 +1,58 @@
 #ifndef UTILS_HPP_
 #define UTILS_HPP_
+#include <sys/time.h>
+
+#include <cmath>
+#include <ctime>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "verushash/arith_uint256.h"
 #include "verushash/endian.h"
 #include "verushash/uint256.h"
+#include "static_config/static_config.hpp"
 
-// bool IsAddressValid(std::string addr){
-//     std::vector<unsigned char> bytes;
 
-//     // if(!DecodeBase58(addr, bytes) return false;
-// }
+#define DIFF_US(end, start) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+#define TIME_NOW() std::chrono::steady_clock::now()
 
-inline std::string ReverseHex(std::string input)
+#define unlikely(expr) (__builtin_expect(!!(expr), 0))
+#define likely(expr) (__builtin_expect(!!(expr), 1))
+
+inline int64_t GetCurrentTimeMs()
 {
-    int size = input.size();
-    char str[size + 1];
+    struct timeval time_now;
+    gettimeofday(&time_now, nullptr);
+    return (time_now.tv_sec * 1000) + (time_now.tv_usec / 1000);
+}
+
+inline int fast_atoi(const char* str, int size)
+{
+    int val = 0;
+    for (int i = 0; i < size; i++)
+    {
+        val = val * 10 + str[i] - '0';
+    }
+    return val;
+}
+
+inline int SetHighPriorityThread(std::thread& thr)
+{
+    struct sched_param param;
+    int maxPriority;
+
+    param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+    int res = pthread_setschedparam(thr.native_handle(), SCHED_FIFO, &param);
+    
+    return res;
+}
+
+inline void ReverseHex(char* dest, const char* input, uint32_t size)
+{
     for (int i = 0; i < size / 2; i += 2)
     {
         char left = input[i];
@@ -26,60 +60,84 @@ inline std::string ReverseHex(std::string input)
         char right = input[size - (i + 1)];
         char right1 = input[size - (i + 2)];
 
-        str[i + 1] = right;
-        str[i] = right1;
-        str[size - (i + 2)] = left;
-        str[size - (i + 1)] = left1;
+        dest[i + 1] = right;
+        dest[i] = right1;
+        dest[size - (i + 2)] = left;
+        dest[size - (i + 1)] = left1;
     }
-    str[size] = '\0';
-    return std::string(str);
 }
 
-inline char* ReverseHex(char* input, uint16_t size)
+constexpr const char* BoolToCstring(const bool b)
 {
-    char* str = new char[size + 1];
-    for (int i = 0; i < size / 2; i += 2)
+    return b ? "true" : "false";
+}
+
+inline char GetHex(char c)
+{
+    // assumes all hex is in lowercase
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    else if (c >= 'a' && c <= 'f')
+        return 10 + (c - 'a');
+
+    return 0;
+}
+
+inline uint32_t HexToUint(const char* hex, std::size_t size)
+{
+    uint32_t val = 0;
+    for (int i = 0; i < size; i++)
     {
-        char left = input[i];
-        char left1 = input[i + 1];
-        char right = input[size - (i + 1)];
-        char right1 = input[size - (i + 2)];
-
-        str[i + 1] = right;
-        str[i] = right1;
-        str[size - (i + 2)] = left;
-        str[size - (i + 1)] = left1;
+        val *= 16;
+        val += GetHex(hex[i]);
     }
-    str[size] = '\0';
-    return str;
+    return val;
 }
 
-inline std::string Unhexlify(const std::string& hex)
+inline void Hexlify(char* dest, const unsigned char* src, size_t srcSize)
 {
-    std::vector<unsigned char> bytes;
+    const char hex[] = "0123456789abcdef";
 
-    for (unsigned int i = 0; i < hex.length(); i += 2)
+    // each byte is 2 characters in hex
+    for (int i = 0; i < srcSize; i++)
     {
-        std::string byteString = hex.substr(i, 2);
-        unsigned char byte =
-            (unsigned char)strtol(byteString.c_str(), NULL, 16);
-        bytes.push_back(byte);
+        unsigned char val = src[i];
+
+        char c1 = '0', c2 = '0';
+        if (val < 16)
+            c2 = hex[val];
+        else
+        {
+            char c2Val = val % 16;
+            c2 = hex[c2Val];
+            c1 = hex[(val - c2Val) / 16];
+        }
+        dest[i * 2] = c1;
+        dest[i * 2 + 1] = c2;
     }
-
-    std::string result(bytes.begin(), bytes.end());
-    return result;
 }
 
-inline std::string ToHex(uint32_t num)
+inline void PrintHex(uint8_t* b, std::size_t size)
 {
-    std::stringstream ss;
-    ss << std::hex << std::setfill('0') << std::setw(8) << htobe32(num);
-    return ss.str();
+    for (int i = 0; i < size; i++)
+    {
+        std::cout << std::hex << std::setfill('0') << std::setw(2) << int(b[i]);
+    }
+    std::cout << std::endl;
 }
 
-inline void ToHex(char* dest, uint32_t num) { sprintf(dest, "%08x", num); }
+inline void Unhexlify(unsigned char* dest, const char* src, size_t size)
+{
+    // each byte is 2 characters in hex
+    for (int i = 0; i < size / 2; i++)
+    {
+        unsigned char char1 = GetHex(src[i * 2]);
+        unsigned char char2 = GetHex(src[i * 2 + 1]);
+        dest[i] = char2 + char1 * 16;
+    }
+}
 
-inline uint32_t FromHex(std::string str)
+inline uint32_t FromHex(const char* str)
 {
     uint32_t val;
     std::stringstream ss;
@@ -88,24 +146,96 @@ inline uint32_t FromHex(std::string str)
     return val;
 }
 
-// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
-inline std::string VarInt(uint64_t len)
+// from script.h
+inline std::vector<uint8_t> GenNumScript(const int64_t value)
 {
-    std::stringstream ss;
-    if (len < 0xfd)
-        ss << std::hex << std::setfill('0') << std::setw(2) << len;
-    else if (len <= 0xffffffff)
-        ss << "fd" << std::hex << std::setfill('0') << std::setw(4)
-           << htobe16(len);
-    else if (len <= 0xffffffff)
-        ss << "fe" << std::hex << std::setfill('0') << std::setw(8)
-           << htobe32(len);
-    else
-        ss << "ff" << std::hex << std::setfill('0') << std::setw(16)
-           << htobe64(len);
+    std::vector<uint8_t> result;
+    const bool neg = value < 0;
+    uint64_t absvalue = neg ? -value : value;
 
-    return ss.str();
+    if(value == 0){
+        result.push_back(0);
+        return result;
+    }
+
+    while (absvalue)
+    {
+        result.push_back(absvalue & 0xff);
+        absvalue >>= 8;
+    }
+
+    //    - If the most significant byte is >= 0x80 and the value is positive,
+    //    push a new zero-byte to make the significant byte < 0x80 again.
+
+    //    - If the most significant byte is >= 0x80 and the value is negative,
+    //    push a new 0x80 byte that will be popped off when converting to an
+    //    integral.
+
+    //    - If the most significant byte is < 0x80 and the value is negative,
+    //    add 0x80 to it, since it will be subtracted and interpreted as a
+    //    negative when converting to an integral.
+
+    if (result.back() & 0x80)
+        result.push_back(neg ? 0x80 : 0);
+    else if (neg)
+        result.back() |= 0x80;
+
+    return result;
 }
+
+inline std::pair<uint64_t, uint8_t> ReadNumScript(uint8_t* script){
+    uint8_t type = script[0];
+    if(type < 0xFD)
+    {
+        return std::make_pair(type, 1);
+    }
+    else if(type == 0xFD)
+    {
+        return std::make_pair(*reinterpret_cast<uint16_t*>(script + 1), 3);
+    }
+    else if(type == 0xFE)
+    {
+        return std::make_pair(*reinterpret_cast<uint32_t*>(script + 1), 5);
+    }
+    else if(type == 0xFF)
+    {
+        return std::make_pair(*reinterpret_cast<uint64_t*>(script + 1), 9);
+    }
+    return std::make_pair(0, 0);
+}
+
+// https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
+inline char VarInt(uint64_t& len)
+{
+    if (len < 0xfd)
+        return 1;
+    else if (len <= 0xFFFF)
+    {
+        len = (0xfd << 16) | len;
+        return 3;
+    }
+    else if (len <= 0xFFFFFFFF)
+    {
+        len = ((uint64_t)0xfe << 32) | len;
+        return 5;
+    }
+
+    //problem 
+    // len = ((uint64_t)0xff << 64) | len;
+    return 9;
+}
+
+inline uint8_t GetByteAmount(uint32_t num)
+{
+    if (num <= 0xff)
+        return 1;
+    else if (num <= 0xffff)
+        return 2;
+    else if (num <= 0xffffff)
+        return 3;
+    return 4;
+}
+
 inline int intPow(int x, unsigned int p)
 {
     if (p == 0) return 1;
@@ -118,38 +248,61 @@ inline int intPow(int x, unsigned int p)
         return x * tmp * tmp;
 }
 
-static double DifficultyFromBits(int64_t nBits)
+constexpr double BitsToDiff(const unsigned bits)
 {
-    // from chain params
-    uint256 powLimit256 = uint256S(
-        "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
-    uint32_t powLimit = UintToArith256(powLimit256).GetCompact(false);
-    int nShift = (nBits >> 24) & 0xff;
-    int nShiftAmount = (powLimit >> 24) & 0xff;
-
-    double dDiff =
-        (double)(powLimit & 0x00ffffff) / (double)(nBits & 0x00ffffff);
-    while (nShift < nShiftAmount)
-    {
-        dDiff *= 256.0;
-        nShift++;
-    }
-
-    while (nShift > nShiftAmount)
-    {
-        dDiff /= 256.0;
-        nShift--;
-    }
-
-    return dDiff;
+    const unsigned exponent_diff = 8 * (DIFF1_EXPONENT - ((bits >> 24) & 0xFF));
+    const double significand = bits & 0xFFFFFF;
+    return std::ldexp(DIFF1_COEFFICIENT / significand, exponent_diff);
 }
 
-static std::string DiffToTarget(double diff)
+constexpr uint64_t pow2(int power)
 {
-    uint64_t t = 0x0000ffff00000000 / 1;
+    // if (power == 0) return 1;
 
-    arith_uint256 arith256;
-    return arith256.SetCompact(t).GetHex();
+    // return 2 * pow2(power - 1);
+
+    return (1ULL << power);
+}
+
+inline double GetExpectedHashes(const double diff)
+{
+    constexpr uint64_t power = 256 - 8 * (DIFF1_EXPONENT - 3);
+    constexpr double hash_multiplier = static_cast<double>(pow2(power)) / DIFF1_COEFFICIENT;
+
+    return diff * hash_multiplier;
+    // for verus 2^ 24 / 0x0f0f0f = 17...
+}
+
+// ms
+inline int64_t GetDailyTimestamp()
+{
+    int64_t time = std::time(nullptr);
+    time = time - (time % 86400);
+    return time * 1000;
+}
+
+// https://bitcoin.stackexchange.com/questions/30467/what-are-the-equations-to-convert-between-bits-and-difficulty
+static uint32_t DiffToBits(double difficulty)
+{
+    int shiftBytes;
+    int64_t word;
+    for (shiftBytes = 1; true; shiftBytes++)
+    {
+        word =
+            (DIFF1_COEFFICIENT * pow(0x100, shiftBytes)) / difficulty;
+        if (word >= 0xffff) break;
+    }
+    word &= 0xffffff;  // convert to int < 0xffffff
+    int size = DIFF1_EXPONENT - shiftBytes;
+    // the 0x00800000 bit denotes the sign, so if it is already set, divide the
+    // mantissa by 0x100 and increase the size by a byte
+    if (word & 0x800000)
+    {
+        word >>= 8;
+        size++;
+    }
+    uint32_t bits = (size << 24) | word;
+    return bits;
 }
 
 #endif

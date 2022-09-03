@@ -2,50 +2,56 @@
 #ifndef MERKLE_TREE_HPP
 #define MERKLE_TREE_HPP
 
+#include <array>
 #include <iostream>
 #include <string>
 #include <vector>
+#include "hash_wrapper.hpp"
+#include "jobs/block_template.hpp"
+
 #include "utils.hpp"
 
 class MerkleTree
 {
-   private:
-    std::vector<char*> txIds;
-    void(*hash)(char*, int, char*);
-
    public:
-    MerkleTree()
-        : hash(hash)
+    // static void CalcRoot(
+    //     uint8_t* res, const std::vector<TransactionData>& txsData)
+    // {
+    //     std::vector<uint8_t> hashes;
+    //     uint32_t hash_count = txsData.size();
+
+    //     hashes.reserve(txsData.size() * HASH_SIZE);
+
+    //     for (int i = 0; i < hash_count; i++)
+    //     {
+    //         memcpy(hashes.data() + i * HASH_SIZE, txsData[i].hash, HASH_SIZE);
+    //     }
+
+    //     CalcRoot(res, hashes, hash_count);
+    // }
+
+    static void CalcRoot(uint8_t* res, std::vector<uint8_t>& hashes,
+                         std::size_t hash_count)
     {
-    }
-
-    void AddTx(char* txHex, int size) {
-        char txId[32];
-        hash(txHex, size, txId);
-        txIds.push_back(txId);
-    }
-
-    void CalcRoot(char* res)
-    {
-        std::vector<char*> leafs(txIds);
-
-        while (leafs.size() != 1)
+        while (hash_count > 1)
         {
-            if (leafs.size() % 2 != 0) leafs.push_back(leafs[leafs.size() - 1]);
-
-            std::vector<char*> tempLeafs;
-
-            for (int i = 0; i < leafs.size(); i += 2)
+            for (int i = 0; i < hash_count; i += 2)
             {
-                // std::string combined = (leafs[i]) + (leafs[i + 1]);
-                char combinedHash[32];
-                hash(leafs[i], 32 * 2, combinedHash);
-                tempLeafs.push_back(combinedHash);
-            }
+                if (i + 1 == hash_count)
+                {
+                    hashes.reserve(hashes.size() + i * HASH_SIZE);
+                    memcpy(hashes.data() + i * HASH_SIZE,
+                           hashes.data() + (i - 1) * HASH_SIZE, HASH_SIZE);
+                }
 
-            leafs = tempLeafs;
+                HashWrapper::SHA256d(hashes.data() + (i / 2) * HASH_SIZE,
+                                     hashes.data() + i * HASH_SIZE,
+                                     HASH_SIZE * 2);
+            }
+            hash_count /= 2;
         }
-        std::memcpy(res, leafs[0], 32);
-    } 
+
+        memcpy(res, hashes.data(), HASH_SIZE);
+    }
 };
 #endif

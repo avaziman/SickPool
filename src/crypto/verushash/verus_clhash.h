@@ -1,4 +1,4 @@
-/*
+ /*
  * This uses variations of the clhash algorithm for Verus Coin, licensed
  * with the Apache-2.0 open source license.
  * 

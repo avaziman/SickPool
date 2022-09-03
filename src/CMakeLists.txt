@@ -1,43 +1,54 @@
-include_directories(daemon)
+cmake_minimum_required(VERSION 3.23.2)
 
-file(GLOB_RECURSE SRC_FILES
-     "*.h"
-     "*.c"
-     "*.hpp"
-     "*.cpp"
-     )
+include(FetchContent)
 
-find_package(Boost 1.68 REQUIRED)
+FetchContent_Declare(
+    simdjson
+    GIT_REPOSITORY https://github.com/simdjson/simdjson.git
+    GIT_TAG tags/v2.2.2
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(simdjson)
 
-add_executable(${PROJECT_NAME} ${SRC_FILES})
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG tags/9.0.0
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(fmt)
 
-# <------------ add hiredis dependency here --------------->
+# optimized hash function
+add_subdirectory(crypto/verushash)
+add_subdirectory(crypto/x25x)
 find_path(HIREDIS_HEADER hiredis)
-target_include_directories(${PROJECT_NAME} PUBLIC ${HIREDIS_HEADER})
+
+file(GLOB SRC_FILES
+    "stratum/*.cpp"
+    "crypto/*.cpp"
+    "stats/*.cpp"
+    "blocks/*.cpp"
+    "jobs/*.cpp"
+    "redis/*.cpp"
+    "round/*.cpp"
+    "payments/*.cpp"
+    "logger/*.cpp"
+)
+
+# message("SRC FILES: ${SRC_FILES}")
+
+add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
+
+set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs)
+target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
 find_library(HIREDIS_LIB hiredis)
-target_link_libraries(${PROJECT_NAME} ${HIREDIS_LIB})
-
-# <------------ add redis-plus-plus dependency here -------------->
-find_path(REDIS_PLUS_PLUS_HEADER sw)      # NOTE: this should be *sw* NOT *redis++*
-target_include_directories(${PROJECT_NAME} PUBLIC ${REDIS_PLUS_PLUS_HEADER})
-
-find_library(REDIS_PLUS_PLUS_LIB redis++)
-target_link_libraries(${PROJECT_NAME} ${REDIS_PLUS_PLUS_LIB})
+target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER})
 
 target_link_libraries(
-    ${PROJECT_NAME}
-    Boost::boost
+    ${PROJECT_NAME_CORE}
+    ${HIREDIS_LIB}
     pthread
+    simdjson
+    fmt::fmt
+    sickverushash
+    sickx25x
 )
-
-if(WIN32) 
-target_link_libraries(
-    ${PROJECT_NAME}
-    ws2_32
-)
-endif(WIN32)
-
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/crypto/verushash/verus_clhash.cpp PROPERTIES COMPILE_FLAGS " -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/crypto/verushash/verus_hash.cpp PROPERTIES COMPILE_FLAGS "   -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/crypto/verushash/haraka.c PROPERTIES COMPILE_FLAGS "         -m64 -mavx -mpclmul -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -maes  -funroll-loops -fomit-frame-pointer")

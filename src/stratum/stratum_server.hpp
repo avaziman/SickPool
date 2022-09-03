@@ -1,89 +1,139 @@
 #ifndef STRATUM_SERVER_HPP_
 #define STRATUM_SERVER_HPP_
-#define VERUS_MAX_BLOCK_SIZE (1024 * 1024 * 2)
-#include "byteswap.h"
+#include <simdjson.h>
 
-#include <rapidjson/document.h>
-#include <sw/redis++/redis++.h>
-#include <sys/socket.h>
-
-#include <algorithm>
+#include <any>
 #include <chrono>
-#include <iostream>
+#include <deque>
+#include <functional>
+#include <iterator>
+#include <mutex>
 #include <thread>
+#include <unordered_map>
 #include <vector>
+#include <map>
 
-#include "../coin_config.hpp"
-#include "../crypto/block.hpp"
-#include "../crypto/block_header.hpp"
-#include "../crypto/hash_wrapper.hpp"
-#include "../crypto/merkle_tree.hpp"
-#include "../crypto/transaction.hpp"
-#include "../crypto/verus_header.hpp"
-#include "../crypto/verus_transaction.hpp"
-#include "../crypto/verushash/verus_hash.h"
-#include "../daemon/daemon_rpc.hpp"
+#include "static_config/static_config.hpp"
+#include "connection.hpp"
 #include "../sock_addr.hpp"
-#include "job.hpp"
-#include "redis_manager.hpp"
-#include "share.hpp"
-#include "share_result.hpp"
+#include "benchmark.hpp"
+#include "blocks/block_submission.hpp"
+#include "blocks/block_submission_manager.hpp"
+#include "control/control_server.hpp"
+#include "jobs/job_manager.hpp"
+#include "redis/redis_manager.hpp"
+#include "shares/share_processor.hpp"
+#include "stats_manager.hpp"
 #include "stratum_client.hpp"
-#include "verus_job.hpp"
+#include "server.hpp"
+#include "logger.hpp"
 
-// how we store stale and invalid shares in database
-#define STALE_SHARE_DIFF -1
-#define INVALID_SHARE_DIFF -2
 
-using namespace sw::redis;
-
-using namespace rapidjson;
-using namespace std::chrono;
-
-class StratumServer
+class StratumServer : public Server<StratumClient>
 {
    public:
-    StratumServer(CoinConfig config);
+
+    StratumServer(const CoinConfig& conf);
     ~StratumServer();
-    void StartListening();
-    int sockfd;
-
-   private:
-    CoinConfig coinConfig;
-    sockaddr_in addr;
-    uint32_t job_count;
-
-    RedisManager* redis_manager;
-
-    std::vector<DaemonRpc*> rpcs;
-    std::vector<StratumClient*> clients;
-    std::vector<Job*> jobs;
-
     void Listen();
-    void HandleSocket(int sockfd);
-    void HandleReq(StratumClient* cli, char buffer[]);
-    void HandleBlockUpdate(Value& params);
+    void Stop();
 
-    void HandleSubscribe(StratumClient* cli, int id, Value& params);
-    void HandleAuthorize(StratumClient* cli, int id, Value& params);
-    void HandleSubmit(StratumClient* cli, int id, Value& params);
+   protected:
+    CoinConfig coin_config;
+    std::string chain{COIN_SYMBOL};
 
-    void HandleShare(StratumClient* cli, int id, Share& share);
-    void RejectShare(StratumClient* cli, int id, ShareResult error);
-    bool SubmitBlock(std::string blockHex);
+    simdjson::ondemand::parser httpParser =
+        simdjson::ondemand::parser(HTTP_REQ_ALLOCATE);
 
-    void UpdateDifficulty(StratumClient* cli);
+    std::jthread control_thread;
+    std::jthread stats_thread;
+    std::vector<std::jthread> processing_threads;
 
-    void BroadcastJob(Job* job);
-    void BroadcastJob(StratumClient* cli, Job* job);
+    job_manager_t job_manager;
+    ControlServer control_server;
+    RedisManager redis_manager;
+    StatsManager stats_manager;
+    DaemonManager daemon_manager;
+    SubmissionManager submission_manager;
+    DifficultyManager diff_manager;
+    PaymentManager payment_manager;
 
-    Job* GetJobById(std::string id);
+    RoundManager round_manager_pow;
+    RoundManager round_manager_pos;
 
-    void CheckAcceptedBlock(uint32_t height);
+    // O(log n) delete + insert
+    // saving the pointer in epoll gives us O(1) access!
+    // allows us to sort connections by hashrate to minimize loss
+    std::map<std::shared_ptr<Connection<StratumClient>>, double> clients;
+    std::shared_mutex clients_mutex;
 
-    std::string GetCoinbaseTx(std::string addr, int64_t value, uint32_t curtime,
-                              uint32_t height);
 
-    char* SendRpcReq(int id, std::string method, std::string params = "");
+    void HandleControlCommands(std::stop_token st);
+    void HandleControlCommand(ControlCommands cmd, char* buff);
+
+    virtual void HandleReq(StratumClient* cli, WorkerContext* wc,
+                           std::string_view req) = 0;
+    void HandleBlockNotify();
+    void HandleWalletNotify(WalletNotify* wal_notify);
+
+    RpcResult HandleShare(StratumClient* cli, WorkerContext* wc,
+                          share_t& share);
+
+    virtual void UpdateDifficulty(StratumClient* cli) = 0;
+
+    void BroadcastJob(StratumClient* cli, const job_t* job) const;
+    int AcceptConnection(sockaddr_in* addr, socklen_t* addr_size);
+    void InitListeningSock();
+    // void EraseClient(int sockfd,
+    //                  std::list<std::unique_ptr<StratumClient>>::iterator* it);
+    void ServiceSockets(std::stop_token st);
+    void HandleConsumeable(connection_it* conn) override;
+    void HandleConnected(connection_it* conn) override;
+    void HandleDisconnected(connection_it* conn) override;
+
+    inline void SendRes(int sock, int req_id, const RpcResult& res)
+    {
+        char buff[512];
+        size_t len = 0;
+
+        if (res.code == ResCode::OK)
+        {
+            len = fmt::format_to_n(
+                buff, sizeof(buff),
+                "{{\"id\":{},\"result\":{},\"error\":null}}\n", req_id, res.msg).size;
+        }
+        else
+        {
+            len = fmt::format_to_n(
+                buff, sizeof(buff),
+                "{{\"id\":{},\"result\":null,\"error\":[{},\"{}\",null]}}\n",
+                req_id, (int)res.code, res.msg).size;
+        }
+
+        SendRaw(sock, buff, len);
+    }
+
+    inline std::size_t SendRaw(int sock, const char* data,
+                               std::size_t len) const
+    {
+        // dont send sigpipe
+        auto res = send(sock, data, len, MSG_NOSIGNAL);
+
+        if (res == -1)
+        {
+            Logger::Log(LogType::Error, LogField::Stratum,
+                        "Failed to send on sock fd {}, errno: {} -> {}", sock,
+                        errno, std::strerror(errno));
+        }
+
+        return res;
+    }
 };
+
+#ifdef STRATUM_PROTOCOL_ZEC
+#include "stratum_server_zec.hpp"
+#elif STRATUM_PROTOCOL_BTC
+#include "stratum_server_btc.hpp"
+#endif
+
 #endif

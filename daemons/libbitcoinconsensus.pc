@@ -1,0 +1,10 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: Sin Core consensus library
+Description: Library for the Bitcoin consensus protocol.
+Version: 22.0.3
+Libs: -L${libdir} -lbitcoinconsensus
+Cflags: -I${includedir}
