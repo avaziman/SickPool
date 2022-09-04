@@ -1,14 +1,11 @@
 [Unit]
-Description=Production stratum server
-WorkingDirectory=~/stratum/
-ExecStart=./Api
-
+Description=Production api server
 After=network.target
-After=redis-server
-Restart=always
 
 [Service]
-User=sickpool
+User=pool
+ExecStart=/home/pool/actions-runner-api/_work/SickPoolAPI/SickPoolAPI/target/release/api
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

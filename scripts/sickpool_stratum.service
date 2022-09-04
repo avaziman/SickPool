@@ -1,14 +1,11 @@
 [Unit]
-Description=Production pool api server
-WorkingDirectory=~/Api/
-ExecStart=./SickPoolApi
-
+Description=Production pool server
 After=network.target
-After=redis-server
-Restart=always
 
 [Service]
-User=sickpool
+User=pool
+ExecStart=/home/pool/actions-runner-server/_work/SickPool/SickPool/build/SickPool
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

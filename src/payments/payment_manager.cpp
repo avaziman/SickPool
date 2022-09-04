@@ -39,11 +39,11 @@ bool PaymentManager::GetRewardsProp(round_shares_t& miner_shares,
             round_share.share * static_cast<double>(substracted_reward));
         miner_shares.emplace_back(addr, round_share);
 
-        Logger::Log(LogType::Info, LogField::PaymentManager,
-                    "Miner round share: {}, effort: {}, share: {}, reward: "
-                    "{}, total effort: {}",
-                    addr, round_share.effort, round_share.share,
-                    round_share.reward, total_effort);
+        // Logger::Log(LogType::Info, LogField::PaymentManager,
+                    // "Miner round share: {}, effort: {}, share: {}, reward: "
+                    // "{}, total effort: {}",
+                    // addr, round_share.effort, round_share.share,
+                    // round_share.reward, total_effort);
     }
 
     return true;
