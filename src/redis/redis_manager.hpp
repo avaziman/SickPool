@@ -103,7 +103,7 @@ class RedisManager
                       std::string_view chain);
 
     /* payout */
-    bool AddPayout(const PendingPayment* payment);
+    bool AddPayout(const PaymentInfo* payment);
 
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
@@ -111,7 +111,9 @@ class RedisManager
 
     std::string hget(std::string_view key, std::string_view field);
 
-    void LoadCurrentRound(std::string_view chain, std::string_view type, Round* rnd);
+    void LoadCurrentRound(std::string_view chain, std::string_view type,
+                          Round *rnd);
+    bool LoadImmatureBlocks(std::vector<std::unique_ptr<ExtendedSubmission>>& submsissions);
 
     inline bool GetReplies(redis_unique_ptr *last_reply = nullptr)
     {

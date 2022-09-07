@@ -2,15 +2,22 @@
 STRATUM_SERVICE=sickpool_stratum
 API_SERVICE=sickpool_api
 
+# general use
+sudo apt install wget git
+
+# web server
+sudo apt install nginx
+
 # move to the location of our custom services
-sudo mv ./$STRATUM_SERVICE.service /etc/systemd/system
-sudo mv ./$API_SERVICE.service /etc/systemd/system
+sudo cp ./$STRATUM_SERVICE.service /etc/systemd/system
+sudo cp ./$API_SERVICE.service /etc/systemd/system
 
 # install building dependencies
 # server
-sudo apt install libhiredis-dev gcc-10
+sudo apt install libhiredis-dev gcc-10 cmake
 # api
 curl https://sh.rustup.rs -sSf | sh
+sudo apt install build-essential
 # website
 sudo apt install node
 

@@ -22,14 +22,12 @@ const job_t* JobManagerSin::GetNewJob(const std::string& json_template)
         ondemand::array txs = res["transactions"].get_array();
 
         int64_t additional_fee = 0;
-
-        bool includes_payment = payment_manager->ShouldIncludePayment(
-            blockTemplate.prev_block_hash);
+        bool includes_payment = payment_manager->pending_payment.get();
 
         if (includes_payment)
         {
-            blockTemplate.tx_list.AddTxData(payment_manager->pending_tx->td);
-            additional_fee += payment_manager->pending_tx->td.fee;
+            blockTemplate.tx_list.AddTxData(payment_manager->pending_payment->td);
+            additional_fee += payment_manager->pending_payment->td.fee;
         }
 
         // for (auto tx : txs)
@@ -146,8 +144,7 @@ const job_t* JobManagerSin::GetNewJob(const std::string& json_template)
             jobs.pop_back();
         }
 
-        jobs.emplace_back(std::move(job));
-        return jobs.back().get();
+        return jobs.emplace_back(std::move(job)).get();
     }
     catch (const simdjson::simdjson_error& err)
     {

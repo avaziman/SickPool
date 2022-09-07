@@ -1,6 +1,7 @@
 #include "hash_algo.hpp"
 
 #define STRATUM_PROTOCOL_BTC 1
+#define HASH_ALGO HASH_ALGO_X25X
 
 // diff 1
 // static constexpr uint32_t DIFF1_BITS = 0x1f00ffff;
@@ -17,8 +18,6 @@ static constexpr uint32_t MAX_FUTURE_BLOCK_TIME = 60;
 static constexpr uint32_t BLOCK_TIME = 60;
 
 static constexpr uint32_t COINBASE_MATURITY = 20;
-
-static constexpr HashAlgo HASH_ALGO = HashAlgo::X25X;
 
 // tx
 static constexpr uint32_t TXVERSION = 2;

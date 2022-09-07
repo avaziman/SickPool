@@ -1,0 +1,13 @@
+[Unit]
+Description=Production pool server
+After=network.target
+
+[Service]
+User=pool
+ExecStart=/home/pool/actions-runner-server/_work/SickPool/SickPool/build/SickPool /home/pool/actions-runner-server/_work/SickPool/SickPool/config/coins/SIN.json
+Restart=always
+StandardOutput=file:/home/pool/logs/pool.log
+StandardError=file:/home/pool/logs/pool_error.log
+
+[Install]
+WantedBy=multi-user.target

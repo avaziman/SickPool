@@ -1,12 +1,12 @@
 #include "redis_manager.hpp"
 
-bool RedisManager::AddPayout(const PendingPayment* payment)
+bool RedisManager::AddPayout(const PaymentInfo* payment)
 {
     using namespace std::string_view_literals;
     int64_t curtime = GetCurrentTimeMs();
     {
         RedisTransaction tx(this);
-        for (const auto& [addr, reward] : payment->info.rewards)
+        for (const auto& [addr, reward] : payment->rewards)
         {
             std::string reward_str = std::to_string(-1 * reward);
             std::string_view negative_reward_sv(reward_str);
@@ -36,10 +36,10 @@ bool RedisManager::AddPayout(const PendingPayment* payment)
         memcpy(finished.hash_hex, payment->td.hash_hex,
                HASH_SIZE_HEX);
         finished.id = payment->id;
-        finished.total_paid_amount = payment->info.total_paid;
+        finished.total_paid_amount = payment->total_paid;
         finished.time_ms = curtime;
         finished.fee = payment->td.fee;
-        finished.total_payees = payment->info.rewards.size();
+        finished.total_payees = payment->rewards.size();
 
         AppendCommand(
             {"LPUSH"sv, PAYOUTS_KEY,

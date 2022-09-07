@@ -29,6 +29,14 @@ class SubmissionManager
                     "Submission manager started, block number: {}",
                     block_number);
 
+        redis_manager->LoadImmatureBlocks(immature_block_submissions);
+
+        for (std::unique_ptr<ExtendedSubmission>& sub : immature_block_submissions) {
+            Logger::Log(LogType::Info, LogField::SubmissionManager,
+                        "Submission manager loaded immature block id: {}, hash: {}",
+                        sub->number, std::string_view((char*)sub->hash_hex, HASH_SIZE_HEX));
+        }
+
         last_matured_time = GetCurrentTimeMs();
     }
 

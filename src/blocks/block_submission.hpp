@@ -25,13 +25,13 @@ struct BlockSubmission
     BlockSubmission(const std::string_view chainsv,
                     const std::string_view worker_full,
                     const BlockType blocktype, const uint32_t height,
-                    const int64_t reward, const Round& chain_round,
+                    const int64_t reward, const uint64_t dur,
                     const int64_t time, const uint32_t number,
                     const double diff, const double effort_percent,
                     const uint8_t* hash)
         : block_type(blocktype),
           block_reward(reward),
-          duration_ms(time - chain_round.round_start_ms),
+          duration_ms(dur),
           time_ms(time),
           height(height),
           number(number),
@@ -71,16 +71,24 @@ struct ExtendedSubmission : public BlockSubmission
     ExtendedSubmission(const std::string_view chainsv,
                        const std::string_view worker_full,
                        const BlockType blocktype, const uint32_t height,
-                       const int64_t reward, const Round& chain_round,
+                       const int64_t reward, const uint64_t dur,
                        const int64_t time, const uint32_t number,
                        const double diff, const double effort_percent,
                        const uint8_t* hash, const uint8_t* cb_txid)
         : chain_sv(chainsv),
           miner_sv(worker_full.data(), ADDRESS_LEN),
           BlockSubmission(chainsv, worker_full, blocktype, height, reward,
-                          chain_round, time, number, diff, effort_percent, hash)
+                          dur, time, number, diff, effort_percent, hash)
     {
         memcpy(coinbase_txid, cb_txid, sizeof(coinbase_txid));
+    }
+
+    ExtendedSubmission(BlockSubmission& submission) : BlockSubmission(submission)
+    {
+        chain_sv = std::string_view((char*)submission.chain,
+                                         strlen((char*)submission.chain));
+        miner_sv = std::string_view((char*)submission.miner,
+                                    ADDRESS_LEN);
     }
     // way easier to use than unsigned char pointer :)
     std::string_view chain_sv;

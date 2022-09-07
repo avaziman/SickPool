@@ -30,10 +30,9 @@ class PaymentManager
     static int64_t last_payout_ms;
     static int64_t minimum_payout_threshold;
 
-    bool payment_included = false;
-    std::unique_ptr<PendingPayment> pending_tx;
+    std::unique_ptr<PaymentInfo> pending_payment;
+    std::unique_ptr<PaymentInfo> finished_payment;
 
-    bool ShouldIncludePayment(std::string_view prevblockhash);
     void UpdatePayouts(RoundManager* round_manager, int64_t curtime_ms);
 
    private:

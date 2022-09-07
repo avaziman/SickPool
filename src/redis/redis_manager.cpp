@@ -189,7 +189,7 @@ bool RedisManager::LoadUnpaidRewards(
 
     redis_unique_ptr reply;
     if (!GetReplies(&reply)) return false;
-    // TODO: Check response types
+
     for (int i = 0; i < reply->elements; i++)
     {
         if (reply->element[i]->elements != 3 ||

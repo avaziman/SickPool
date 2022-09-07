@@ -326,6 +326,7 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
 
     Round round = round_manager_pos.GetChainRound();
     const auto now_ms = GetCurrentTimeMs();
+    const uint64_t duration_ms = now_ms - round.round_start_ms;
     const double effort_percent =
         round.total_effort / round.estimated_effort * 100.f;
 
@@ -338,7 +339,7 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
 
     auto submission = std::make_unique<ExtendedSubmission>(
         std::string_view(chain), std::string_view(coin_config.pool_addr),
-        BlockType::POS, block_res.height, reward_value, round, now_ms,
+        BlockType::POS, block_res.height, reward_value, duration_ms, now_ms,
         SubmissionManager::block_number, 0.d, 0.d, block_hash_bin, tx_id_bin);
 
     submission_manager.AddImmatureBlock(std::move(submission),
@@ -348,8 +349,8 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
                 "Added immature PoS Block! hash: {}", block_hash);
 }
 
-RpcResult StratumServer::HandleShare(StratumClient* cli,
-                                     WorkerContext *wc, share_t &share)
+RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
+                                     share_t &share)
 {
     int64_t time = GetCurrentTimeMs();
     // Benchmark<std::chrono::microseconds> share_bench("Share process");
@@ -361,7 +362,8 @@ RpcResult StratumServer::HandleShare(StratumClient* cli,
     // to make sure the job isn't removed while we are using it,
     // and at the same time allow multiple threads to use same job
     std::shared_lock<std::shared_mutex> job_read_lock;
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    // std::this_thread::sleep_for(std::chrono::seconds(3));
+
     if (job == nullptr)
     {
         share_res.code = ResCode::JOB_NOT_FOUND;
@@ -393,7 +395,8 @@ RpcResult StratumServer::HandleShare(StratumClient* cli,
 
         if (job->is_payment)
         {
-            payment_manager.payment_included = true;
+            payment_manager.finished_payment.reset(
+                payment_manager.pending_payment.release());
         }
 
         // submit ASAP
@@ -406,6 +409,7 @@ RpcResult StratumServer::HandleShare(StratumClient* cli,
         // job will remain safe thanks to the lock.
         const std::string_view worker_full(cli->GetFullWorkerName());
         const auto chain_round = round_manager_pow.GetChainRound();
+        const uint64_t duration_ms = time - chain_round.round_start_ms;
         const auto type =
             job->is_payment ? BlockType::POW_PAYMENT : BlockType::POW;
         const double dur = time - chain_round.round_start_ms;
@@ -414,16 +418,15 @@ RpcResult StratumServer::HandleShare(StratumClient* cli,
             (job->target_diff / (chain_round.total_effort / (dur / 1000))) *
             100.f;
 
-        if constexpr (HASH_ALGO == HashAlgo::X25X)
-        {
-            HashWrapper::X22I(share_res.hash_bytes.data(), wc->block_header);
-            // std::reverse(share_res.hash_bytes.begin(),
-            //              share_res.hash_bytes.end());
-        }
+#if HASH_ALGO == HASH_ALGO_X25X
+        HashWrapper::X22I(share_res.hash_bytes.data(), wc->block_header);
+        // std::reverse(share_res.hash_bytes.begin(),
+        //              share_res.hash_bytes.end());
+#endif
 
         auto submission = std::make_unique<ExtendedSubmission>(
             chain, worker_full, type, job->height, job->GetBlockReward(),
-            chain_round, time, SubmissionManager::block_number,
+            duration_ms, time, SubmissionManager::block_number,
             share_res.difficulty, effort_percent, share_res.hash_bytes.data(),
             job->coinbase_tx_id);
 
@@ -465,7 +468,8 @@ void StratumServer::BroadcastJob(StratumClient *cli, const job_t *job) const
     SendRaw(cli->sock, notifyMsg.data(), notifyMsg.size());
 }
 
-// the shared pointer makes sure the client won't be freed as long as we are processing it
+// the shared pointer makes sure the client won't be freed as long as we are
+// processing it
 
 void StratumServer::HandleConsumeable(connection_it *it)
 {

@@ -32,19 +32,14 @@ struct PayeeInfo
 };
 
 struct PaymentInfo{
+    PaymentInfo(uint32_t id) : id(id) {}
+    uint32_t id;
     int64_t total_paid = 0;
     reward_map_t rewards;
     std::string raw_transaction_hex;
     char block_hash_hex[64];
-};
-
-struct PendingPayment
-{
-    PendingPayment(uint32_t id) :  id(id) {}
-    uint32_t id;
     TransactionData td;
     transaction_t tx;
-    PaymentInfo info;
 };
 
 #pragma pack(push, 1)

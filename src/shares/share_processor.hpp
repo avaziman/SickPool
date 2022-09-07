@@ -19,10 +19,10 @@
 class ShareProcessor
 {
    public:
-    static inline bool VerifyShareParams(ShareResult& result, const job_t* job, std::string_view given_time,
-                                  const int64_t curtime)
+    static inline bool VerifyShareParams(ShareResult& result, const job_t* job,
+                                         std::string_view given_time,
+                                         const int64_t curtime)
     {
-
         uint32_t shareTime = HexToUint(given_time.data(), given_time.size());
 // in btc the value in not reversed
 #ifdef STRATUM_ZEC
@@ -38,7 +38,8 @@ class ShareProcessor
             result.message =
                 fmt::format("Invalid nTime (min: {}, max: {}, given: {})",
                             minTime, maxTime, shareTime);
-            result.difficulty = static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
+            result.difficulty =
+                static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
             return false;
         }
 
@@ -63,26 +64,22 @@ class ShareProcessor
         // std::cout << "block header: " << std::endl;
         // PrintHex(headerData, BLOCK_HEADER_SIZE);
 
-        if constexpr (HASH_ALGO == HashAlgo::VERUSHASH_V2b2)
-        {
-            // takes about 6-8 microseconds vs 8-12 on snomp
-            HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
-                                       BLOCK_HEADER_SIZE, &wc->hasher);
-        }
-        else if constexpr (HASH_ALGO == HashAlgo::X25X)
-        {
-            HashWrapper::X25X(result.hash_bytes.data(), headerData,
-                              BLOCK_HEADER_SIZE);
-        }
-        else
-        {
-            throw std::runtime_error("Missing hash function");
-        }
+#if HASH_ALGO == HASH_ALGO_VERUSHASH
+        // takes about 6-8 microseconds vs 8-12 on snomp
+        HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
+                                   BLOCK_HEADER_SIZE, &wc->hasher);
+#elif HASH_ALGO == HASH_ALGO_X25X
+        HashWrapper::X25X(result.hash_bytes.data(), headerData,
+                          BLOCK_HEADER_SIZE);
+#else
+#error "Missing hash function";
+#endif
 
         uint256 hash(result.hash_bytes);
-        // Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash:
-        // {}",
-        //             hash.GetHex());
+        Logger::Log(
+            LogType::Debug, LogField::ShareProcessor,
+            "Share hash: {} ",
+            hash.GetHex());
 
         // arith_uint256 hashArith = UintToArith256(hash);
 

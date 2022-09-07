@@ -71,4 +71,33 @@ bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,
                .get() == nullptr;
 }
 
+bool RedisManager::LoadImmatureBlocks(
+    std::vector<std::unique_ptr<ExtendedSubmission>> &submissions)
+
+{
+    auto reply = Command({"KEYS", "immature-rewards:*"});
+
+    for (int i = 0; i < reply->elements; i++)
+    {
+        std::string_view block_id(reply->element[i]->str,
+                                  reply->element[i]->len);
+        block_id =
+            block_id.substr(block_id.find_last_of(":") + 1, block_id.size());
+
+        auto block_reply = Command({"GET", fmt::format("block:{}", block_id)});
+
+        if (block_reply->type != REDIS_REPLY_STRING)
+        {
+            continue;
+        }
+
+        auto submission = (BlockSubmission *)block_reply->str;
+        std::unique_ptr<ExtendedSubmission> extended =
+            std::make_unique<ExtendedSubmission>(*submission);
+
+        submissions.emplace_back(std::move(extended));
+    }
+
+    return true;
+}
 #endif
