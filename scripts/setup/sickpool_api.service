@@ -6,8 +6,8 @@ After=network.target
 User=pool
 ExecStart=/home/pool/actions-runner-api/_work/SickPoolAPI/SickPoolAPI/target/release/api
 Restart=always
-StandardOutput=file:/home/pool/logs/api.log
-StandardError=file:/home/pool/logs/api_error.log
+StandardOutput=append:/home/pool/logs/api.log
+StandardError=append:/home/pool/logs/api_error.log
 
 [Install]
 WantedBy=multi-user.target

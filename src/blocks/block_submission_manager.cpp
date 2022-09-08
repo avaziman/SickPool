@@ -41,6 +41,7 @@ void SubmissionManager::CheckImmatureSubmissions()
         }
         catch (const simdjson_error& err)
         {
+            confirmations = 0;
             Logger::Log(LogType::Info, LogField::SubmissionManager,
                         "Failed to get confirmations for block {}, parse "
                         "error: {}",
@@ -57,13 +58,21 @@ void SubmissionManager::CheckImmatureSubmissions()
 
         int64_t confirmation_time = GetCurrentTimeMs();
 
-        if (confirmations > COINBASE_MATURITY)
+        if (confirmations == -1)
+        {
+            Logger::Log(LogType::Info, LogField::SubmissionManager,
+                        "Block {} has been orphaned! :(", hashHex);
+
+            redis_manager->UpdateImmatureRewards(chain, submission->number,
+                                                 confirmation_time, false);
+            immature_block_submissions.erase(
+                immature_block_submissions.begin() + i);
+            i--;
+        }
+        else if (confirmations > COINBASE_MATURITY)
         {
             Logger::Log(LogType::Info, LogField::SubmissionManager,
                         "Block {} has matured!", hashHex);
-            Logger::Log(LogType::Info, LogField::SubmissionManager,
-                        "Checking confirmations for {} blocks",
-                        immature_block_submissions.size());
 
             //     int64_t duration_ms = confirmation_time - last_matured_time;
             //     redis_manager->AddStakingPoints(chain, duration_ms);
@@ -76,17 +85,6 @@ void SubmissionManager::CheckImmatureSubmissions()
                 immature_block_submissions.begin() + i);
 
             last_matured_time = confirmation_time;
-            i--;
-        }
-        else if (confirmations == -1)
-        {
-            Logger::Log(LogType::Info, LogField::SubmissionManager,
-                        "Block {} has been orphaned! :(", hashHex);
-
-            redis_manager->UpdateImmatureRewards(chain, submission->number,
-                                                 confirmation_time, false);
-            immature_block_submissions.erase(
-                immature_block_submissions.begin() + i);
             i--;
         }
     }

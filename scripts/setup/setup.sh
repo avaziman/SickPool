@@ -26,6 +26,13 @@ curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyr
 
 echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
 
+# redis timeseries
+git clone --recursive https://github.com/RedisTimeSeries/RedisTimeSeries.git
+cd RedisTimeSeries
+make setup
+make build
+
+
 sudo apt-get update
 sudo apt-get install redis
 

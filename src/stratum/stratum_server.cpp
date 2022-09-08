@@ -188,7 +188,7 @@ void StratumServer::HandleBlockNotify()
     submission_manager.CheckImmatureSubmissions();
 
     redis_manager.SetNewBlockStats(chain, curtime_ms, net_est_hr,
-                                   new_job->expected_shares);
+                                   new_job->target_diff);
 
     Logger::Log(
         LogType::Info, LogField::JobManager,

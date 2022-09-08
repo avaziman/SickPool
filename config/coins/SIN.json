@@ -16,6 +16,7 @@
     "socket_recv_timeout_seconds": 3,
     "payment_interval_seconds": 0,
     "min_payout_threshold": 1,
+    "_1satoshi": "",
     "rpcs": [
         {
             "host": "127.0.0.1:27397",
