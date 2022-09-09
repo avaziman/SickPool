@@ -13,7 +13,7 @@ struct CoinConfig
     std::string pool_addr;
     double pow_fee;
     double pos_fee;
-    double default_diff;
+    double default_difficulty;
     double target_shares_rate;
     double minimum_difficulty;
     int64_t stratum_port;

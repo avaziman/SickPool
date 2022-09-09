@@ -73,21 +73,6 @@ int main(int argc, char** argv)
         simdjson::padded_string json = simdjson::padded_string::load(argv[1]);
         ParseCoinConfig(json, coinConfig);
 
-        Logger::Log(LogType::Info, LogField::Config, "Coin config loaded:");
-        Logger::Log(LogType::Info, LogField::Config, "Pool address: {}",
-                    coinConfig.pool_addr);
-        Logger::Log(LogType::Info, LogField::Config, "Redis port: {}",
-                    coinConfig.redis_port);
-        Logger::Log(LogType::Info, LogField::Config, "PoW fee: {}",
-                    coinConfig.pow_fee);
-        Logger::Log(LogType::Info, LogField::Config, "PoS fee: {}",
-                    coinConfig.pos_fee);
-        Logger::Log(LogType::Info, LogField::Config, "Hashrate retention: {}s",
-                    coinConfig.hashrate_interval_seconds);
-        Logger::Log(LogType::Info, LogField::Config, "Hashrate ttl: {}s",
-                    coinConfig.hashrate_ttl_seconds);
-        Logger::Log(LogType::Info, LogField::Config, "Effort retention: {}s",
-                    coinConfig.effort_interval_seconds);
 
         stratum_server_t stratum_server(coinConfig);
         stratum_server_ptr = &stratum_server;
@@ -102,6 +87,7 @@ int main(int argc, char** argv)
     return EXIT_FAILURE;  // should never finish!
 }
 
+#define CONFIG_PRINT_WIDTH 40
 void AssignJson(const char* name, std::string& obj,
                 simdjson::ondemand::document& doc)
 {
@@ -116,6 +102,8 @@ void AssignJson(const char* name, std::string& obj,
         throw std::runtime_error(std::string("Invalid or no \"") + name +
                                  "\" (string) variable in config file");
     }
+    Logger::Log(LogType::Info, LogField::Config, "{:<{}}: {}", name,
+                CONFIG_PRINT_WIDTH, obj);
 }
 
 template <typename T>
@@ -130,6 +118,8 @@ void AssignJson(const char* name, T& obj, simdjson::ondemand::document& doc)
         throw std::runtime_error(std::string("Invalid or no \"") + name +
                                  "\" () variable in config file");
     }
+    Logger::Log(LogType::Info, LogField::Config, "{:<{}}: {}", name,
+                CONFIG_PRINT_WIDTH, obj);
 }
 
 void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
@@ -152,7 +142,8 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
     AssignJson("diff_adjust_seconds", cnfg.diff_adjust_seconds, configDoc);
     AssignJson("pow_fee", cnfg.pow_fee, configDoc);
     AssignJson("pos_fee", cnfg.pos_fee, configDoc);
-    AssignJson("default_diff", cnfg.default_diff, configDoc);
+    AssignJson("default_difficulty", cnfg.default_difficulty, configDoc);
+    AssignJson("minimum_difficulty", cnfg.minimum_difficulty, configDoc);
     AssignJson("target_shares_rate", cnfg.target_shares_rate, configDoc);
     AssignJson("pool_addr", cnfg.pool_addr, configDoc);
     AssignJson("payment_interval_seconds", cnfg.payment_interval_seconds,

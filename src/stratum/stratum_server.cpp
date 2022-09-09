@@ -544,7 +544,7 @@ void StratumServer::HandleConnected(connection_it *it)
 {
     std::shared_ptr<Connection<StratumClient>> conn = *(*it);
     conn->ptr = std::make_shared<StratumClient>(GetCurrentTimeMs(),
-                                                coin_config.default_diff);
+                                                coin_config.default_difficulty);
     std::unique_lock lock(clients_mutex);
     clients.emplace(conn, 0);
 }
