@@ -52,7 +52,7 @@ class RedisManager
 
     bool UpdateImmatureRewards(std::string_view chain, uint32_t block_num,
                                int64_t matured_time, bool matured);
-
+    int GetBlockNumber();
     /* stats */
 
     bool AddNewMiner(std::string_view address, std::string_view addr_lowercase,

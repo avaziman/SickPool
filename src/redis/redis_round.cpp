@@ -75,3 +75,9 @@ bool RedisManager::CloseRound(std::string_view chain, std::string_view type,
 
     return GetReplies();
 }
+
+int RedisManager::GetBlockNumber(){
+    auto reply = Command({"GET", BLOCK_NUMBER_KEY});
+
+    return std::strtol(reply->str, nullptr, 10);
+}

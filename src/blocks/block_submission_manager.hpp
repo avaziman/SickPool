@@ -24,7 +24,7 @@ class SubmissionManager
           round_manager_pos(round_manager_pos)
     {
         // SubmissionManager::block_number = redis_manager->GetBlockNumber();
-        SubmissionManager::block_number = 0;
+        SubmissionManager::block_number = redis_manager->GetBlockNumber();
         Logger::Log(LogType::Info, LogField::SubmissionManager,
                     "Submission manager started, block number: {}",
                     block_number);

@@ -95,3 +95,22 @@ TEST(MerkleRootTest, SHA256MerkleRoot10Tx)
         merkle_root ==
         "3b251bf71d07790d31b057ce26c7daae3cbe30bf0fda8b4199292c81464b325c");
 }
+
+TEST(MerkleRootTest, SHA256MerkleRoot6Tx)
+{
+    HashWrapper::InitSHA256();
+    // SIN block #1132522:
+    // 473194b1e3301c0fac3b89ab100aedefb7c790aa9255f2e95be9da71bdb91050
+
+    auto merkle_root = GetMerkleRoot(
+        {"0b00e7279d3bb1adf3ff42d8f3903b9357e8f3bb1401a62726c89cbc12924060",
+         "00d433baaf8ed6fc2a0c380752430fd4d6d0f2a4395087950e1a46d61dc0ffe0",
+         "72c9f81a0ebeea8d8f0a1d805ec8a9fdbb7e26c21f1b0a7c8d3fc6526f324b7d",
+         "7a8d7b15d3731d2369441986702921d557c9b1e171b7f53aaac3e0185d4c6c0f",
+         "a2ac25455a26d2f2253d243d88fda321715e78908a775bbaa6de5e8723e47931",
+         "576fa9a08c61e717fc10ca2abb567c815a5665fbe3c9686a5052433611a28018"});
+
+    ASSERT_TRUE(
+        merkle_root ==
+        "96113d098fc3c1d55dc231e1295f9672f9659018ad43d8c2fd26c2cc236436cf");
+}
