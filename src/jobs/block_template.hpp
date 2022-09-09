@@ -43,10 +43,12 @@ struct TransactionData
         data.resize(data_hex.size() / 2);
         Unhexlify(data.data(), data_hex.data(), data_hex.size());
 
-        // no need to reverse here, as its directly from hash
+        // no need to reverse here, as in block encoding
         HashWrapper::SHA256d(hash, data.data(), data.size());
         
+        // the hex does need to be reversed
         Hexlify(hash_hex, hash, sizeof(hash));
+        ReverseHex(hash_hex, HASH_SIZE_HEX);
     }
 
     TransactionData() = default;
