@@ -48,7 +48,7 @@ struct TransactionData
         
         // the hex does need to be reversed
         Hexlify(hash_hex, hash, sizeof(hash));
-        ReverseHex(hash_hex, HASH_SIZE_HEX);
+        ReverseHex(hash_hex, hash_hex, HASH_SIZE_HEX);
     }
 
     TransactionData() = default;
