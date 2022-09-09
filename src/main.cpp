@@ -49,6 +49,8 @@ int main(int argc, char** argv)
     //                  .GetCompact();
     // std::cout << "Block Submission Size: " << sizeof(BlockSubmission);
     Logger::Log(LogType::Info, LogField::Config, "Starting SickPool!");
+    Logger::Log(LogType::Info, LogField::Config, "Git commit hash: {}",
+                GIT_COMMIT_HASH);
 
     Logger::Log(LogType::Info, LogField::Config, "Static config:");
     Logger::Log(LogType::Info, LogField::Config, "Coin symbol: {}",
@@ -99,8 +101,7 @@ void AssignJson(const char* name, std::string& obj,
     }
     catch (...)
     {
-        throw std::runtime_error(std::string("Invalid or no \"") + name +
-                                 "\" (string) variable in config file");
+        throw std::runtime_error(fmt::format("Invalid or no \"{}\" (expected string) variable in config file", name));
     }
     Logger::Log(LogType::Info, LogField::Config, "{:<{}}: {}", name,
                 CONFIG_PRINT_WIDTH, obj);
@@ -115,8 +116,7 @@ void AssignJson(const char* name, T& obj, simdjson::ondemand::document& doc)
     }
     catch (...)
     {
-        throw std::runtime_error(std::string("Invalid or no \"") + name +
-                                 "\" () variable in config file");
+        throw std::runtime_error(fmt::format("Invalid or no \"{}\" variable in config file", name));
     }
     Logger::Log(LogType::Info, LogField::Config, "{:<{}}: {}", name,
                 CONFIG_PRINT_WIDTH, obj);
