@@ -141,13 +141,13 @@ class DaemonManager
 
     bool FundRawTransaction(FundRawTransactionRes& fund_res,
                             simdjson::ondemand::parser& parser,
-                            std::string_view raw_tx, int fee_rate)
+                            std::string_view raw_tx, int fee_rate, std::string_view change_addr)
     {
         using namespace simdjson;
 
         std::string result_body;
         std::string params =
-            fmt::format("[\"{}\",{{\"fee_rate\":{}}}]", raw_tx, fee_rate);
+            fmt::format("[\"{}\",{{\"fee_rate\":{},\"changeAddress\":\"{}\"}}]", raw_tx, fee_rate, change_addr);
         int res_code = SendRpcReq(result_body, 1, "fundrawtransaction", params);
 
         if (res_code != 200)

@@ -35,14 +35,17 @@ class MerkleTree
     {
         while (hash_count > 1)
         {
+            // if odd amount of leafs, duplicate the last
+            if (hash_count & 1)
+            {
+                hashes.reserve(hashes.size() + HASH_SIZE);
+                memcpy(hashes.data() + hash_count * HASH_SIZE,
+                       hashes.data() + (hash_count - 1) * HASH_SIZE, HASH_SIZE);
+                hash_count++;
+            }
+
             for (int i = 0; i < hash_count; i += 2)
             {
-                if (i + 1 == hash_count)
-                {
-                    hashes.reserve(hashes.size() + i * HASH_SIZE);
-                    memcpy(hashes.data() + i * HASH_SIZE,
-                           hashes.data() + (i - 1) * HASH_SIZE, HASH_SIZE);
-                }
 
                 HashWrapper::SHA256d(hashes.data() + (i / 2) * HASH_SIZE,
                                      hashes.data() + i * HASH_SIZE,

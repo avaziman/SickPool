@@ -74,7 +74,7 @@ bool PaymentManager::GeneratePayout(RoundManager* round_manager,
     // 0 fees
     if (!daemon_manager->FundRawTransaction(
             fund_res, parser, std::string_view(bytes_hex, sizeof(bytes_hex)),
-            0))
+            0, pool_addr))
     {
         Logger::Log(LogType::Info, LogField::PaymentManager,
                     "Failed to fund rawtransaction.");
@@ -168,7 +168,7 @@ void PaymentManager::UpdatePayouts(RoundManager* round_manager,
         {
             Logger::Log(
                 LogType::Info, LogField::PaymentManager,
-                "Generated payout txid: {}, data: {}.",
+                "Generated payout txid: {}, data: {}",
                 std::string_view(pending_payment->td.hash_hex, HASH_SIZE_HEX),
                 pending_payment->td.data_hex);
         }
