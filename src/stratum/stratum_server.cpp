@@ -163,19 +163,43 @@ void StratumServer::HandleBlockNotify()
     // save it to process round
     {
         std::shared_lock clients_read_lock(clients_mutex);
-        for (auto &[con, _] : clients)
+        for (const auto &[conn, _] : clients)
         {
-            auto cli = con->ptr.get();
+            auto cli = conn->ptr.get();
             if (cli->GetIsAuthorized())
             {
                 if (cli->GetIsPendingDiff())
                 {
                     cli->ActivatePendingDiff();
-                    UpdateDifficulty(cli);
+                    UpdateDifficulty(conn.get());
                 }
 
-                BroadcastJob(cli, new_job);
+                BroadcastJob(conn.get(), new_job);
             }
+        }
+
+        // after we broadcasted new job:
+        // > kick clients with below min difficulty
+        // > update the map according to difficulties (notify best miners first)
+        // > reset duplicate shares map
+
+        for (auto it = clients.begin(); it != clients.end();)
+        {
+            const auto cli = (*it).first->ptr;
+            const auto cli_diff = cli->GetDifficulty();
+            if (cli_diff < coin_config.minimum_difficulty)
+            {
+                DisconnectClient(it->first);
+                it++;
+            }
+            else
+            {
+                ++it;
+            }
+
+            cli->ResetShareSet();
+            // update the difficulty in the map
+            it->second = cli_diff;
         }
         // TODO: reset shares
     }
@@ -389,7 +413,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 #ifndef STRATUM_PROTOCOL_BTC
         job->GetBlockHex(blockData, wc->block_header);
 #else
-        job->GetBlockHex(blockData, wc->block_header, cli->GetExtraNonce(),
+        job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
                          share.extranonce2);
 #endif
 
@@ -461,11 +485,12 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     return rpc_res;
 }
 
-void StratumServer::BroadcastJob(StratumClient *cli, const job_t *job) const
+void StratumServer::BroadcastJob(Connection<StratumClient> *conn,
+                                 const job_t *job) const
 {
     // auto res =
     auto notifyMsg = job->GetNotifyMessage();
-    SendRaw(cli->sock, notifyMsg.data(), notifyMsg.size());
+    SendRaw(conn->sock, notifyMsg.data(), notifyMsg.size());
 }
 
 // the shared pointer makes sure the client won't be freed as long as we are
@@ -495,7 +520,7 @@ void StratumServer::HandleConsumeable(connection_it *it)
     while (req_end)
     {
         req_len = req_end - req_start;
-        HandleReq(conn->ptr.get(), &wc, std::string_view(req_start, req_len));
+        HandleReq(conn.get(), &wc, std::string_view(req_start, req_len));
 
         last_req_end = req_end;
         req_start = req_end + 1;
@@ -518,7 +543,7 @@ void StratumServer::HandleConsumeable(connection_it *it)
 void StratumServer::HandleConnected(connection_it *it)
 {
     std::shared_ptr<Connection<StratumClient>> conn = *(*it);
-    conn->ptr = std::make_shared<StratumClient>(conn->sock, "", 0,
+    conn->ptr = std::make_shared<StratumClient>(GetCurrentTimeMs(),
                                                 coin_config.default_diff);
     std::unique_lock lock(clients_mutex);
     clients.emplace(conn, 0);
@@ -526,7 +551,13 @@ void StratumServer::HandleConnected(connection_it *it)
 
 void StratumServer::HandleDisconnected(connection_it *conn)
 {
-    std::shared_ptr<Connection<StratumClient>> conn_ptr = (*(*conn));
+    auto conn_ptr = (*(*conn));
+    DisconnectClient(conn_ptr);
+}
+
+void StratumServer::DisconnectClient(
+    const std::shared_ptr<Connection<StratumClient>> conn_ptr)
+{
     auto sock = conn_ptr->sock;
     stats_manager.PopWorker(conn_ptr->ptr->GetFullWorkerName(),
                             conn_ptr->ptr->GetAddress());

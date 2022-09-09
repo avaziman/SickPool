@@ -15,6 +15,7 @@ struct CoinConfig
     double pos_fee;
     double default_diff;
     double target_shares_rate;
+    double minimum_difficulty;
     int64_t stratum_port;
     int64_t control_port;
     int64_t redis_port;

@@ -3,11 +3,12 @@
 #ifdef STRATUM_PROTOCOL_BTC
 #include "stratum_server_btc.hpp"
 
-void StratumServerBtc::HandleReq(StratumClient* cli, WorkerContext *wc,
+void StratumServerBtc::HandleReq(Connection<StratumClient>* conn, WorkerContext *wc,
                                  std::string_view req)
 {
     int id = 0;
-    const int sock = cli->sock;
+    const int sock = conn->sock;
+    const auto cli = conn->ptr.get();
 
     std::string_view method;
     simdjson::ondemand::array params;
@@ -56,7 +57,7 @@ void StratumServerBtc::HandleReq(StratumClient* cli, WorkerContext *wc,
         if (res.code == ResCode::OK)
         {
             SendRes(sock, id, res);
-            UpdateDifficulty(cli);
+            UpdateDifficulty(conn);
 
             const job_t *job = job_manager.GetLastJob();
 
@@ -67,7 +68,7 @@ void StratumServerBtc::HandleReq(StratumClient* cli, WorkerContext *wc,
                 return;
             }
 
-            BroadcastJob(cli, job);
+            BroadcastJob(conn, job);
             return;
         }
     }
@@ -94,7 +95,7 @@ RpcResult StratumServerBtc::HandleSubscribe(
     auto res = fmt::format(
         "[[[\"mining.set_difficulty\",null],"
         "[\"mining.notify\",null]],\"{}\",{}]",
-        cli->GetExtraNonce(), EXTRANONCE2_SIZE);
+        cli->extra_nonce_sv, EXTRANONCE2_SIZE);
 
     return RpcResult(ResCode::OK, res);
 }
@@ -239,8 +240,10 @@ RpcResult StratumServerBtc::HandleSubmit(StratumClient *cli, WorkerContext *wc,
 }
 
 // https://en.bitcoin.it/wiki/Stratum_mining_protocol#mining.set_difficulty
-void StratumServerBtc::UpdateDifficulty(StratumClient *cli)
+void StratumServerBtc::UpdateDifficulty(Connection<StratumClient> *conn)
 {
+    const auto cli = conn->ptr;
+
     char request[512];
     int len = fmt::format_to_n(request, sizeof(request),
                                "{{\"id\":null,\"method\":\"mining.set_"
@@ -248,7 +251,7 @@ void StratumServerBtc::UpdateDifficulty(StratumClient *cli)
                                cli->GetDifficulty())
                   .size;
 
-    SendRaw(cli->sock, request, len);
+    SendRaw(conn->sock, request, len);
 
     Logger::Log(LogType::Debug, LogField::Stratum,
                 "Set difficulty for {} to {}", cli->GetFullWorkerName(),

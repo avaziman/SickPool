@@ -7,32 +7,30 @@
 #include <deque>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include <map>
 
-#include "static_config/static_config.hpp"
-#include "connection.hpp"
 #include "../sock_addr.hpp"
 #include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
 #include "blocks/block_submission_manager.hpp"
+#include "connection.hpp"
 #include "control/control_server.hpp"
 #include "jobs/job_manager.hpp"
+#include "logger.hpp"
 #include "redis/redis_manager.hpp"
+#include "server.hpp"
 #include "shares/share_processor.hpp"
+#include "static_config/static_config.hpp"
 #include "stats_manager.hpp"
 #include "stratum_client.hpp"
-#include "server.hpp"
-#include "logger.hpp"
-
 
 class StratumServer : public Server<StratumClient>
 {
    public:
-
     StratumServer(const CoinConfig& conf);
     ~StratumServer();
     void Listen();
@@ -67,11 +65,10 @@ class StratumServer : public Server<StratumClient>
     std::map<std::shared_ptr<Connection<StratumClient>>, double> clients;
     std::shared_mutex clients_mutex;
 
-
     void HandleControlCommands(std::stop_token st);
     void HandleControlCommand(ControlCommands cmd, char* buff);
 
-    virtual void HandleReq(StratumClient* cli, WorkerContext* wc,
+    virtual void HandleReq(Connection<StratumClient>* conn, WorkerContext* wc,
                            std::string_view req) = 0;
     void HandleBlockNotify();
     void HandleWalletNotify(WalletNotify* wal_notify);
@@ -79,18 +76,21 @@ class StratumServer : public Server<StratumClient>
     RpcResult HandleShare(StratumClient* cli, WorkerContext* wc,
                           share_t& share);
 
-    virtual void UpdateDifficulty(StratumClient* cli) = 0;
+    virtual void UpdateDifficulty(Connection<StratumClient>* conn) = 0;
 
-    void BroadcastJob(StratumClient* cli, const job_t* job) const;
+    void BroadcastJob(Connection<StratumClient>* conn, const job_t* job) const;
     int AcceptConnection(sockaddr_in* addr, socklen_t* addr_size);
     void InitListeningSock();
     // void EraseClient(int sockfd,
-    //                  std::list<std::unique_ptr<StratumClient>>::iterator* it);
+    //                  std::list<std::unique_ptr<StratumClient>>::iterator*
+    //                  it);
     void ServiceSockets(std::stop_token st);
     void HandleConsumeable(connection_it* conn) override;
     void HandleConnected(connection_it* conn) override;
     void HandleDisconnected(connection_it* conn) override;
 
+    void DisconnectClient(
+        const std::shared_ptr<Connection<StratumClient>> conn_ptr);
     inline void SendRes(int sock, int req_id, const RpcResult& res)
     {
         char buff[512];
@@ -98,16 +98,19 @@ class StratumServer : public Server<StratumClient>
 
         if (res.code == ResCode::OK)
         {
-            len = fmt::format_to_n(
-                buff, sizeof(buff),
-                "{{\"id\":{},\"result\":{},\"error\":null}}\n", req_id, res.msg).size;
+            len =
+                fmt::format_to_n(buff, sizeof(buff),
+                                 "{{\"id\":{},\"result\":{},\"error\":null}}\n",
+                                 req_id, res.msg)
+                    .size;
         }
         else
         {
-            len = fmt::format_to_n(
-                buff, sizeof(buff),
-                "{{\"id\":{},\"result\":null,\"error\":[{},\"{}\",null]}}\n",
-                req_id, (int)res.code, res.msg).size;
+            len = fmt::format_to_n(buff, sizeof(buff),
+                                   "{{\"id\":{},\"result\":null,\"error\":[{},"
+                                   "\"{}\",null]}}\n",
+                                   req_id, (int)res.code, res.msg)
+                      .size;
         }
 
         SendRaw(sock, buff, len);

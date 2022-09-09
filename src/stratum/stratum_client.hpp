@@ -17,7 +17,7 @@
 class StratumClient
 {
    public:
-    StratumClient(const int sock, const std::string& ip, const int64_t time, const double diff);
+    StratumClient(const int64_t time, const double diff);
 
     double GetDifficulty() const { return current_diff; }
     double GetPendingDifficulty() const { return pending_diff; }
@@ -25,8 +25,6 @@ class StratumClient
     bool GetIsPendingDiff() const { return is_pending_diff; }
     uint32_t GetShareCount() const { return share_count; }
     int64_t GetLastAdjusted() const { return last_adjusted; }
-    std::string_view GetExtraNonce() const { return extra_nonce_str; }
-    std::string_view GetIp() const { return ip; }
 
     // make sting_view when unordered map supports it
     const std::string& GetAddress() const { return address; }
@@ -37,7 +35,6 @@ class StratumClient
         std::scoped_lock lock(shares_mutex);
         is_pending_diff = true;
         pending_diff = diff;
-        share_count = 0;
         // last_adjusted = curTime;
     }
 
@@ -68,6 +65,12 @@ class StratumClient
         share_uset.clear();
     }
 
+    void ResetShareCount()
+    {
+        std::scoped_lock lock(shares_mutex);
+        share_count = 0;
+    }
+
     // called after auth, before added to databse
     void SetAddress(std::string_view worker, std::string_view addr)
     {
@@ -78,19 +81,20 @@ class StratumClient
     }
 
     void SetAuthorized() { is_authorized = true; }
-    char req_buff[REQ_BUFF_SIZE] /*= {0}*/;
-    std::size_t req_pos = 0;
+
     std::list<std::unique_ptr<StratumClient>>::iterator it;
+
+    const std::string_view extra_nonce_sv;
     bool disconnected = false;
-    int sock;
 
    private:
     static uint32_t extra_nonce_counter;
 
     const int64_t connect_time;
+    const uint32_t extra_nonce;
+
     int64_t last_adjusted;
     int64_t last_share_time;
-    uint32_t extra_nonce;
     uint32_t share_count = 0;
 
     double current_diff;
@@ -98,8 +102,8 @@ class StratumClient
     bool is_authorized = false;
     bool is_pending_diff = false;
 
+    char extra_nonce_hex[EXTRANONCE_SIZE * 2];
     // std::string current_job_id;
-    std::string extra_nonce_str;
     std::string worker_full;
     std::string address;
     std::string ip;

@@ -25,7 +25,8 @@ file(GLOB SRC_FILES
     req_parse_test.cpp
     merkle_root_test.cpp
     difficulty_test.cpp
-    hash_wrapper_test.cpp
+    difficulty_manager_test.cpp
+    hash_wrapper_manager_test.cpp
     payment_test.cpp
     job_construction_test.cpp
     merkle_root_test.cpp

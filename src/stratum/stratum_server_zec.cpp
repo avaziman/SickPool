@@ -97,7 +97,7 @@ RpcResult StratumServerZec::HandleSubscribe(StratumClient *cli,
     Logger::Log(LogType::Info, LogField::Stratum, "client subscribed!");
     
     return RpcResult(ResCode::OK,
-                     fmt::format("[null,\"{}\"]", cli->GetExtraNonce()));
+                     fmt::format("[null,\"{}\"]", cli->extra_nonce_sv));
 }
 
 // https://zips.z.cash/zip-0301#mining-authorize

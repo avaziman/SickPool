@@ -59,7 +59,7 @@ class ShareProcessor
 
         uint8_t* headerData = wc->block_header;
 
-        job->GetHeaderData(headerData, share, cli->GetExtraNonce());
+        job->GetHeaderData(headerData, share, cli->extra_nonce_sv);
 
         // std::cout << "block header: " << std::endl;
         // PrintHex(headerData, BLOCK_HEADER_SIZE);

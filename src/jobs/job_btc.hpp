@@ -191,8 +191,8 @@ class JobBtc : public Job
     }
 
     inline void GetBlockHex(char* res, const uint8_t* header,
-                            std::string_view extra_nonce1,
-                            std::string_view extra_nonce2) const
+                            const std::string_view extra_nonce1,
+                            const std::string_view extra_nonce2) const
     {
         Hexlify(res, header, BLOCK_HEADER_SIZE);
         memcpy(res + (BLOCK_HEADER_SIZE * 2), txs_hex.data(), txs_hex.size());

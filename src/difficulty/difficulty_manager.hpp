@@ -9,14 +9,15 @@
 #include "logger.hpp"
 #include "stratum_client.hpp"
 #include "connection.hpp"
+#include "functional"
 
 class DifficultyManager
 {
    public:
     DifficultyManager(
         std::map<std::shared_ptr<Connection<StratumClient>>, double>* clients, std::shared_mutex* clients_mutex,
-        double targetSharesRate)
-        : clients(clients), clients_mutex(clients_mutex), target_share_rate(targetSharesRate)
+        double target_sharerate)
+        : clients(clients), clients_mutex(clients_mutex), target_share_rate(target_sharerate)
     {
     }
 
@@ -30,12 +31,19 @@ class DifficultyManager
             const double minute_rate =
                 client->GetShareCount() / (passed_seconds / 60);
 
-            const double diff_multiplier = target_share_rate / minute_rate;
+            const double diff_multiplier = minute_rate / target_share_rate;
 
-            const double new_diff = current_diff * diff_multiplier;
+            double new_diff = current_diff * diff_multiplier;
             const double variance = std::abs(new_diff - current_diff);
 
             const double variance_ratio = variance / current_diff;
+
+            client->ResetShareCount();
+
+            if (minute_rate == 0)
+            {
+                new_diff = current_diff / 10;
+            }
 
             if (variance_ratio > 0.1)
             {
@@ -52,7 +60,7 @@ class DifficultyManager
     // static std::mutex clients_mutex;
 
    private:
-    double target_share_rate;
+    const double target_share_rate;
     std::map<std::shared_ptr<Connection<StratumClient>>, double>* clients;
     std::shared_mutex* clients_mutex;
 };
