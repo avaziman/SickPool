@@ -60,17 +60,17 @@ class JobBtc : public Job
 
         for (int i = 1; i < tx_count; i++)
         {
+            // (hashes are already in block encoding)
             memcpy(merkle_branches.data() + (i - 1) * HASH_SIZE,
                    bTemplate.tx_list.transactions[i].hash, HASH_SIZE);
-            // need to be reversed for merkle tree
-            std::reverse(merkle_branches.data() + (i - 1) * HASH_SIZE,
-                         merkle_branches.data() + i * HASH_SIZE);
-// TODO: fix
-            ReverseHex((char*)bTemplate.tx_list.transactions[i].hash_hex,
-                       (char*)bTemplate.tx_list.transactions[i].hash_hex, HASH_SIZE_HEX);
 
-                merkle_branches_sv.push_back(std::string_view(
-                    bTemplate.tx_list.transactions[i].hash_hex, HASH_SIZE_HEX));
+            // reverse for notification message
+            ReverseHex((char*)bTemplate.tx_list.transactions[i].hash_hex,
+                       (char*)bTemplate.tx_list.transactions[i].hash_hex,
+                       HASH_SIZE_HEX);
+
+            merkle_branches_sv.push_back(std::string_view(
+                bTemplate.tx_list.transactions[i].hash_hex, HASH_SIZE_HEX));
         }
 
         std::string coinb1_hex;
@@ -161,6 +161,7 @@ class JobBtc : public Job
         // coinb2
         memcpy(coinbase_bin.get() + cb_offset, coinb2.data(), coinb2.size());
 
+        // insert the coinbase tx id
         HashWrapper::SHA256d(share_merkle_branches.data(), coinbase_bin.get(),
                              coinbase_size);
 
@@ -196,6 +197,7 @@ class JobBtc : public Job
     {
         Hexlify(res, header, BLOCK_HEADER_SIZE);
         memcpy(res + (BLOCK_HEADER_SIZE * 2), txs_hex.data(), txs_hex.size());
+        // eplace the coinbase data hex
         memcpy(res + (BLOCK_HEADER_SIZE + coinb1.size() + tx_vi_length) * 2,
                extra_nonce1.data(), EXTRANONCE_SIZE * 2);
         memcpy(res + (BLOCK_HEADER_SIZE + coinb1.size() + tx_vi_length +

@@ -386,7 +386,6 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     // to make sure the job isn't removed while we are using it,
     // and at the same time allow multiple threads to use same job
     std::shared_lock<std::shared_mutex> job_read_lock;
-    // std::this_thread::sleep_for(std::chrono::seconds(3));
 
     if (job == nullptr)
     {
@@ -398,7 +397,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     {
         job_read_lock = std::shared_lock<std::shared_mutex>(job->job_mutex);
         ShareProcessor::Process(share_res, cli, wc, job, share, time);
-        share_res.code == ResCode::VALID_BLOCK;
+        // share_res.code = ResCode::VALID_BLOCK;
     }
 
     if (unlikely(share_res.code == ResCode::VALID_BLOCK))
@@ -476,12 +475,12 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 
     auto end = TIME_NOW();
 
-    Logger::Log(
-        LogType::Debug, LogField::Stratum,
-        "Share processed in {}us, diff: {}, res: {}",
-        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-            .count(),
-        share_res.difficulty, (int)share_res.code);
+    // Logger::Log(
+    //     LogType::Debug, LogField::Stratum,
+    //     "Share processed in {}us, diff: {}, res: {}",
+    //     std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+    //         .count(),
+    //     share_res.difficulty, (int)share_res.code);
 
     return rpc_res;
 }

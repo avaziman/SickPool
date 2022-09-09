@@ -26,34 +26,26 @@ const job_t* JobManagerSin::GetNewJob(const std::string& json_template)
 
         if (includes_payment)
         {
-            blockTemplate.tx_list.AddTxData(payment_manager->pending_payment->td);
+            blockTemplate.tx_list.AddTxData(
+                payment_manager->pending_payment->td);
             additional_fee += payment_manager->pending_payment->td.fee;
         }
 
-        // for (auto tx : txs)
-        // {
-        //     std::string_view tx_data_hex = tx["data"].get_string();
-        //     std::string_view tx_hash_hex = tx["hash"].get_string();
-        //     TransactionData td(tx_data_hex, tx_hash_hex);
-        //     td.fee = tx["fee"].get_double();
+        for (auto tx : txs)
+        {
+            std::string_view tx_data_hex = tx["data"].get_string();
+            std::string_view tx_hash_hex = tx["hash"].get_string();
+            TransactionData td(tx_data_hex, tx_hash_hex);
+            td.fee = tx["fee"].get_double();
 
-        //     // std::cout << "tx data: " << td.data_hex << std::endl;
-
-        //     int txSize = td.data_hex.size() / 2;
-        //     td.data = std::vector<uint8_t>(txSize);
-        //     Unhexlify(td.data.data(), td.data_hex.data(),
-        //     td.data_hex.size()); Unhexlify(td.hash, tx_hash_hex.data(),
-        //     tx_hash_hex.size());  // hash
-        //     // is reversed std::reverse(td.hash, td.hash + 32);
-
-        //     if (!blockTemplate.tx_list.AddTxData(td))
-        //     {
-        //         Logger::Log(LogType::Warn, LogField::JobManager,
-        //                     "Block template is full! block size is {} bytes",
-        //                     blockTemplate.tx_list.byteCount);
-        //         break;
-        //     }
-        // }
+            if (!blockTemplate.tx_list.AddTxData(td))
+            {
+                Logger::Log(LogType::Warn, LogField::JobManager,
+                            "Block template is full! block size is {} bytes",
+                            blockTemplate.tx_list.byteCount);
+                break;
+            }
+        }
 
         blockTemplate.coinbase_value = res["coinbasevalue"].get_int64();
 
