@@ -43,8 +43,8 @@ struct TransactionData
         data.resize(data_hex.size() / 2);
         Unhexlify(data.data(), data_hex.data(), data_hex.size());
 
+        // no need to reverse here, as its directly from hash
         HashWrapper::SHA256d(hash, data.data(), data.size());
-        std::reverse(hash, hash + sizeof(hash));
         
         Hexlify(hash_hex, hash, sizeof(hash));
     }

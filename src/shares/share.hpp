@@ -41,9 +41,9 @@ struct WorkerContext
     uint8_t block_header[BLOCK_HEADER_SIZE];
     simdjson::ondemand::parser json_parser;
 
-    // #if COIN == VRSC
+    #if HASH_ALGO == HASH_ALGO_VERUSHASH
     CVerusHashV2 hasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
-    // #endif
+    #endif
 };
 
 enum class ResCode

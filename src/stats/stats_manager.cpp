@@ -114,15 +114,6 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             ws.interval_hashrate =
                 ws.current_interval_effort / (double)hashrate_interval_seconds;
 
-            //TODO: make sure it never gets here
-            // if (worker.size() < ADDRESS_LEN)
-            // {
-            //     //TODO: fix data race /bug here
-            //     Logger::Log(LogType::Error, LogField::StatsManager,
-            //                 "Removing invalid worker name: {}", worker);
-            //     worker_stats_map.erase(worker);
-            //     continue;
-            // }
             std::string addr = worker.substr(0, ADDRESS_LEN);
 
             ws.average_hashrate_sum += ws.interval_hashrate;
@@ -134,6 +125,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             auto& miner_stats = miner_stats_map[addr];
             miner_stats.average_hashrate_sum += ws.average_hashrate_sum;
             miner_stats.current_interval_effort += ws.current_interval_effort;
+            
             miner_stats.interval_valid_shares += ws.interval_valid_shares;
             miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
             miner_stats.interval_stale_shares += ws.interval_stale_shares;

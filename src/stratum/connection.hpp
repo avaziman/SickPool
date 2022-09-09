@@ -27,7 +27,7 @@ struct Connection
     std::list<std::shared_ptr<Connection>>::iterator it;
 
     private:
-     char ip_str[INET_ADDRSTRLEN];
+     char ip_str[INET_ADDRSTRLEN] = {0};
 };
 
 #endif

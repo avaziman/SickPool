@@ -60,7 +60,7 @@ class JobBtc : public Job
 
         for (int i = 1; i < tx_count; i++)
         {
-            // (hashes are already in block encoding)
+            // (hashes are already in block encoding, (hash_hex is not))
             memcpy(merkle_branches.data() + (i - 1) * HASH_SIZE,
                    bTemplate.tx_list.transactions[i].hash, HASH_SIZE);
 
@@ -197,7 +197,7 @@ class JobBtc : public Job
     {
         Hexlify(res, header, BLOCK_HEADER_SIZE);
         memcpy(res + (BLOCK_HEADER_SIZE * 2), txs_hex.data(), txs_hex.size());
-        // eplace the coinbase data hex
+        // emplace the coinbase data hex
         memcpy(res + (BLOCK_HEADER_SIZE + coinb1.size() + tx_vi_length) * 2,
                extra_nonce1.data(), EXTRANONCE_SIZE * 2);
         memcpy(res + (BLOCK_HEADER_SIZE + coinb1.size() + tx_vi_length +
