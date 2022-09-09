@@ -398,6 +398,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     {
         job_read_lock = std::shared_lock<std::shared_mutex>(job->job_mutex);
         ShareProcessor::Process(share_res, cli, wc, job, share, time);
+        share_res.code == ResCode::VALID_BLOCK;
     }
 
     if (unlikely(share_res.code == ResCode::VALID_BLOCK))
