@@ -175,7 +175,7 @@ class JobBtc : public Job
         MerkleTree::CalcRootFromSteps(buff + MERKLE_ROOT_POS, cbtxid,
                                       merkle_steps, merkle_steps_count);
 
-        PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
+        // PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
 
         constexpr auto TIME_POS = MERKLE_ROOT_POS + MERKLE_ROOT_SIZE;
         Unhexlify(buff + TIME_POS, share.time.data(), TIME_SIZE * 2);
