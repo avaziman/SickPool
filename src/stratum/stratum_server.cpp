@@ -437,10 +437,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
         const auto type =
             job->is_payment ? BlockType::POW_PAYMENT : BlockType::POW;
         const double dur = time - chain_round.round_start_ms;
-        const double effort_percent =
-            (dur / 1000) /
-            (job->target_diff / (chain_round.total_effort / (dur / 1000))) *
-            100.f;
+        const double effort_percent = ((chain_round.total_effort - share_res.difficulty) / job->target_diff) * 100.f;
 
 #if HASH_ALGO == HASH_ALGO_X25X
         HashWrapper::X22I(share_res.hash_bytes.data(), wc->block_header);
