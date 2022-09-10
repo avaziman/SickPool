@@ -139,7 +139,7 @@ bool SubmissionManager::AddImmatureBlock(
                         .c_str()),
         fmt::format("Hash: {}", std::string_view((char*)submission->hash_hex,
                                                  HASH_SIZE_HEX)),
-        70);
+        72);
 
     Logger::Log(LogType::Info, LogField::SubmissionManager,
                 "Closed round for block submission no {} (immature).",

@@ -36,7 +36,7 @@ const job_t* JobManagerSin::GetNewJob(const std::string& json_template)
             std::string_view tx_data_hex = tx["data"].get_string();
             std::string_view tx_hash_hex = tx["hash"].get_string();
             TransactionData td(tx_data_hex, tx_hash_hex);
-            td.fee = tx["fee"].get_double();
+            // td.fee = tx["fee"].get_double();
 
             if (!blockTemplate.tx_list.AddTxData(td))
             {

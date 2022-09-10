@@ -53,9 +53,7 @@ class JobBtc : public Job
         // bswap_32(bTemplate.bits);
 
         // exclude coinbase tx, as every share has a different one
-        std::vector<std::string_view> merkle_branches_sv;
-
-        merkle_branches_sv.reserve(tx_count - 1);
+        std::vector<uint8_t> merkle_branches;
         merkle_branches.reserve((tx_count - 1) * HASH_SIZE);
 
         for (int i = 1; i < tx_count; i++)
@@ -63,14 +61,18 @@ class JobBtc : public Job
             // (hashes are already in block encoding, (hash_hex is not))
             memcpy(merkle_branches.data() + (i - 1) * HASH_SIZE,
                    bTemplate.tx_list.transactions[i].hash, HASH_SIZE);
+        }
 
-            // reverse for notification message
-            ReverseHex((char*)bTemplate.tx_list.transactions[i].hash_hex,
-                       (char*)bTemplate.tx_list.transactions[i].hash_hex,
-                       HASH_SIZE_HEX);
+        merkle_steps.reserve(tx_count * HASH_SIZE);
+        merkle_steps_count =
+            MerkleTree::CalcSteps(merkle_steps, merkle_branches, tx_count - 1);
+        std::vector<std::string> merkle_steps_str(merkle_steps_count);
 
-            merkle_branches_sv.push_back(std::string_view(
-                bTemplate.tx_list.transactions[i].hash_hex, HASH_SIZE_HEX));
+        for (int i = 0; i < merkle_steps_count; i++)
+        {
+            merkle_steps_str[i].resize(HASH_SIZE_HEX);
+            Hexlify(merkle_steps_str[i].data(),
+                      merkle_steps.data() + i * HASH_SIZE, HASH_SIZE);
         }
 
         std::string coinb1_hex;
@@ -103,7 +105,7 @@ class JobBtc : public Job
                                  HASH_SIZE_HEX),  // prev hash
                 coinb1_hex,                       // coinb1
                 coinb2_hex,                       // coinb2
-                merkle_branches_sv,               // merkle branches
+                merkle_steps_str,                 // merkle branches
                 bTemplate.version, bTemplate.bits, bTemplate.min_time, clean)
                 .size;
         notify_buff_sv = std::string_view(notify_buff, len);
@@ -138,10 +140,8 @@ class JobBtc : public Job
     void GetHeaderData(uint8_t* buff, const ShareBtc& share,
                        std::string_view extranonce1) const override
     {
-        std::vector<uint8_t> share_merkle_branches;
+        uint8_t cbtxid[HASH_SIZE];
         auto coinbase_bin = std::make_unique<uint8_t[]>(coinbase_size);
-
-        share_merkle_branches.reserve(tx_count * HASH_SIZE);
 
         auto cb_offset = 0;
         // coinb1
@@ -162,20 +162,20 @@ class JobBtc : public Job
         memcpy(coinbase_bin.get() + cb_offset, coinb2.data(), coinb2.size());
 
         // insert the coinbase tx id
-        HashWrapper::SHA256d(share_merkle_branches.data(), coinbase_bin.get(),
-                             coinbase_size);
+        HashWrapper::SHA256d(cbtxid, coinbase_bin.get(), coinbase_size);
 
-        // the rest of the txids
-        memcpy(share_merkle_branches.data() + HASH_SIZE, merkle_branches.data(),
-               (tx_count - 1) * HASH_SIZE);
-
-        // generate the blk header:
+        // generate the block header:
         memcpy(buff, static_header_data, BLOCK_HEADER_STATIC_SIZE);
+
+        // PrintHex(share_merkle_branches.data(), tx_count * HASH_SIZE,
+        //          "Merkle branches");
 
         // generate the merkle root
         constexpr auto MERKLE_ROOT_POS = VERSION_SIZE + PREVHASH_SIZE;
-        MerkleTree::CalcRoot(buff + MERKLE_ROOT_POS, share_merkle_branches,
-                             tx_count);
+        MerkleTree::CalcRootFromSteps(buff + MERKLE_ROOT_POS, cbtxid,
+                                      merkle_steps, merkle_steps_count);
+
+        PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
 
         constexpr auto TIME_POS = MERKLE_ROOT_POS + MERKLE_ROOT_SIZE;
         Unhexlify(buff + TIME_POS, share.time.data(), TIME_SIZE * 2);
@@ -216,7 +216,8 @@ class JobBtc : public Job
     const std::size_t coinbase_size;
 
     // char vector so we don't need to copy to calculate merkle root
-    std::vector<uint8_t> merkle_branches;
+    std::vector<uint8_t> merkle_steps;
+    int merkle_steps_count;
     int written = 0;
 };
 

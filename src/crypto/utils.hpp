@@ -117,8 +117,9 @@ inline void Hexlify(char* dest, const unsigned char* src, size_t srcSize)
     }
 }
 
-inline void PrintHex(uint8_t* b, std::size_t size)
+inline void PrintHex(uint8_t* b, std::size_t size, std::string comment = "")
 {
+    std::cout << comment << ": ";
     for (int i = 0; i < size; i++)
     {
         std::cout << std::hex << std::setfill('0') << std::setw(2) << int(b[i]);

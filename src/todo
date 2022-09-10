@@ -1,7 +1,8 @@
 todo:
 
+fix on sinovate trying to launch 2 daemons (regtest + mainnet) = crash
+
 fix average
-check what happens when we cant fund the payout, (bug)
 
 
 script that:
@@ -15,7 +16,6 @@ LoadMatureRewards on startup
 pos
 show share rate and share difficulty for each workers
 load immature blocks on startup
-fix difficulty manager
 setting to not show everyone ur profile
 adjust to staking age
 write health check??
@@ -36,6 +36,8 @@ later:
 show personal luck
 check if we own pool address
 done
+check what happens when we cant fund the payout, (bug)
+fix difficulty manager
 
 check if miner exists from address map and remove him after being idle for 5 minutes same for worker
 wrap daemon rpc commands then use --!getblock to get the txid of the block reward to use it to send the rewardsd

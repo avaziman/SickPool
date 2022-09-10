@@ -34,7 +34,7 @@ struct TransactionData
         Unhexlify(data.data(), data_hex.data(), data_hex.size());
 
         Unhexlify(hash, hashhex.data(), hashhex.size());
-        std::reverse(hash, hash + sizeof(hash));
+        std::reverse(hash, hash + HASH_SIZE);
 
         memcpy(hash_hex, hashhex.data(), HASH_SIZE_HEX);
     }
@@ -47,7 +47,7 @@ struct TransactionData
         HashWrapper::SHA256d(hash, data.data(), data.size());
         
         // the hex does need to be reversed
-        Hexlify(hash_hex, hash, sizeof(hash));
+        Hexlify(hash_hex, hash, HASH_SIZE);
         ReverseHex(hash_hex, hash_hex, HASH_SIZE_HEX);
     }
 

@@ -21,9 +21,10 @@ FetchContent_MakeAvailable(googletest)
 file(GLOB SRC_FILES
     main.cpp
     redis_test.cpp
-    job_manager_test.cpp
+    job_manager_sin_test.cpp
     req_parse_test.cpp
     merkle_root_test.cpp
+    merkle_steps_test.cpp
     difficulty_test.cpp
     difficulty_manager_test.cpp
     hash_wrapper_manager_test.cpp
