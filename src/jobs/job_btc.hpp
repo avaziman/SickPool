@@ -54,18 +54,18 @@ class JobBtc : public Job
 
         // exclude coinbase tx, as every share has a different one
         std::vector<uint8_t> merkle_branches;
-        merkle_branches.reserve((tx_count - 1) * HASH_SIZE);
+        merkle_branches.reserve(tx_count * HASH_SIZE);
 
-        for (int i = 1; i < tx_count; i++)
+        for (int i = 0; i < tx_count; i++)
         {
             // (hashes are already in block encoding, (hash_hex is not))
-            memcpy(merkle_branches.data() + (i - 1) * HASH_SIZE,
+            memcpy(merkle_branches.data() + i * HASH_SIZE,
                    bTemplate.tx_list.transactions[i].hash, HASH_SIZE);
         }
 
         merkle_steps.reserve(tx_count * HASH_SIZE);
         merkle_steps_count =
-            MerkleTree::CalcSteps(merkle_steps, merkle_branches, tx_count - 1);
+            MerkleTree::CalcSteps(merkle_steps, merkle_branches, tx_count);
         std::vector<std::string> merkle_steps_str(merkle_steps_count);
 
         for (int i = 0; i < merkle_steps_count; i++)
@@ -175,7 +175,7 @@ class JobBtc : public Job
         MerkleTree::CalcRootFromSteps(buff + MERKLE_ROOT_POS, cbtxid,
                                       merkle_steps, merkle_steps_count);
 
-        // PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
+        PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
 
         constexpr auto TIME_POS = MERKLE_ROOT_POS + MERKLE_ROOT_SIZE;
         Unhexlify(buff + TIME_POS, share.time.data(), TIME_SIZE * 2);
