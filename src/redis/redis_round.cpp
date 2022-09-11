@@ -41,7 +41,7 @@ void RedisManager::AppendAddRoundShares(std::string_view chain,
              fmt::format("{}:{}", IMMATURE_REWARDS, submission->number), addr,
              std::string_view((char *)&round_share, sizeof(RoundShare))});
 
-        AppendCommand({"HINCRYBY"sv, fmt::format("solver:{}", addr),
+        AppendCommand({"HINCRBY"sv, fmt::format("solver:{}", addr),
                        IMMATURE_BALANCE_KEY,
                        std::to_string(round_share.reward)});
     }
