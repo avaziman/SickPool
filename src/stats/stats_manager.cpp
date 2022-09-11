@@ -20,12 +20,6 @@ StatsManager::StatsManager(RedisManager* redis_manager,
     StatsManager::average_hashrate_interval_seconds = avg_hr_interval;
     StatsManager::diff_adjust_seconds = diff_adjust_seconds;
     StatsManager::hashrate_ttl_seconds = hashrate_ttl;
-
-    if (!LoadAvgHashrateSums())
-    {
-        Logger::Log(LogType::Critical, LogField::StatsManager,
-                    "Failed to load hashrate sums!");
-    }
 }
 void StatsManager::Start(std::stop_token st)
 {
@@ -44,6 +38,12 @@ void StatsManager::Start(std::stop_token st)
 
     int64_t next_diff_update =
         now - (now % diff_adjust_seconds) + diff_adjust_seconds;
+
+    if (!LoadAvgHashrateSums(next_interval_update * 1000))
+    {
+        Logger::Log(LogType::Critical, LogField::StatsManager,
+                    "Failed to load hashrate sums!");
+    }
 
     while (!st.stop_requested())
     {
@@ -106,7 +106,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
         for (auto& [worker, worker_hr] : remove_worker_hashrates)
         {
-            worker_stats_map[worker].average_hashrate_sum -= worker_hr; 
+            worker_stats_map[worker].average_hashrate_sum -= worker_hr;
         }
 
         for (auto& [worker, ws] : worker_stats_map)
@@ -125,7 +125,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             auto& miner_stats = miner_stats_map[addr];
             miner_stats.average_hashrate_sum += ws.average_hashrate_sum;
             miner_stats.current_interval_effort += ws.current_interval_effort;
-            
+
             miner_stats.interval_valid_shares += ws.interval_valid_shares;
             miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
             miner_stats.interval_stale_shares += ws.interval_stale_shares;
@@ -148,10 +148,10 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
                                               &stats_map_mutex, update_time_ms);
 }
 
-bool StatsManager::LoadAvgHashrateSums()
+bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
 {
     std::vector<std::pair<std::string, double>> vec;
-    bool res = redis_manager->LoadAverageHashrateSum(vec, "worker");
+    bool res = redis_manager->LoadAverageHashrateSum(vec, "worker", hr_time);
 
     if (!res)
     {
@@ -191,6 +191,10 @@ void StatsManager::AddShare(const std::string& worker_full,
 
         worker_stats->interval_valid_shares++;
         worker_stats->current_interval_effort += expected_shares;
+
+        Logger::Log(LogType::Debug, LogField::StatsManager,
+                    "Logged share with diff: {}, hashes: {}", diff,
+                    expected_shares);
     }
 }
 
@@ -211,14 +215,14 @@ bool StatsManager::AddWorker(const std::string& address,
     std::transform(addr_lowercase.begin(), addr_lowercase.end(),
                    addr_lowercase.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-                   
+
     // 100% new, as we loaded all existing miners
     if (new_miner)
     {
         Logger::Log(LogType::Info, LogField::StatsManager,
                     "New miner has spawned: {}", address);
-        if (redis_manager->AddNewMiner(address, addr_lowercase, worker_full, idTag,
-                                       script_pub_key, curtime))
+        if (redis_manager->AddNewMiner(address, addr_lowercase, worker_full,
+                                       idTag, script_pub_key, curtime))
         {
             Logger::Log(LogType::Info, LogField::StatsManager,
                         "Miner {} added to database.", address);
@@ -233,8 +237,8 @@ bool StatsManager::AddWorker(const std::string& address,
 
     if (new_worker || returning_worker)
     {
-        if (redis_manager->AddNewWorker(address,
-                                        addr_lowercase, worker_full, idTag))
+        if (redis_manager->AddNewWorker(address, addr_lowercase, worker_full,
+                                        idTag))
         {
             Logger::Log(LogType::Info, LogField::StatsManager,
                         "Worker {} added to database.", worker_full);

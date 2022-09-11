@@ -94,8 +94,8 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Failed to getnetworkhashps: {}", err.what());
+            Logger::Log(LogType::Warn, LogField::DaemonManager,
+                        "Failed to parse getnetworkhashps response: {}", err.what());
             return 0;
         }
 
@@ -115,6 +115,9 @@ class DaemonManager
 
         if (res_code != 200)
         {
+            Logger::Log(LogType::Warn, LogField::DaemonManager,
+                        "Failed to signrawtransaction, response: {}, rawtx: {}",
+                        result_body, funded_tx);
             return false;
         }
 
@@ -131,8 +134,8 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Failed to signrawtransaction: {}", err.what());
+            Logger::Log(LogType::Warn, LogField::DaemonManager,
+                        "Failed to parse signrawtransaction response: {}", err.what());
             return false;
         }
 
@@ -152,6 +155,8 @@ class DaemonManager
 
         if (res_code != 200)
         {
+            Logger::Log(LogType::Warn, LogField::DaemonManager,
+                        "Failed to fundrawtransaction, response: {}", result_body);
             return false;
         }
 
@@ -164,13 +169,14 @@ class DaemonManager
             res = fund_res.doc["result"].get_object();
 
             fund_res.hex = res["hex"].get_string();
-            fund_res.changepos = res["changepos"].get_int64();
             fund_res.fee = res["fee"].get_double();
+            fund_res.changepos = res["changepos"].get_int64();
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Failed to fundrawtransaction: {}", err.what());
+            Logger::Log(LogType::Warn, LogField::DaemonManager,
+                            "Failed to parse fundrawtransaction response: {}, body: {}", err.what(), result_body);
+                    
             return false;
         }
 
@@ -184,15 +190,13 @@ class DaemonManager
 
 
         std::string result_body;
-        int res_code =
-            SendRpcReq(result_body, 1, "getidentity",
-                                 DaemonRpc::GetParamsStr(addr));
-
+        int res_code = SendRpcReq(result_body, 1, "getidentity",
+                                  DaemonRpc::GetParamsStr(addr));
         if (res_code != 200)
         {
             return false;
         }
-
+        
         ondemand::object res;
         try
         {
@@ -205,8 +209,8 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Critical, LogField::Stratum,
-                        "Failed to getidentity: {}",
+            Logger::Log(LogType::Warn, LogField::DaemonManager,
+                        "Failed to parse getidentity response: {}",
                         err.what());
             return false;
         }
@@ -246,7 +250,7 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Critical, LogField::Stratum,
+            Logger::Log(LogType::Warn, LogField::DaemonManager,
                         "Authorize RPC (validateaddress) failed: {}",
                         err.what());
             return false;
@@ -291,7 +295,8 @@ class DaemonManager
         catch (const simdjson_error& err)
         {
             Logger::Log(LogType::Error, LogField::Stratum,
-                        "Failed to parse getblock, error: {}", err.what());
+                        "Failed to parse getblock response, error: {}",
+                        err.what());
             return false;
         }
         return true;

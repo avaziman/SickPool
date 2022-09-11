@@ -104,20 +104,16 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
 
 bool RedisManager::LoadAverageHashrateSum(
     std::vector<std::pair<std::string, double>> &hashrate_sums,
-    std::string_view prefix)
+    std::string_view prefix, int64_t hr_time)
 {
-    int64_t time_now = GetCurrentTimeMs();
-    int64_t to =
-        time_now -
-        time_now % StatsManager::average_hashrate_interval_seconds * 1000 +
-        StatsManager::average_hashrate_interval_seconds * 1000;
+    int64_t from =
+        hr_time - StatsManager::average_hashrate_interval_seconds * 1000;
 
-    int64_t from = to - StatsManager::average_hashrate_interval_seconds * 1000;
     TsAggregation aggregation{
         .type = "SUM",
         .time_bucket_ms =
             StatsManager::average_hashrate_interval_seconds * 1000};
-    return TsMrange(hashrate_sums, prefix, HASHRATE_KEY, from, to, &aggregation);
+    return TsMrange(hashrate_sums, prefix, HASHRATE_KEY, from, hr_time, &aggregation);
 }
 
 bool RedisManager::ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,

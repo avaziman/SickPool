@@ -251,6 +251,9 @@ void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
 
     auto bhash256 = UintToArith256(uint256S(block_hash.data()));
     double bhashDiff = BitsToDiff(bhash256.GetCompact());
+
+    if (job_manager.GetLastJob() == nullptr) return;
+
     double pow_diff = job_manager.GetLastJob()->target_diff;
 
     Logger::Log(LogType::Info, LogField::Stratum,

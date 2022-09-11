@@ -37,7 +37,7 @@ class StatsManager
     // ) miner hashrate
     // ) pool hashrate
     void Start(std::stop_token st);
-    bool LoadAvgHashrateSums();
+    bool LoadAvgHashrateSums(int64_t hr_time);
     void AddShare(const std::string& worker_full, const std::string& miner_addr,
                   const double diff);
     bool AddWorker(const std::string& address, const std::string& worker_full,

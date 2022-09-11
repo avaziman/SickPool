@@ -22,6 +22,7 @@ enum class LogField
     Stratum,
     JobManager,
     ShareProcessor,
+    DaemonManager,
     Redis,
     StatsManager,
     ControlServer,
@@ -61,6 +62,8 @@ inline const char* ToString(LogField v)
             return "ROUND";
         case LogField::Benchmark:
             return "BENCH";
+        case LogField::DaemonManager:
+            return "DAEMON";
         default:
             return "Unknown";
     }

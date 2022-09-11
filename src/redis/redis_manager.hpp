@@ -82,7 +82,7 @@ class RedisManager
     /* stats */
     bool LoadAverageHashrateSum(
         std::vector<std::pair<std::string, double>> &hashrate_sums,
-        std::string_view prefix);
+        std::string_view prefix, int64_t hr_time);
 
     bool LoadMinersEfforts(std::string_view chain, std::string_view type,
                            efforts_map_t &efforts);

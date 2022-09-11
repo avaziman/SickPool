@@ -40,10 +40,10 @@ bool PaymentManager::GetRewardsProp(round_shares_t& miner_shares,
         miner_shares.emplace_back(addr, round_share);
 
         Logger::Log(LogType::Info, LogField::PaymentManager,
-        "Miner round share: {}, effort: {}, share: {}, reward: "
-        "{}, total effort: {}",
-        addr, round_share.effort, round_share.share,
-        round_share.reward, total_effort);
+                    "Miner round share: {}, effort: {}, share: {}, reward: "
+                    "{}, total effort: {}",
+                    addr, round_share.effort, round_share.share,
+                    round_share.reward, total_effort);
     }
 
     return true;
@@ -57,9 +57,11 @@ bool PaymentManager::GeneratePayout(RoundManager* round_manager,
     std::vector<std::pair<std::string, PayeeInfo>> rewards;
     round_manager->LoadUnpaidRewards(rewards);
 
-    for (const auto& [addr, info] : rewards) {
+    for (const auto& [addr, info] : rewards)
+    {
         Logger::Log(LogType::Info, LogField::PaymentManager,
-                    "Pending reward to {} -> {}, threshold: {}.", addr, info.amount, info.settings.threshold);
+                    "Pending reward to {} -> {}, threshold: {}.", addr,
+                    info.amount, info.settings.threshold);
     }
 
     if (!GeneratePayoutTx(payout_bytes, rewards))
@@ -69,17 +71,16 @@ bool PaymentManager::GeneratePayout(RoundManager* round_manager,
 
     char bytes_hex[payout_bytes.size() * 2];
     Hexlify(bytes_hex, payout_bytes.data(), payout_bytes.size());
+    std::string_view unfunded_rawtx(bytes_hex, sizeof(bytes_hex));
 
     FundRawTransactionRes fund_res;
     // 0 fees
-    if (!daemon_manager->FundRawTransaction(
-            fund_res, parser, std::string_view(bytes_hex, sizeof(bytes_hex)),
-            0, pool_addr))
-    {
-        Logger::Log(LogType::Info, LogField::PaymentManager,
-                    "Failed to fund rawtransaction.");
-        return false;
-    }
+    if (!daemon_manager->FundRawTransaction(fund_res, parser, unfunded_rawtx, 0, pool_addr))
+        {
+            Logger::Log(LogType::Info, LogField::PaymentManager,
+                        "Failed to fund rawtransaction. {}", unfunded_rawtx);
+            return false;
+        }
 
     SignRawTransactionRes sign_res;
     if (!daemon_manager->SignRawTransaction(sign_res, parser, fund_res.hex))
@@ -90,8 +91,7 @@ bool PaymentManager::GeneratePayout(RoundManager* round_manager,
     }
 
     pending_payment->raw_transaction_hex = sign_res.hex;
-    pending_payment->td =
-        TransactionData(pending_payment->raw_transaction_hex);
+    pending_payment->td = TransactionData(pending_payment->raw_transaction_hex);
 
     return true;
 }
@@ -110,9 +110,10 @@ bool PaymentManager::GeneratePayoutTx(
         if (reward_info.amount < reward_info.settings.threshold ||
             reward_info.amount == 0)
         {
-            Logger::Log(
-                LogType::Info, LogField::PaymentManager,
-                "Skipping {} in payment insufficient threshold: {}/{}", addr, reward_info.amount, reward_info.settings.threshold);
+            Logger::Log(LogType::Info, LogField::PaymentManager,
+                        "Skipping {} in payment insufficient threshold: {}/{}",
+                        addr, reward_info.amount,
+                        reward_info.settings.threshold);
             continue;
         }
 
@@ -160,7 +161,8 @@ void PaymentManager::UpdatePayouts(RoundManager* round_manager,
             "Payment has been included in block and added to database!");
     }
 
-    // make sure there is no currently pending payment or an unprocessed finished payment
+    // make sure there is no currently pending payment or an unprocessed
+    // finished payment
     if (!pending_payment.get() && !finished_payment.get() &&
         curtime_ms > last_payout_ms + (payout_age_seconds * 1000))
     {

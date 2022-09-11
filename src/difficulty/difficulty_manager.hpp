@@ -29,7 +29,7 @@ class DifficultyManager
             StratumClient* client = conn->ptr.get();
             const double current_diff = client->GetDifficulty();
             const double minute_rate =
-                client->GetShareCount() / (passed_seconds / 60);
+                static_cast<double>(client->GetShareCount()) / (passed_seconds / 60.d);
 
             const double diff_multiplier = minute_rate / target_share_rate;
 

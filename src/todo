@@ -1,9 +1,8 @@
 todo:
 
+fix bad merkle root on paymentff
+
 fix on sinovate trying to launch 2 daemons (regtest + mainnet) = crash
-
-fix average
-
 
 script that:
 edits .conf file
@@ -50,3 +49,4 @@ maturity thing
 set round time if there isnt in db
 >fix on bad auth crash?
 fix request too big when its not?
+fix average

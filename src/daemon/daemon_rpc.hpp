@@ -132,7 +132,7 @@ class DaemonRpc
             }
             header_recv += recvRes;
             // for the response end check, gets overriden
-            headerBuff[header_recv - 1] = '\0';
+            headerBuff[header_recv] = '\0';
         } while ((end_of_header = std::strstr(headerBuff, "\r\n\r\n")) ==
                  nullptr);
 
@@ -168,7 +168,7 @@ class DaemonRpc
         while (content_received < content_length)
         {
             std::size_t recvRes =
-                recv(sockfd, result.data() + content_received - 1,
+                recv(sockfd, result.data() + content_received,
                      content_length - content_received, 0);
             if (recvRes <= 0)
             {

@@ -72,13 +72,13 @@ bool RedisManager::DoesAddressExist(std::string_view addrOrId,
 }
 
 bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t curtime_ms,
-                                    double net_est_hr, double estimated_shares)
+                                    double net_est_hr, double target_diff)
 {
     std::scoped_lock lock(rc_mutex);
 
     AppendAddNetworkHr(chain, curtime_ms, net_est_hr);
     AppendSetMinerEffort(chain, RedisManager::ESTIMATED_EFFORT_KEY, "pow",
-                         estimated_shares);
+                         target_diff);
     return GetReplies();
 }
 
