@@ -3,17 +3,21 @@
 
 #include "job_manager.hpp"
 #include "transaction.hpp"
+#include "daemon_manager_sin.hpp"
+#include "daemon_responses_sin.hpp"
 
 class JobManagerSin : public JobManager
 {
    public:
     using JobManager::JobManager;
     // will be used when new transactions come on the same block
-    BlockTemplateBtc blockTemplate;
+    BlockTemplateBtc block_template = BlockTemplateBtc();
 
-    const job_t* GetNewJob() override;
-    const job_t* GetNewJob(const std::string& json_template) override;
+    const job_t* GetNewJob() /*override*/;
+    const job_t* GetNewJob(const BlockTemplateRes& btemplate) /*override*/;
 
+    std::size_t GetCoinbaseTx(TransactionBtc& coinbase_tx,
+                              const BlockTemplateRes& rpctemplate);
     std::size_t AddCoinbaseInput(TransactionBtc& tx, const uint32_t height);
 };
 

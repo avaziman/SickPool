@@ -3,7 +3,7 @@
 #include <deque>
 #include <unordered_map>
 
-#include "daemon_manager.hpp"
+#include "daemon_manager_t.hpp"
 #include "logger.hpp"
 #include "redis_manager.hpp"
 #include "round_manager.hpp"
@@ -17,7 +17,7 @@ class RedisManager;
 class PaymentManager
 {
    public:
-    PaymentManager(RedisManager* rm, DaemonManager* dm, const std::string& pool_addr, int payout_age_s,
+    PaymentManager(RedisManager* rm, daemon_manager_t* dm, const std::string& pool_addr, int payout_age_s,
                    int64_t minimum_payout_threshold);
     static bool GetRewardsProp(round_shares_t& miner_shares,
                                int64_t block_reward,
@@ -41,7 +41,7 @@ class PaymentManager
         const std::vector<std::pair<std::string, PayeeInfo>>& rewards);
     // void ResetPayment();
     RedisManager* redis_manager;
-    DaemonManager* daemon_manager;
+    daemon_manager_t* daemon_manager;
     std::string pool_addr;
     // block id -> block height, maturity time, pending to be paid
     simdjson::ondemand::parser parser;

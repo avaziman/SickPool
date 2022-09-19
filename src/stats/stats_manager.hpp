@@ -55,6 +55,7 @@ class StatsManager
     static int average_hashrate_interval_seconds;
     static int diff_adjust_seconds;
     static int hashrate_ttl_seconds;
+    static double average_interval_ratio;
 
    private:
     RedisManager* redis_manager;

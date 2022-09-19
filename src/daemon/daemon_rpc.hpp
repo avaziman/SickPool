@@ -48,6 +48,11 @@ class DaemonRpc
         return fmt::format("\"{}\"", arg);
     }
 
+    static std::string ToJsonStr(std::pair<std::string_view, auto> arg)
+    {
+        return fmt::format("\"{}\":{}", arg.first, ToJsonStr(arg.second));
+    }
+
     template <typename... T>
     static std::string GetParamsStr(T&&... args)
     {

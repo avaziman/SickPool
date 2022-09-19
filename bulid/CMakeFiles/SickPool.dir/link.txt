@@ -1,0 +1,1 @@
+/usr/bin/g++-10  -O0 -g3 -O3 -DNDEBUG CMakeFiles/SickPool.dir/src/main.cpp.o -o SickPool  -Wl,-rpath,/usr/local/lib src/libSickPool_core.a /usr/local/lib/libhiredis.so -lpthread _deps/simdjson-build/libsimdjson.a _deps/fmt-build/libfmt.a src/crypto/verushash/libsickverushash.a src/crypto/x25x/libsickx25x.a 

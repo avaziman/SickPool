@@ -1,5 +1,5 @@
 todo:
-
+maybe average remove is one before ts
 fix bad merkle root on paymentff
 
 fix on sinovate trying to launch 2 daemons (regtest + mainnet) = crash

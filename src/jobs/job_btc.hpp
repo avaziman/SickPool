@@ -12,9 +12,26 @@
 #include <vector>
 
 #include "block_template.hpp"
+#include "daemon_responses_sin.hpp"
 #include "job.hpp"
 #include "share.hpp"
 #include "static_config.hpp"
+
+struct BlockTemplateBtc : public BlockTemplate
+{
+    std::span<uint8_t> coinb1;
+    std::span<uint8_t> coinb2;
+
+    BlockTemplateBtc() = default;
+    
+    BlockTemplateBtc(const BlockTemplateRes& rpct)
+        : BlockTemplate(rpct.version, rpct.prev_block_hash,
+                        rpct.transactions.size() + 2, rpct.coinbase_value,
+                        rpct.min_time,
+                        HexToUint(rpct.bits.data(), BITS_SIZE * 2), rpct.height)
+    {
+    }
+};
 
 class JobBtc : public Job
 {
@@ -54,7 +71,8 @@ class JobBtc : public Job
 
         // exclude coinbase tx, as every share has a different one
         std::vector<uint8_t> merkle_branches;
-        merkle_branches.reserve(tx_count * HASH_SIZE);
+        // one extra for duplicate hash
+        merkle_branches.reserve((tx_count + 1) * HASH_SIZE);
 
         for (int i = 0; i < tx_count; i++)
         {
@@ -72,7 +90,7 @@ class JobBtc : public Job
         {
             merkle_steps_str[i].resize(HASH_SIZE_HEX);
             Hexlify(merkle_steps_str[i].data(),
-                      merkle_steps.data() + i * HASH_SIZE, HASH_SIZE);
+                    merkle_steps.data() + i * HASH_SIZE, HASH_SIZE);
         }
 
         std::string coinb1_hex;
@@ -167,14 +185,15 @@ class JobBtc : public Job
         // generate the block header:
         memcpy(buff, static_header_data, BLOCK_HEADER_STATIC_SIZE);
 
-        // PrintHex(share_merkle_branches.data(), tx_count * HASH_SIZE,
-        //          "Merkle branches");
-
         // generate the merkle root
         constexpr auto MERKLE_ROOT_POS = VERSION_SIZE + PREVHASH_SIZE;
         MerkleTree::CalcRootFromSteps(buff + MERKLE_ROOT_POS, cbtxid,
                                       merkle_steps, merkle_steps_count);
 
+        PrintHex(cbtxid, HASH_SIZE, "Coinb txid");
+        PrintHex(coinbase_bin.get(), coinbase_size, "Coinb data");
+        PrintHex(merkle_steps.data(), merkle_steps_count * HASH_SIZE,
+                 "Merkle steps");
         PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
 
         constexpr auto TIME_POS = MERKLE_ROOT_POS + MERKLE_ROOT_SIZE;

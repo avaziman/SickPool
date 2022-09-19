@@ -5,6 +5,7 @@ int StatsManager::effort_interval_seconds;
 int StatsManager::average_hashrate_interval_seconds;
 int StatsManager::hashrate_ttl_seconds;
 int StatsManager::diff_adjust_seconds;
+double StatsManager::average_interval_ratio;
 
 StatsManager::StatsManager(RedisManager* redis_manager,
                            DifficultyManager* diff_manager,
@@ -20,6 +21,7 @@ StatsManager::StatsManager(RedisManager* redis_manager,
     StatsManager::average_hashrate_interval_seconds = avg_hr_interval;
     StatsManager::diff_adjust_seconds = diff_adjust_seconds;
     StatsManager::hashrate_ttl_seconds = hashrate_ttl;
+    StatsManager::average_interval_ratio = (double)avg_hr_interval / hr_interval;
 }
 void StatsManager::Start(std::stop_token st)
 {
@@ -112,36 +114,24 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         for (auto& [worker, ws] : worker_stats_map)
         {
             ws.interval_hashrate =
-                ws.current_interval_effort / (double)hashrate_interval_seconds;
+                GetExpectedHashes(ws.current_interval_effort) / (double)hashrate_interval_seconds;
 
             std::string addr = worker.substr(0, ADDRESS_LEN);
 
             ws.average_hashrate_sum += ws.interval_hashrate;
 
             ws.average_hashrate = ws.average_hashrate_sum /
-                                  ((double)average_hashrate_interval_seconds /
-                                   hashrate_interval_seconds);
+                                  average_interval_ratio;
 
             auto& miner_stats = miner_stats_map[addr];
-            miner_stats.average_hashrate_sum += ws.average_hashrate_sum;
-            miner_stats.current_interval_effort += ws.current_interval_effort;
+            miner_stats.average_hashrate += ws.average_hashrate;
+            miner_stats.interval_hashrate += ws.interval_hashrate;
 
             miner_stats.interval_valid_shares += ws.interval_valid_shares;
             miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
             miner_stats.interval_stale_shares += ws.interval_stale_shares;
 
             if (ws.interval_hashrate > 0) miner_stats.worker_count++;
-        }
-
-        for (auto& [miner_addr, miner_ws] : miner_stats_map)
-        {
-            miner_ws.interval_hashrate = miner_ws.current_interval_effort /
-                                         (double)hashrate_interval_seconds;
-
-            miner_ws.average_hashrate =
-                miner_ws.average_hashrate_sum /
-                ((double)average_hashrate_interval_seconds /
-                 hashrate_interval_seconds);
         }
     }
     return redis_manager->UpdateIntervalStats(worker_stats_map, miner_stats_map,
@@ -187,14 +177,17 @@ void StatsManager::AddShare(const std::string& worker_full,
     }
     else
     {
-        const double expected_shares = GetExpectedHashes(diff);
+        // const double expected_shares = GetExpectedHashes(diff);
 
         worker_stats->interval_valid_shares++;
-        worker_stats->current_interval_effort += expected_shares;
+        // worker_stats->current_interval_effort += expected_shares;
+        worker_stats->current_interval_effort += diff;
 
         Logger::Log(LogType::Debug, LogField::StatsManager,
-                    "Logged share with diff: {}, hashes: {}", diff,
-                    expected_shares);
+                    "Logged share with diff: {}", diff);
+        // Logger::Log(LogType::Debug, LogField::StatsManager,
+        //             "Logged share with diff: {}, hashes: {}", diff,
+        //             expected_shares);
     }
 }
 

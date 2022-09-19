@@ -10,7 +10,7 @@
 class TransactionBtc : public Transaction
 {
    public:
-    TransactionBtc(uint32_t locktime = 0x00000000) : Transaction(locktime) {}
+    using Transaction::Transaction;
 
     std::size_t GetBytes(std::vector<uint8_t>& bytes) /*override*/;
     TransactionBtc GetCoinbase(int64_t value, uint32_t height);

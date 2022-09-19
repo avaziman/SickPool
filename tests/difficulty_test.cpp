@@ -4,11 +4,18 @@
 #include "crypto/verushash/byteswap.h"
 #include "crypto/verushash/uint256.h"
 
+// TEST(DifficultyTest, Diff1BitsToFloat1)
+// {
+//     double diff = BitsToDiff(0x1f00ffff);
+//     ASSERT_EQ(diff, 1.52587890625e-05);
+// }
+
 TEST(DifficultyTest, Diff1BitsToFloat)
 {
     double diff = BitsToDiff(DIFF1_BITS);
     ASSERT_EQ(diff, 1.0);
 }
+
 
 TEST(DifficultyTest, RandomEqualityCheck)
 {

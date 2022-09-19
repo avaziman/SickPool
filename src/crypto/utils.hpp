@@ -11,13 +11,13 @@
 #include <thread>
 #include <vector>
 
+#include "static_config/static_config.hpp"
 #include "verushash/arith_uint256.h"
 #include "verushash/endian.h"
 #include "verushash/uint256.h"
-#include "static_config/static_config.hpp"
 
-
-#define DIFF_US(end, start) std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
+#define DIFF_US(end, start) \
+    std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 #define TIME_NOW() std::chrono::steady_clock::now()
 
 #define unlikely(expr) (__builtin_expect(!!(expr), 0))
@@ -47,7 +47,7 @@ inline int SetHighPriorityThread(std::thread& thr)
 
     param.sched_priority = sched_get_priority_max(SCHED_FIFO);
     int res = pthread_setschedparam(thr.native_handle(), SCHED_FIFO, &param);
-    
+
     return res;
 }
 
@@ -94,13 +94,15 @@ inline uint32_t HexToUint(const char* hex, std::size_t size)
     return val;
 }
 
-inline void Hexlify(char* dest, const unsigned char* src, size_t srcSize)
+template <typename T>
+constexpr void Hexlify(char* dest, const T* src, size_t srcSize)
 {
-    const char hex[] = "0123456789abcdef";
+    constexpr const char hex[] = "0123456789abcdef";
 
     // each byte is 2 characters in hex
     for (int i = 0; i < srcSize; i++)
     {
+        // unsigned char val = src[i];
         unsigned char val = src[i];
 
         char c1 = '0', c2 = '0';
@@ -117,7 +119,17 @@ inline void Hexlify(char* dest, const unsigned char* src, size_t srcSize)
     }
 }
 
-inline void PrintHex(uint8_t* b, std::size_t size, std::string comment = "")
+template <const std::string_view& src>
+constexpr auto Hexlify()
+{
+    constexpr std::size_t hex_size = src.size() * 2;
+    std::array<char, hex_size> arr;
+    Hexlify(arr.data(), src.data(), src.size());
+
+    return arr;
+}
+
+inline void PrintHex(const uint8_t* b, std::size_t size, std::string comment = "")
 {
     std::cout << comment << ": ";
     for (int i = 0; i < size; i++)
@@ -154,7 +166,8 @@ inline std::vector<uint8_t> GenNumScript(const int64_t value)
     const bool neg = value < 0;
     uint64_t absvalue = neg ? -value : value;
 
-    if(value == 0){
+    if (value == 0)
+    {
         result.push_back(0);
         return result;
     }
@@ -184,21 +197,22 @@ inline std::vector<uint8_t> GenNumScript(const int64_t value)
     return result;
 }
 
-inline std::pair<uint64_t, uint8_t> ReadNumScript(uint8_t* script){
+inline std::pair<uint64_t, uint8_t> ReadNumScript(uint8_t* script)
+{
     uint8_t type = script[0];
-    if(type < 0xFD)
+    if (type < 0xFD)
     {
         return std::make_pair(type, 1);
     }
-    else if(type == 0xFD)
+    else if (type == 0xFD)
     {
         return std::make_pair(*reinterpret_cast<uint16_t*>(script + 1), 3);
     }
-    else if(type == 0xFE)
+    else if (type == 0xFE)
     {
         return std::make_pair(*reinterpret_cast<uint32_t*>(script + 1), 5);
     }
-    else if(type == 0xFF)
+    else if (type == 0xFF)
     {
         return std::make_pair(*reinterpret_cast<uint64_t*>(script + 1), 9);
     }
@@ -221,8 +235,8 @@ inline char VarInt(uint64_t& len)
         return 5;
     }
 
-    //problem 
-    // len = ((uint64_t)0xff << 64) | len;
+    // problem
+    //  len = ((uint64_t)0xff << 64) | len;
     return 9;
 }
 
@@ -268,7 +282,8 @@ constexpr uint64_t pow2(int power)
 inline double GetExpectedHashes(const double diff)
 {
     constexpr uint64_t power = 256 - 8 * (DIFF1_EXPONENT - 3);
-    constexpr double hash_multiplier = static_cast<double>(pow2(power)) / DIFF1_COEFFICIENT;
+    constexpr double hash_multiplier =
+        static_cast<double>(pow2(power)) / DIFF1_COEFFICIENT;
 
     return diff * hash_multiplier;
     // for verus 2^ 24 / 0x0f0f0f = 17...
@@ -289,8 +304,7 @@ static uint32_t DiffToBits(double difficulty)
     int64_t word;
     for (shiftBytes = 1; true; shiftBytes++)
     {
-        word =
-            (DIFF1_COEFFICIENT * pow(0x100, shiftBytes)) / difficulty;
+        word = (DIFF1_COEFFICIENT * pow(0x100, shiftBytes)) / difficulty;
         if (word >= 0xffff) break;
     }
     word &= 0xffffff;  // convert to int < 0xffffff

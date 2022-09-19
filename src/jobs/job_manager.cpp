@@ -1,27 +1,25 @@
 #include "job_manager.hpp"
 
-const job_t* JobManager::GetNewJob()
-{
-    using namespace simdjson;
-    std::string json;
-    int resCode = daemon_manager->SendRpcReq(json, 1, "getblocktemplate");
+// const job_t* JobManager::GetNewJob()
+// {
+//     using namespace simdjson;
+//     std::string json;
+//     int resCode = daemon_manager->SendRpcReq(json, 1, "getblocktemplate");
 
-    if (resCode != 200)
-    {
-        Logger::Log(LogType::Critical, LogField::JobManager,
-                    "Failed to get block template, http code: {}, response: {}",
-                    strerror(resCode), json);
-        // TODO: make sock err negative maybe http positive to diffrinciate
-        return nullptr;
-    }
+//     if (resCode != 200)
+//     {
+//         Logger::Log(LogType::Critical, LogField::JobManager,
+//                     "Failed to get block template, http code: {}, response: {}",
+//                     strerror(resCode), json);
+//         // TODO: make sock err negative maybe http positive to diffrinciate
+//         return nullptr;
+//     }
 
-    return GetNewJob(json);
-}
+//     return GetNewJob(json);
+// }
 
-
-transaction_t JobManager::GetCoinbaseTx(
-    int64_t value, uint32_t height,
-    const std::vector<Output>& extra_outputs)
+transaction_t JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
+                                        std::string_view rpc_coinbase)
 {
     unsigned char prevTxIn[HASH_SIZE] = {0};  // null last input
     // unsigned int locktime = 0;         // null locktime (no locktime)
@@ -44,10 +42,6 @@ transaction_t JobManager::GetCoinbaseTx(
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
     coinbaseTx.AddP2PKHOutput(pool_addr, value);
 
-    for (auto output : extra_outputs)
-    {
-        coinbaseTx.vout.emplace_back(output);
-    }
 #if COIN == VRSCTEST
 //TODO: do this as extra output
     coinbaseTx.AddFeePoolOutput(

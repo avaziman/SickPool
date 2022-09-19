@@ -319,4 +319,5 @@ class DaemonManager
     std::mutex rpc_mutex;
 };
 
+
 #endif

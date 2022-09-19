@@ -31,6 +31,7 @@ file(GLOB SRC_FILES
     "round/*.cpp"
     "payments/*.cpp"
     "logger/*.cpp"
+    "daemon/*.cpp"
 )
 
 # message("SRC FILES: ${SRC_FILES}")

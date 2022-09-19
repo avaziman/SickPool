@@ -41,7 +41,7 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    RedisManager(const std::string &ip, int port);
+    RedisManager(const std::string &ip, int port, int hrttl);
     ~RedisManager();
 
     /* block */

@@ -10,14 +10,14 @@
 #include "base58.h"
 #include "utils.hpp"
 
-#define PUBKEYHASH_BYTES_LEN 20
-#define P2PKH_SCRIPT_SIZE (PUBKEYHASH_BYTES_LEN + 5)
+constexpr auto PUBKEYHASH_BYTES_LEN = 20;
+constexpr auto P2PKH_SCRIPT_SIZE = PUBKEYHASH_BYTES_LEN + 5;
 
-#define OP_DUP 0x76
-#define OP_HASH160 0xa9
-#define OP_EQUALVERIFY 0x88
-#define OP_CHECKSIG 0xac
-#define OP_CRYPTOCONDITION 0xfc
+constexpr auto OP_DUP = 0x76;
+constexpr auto OP_HASH160 = 0xa9;
+constexpr auto OP_EQUALVERIFY = 0x88;
+constexpr auto OP_CHECKSIG = 0xac;
+constexpr auto OP_CRYPTOCONDITION = 0xfc;
 
 // the specific part of a specific output list in a transaction (txid +
 // index)
@@ -120,7 +120,13 @@ class Transaction
     int written = 0;
 
    public:
-    Transaction(uint32_t locktime = 0x00000000) : lock_time(locktime) {}
+    Transaction(std::size_t max_vin_size = 0, std::size_t max_vout_size = 0,
+                uint32_t locktime = 0x00000000)
+        : lock_time(locktime)
+    {
+        vin.reserve(max_vin_size);
+        vout.reserve(max_vout_size);
+    }
 
     static void GetP2PKHScript(std::string_view toAddress,
                                std::vector<unsigned char>& res)
@@ -153,6 +159,8 @@ class Transaction
     void AddOutput(const Output& output);
     // virtual void GetBytes(std::vector<uint8_t>& bytes);
     // TODO: make public func
+    void SetOutputs(std::vector<Output>& outputs) { vout = std::move(outputs); }
+
     std::vector<Output> vout;
     std::vector<Input> vin;
     };

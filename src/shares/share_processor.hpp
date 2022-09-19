@@ -76,10 +76,10 @@ class ShareProcessor
 #endif
 
         uint256 hash(result.hash_bytes);
-        // Logger::Log(
-        //     LogType::Debug, LogField::ShareProcessor,
-        //     "Share hash: {} ",
-        //     hash.GetHex());
+        Logger::Log(
+            LogType::Debug, LogField::ShareProcessor,
+            "Share hash: {} ",
+            hash.GetHex());
 
         // arith_uint256 hashArith = UintToArith256(hash);
 

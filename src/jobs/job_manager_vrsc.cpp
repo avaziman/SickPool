@@ -24,29 +24,13 @@ const job_t* JobManagerVrsc::GetNewJob(const std::string& json_template)
         ondemand::array txs = res["transactions"].get_array();
 
         int64_t additional_fee = 0;
-        bool includes_payment =
-            payment_manager->ShouldIncludePayment(blockTemplate.prev_block_hash);
+        bool includes_payment = payment_manager->pending_payment.get();
+
         if (includes_payment)
         {
-            std::string& payment_hash_hex =
-                payment_manager->pending_tx->info.tx_hash_hex;
-
-            if (!payment_hash_hex.empty() &&
-                payment_hash_hex == blockTemplate.prev_block_hash)
-            {
-                payment_manager->payment_included = true;
-            }
-            else
-            {
-                // either we have yet to create jobs with this payment or a
-                // block with this payment was orphaned.
-                TransactionData td(payment_hash_hex);
-                payment_hash_hex.reserve(HASH_SIZE_HEX);
-                Hexlify(payment_hash_hex.data(), td.hash, HASH_SIZE_HEX);
-
-                blockTemplate.tx_list.AddTxData(td);
-                additional_fee += payment_manager->pending_tx->info.fee;
-            }
+            blockTemplate.tx_list.AddTxData(
+                payment_manager->pending_payment->td);
+            additional_fee += payment_manager->pending_payment->td.fee;
         }
 
         for (auto tx : txs)
@@ -85,9 +69,10 @@ const job_t* JobManagerVrsc::GetNewJob(const std::string& json_template)
         blockTemplate.height =
             static_cast<uint32_t>(res["height"].get_int64());
 
-        TransactionData coinbaseTx = GetCoinbaseTxData(
-            blockTemplate.coinbase_value + additional_fee, blockTemplate.height,
-            blockTemplate.min_time, blockTemplate.coinbase_hex);
+        transaction_t coinbaseTx = GetCoinbaseTx(
+            blockTemplate.coinbase_value + additional_fee, blockTemplate.height, blockTemplate.coinbase_hex);
+
+        TransactionData cbtd;
 
         // we need to hexlify here otherwise hex will be garbage
         char coinbaseHex[coinbaseTx.data.size() * 2];
@@ -98,12 +83,9 @@ const job_t* JobManagerVrsc::GetNewJob(const std::string& json_template)
 
         std::string jobIdHex = fmt::format("{:08x}", job_count);
 
-        job_t job(jobIdHex, blockTemplate, includes_payment);
+        auto job = std::make_unique<job_t>(jobIdHex, blockTemplate, includes_payment);
 
-        last_job_id_hex = jobIdHex;
-        job_count++;
-
-        return &jobs.emplace_back(std::move(job));
+        return SetNewJob(std::move(job));
     }
     catch (const simdjson::simdjson_error& err)
     {

@@ -14,22 +14,22 @@
 class MerkleTree
 {
    public:
-    // static void CalcRoot(
-    //     uint8_t* res, const std::vector<TransactionData>& txsData)
-    // {
-    //     std::vector<uint8_t> hashes;
-    //     uint32_t hash_count = txsData.size();
+    static void CalcRoot(
+        uint8_t* res, const std::vector<TransactionData>& txsData)
+    {
+        std::vector<uint8_t> hashes;
+        uint32_t hash_count = txsData.size();
 
-    //     hashes.reserve(txsData.size() * HASH_SIZE);
+        hashes.reserve(txsData.size() * HASH_SIZE);
 
-    //     for (int i = 0; i < hash_count; i++)
-    //     {
-    //         memcpy(hashes.data() + i * HASH_SIZE, txsData[i].hash,
-    //         HASH_SIZE);
-    //     }
+        for (int i = 0; i < hash_count; i++)
+        {
+            memcpy(hashes.data() + i * HASH_SIZE, txsData[i].hash,
+            HASH_SIZE);
+        }
 
-    //     CalcRoot(res, hashes, hash_count);
-    // }
+        CalcRoot(res, hashes, hash_count);
+    }
 
     static void CalcRoot(uint8_t* res, std::vector<uint8_t>& hashes,
                          std::size_t hash_count)
@@ -82,10 +82,11 @@ class MerkleTree
         {
             if (hash_count & 1)
             {
-                if (hashes.capacity() < (hash_count + 1) * HASH_SIZE)
-                {
-                    hashes.reserve(hashes.capacity() + HASH_SIZE);
-                }
+                // bug here because the new reseve doesnt contain the hashes (it wasnt resized), so just make sure its big enough
+                // if (hashes.capacity() < (hash_count + 1) * HASH_SIZE)
+                // {
+                //     hashes.reserve(hashes.capacity() + HASH_SIZE);
+                // }
                 memcpy(hashes.data() + hash_count * HASH_SIZE,
                        hashes.data() + (hash_count - 1) * HASH_SIZE, HASH_SIZE);
                 hash_count++;

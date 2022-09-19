@@ -51,7 +51,7 @@ class StratumServer : public Server<StratumClient>
     ControlServer control_server;
     RedisManager redis_manager;
     StatsManager stats_manager;
-    DaemonManager daemon_manager;
+    daemon_manager_t daemon_manager;
     SubmissionManager submission_manager;
     DifficultyManager diff_manager;
     PaymentManager payment_manager;

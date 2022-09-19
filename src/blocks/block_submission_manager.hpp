@@ -7,14 +7,14 @@
 #include <memory>
 
 #include "block_submission.hpp"
-#include "daemon_manager.hpp"
+#include "daemon_manager_t.hpp"
 #include "stats/stats_manager.hpp"
 
 class SubmissionManager
 {
    public:
     SubmissionManager(RedisManager* redis_manager,
-                      DaemonManager* daemon_manager,
+                      daemon_manager_t* daemon_manager,
                       PaymentManager* payment_manager,
                       RoundManager* round_manager_pow,
                       RoundManager* round_manager_pos)
@@ -71,7 +71,7 @@ class SubmissionManager
 
     std::mutex blocks_lock;
     RedisManager* redis_manager;
-    DaemonManager* daemon_manager;
+    daemon_manager_t* daemon_manager;
     PaymentManager* payment_manager;
     RoundManager* round_manager_pow;
     RoundManager* round_manager_pos;

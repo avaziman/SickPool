@@ -25,7 +25,7 @@ class Job
           height(bTemplate.height),
           is_payment(is_payment),
           target_diff(BitsToDiff(bTemplate.bits)),
-          expected_shares(GetExpectedHashes(this->target_diff)),
+          expected_hashes(GetExpectedHashes(this->target_diff)),
           tx_count(bTemplate.tx_list.transactions.size())
     {
         // target.SetHex(std::string(bTemplate.target));
@@ -34,7 +34,7 @@ class Job
 
         tx_vi_length = VarInt(txAmountByteValue);
         txs_hex = std::vector<char>(
-            (tx_vi_length + bTemplate.tx_list.byteCount) * 2);
+            (tx_vi_length + bTemplate.tx_list.byte_count) * 2);
         Hexlify(txs_hex.data(), (unsigned char*)&txAmountByteValue,
                 tx_vi_length);
 
@@ -43,11 +43,11 @@ class Job
         {
             memcpy(txs_hex.data() + written, txData.data_hex.data(),
                    txData.data_hex.size());
-            written += txData.data_hex.size();
+             written += txData.data_hex.size();
         }
 
-        // Logger::Log(LogType::Debug, LogField::JobManager, "tx hex: {}",
-        //             std::string_view(txs_hex.data(), txs_hex.size()));
+        Logger::Log(LogType::Debug, LogField::JobManager, "tx hex: {}",
+                    std::string_view(txs_hex.data(), txs_hex.size()));
     }
 
     // inline virtual void GetBlockHex(const WorkerContext* wc, char* res) const
@@ -73,7 +73,7 @@ class Job
     const uint32_t height;
     const int64_t min_time;
     const double target_diff;
-    const double expected_shares;
+    const double expected_hashes;
     mutable std::shared_mutex job_mutex;
 
    protected:

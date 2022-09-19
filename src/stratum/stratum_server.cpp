@@ -3,7 +3,7 @@
 StratumServer::StratumServer(const CoinConfig &conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(conf),
-      redis_manager("127.0.0.1", (int)conf.redis_port),
+      redis_manager("127.0.0.1", (int)conf.redis_port, conf.hashrate_ttl_seconds * 1000),
       clients_mutex(),
       clients(),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
@@ -207,7 +207,7 @@ void StratumServer::HandleBlockNotify()
     payment_manager.UpdatePayouts(&round_manager_pow, curtime_ms);
 
     // the estimated share amount is supposed to be meet at block time
-    const double net_est_hr = new_job->expected_shares / BLOCK_TIME;
+    const double net_est_hr = new_job->expected_hashes / BLOCK_TIME;
 
     submission_manager.CheckImmatureSubmissions();
 
@@ -231,7 +231,7 @@ void StratumServer::HandleBlockNotify()
         fmt::format("Height: {}", new_job->height),
         fmt::format("Min time: {}", new_job->min_time),
         fmt::format("Difficulty: {}", new_job->target_diff),
-        fmt::format("Est. shares: {}", new_job->expected_shares),
+        fmt::format("Est. shares: {}", new_job->expected_hashes),
         fmt::format("Block reward: {}", new_job->GetBlockReward()),
         fmt::format("Transaction count: {}", new_job->GetTransactionCount()),
         fmt::format("Block size: {}", new_job->GetBlockSizeHex()), 40);

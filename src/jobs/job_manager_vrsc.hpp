@@ -13,7 +13,4 @@ class JobManagerVrsc : public JobManager
 
     const job_t* GetNewJob(const std::string& json_template) override;
 };
-
-using job_manager_t = JobManagerVrsc;
-
 #endif

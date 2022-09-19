@@ -1,6 +1,6 @@
 #include "redis_manager.hpp"
 
-RedisManager::RedisManager(const std::string &ip, int port)
+RedisManager::RedisManager(const std::string &ip, int port, int hashrate_ttl_ms)
     : rc(redisConnect(ip.c_str(), port))
 {
     using namespace std::string_view_literals;
@@ -24,8 +24,8 @@ RedisManager::RedisManager(const std::string &ip, int port)
     AppendCommand(
         {"TS.CREATE"sv, fmt::format("{}:{}", MINER_COUNT_KEY, "pool")});
     AppendCommand({"TS.CREATE"sv, fmt::format("{}:{}", HASHRATE_KEY, "pool"),
-                   "RETENTION"sv, "0"sv, "LABELS"sv, "type"sv,
-                   "pool-hashrate"sv});
+                   "RETENTION"sv, std::to_string(hashrate_ttl_ms), "LABELS"sv,
+                   "type"sv, "pool-hashrate"sv});
 
     if (!GetReplies())
     {
@@ -148,8 +148,11 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
                            fmt::format("solver-index:{}", MATURE_BALANCE_KEY),
                            reward_sv, addr});
 
-            AppendCommand({"HINCRBY"sv, fmt::format("solver:{}", addr),
-                           MATURE_BALANCE_KEY, reward_sv});
+            auto solver_key = fmt::format("solver:{}", addr);
+            AppendCommand(
+                {"HINCRBY"sv, solver_key, MATURE_BALANCE_KEY, reward_sv});
+            AppendCommand({"HINCRBY"sv, solver_key, IMMATURE_BALANCE_KEY,
+                           fmt::format("-{}", reward_sv)});
 
             matured_funds += miner_share->reward;
         }

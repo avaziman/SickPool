@@ -19,7 +19,6 @@ void TransactionVrsc::GetBytes(std::vector<unsigned char>& bytes)
     {
         WriteData(bytes.data(), input.previous_output.txid_hash, HASH_SIZE);
         WriteData(bytes.data(), &input.previous_output.index, sizeof(Input::previous_output.index));
-        WriteData(bytes.data(), &input.sig_compact_val, input.sig_compact_len);
         WriteData(bytes.data(), input.signature_script.data(),
                   input.signature_script.size());
 
@@ -31,8 +30,6 @@ void TransactionVrsc::GetBytes(std::vector<unsigned char>& bytes)
     {
         WriteData(bytes.data(), &output.value, sizeof(Output::value));
 
-        WriteData(bytes.data(), &output.script_compact_val,
-                  output.script_compact_len);
         WriteData(bytes.data(), output.pk_script.data(),
                   output.pk_script.size());
     }
@@ -84,15 +81,10 @@ void TransactionVrsc::AddFeePoolOutput(std::string_view coinbaseHex)
 
     Output output;
     output.value = 0;
-    output.pk_script = std::vector<uint8_t>(pos, pos + feePoolVI.first);
-
-    uint64_t varIntVal = output.pk_script.size();
-    char varIntLen = VarInt(varIntVal);
-    output.script_compact_val = varIntVal;
-    output.script_compact_len = varIntLen;
+    output.pk_script = std::vector<uint8_t>(pos - feePoolVI.second, pos + feePoolVI.first);
 
     vout.push_back(output);
-    tx_len += sizeof(output.value) + output.pk_script.size() + varIntLen;
+    tx_len += sizeof(output.value) + output.pk_script.size();
 }
 
 #endif

@@ -5,7 +5,7 @@ int64_t PaymentManager::minimum_payout_threshold;
 int64_t PaymentManager::last_payout_ms;
 uint32_t PaymentManager::payment_counter = 0;
 
-PaymentManager::PaymentManager(RedisManager* rm, DaemonManager* dm,
+PaymentManager::PaymentManager(RedisManager* rm, daemon_manager_t* dm,
                                const std::string& pool_addr, int payout_age_s,
                                int64_t min_threshold)
     : redis_manager(rm), daemon_manager(dm), pool_addr(pool_addr)
