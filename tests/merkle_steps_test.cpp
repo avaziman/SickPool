@@ -123,11 +123,11 @@ TEST(MerkleStepsTest, SHA256MerkleSteps3Tx)
     HashWrapper::InitSHA256();
     // SIN block #1133439:
     // 0fbfb95728776106d08815ba67786240c0d3fa31e6d32d3ea786b265a42a5365
-    auto merkle_steps = GetMerkleSteps({
-        "b0175192e717aab4358d058cbf138525c6ce19ccaa98a31bcd88969704baed93",
-        "225e84b7ed0444cbd3df775b1cb01c1bbb1fa79efa769b9abe212a4ff6c13084",
-        "bd71c318d71af9282bf2dec676bcdeef0b5aaeadf2a31d5479829ea344f182f4",
-    });
+    auto merkle_steps = GetMerkleSteps(
+        {"b0175192e717aab4358d058cbf138525c6ce19ccaa98a31bcd88969704baed93",
+         "225e84b7ed0444cbd3df775b1cb01c1bbb1fa79efa769b9abe212a4ff6c13084",
+         "bd71c318d71af9282bf2dec676bcdeef0b5aaeadf2a31d5479829ea344f182f4",
+         "bd71c318d71af9282bf2dec676bcdeef0b5aaeadf2a31d5479829ea344f182f4"});
     ASSERT_EQ(
         merkle_steps,
         std::vector<std::string>(
