@@ -1,3 +1,0 @@
-/home/sickguy/Documents/Projects/SickPool/server/bulid/_deps/simdjson-subbuild/CMakeFiles/simdjson-populate.dir
-/home/sickguy/Documents/Projects/SickPool/server/bulid/_deps/simdjson-subbuild/CMakeFiles/edit_cache.dir
-/home/sickguy/Documents/Projects/SickPool/server/bulid/_deps/simdjson-subbuild/CMakeFiles/rebuild_cache.dir
