@@ -14,15 +14,38 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateRes& rpctemplate)
 
     block_template = BlockTemplateBtc(rpctemplate);
 
+    // assume coinbase transaction size + block header is 1000 bytes (extra)
+    int block_size = 1000;
+    int include_tx_count = 0;
+
+    for (auto tx_res : rpctemplate.transactions)
+    {
+        const int tx_size = tx_res.data.size();
+        
+        // wouldn't help because won't update infinity node fees (burn tx fee)
+        if (block_size + tx_size >= MAX_BLOCK_SIZE) break;
+
+        block_size += tx_size;
+
+        // we don't receive any tx fee as its burned
+        // block_template.coinbase_value += tx_res.fee;
+        include_tx_count++;
+    }
+
+    bool payment_guaranteed =
+        includes_payment &&
+        block_size + payment_manager->pending_payment->td.data.size() <
+            MAX_BLOCK_SIZE;
+
+    // if (payment_guaranteed)
+    // {
+    //     additional_fee += payment_manager->pending_payment->td.fee;
+    // }
+    // block_template.coinbase_value += additional_fee;
+
+    // cb
     TransactionBtc cb_tx(cb_input_count, cb_outputs_count);
     const std::size_t coinb1_pos = GetCoinbaseTx(cb_tx, rpctemplate);
-
-    if (includes_payment)
-    {
-        block_template.tx_list.AddTxData(payment_manager->pending_payment->td);
-        additional_fee += payment_manager->pending_payment->td.fee;
-    }
-    block_template.coinbase_value += additional_fee;
 
     // cbtxd
     TransactionData cb_txd;
@@ -35,27 +58,22 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateRes& rpctemplate)
 
     block_template.tx_list.AddTxData(cb_txd);
 
-    for (auto tx_res : rpctemplate.transactions)
+    for (int i = 0; i < include_tx_count; i++)
     {
+        auto tx_res = rpctemplate.transactions[i];
         TransactionData td(tx_res.data, tx_res.hash);
+        block_template.tx_list.AddTxData(td);
 
-        Logger::Log(LogType::Info, LogField::JobManager, "Included txid: {}, data: {}", std::string_view(td.hash_hex, HASH_SIZE_HEX), td.data_hex);
-
-        if (!block_template.tx_list.AddTxData(td))
-        {
-            // we don't include the transaction, so exclude its fee from
-            // coinbase output
-            cb_tx.vout[0].value -= td.fee;
-            Logger::Log(LogType::Warn, LogField::JobManager,
-                        "Block template is full! block size is {} bytes",
-                        block_template.tx_list.byte_count);
-
-            // regenerate the coinbase transaction
-            cb_tx.GetBytes(cb_txd.data);
-            Hexlify(cb_data_hex, cb_txd.data.data(), cb_txd.data.size());
-            block_template.tx_list.transactions[0].Hash();
-        }
+        Logger::Log(LogType::Info, LogField::JobManager,
+                    "Included txid: {}, data: {}",
+                    std::string_view(td.hash_hex, HASH_SIZE_HEX), td.data_hex);
     }
+
+    if (payment_guaranteed)
+    {
+        block_template.tx_list.AddTxData(payment_manager->pending_payment->td);
+    }
+
 
     Logger::Log(LogType::Info, LogField::JobManager,
                 "Coinbase txid: {}, tx: {}", cb_txd.hash_hex, cb_txd.data_hex);
@@ -69,7 +87,7 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateRes& rpctemplate)
     std::string jobIdHex = fmt::format("{:08x}", job_count);
 
     auto job =
-        std::make_unique<job_t>(jobIdHex, block_template, includes_payment);
+        std::make_unique<job_t>(jobIdHex, block_template, payment_guaranteed);
 
     return SetNewJob(std::move(job));
 }
@@ -88,24 +106,32 @@ const job_t* JobManagerSin::GetNewJob()
     return GetNewJob(res);
 }
 
-std::size_t JobManagerSin::GetCoinbaseTx(TransactionBtc& coinbase_tx, const BlockTemplateRes& rpctemplate)
+std::size_t JobManagerSin::GetCoinbaseTx(TransactionBtc& coinbase_tx,
+                                         const BlockTemplateRes& rpctemplate)
 {
     // coinbase output
     std::vector<uint8_t> reward_script;
     Transaction::GetP2PKHScript(pool_addr, reward_script);
 
-    // to be replaced with reward output
+    for (auto infnode : rpctemplate.infinity_nodes)
+    {
+        block_template.coinbase_value -= infnode.value;
+    }
+
+    for (auto devfee : rpctemplate.dev_fee)
+    {
+        block_template.coinbase_value -= devfee.value;
+    }
+
     coinbase_tx.AddOutput(Output(block_template.coinbase_value, reward_script));
 
     for (auto infnode : rpctemplate.infinity_nodes)
     {
-        coinbase_tx.vout[0].value -= infnode.value;
         coinbase_tx.AddOutput(Output(infnode.value, infnode.script_hex));
     }
 
     for (auto devfee : rpctemplate.dev_fee)
     {
-        coinbase_tx.vout[0].value -= devfee.value;
         coinbase_tx.AddOutput(Output(devfee.value, devfee.script_hex));
     }
 

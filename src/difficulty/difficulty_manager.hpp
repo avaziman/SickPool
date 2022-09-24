@@ -21,12 +21,16 @@ class DifficultyManager
     {
     }
 
-    void Adjust(const int passed_seconds)
+    void Adjust(const int passed_seconds, const int curtime_ms)
     {
         std::shared_lock read_lock(*clients_mutex);
         for (auto& [conn, _] : *clients)
         {
             StratumClient* client = conn->ptr.get();
+
+            // client hasn't been connected for long enough
+            if (curtime_ms - client->connect_time < passed_seconds) continue;
+
             const double current_diff = client->GetDifficulty();
             const double minute_rate =
                 static_cast<double>(client->GetShareCount()) / (passed_seconds / 60.d);

@@ -232,7 +232,7 @@ void StratumServer::HandleBlockNotify()
         fmt::format("Min time: {}", new_job->min_time),
         fmt::format("Difficulty: {}", new_job->target_diff),
         fmt::format("Est. shares: {}", new_job->expected_hashes),
-        fmt::format("Block reward: {}", new_job->GetBlockReward()),
+        fmt::format("Block reward: {}", new_job->block_reward),
         fmt::format("Transaction count: {}", new_job->GetTransactionCount()),
         fmt::format("Block size: {}", new_job->GetBlockSizeHex()), 40);
 }
@@ -449,7 +449,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 #endif
 
         auto submission = std::make_unique<ExtendedSubmission>(
-            chain, worker_full, type, job->height, job->GetBlockReward(),
+            chain, worker_full, type, job->height, job->block_reward,
             duration_ms, time, SubmissionManager::block_number,
             share_res.difficulty, effort_percent, share_res.hash_bytes.data(),
             job->coinbase_tx_id);

@@ -25,6 +25,7 @@ struct BlockTemplateBtc : public BlockTemplate
     BlockTemplateBtc() = default;
     
     BlockTemplateBtc(const BlockTemplateRes& rpct)
+    // extra tx space for coinbase + payment
         : BlockTemplate(rpct.version, rpct.prev_block_hash,
                         rpct.transactions.size() + 2, rpct.coinbase_value,
                         rpct.min_time,
@@ -190,11 +191,11 @@ class JobBtc : public Job
         MerkleTree::CalcRootFromSteps(buff + MERKLE_ROOT_POS, cbtxid,
                                       merkle_steps, merkle_steps_count);
 
-        PrintHex(cbtxid, HASH_SIZE, "Coinb txid");
-        PrintHex(coinbase_bin.get(), coinbase_size, "Coinb data");
-        PrintHex(merkle_steps.data(), merkle_steps_count * HASH_SIZE,
-                 "Merkle steps");
-        PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
+        // PrintHex(cbtxid, HASH_SIZE, "Coinb txid");
+        // PrintHex(coinbase_bin.get(), coinbase_size, "Coinb data");
+        // PrintHex(merkle_steps.data(), merkle_steps_count * HASH_SIZE,
+        //          "Merkle steps");
+        // PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
 
         constexpr auto TIME_POS = MERKLE_ROOT_POS + MERKLE_ROOT_SIZE;
         Unhexlify(buff + TIME_POS, share.time.data(), TIME_SIZE * 2);

@@ -73,8 +73,8 @@ void StatsManager::Start(std::stop_token st)
 
         if (next_update == next_diff_update)
         {
+            diff_manager->Adjust(diff_adjust_seconds, next_diff_update);
             next_diff_update += diff_adjust_seconds;
-            diff_manager->Adjust(diff_adjust_seconds);
         }
 
         auto startChrono = system_clock::now();

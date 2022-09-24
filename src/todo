@@ -1,4 +1,5 @@
 todo:
+fix bug where diff is adjusted even if miner is too new
 maybe average remove is one before ts
 fix bad merkle root on paymentff
 

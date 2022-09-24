@@ -85,12 +85,12 @@ class StratumClient
     std::list<std::unique_ptr<StratumClient>>::iterator it;
 
     const std::string_view extra_nonce_sv;
+    const int64_t connect_time;
     bool disconnected = false;
 
    private:
     static uint32_t extra_nonce_counter;
 
-    const int64_t connect_time;
     const uint32_t extra_nonce;
 
     int64_t last_adjusted;

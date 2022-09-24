@@ -20,7 +20,7 @@ double GetNextDiff(const int time_period, const double target_shares,
     for (int i = 0; i < shares_done; i++) conn->ptr->SetLastShare(0, 0);
 
     DifficultyManager diff_manager(&clients, &useless_mutex, target_shares);
-    diff_manager.Adjust(time_period);
+    diff_manager.Adjust(time_period, 1 + time_period);
     return conn->ptr->GetPendingDifficulty();
 }
 
