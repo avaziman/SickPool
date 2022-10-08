@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 
+#include "cn/currency_core/basic_pow_helpers.h"
 #include "jobs/job_manager.hpp"
 #include "logger.hpp"
 #include "share.hpp"
@@ -29,19 +30,19 @@ class ShareProcessor
         shareTime = bswap_32(shareTime);  // swap to little endian
 #endif
 
-        int64_t minTime = job->min_time;
-        int64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
+        // int64_t minTime = job->min_time;
+        // int64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
 
-        if (shareTime < minTime || shareTime > maxTime)
-        {
-            result.code = ResCode::UNKNOWN;
-            result.message =
-                fmt::format("Invalid nTime (min: {}, max: {}, given: {})",
-                            minTime, maxTime, shareTime);
-            result.difficulty =
-                static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
-            return false;
-        }
+        // if (shareTime < minTime || shareTime > maxTime)
+        // {
+        //     result.code = ResCode::UNKNOWN;
+        //     result.message =
+        //         fmt::format("Invalid nTime (min: {}, max: {}, given: {})",
+        //                     minTime, maxTime, shareTime);
+        //     result.difficulty =
+        //         static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
+        //     return false;
+        // }
 
         return true;
     }
@@ -52,10 +53,10 @@ class ShareProcessor
     {
         // veirfy params before even hashing
 
-        if (!VerifyShareParams(result, job, share.time, curTime))
-        {
-            return;
-        }
+        // if (!VerifyShareParams(result, job, share.time, curTime))
+        // {
+        //     return;
+        // }
 
         uint8_t* headerData = wc->block_header;
 
@@ -71,15 +72,19 @@ class ShareProcessor
 #elif HASH_ALGO == HASH_ALGO_X25X
         HashWrapper::X25X(result.hash_bytes.data(), headerData,
                           BLOCK_HEADER_SIZE);
+#elif HASH_ALGO == HASH_ALGO_PROGPOW
+        uint64_t nonce = HexToUint(share.nonce.data(), sizeof(uint64_t));
+        currency::get_block_longhash(static_cast<uint64_t>(job->height),
+                                     *reinterpret_cast<const crypto::hash*>(
+                                         job->block_template_hash.data()),
+                                     nonce);
 #else
 #error "Missing hash function";
 #endif
 
         uint256 hash(result.hash_bytes);
-        Logger::Log(
-            LogType::Debug, LogField::ShareProcessor,
-            "Share hash: {} ",
-            hash.GetHex());
+        Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash: {} ",
+                    hash.GetHex());
 
         // arith_uint256 hashArith = UintToArith256(hash);
 
@@ -99,13 +104,13 @@ class ShareProcessor
         result.difficulty = BitsToDiff(UintToArith256(hash).GetCompact(false));
 
         // if (hashArith >= *job->GetTarget())
-        if (unlikely(result.difficulty >= job->target_diff))
+        if (unlikely_cond(result.difficulty >= job->target_diff))
         {
             result.code = ResCode::VALID_BLOCK;
             return;
         }
-        else if (unlikely(result.difficulty / cli->GetDifficulty() <
-                          1.))  // allow 5% below
+        else if (unlikely_cond(result.difficulty / cli->GetDifficulty() <
+                               1.d))  // allow 5% below
         {
             result.code = ResCode::LOW_DIFFICULTY_SHARE;
             result.message =

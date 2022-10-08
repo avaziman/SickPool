@@ -1,8 +1,8 @@
 #include "static_config.hpp"
-#if COIN == SIN
+#if SICK_COIN == SIN
 #include "job_manager_sin.hpp"
 
-const job_t* JobManagerSin::GetNewJob(const BlockTemplateRes& rpctemplate)
+const job_t* JobManagerSin::GetNewJob(const BlockTemplateResSin& rpctemplate)
 {
     int64_t additional_fee = 0;
     bool includes_payment = payment_manager->pending_payment.get();
@@ -31,6 +31,9 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateRes& rpctemplate)
         // block_template.coinbase_value += tx_res.fee;
         include_tx_count++;
     }
+
+    //TODO: fix
+    block_template.block_size = block_size;
 
     bool payment_guaranteed =
         includes_payment &&
@@ -94,7 +97,7 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateRes& rpctemplate)
 
 const job_t* JobManagerSin::GetNewJob()
 {
-    BlockTemplateRes res;
+    BlockTemplateResSin res;
     if (!daemon_manager->GetBlockTemplate(res, jsonParser))
     {
         Logger::Log(LogType::Critical, LogField::JobManager,
@@ -107,7 +110,7 @@ const job_t* JobManagerSin::GetNewJob()
 }
 
 std::size_t JobManagerSin::GetCoinbaseTx(TransactionBtc& coinbase_tx,
-                                         const BlockTemplateRes& rpctemplate)
+                                         const BlockTemplateResSin& rpctemplate)
 {
     // coinbase output
     std::vector<uint8_t> reward_script;

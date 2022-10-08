@@ -3,6 +3,13 @@
 #ifdef STRATUM_PROTOCOL_BTC
 #include "stratum_server_btc.hpp"
 
+void StratumServerBtc::BroadcastJob(Connection<StratumClient> *conn,
+                                 const job_t *job) const
+{
+    auto notifyMsg = job->GetNotifyMessage();
+    SendRaw(conn->sock, notifyMsg.data(), notifyMsg.size());
+}
+
 void StratumServerBtc::HandleReq(Connection<StratumClient>* conn, WorkerContext *wc,
                                  std::string_view req)
 {

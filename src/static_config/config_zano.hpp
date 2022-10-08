@@ -1,6 +1,6 @@
 #include "hash_algo.hpp"
 
-#define STRATUM_PROTOCOL_BTC 1
+#define STRATUM_PROTOCOL_CN 1
 #define HASH_ALGO HASH_ALGO_PROGPOW
 #define COIN_SYMBOL "ZANO"
 
@@ -29,9 +29,11 @@ static constexpr uint32_t COINBASE_MATURITY = 20;
 // encoded as in block header
 static constexpr uint32_t BLOCK_VERSION = 0x20000000;
 
-static constexpr uint32_t BLOCK_HEADER_SIZE = VERSION_SIZE + PREVHASH_SIZE +
-                                              MERKLE_ROOT_SIZE + TIME_SIZE +
-                                              BITS_SIZE + NONCE_SIZE;
+// static constexpr uint32_t BLOCK_HEADER_SIZE = VERSION_SIZE + PREVHASH_SIZE +
+//                                               MERKLE_ROOT_SIZE + TIME_SIZE +
+//                                               BITS_SIZE + NONCE_SIZE;
+
+static constexpr uint32_t BLOCK_HEADER_SIZE = 81;
 
 static constexpr uint32_t BLOCK_HEADER_STATIC_SIZE =
     VERSION_SIZE + PREVHASH_SIZE;

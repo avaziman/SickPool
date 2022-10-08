@@ -2,6 +2,7 @@
 #define STRATUM_SERVER_HPP_
 #include <simdjson.h>
 
+#include <type_traits>
 #include <any>
 #include <chrono>
 #include <deque>
@@ -78,7 +79,8 @@ class StratumServer : public Server<StratumClient>
 
     virtual void UpdateDifficulty(Connection<StratumClient>* conn) = 0;
 
-    void BroadcastJob(Connection<StratumClient>* conn, const job_t* job) const;
+    virtual void BroadcastJob(Connection<StratumClient>* conn,
+                              const job_t* job) const = 0;
     int AcceptConnection(sockaddr_in* addr, socklen_t* addr_size);
     void InitListeningSock();
     // void EraseClient(int sockfd,
@@ -137,6 +139,8 @@ class StratumServer : public Server<StratumClient>
 #include "stratum_server_zec.hpp"
 #elif STRATUM_PROTOCOL_BTC
 #include "stratum_server_btc.hpp"
+#elif STRATUM_PROTOCOL_CN
+#include "stratum_server_cn.hpp"
 #endif
 
 #endif

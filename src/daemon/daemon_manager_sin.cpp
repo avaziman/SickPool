@@ -1,6 +1,6 @@
 #include "daemon_manager_sin.hpp"
 
-bool DaemonManagerSin::GetBlockTemplate(BlockTemplateRes& templateRes,
+bool DaemonManagerSin::GetBlockTemplate(BlockTemplateResSin& templateRes,
                                         simdjson::ondemand::parser& parser)
 {
     using namespace simdjson;

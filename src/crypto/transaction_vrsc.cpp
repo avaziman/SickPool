@@ -1,6 +1,6 @@
 #include "static_config.hpp"
 
-#if COIN == VRSC
+#if SICK_COIN == VRSC
 #include "transaction_vrsc.hpp"
 void TransactionVrsc::GetBytes(std::vector<unsigned char>& bytes)
 {

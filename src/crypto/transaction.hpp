@@ -165,9 +165,11 @@ class Transaction
     std::vector<Input> vin;
     };
 
-#if COIN == VRSC
+#if SICK_COIN == VRSC
 #include "transaction_vrsc.hpp"
-#elif COIN == SIN
+#elif SICK_COIN == SIN
+#include "transaction_btc.hpp"
+#elif SICK_COIN == ZANO
 #include "transaction_btc.hpp"
 #endif
 #endif

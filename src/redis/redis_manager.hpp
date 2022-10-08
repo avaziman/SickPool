@@ -9,8 +9,8 @@
 #include <functional>
 #include <iostream>
 #include <iterator>
-#include <unordered_map>
 #include <mutex>
+#include <unordered_map>
 #include <vector>
 
 #include "benchmark.hpp"
@@ -23,6 +23,7 @@
 #include "static_config/static_config.hpp"
 #include "stats/stats.hpp"
 #include "stats/stats_manager.hpp"
+#include "utils.hpp"
 
 #define xstr(s) str(s)
 #define STRM(s) #s
@@ -34,6 +35,38 @@ struct TsAggregation
     std::string type;
     int64_t time_bucket_ms;
 };
+
+enum class Prefix
+{
+    POW,
+    BLOCK_NUMBER,
+    PAYOUTS,
+    ADDRESS_MAP,
+    PAYOUT_THRESHOLD,
+    IDENTITY,
+    HASHRATE,
+    JOIN_TIME,
+    WORKER_COUNT,
+    MATURE_BALANCE,
+    IMMATURE_BALANCE,
+    SCRIPT_PUB_KEY,
+    ROUND_EFFORT,
+    MINER_COUNT,
+    TOTAL_EFFORT,
+    ESTIMATED_EFFORT,
+    ROUND_START_TIME,
+    IMMATURE_REWARD,
+    NETWORK_HASHRATE,
+};
+static constexpr std::string_view coin_symbol = COIN_SYMBOL;
+static constexpr std::string_view separator = ":";
+
+template <auto T>
+constexpr std::string_view PrefixKey()
+{
+    static constexpr std::string_view name = EnumName<T>();
+    return join_v<coin_symbol, name, separator>;
+}
 
 class RedisTransaction;
 class RedisManager
@@ -71,13 +104,14 @@ class RedisManager
     void AppendAddRoundShares(std::string_view chain,
                               const BlockSubmission *submission,
                               const round_shares_t &miner_shares);
-    bool SetNewBlockStats(std::string_view chain, int64_t curtime, double net_hr, double estimated_shares);
+    bool SetNewBlockStats(std::string_view chain, int64_t curtime,
+                          double net_hr, double estimated_shares);
     bool ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
                                  int64_t time_now);
 
     bool CloseRound(std::string_view chain, std::string_view type,
                     const ExtendedSubmission *submission,
-                    round_shares_t& round_shares, int64_t time_ms);
+                    round_shares_t &round_shares, int64_t time_ms);
 
     /* stats */
     bool LoadAverageHashrateSum(
@@ -88,7 +122,8 @@ class RedisManager
                            efforts_map_t &efforts);
 
     bool UpdateEffortStats(efforts_map_t &miner_stats_map,
-                           const double total_effort, std::unique_lock<std::mutex> stats_mutex);
+                           const double total_effort,
+                           std::unique_lock<std::mutex> stats_mutex);
 
     bool UpdateIntervalStats(worker_map &worker_stats_map,
                              miner_map &miner_stats_map,
@@ -103,7 +138,7 @@ class RedisManager
                       std::string_view chain);
 
     /* payout */
-    bool AddPayout(const PaymentInfo* payment);
+    bool AddPayout(const PaymentInfo *payment);
 
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
@@ -113,7 +148,8 @@ class RedisManager
 
     void LoadCurrentRound(std::string_view chain, std::string_view type,
                           Round *rnd);
-    bool LoadImmatureBlocks(std::vector<std::unique_ptr<ExtendedSubmission>>& submsissions);
+    bool LoadImmatureBlocks(
+        std::vector<std::unique_ptr<ExtendedSubmission>> &submsissions);
 
     inline bool GetReplies(redis_unique_ptr *last_reply = nullptr)
     {
@@ -152,32 +188,13 @@ class RedisManager
     }
 
     static constexpr int ROUND_SHARES_LIMIT = 100;
-    static constexpr std::string_view POW_KEY = "pow";
-    static constexpr std::string_view BLOCK_NUMBER_KEY = "block-number";
-    static constexpr std::string_view PAYOUTS_KEY = "payouts";
-    static constexpr std::string_view ADDRESS_MAP_KEY = "address-map";
-    static constexpr std::string_view PAYOUT_THRESHOLD_KEY = "payout-threshold";
-    static constexpr std::string_view IDENTITY_KEY = "identity";
-    static constexpr std::string_view HASHRATE_KEY = "hashrate";
-    static constexpr std::string_view JOIN_TIME_KEY = "join-time";
-    static constexpr std::string_view WORKER_COUNT_KEY = "worker-count";
-    static constexpr std::string_view MATURE_BALANCE_KEY = "mature-balance";
-    static constexpr std::string_view IMMATURE_BALANCE_KEY = "immature-balance";
-    static constexpr std::string_view SCRIPT_PUB_KEY_KEY = "script-pub-key";
-    static constexpr std::string_view ROUND_EFFORT_KEY = "round-effort";
-    static constexpr std::string_view MINER_COUNT_KEY = "miner-count";
-    static constexpr std::string_view TOTAL_EFFORT_KEY = "$total";
-    static constexpr std::string_view ESTIMATED_EFFORT_KEY = "$estimated";
-    static constexpr std::string_view ROUND_START_TIME_KEY = "$start";
-    static constexpr std::string_view IMMATURE_REWARDS = "immature-rewards";
-    static constexpr std::string_view NETWORK_HASHRATE_KEY = "network-hashrate";
 
     std::mutex rc_mutex;
+
    private:
     redisContext *rc;
     int command_count = 0;
-
-    void AppendCommand(std::initializer_list<std::string_view> args, bool add_coin = true)
+    void AppendCommand(std::initializer_list<std::string_view> args)
     {
         using namespace std::string_literals;
         const size_t argc = args.size();
@@ -192,31 +209,21 @@ class RedisManager
             i++;
         }
 
-        std::string prefixed_key;
-        if (argc > 1 && add_coin)
-        {
-            prefixed_key = fmt::format("{}:{}", COIN_SYMBOL, argv[1]);
-            // add coin prefix to the all keys
-            argv[1] = prefixed_key.data();
-            args_len[1] = prefixed_key.size();
-        }
-
         redisAppendCommandArgv(rc, argc, argv, args_len);
         command_count++;
     }
 
-    redis_unique_ptr Command(std::initializer_list<std::string_view> args,
-                             bool add_coin = true)
+    redis_unique_ptr Command(std::initializer_list<std::string_view> args)
     {
-        AppendCommand(args, add_coin);
+        AppendCommand(args);
         redis_unique_ptr rptr;
         bool res = GetReplies(&rptr);
         return rptr;
     }
 
-    void AppendTsCreate(
-        std::string_view key, std::string_view prefix, std::string_view type,
-        std::string_view address, std::string_view id, uint64_t retention_ms);
+    void AppendTsCreate(std::string_view key, std::string_view prefix,
+                        std::string_view type, std::string_view address,
+                        std::string_view id, uint64_t retention_ms);
 
     bool hset(std::string_view key, std::string_view field,
               std::string_view val);

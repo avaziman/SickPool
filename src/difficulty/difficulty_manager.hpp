@@ -33,7 +33,7 @@ class DifficultyManager
 
             const double current_diff = client->GetDifficulty();
             const double minute_rate =
-                static_cast<double>(client->GetShareCount()) / (passed_seconds / 60.d);
+                static_cast<double>(client->GetShareCount()) / (passed_seconds / 60.0);
 
             const double diff_multiplier = minute_rate / target_share_rate;
 

@@ -13,7 +13,7 @@
 
 #include "block_template.hpp"
 #include "daemon_responses_sin.hpp"
-#include "job.hpp"
+#include "job_base_btc.hpp"
 #include "share.hpp"
 #include "static_config.hpp"
 
@@ -24,7 +24,8 @@ struct BlockTemplateBtc : public BlockTemplate
 
     BlockTemplateBtc() = default;
     
-    BlockTemplateBtc(const BlockTemplateRes& rpct)
+    template <typename Template>
+    BlockTemplateBtc(const Template& rpct)
     // extra tx space for coinbase + payment
         : BlockTemplate(rpct.version, rpct.prev_block_hash,
                         rpct.transactions.size() + 2, rpct.coinbase_value,
@@ -34,12 +35,12 @@ struct BlockTemplateBtc : public BlockTemplate
     }
 };
 
-class JobBtc : public Job
+class JobBtc : public JobBaseBtc
 {
    public:
     JobBtc(const std::string& jobId, const BlockTemplateBtc& bTemplate,
            bool is_payment, bool clean = true)
-        : Job(jobId, bTemplate, is_payment),
+        : JobBaseBtc(jobId, bTemplate, is_payment),
           bits(bTemplate.bits),
           //   coinb1(bTemplate.coinb1.begin(), bTemplate.coinb1.end()),
           //   coinb2(bTemplate.coinb2.begin(), bTemplate.coinb2.end()),

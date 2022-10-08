@@ -21,14 +21,14 @@ bool RedisManager::AddPayout(const PaymentInfo* payment)
                    HASH_SIZE_HEX);
 
             AppendCommand({"ZINCRBY"sv,
-                           fmt::format("solver-index:{}", MATURE_BALANCE_KEY),
+                           fmt::format("solver-index:{}", PrefixKey<Prefix::MATURE_BALANCE>()),
                            negative_reward_sv, addr});
 
-            AppendCommand({"HINCRBY"sv, solver_key, MATURE_BALANCE_KEY,
+            AppendCommand({"HINCRBY"sv, solver_key, PrefixKey<Prefix::MATURE_BALANCE>(),
                            negative_reward_sv});
 
             AppendCommand({"LPUSH"sv,
-                           fmt::format("{}:{}", solver_key, PAYOUTS_KEY),
+                           fmt::format("{}:{}", solver_key, PrefixKey<Prefix::PAYOUTS>()),
                            std::string_view((char*)&upayment, sizeof(UserPayment))});
         }
 
@@ -42,7 +42,7 @@ bool RedisManager::AddPayout(const PaymentInfo* payment)
         finished.total_payees = payment->rewards.size();
 
         AppendCommand(
-            {"LPUSH"sv, PAYOUTS_KEY,
+            {"LPUSH"sv, PrefixKey<Prefix::PAYOUTS>(),
              std::string_view((char*)&finished, sizeof(FinishedPayment))});
     }
     return GetReplies();

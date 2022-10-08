@@ -1,5 +1,5 @@
 #include "static_config.hpp"
-#if COIN == VRSC
+#if SICK_COIN == VRSC
 #include "job_manager_vrsc.hpp"
 
 const job_t* JobManagerVrsc::GetNewJob(const std::string& json_template)

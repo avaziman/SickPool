@@ -6,7 +6,7 @@
 #include <tuple>
 #include <type_traits>
 
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include "../coin_config.hpp"
 #include "../daemon/daemon_rpc.hpp"
 #include "logger.hpp"
@@ -63,7 +63,7 @@ struct SignRawTransactionRes
 class DaemonManager
 {
    public:
-    DaemonManager(const std::vector<RpcConfig>& rpc_configs)
+    DaemonManager(const std::vector<RpcConfig>& rpc_configs): rpc_mutex()
     {
         for (const auto& config : rpc_configs)
         {
@@ -302,12 +302,12 @@ class DaemonManager
         return true;
     }
 
-    int SendRpcReq(std::string& result, int id, std::string_view method, std::string_view params = "[]")
+    int SendRpcReq(std::string& result, int id, std::string_view method, std::string_view params = "[]", std::string_view type = "POST /")
     {
         std::unique_lock rpc_lock(rpc_mutex);
         for (DaemonRpc& rpc : rpcs)
         {
-            int res = rpc.SendRequest(result, id, method, params);
+            int res = rpc.SendRequest(result, id, method, params, type);
             if (res != -1) return res;
         }
 

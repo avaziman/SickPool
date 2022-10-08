@@ -8,9 +8,6 @@
 #include "static_config.hpp"
 
 #include "crypto/base58.h"
-#include "crypto/hash_wrapper.hpp"
-#include "crypto/verushash/arith_uint256.h"
-#include "crypto/verushash/verus_hash.h"
 #include "daemon/daemon_rpc.hpp"
 #include "logger.hpp"
 #include "sock_addr.hpp"

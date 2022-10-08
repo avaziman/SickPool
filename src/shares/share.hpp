@@ -22,18 +22,18 @@ typedef ShareZec share_t;
 // as in order of appearance
 #endif
 
-#ifdef STRATUM_PROTOCOL_BTC
-struct ShareBtc
+// #ifdef STRATUM_PROTOCOL_BTC
+struct ShareCn
 {
     std::string_view worker;
-    std::string_view jobId;
-    std::string_view extranonce2;
-    std::string_view time;
+    
     std::string_view nonce;
+    std::string_view header_pow;
+    std::string_view mix_digest;
 };
-typedef ShareBtc share_t;
+typedef ShareCn share_t;
 
-#endif
+// #endif
 
 struct WorkerContext
 {

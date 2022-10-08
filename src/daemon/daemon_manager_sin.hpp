@@ -7,7 +7,7 @@
 class DaemonManagerSin : public DaemonManager
 {
    public:
-    bool GetBlockTemplate(BlockTemplateRes& templateRes,
+    bool GetBlockTemplate(BlockTemplateResSin& templateRes,
                           simdjson::ondemand::parser& parser);
 };
 #endif

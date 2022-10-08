@@ -1,5 +1,5 @@
 #include "static_config.hpp"
-#if COIN == VRSC
+#if SICK_COIN == VRSC
 #include "job_vrsc.hpp"
 
 #include <gtest/gtest.h>

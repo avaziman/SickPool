@@ -8,7 +8,7 @@
 #include "../daemon/daemon_rpc.hpp"
 #include "block_template.hpp"
 #include "daemon_manager_t.hpp"
-#include "job.hpp"
+#include "job_base_btc.hpp"
 #include "logger.hpp"
 #include "payment_manager.hpp"
 #include "share.hpp"
@@ -85,11 +85,14 @@ class JobManager
                                         std::string_view rpc_cb);
 };
 
-#if COIN == VRSC
+#if SICK_COIN == VRSC
 #include "job_manager_vrsc.hpp"
 using job_manager_t = JobManagerVrsc;
-#elif COIN == SIN
+#elif SICK_COIN == SIN
 #include "job_manager_sin.hpp"
+#else
+#include "job_manager_cryptonote.hpp"
+
 #endif
 
 #endif

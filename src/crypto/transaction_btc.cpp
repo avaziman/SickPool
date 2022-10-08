@@ -1,6 +1,6 @@
 #include "static_config.hpp"
 
-#if COIN == SIN
+#if SICK_COIN == SIN || SICK_COIN == ZANO
 #include "transaction_btc.hpp"
 std::size_t TransactionBtc::GetBytes(std::vector<uint8_t>& bytes)
 {

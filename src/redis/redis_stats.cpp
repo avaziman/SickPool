@@ -36,13 +36,13 @@ bool RedisManager::UpdateEffortStats(efforts_map_t &miner_stats_map,
         AppendSetMinerEffort(COIN_SYMBOL, miner_addr, "pow", miner_effort);
     }
 
-    AppendSetMinerEffort(COIN_SYMBOL, TOTAL_EFFORT_KEY, "pow",
-                            total_effort);
+    AppendSetMinerEffort(COIN_SYMBOL, PrefixKey<Prefix::TOTAL_EFFORT>(), "pow",
+                         total_effort);
     stats_mutex.unlock();
 
     return GetReplies();
 }
-    
+
 bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
                                        miner_map &miner_stats_map,
                                        std::mutex *stats_mutex,
@@ -72,17 +72,18 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
 
         for (auto &[miner_addr, miner_stats] : miner_stats_map)
         {
-            std::string hr_str =
-                std::to_string(miner_stats.interval_hashrate);
+            std::string hr_str = std::to_string(miner_stats.interval_hashrate);
 
             AppendIntervalStatsUpdate(miner_addr, "miner", update_time_ms,
                                       miner_stats);
 
-            AppendCommand({"ZADD"sv, fmt::format("solver-index:{}", HASHRATE_KEY),
-                           hr_str, miner_addr});
+            AppendCommand(
+                {"ZADD"sv,
+                 fmt::format("solver-index:{}", PrefixKey<Prefix::HASHRATE>()),
+                 hr_str, miner_addr});
 
-            AppendHset(fmt::format("solver:{}", miner_addr), HASHRATE_KEY,
-                       hr_str);
+            AppendHset(fmt::format("solver:{}", miner_addr),
+                       PrefixKey<Prefix::HASHRATE>(), hr_str);
 
             AppendUpdateWorkerCount(miner_addr, miner_stats.worker_count,
                                     update_time_ms);
@@ -94,10 +95,10 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
     }
 
     AppendTsAdd("hashrate:pool", update_time_ms, pool_hr);
-    AppendTsAdd(fmt::format("{}:{}", WORKER_COUNT_KEY, "pool"), update_time_ms,
-                pool_miner_count);
-    AppendTsAdd(fmt::format("{}:{}", MINER_COUNT_KEY, "pool"), update_time_ms,
-                pool_worker_count);
+    AppendTsAdd(fmt::format("{}:{}", PrefixKey<Prefix::WORKER_COUNT>(), "pool"),
+                update_time_ms, pool_miner_count);
+    AppendTsAdd(fmt::format("{}:{}", PrefixKey<Prefix::MINER_COUNT>(), "pool"),
+                update_time_ms, pool_worker_count);
 
     return GetReplies();
 }
@@ -113,7 +114,8 @@ bool RedisManager::LoadAverageHashrateSum(
         .type = "SUM",
         .time_bucket_ms =
             StatsManager::average_hashrate_interval_seconds * 1000};
-    return TsMrange(hashrate_sums, prefix, HASHRATE_KEY, from, hr_time, &aggregation);
+    return TsMrange(hashrate_sums, prefix, PrefixKey<Prefix::HASHRATE>(), from,
+                    hr_time, &aggregation);
 }
 
 bool RedisManager::ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
@@ -160,22 +162,18 @@ bool RedisManager::TsMrange(
     redis_unique_ptr reply;
     if (aggregation)
     {
-        reply = Command(
-            {"TS.MRANGE"sv, std::to_string(from), std::to_string(to),
-             "AGGREGATION"sv, aggregation->type,
-             std::to_string(aggregation->time_bucket_ms), "FILTER"sv,
-             fmt::format("prefix={}", prefix), fmt::format("type={}", type)
-
-            },
-            false);
+        reply = Command({"TS.MRANGE"sv, std::to_string(from),
+                         std::to_string(to), "AGGREGATION"sv, aggregation->type,
+                         std::to_string(aggregation->time_bucket_ms),
+                         "FILTER"sv, fmt::format("prefix={}", prefix),
+                         fmt::format("type={}", type)});
     }
     else
     {
         reply =
             Command({"TS.MRANGE"sv, std::to_string(from), std::to_string(to),
                      "FILTER"sv, fmt::format("prefix={}", prefix),
-                     fmt::format("type={}", type)},
-                    false);
+                     fmt::format("type={}", type)});
     }
 
     if (!reply.get()) return false;

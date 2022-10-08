@@ -1,5 +1,5 @@
-#ifndef JOB_HPP_
-#define JOB_HPP_
+#ifndef JOB_BASE_BTC_HPP_
+#define JOB_BASE_BTC_HPP_
 
 #include <ctime>
 #include <iomanip>
@@ -13,24 +13,22 @@
 #include "static_config.hpp"
 #include "share.hpp"
 #include "utils.hpp"
+#include "job_base.hpp"
 
-class Job
+class JobBaseBtc : public JobBase
 {
    public:
-    Job(const std::string& jobId, const BlockTemplate& bTemplate,
+    JobBaseBtc(const std::string& jobId, const BlockTemplate& bTemplate,
         bool is_payment = false)
-        : job_id(jobId),
+        : JobBase(jobId, bTemplate),
           block_reward(bTemplate.coinbase_value),
           min_time(bTemplate.min_time),
-          height(bTemplate.height),
           is_payment(is_payment),
-          target_diff(BitsToDiff(bTemplate.bits)),
-          expected_hashes(GetExpectedHashes(this->target_diff)),
           tx_count(bTemplate.tx_list.transactions.size())
     {
         // target.SetHex(std::string(bTemplate.target));
 
-        txAmountByteValue = tx_count;
+        std::size_t txAmountByteValue = tx_count;
 
         tx_vi_length = VarInt(txAmountByteValue);
         txs_hex = std::vector<char>(
@@ -57,43 +55,34 @@ class Job
     // }
 
     uint8_t* GetPrevBlockHash() { return static_header_data + VERSION_SIZE; }
-    size_t GetTransactionCount() const { return tx_count; }
-    std::size_t GetBlockSizeHex() const
-    {
-        return (BLOCK_HEADER_SIZE * 2) + txs_hex.size();
-    }
-    std::string_view GetId() const { return std::string_view(job_id); }
-    std::string_view GetNotifyMessage() const { return notify_buff_sv; }
+ 
     // arith_uint256* GetTarget() { return &target; }
-    virtual void GetHeaderData(uint8_t* buff, const share_t& share,
-                       std::string_view nonce1) const = 0;
-                       
+    // virtual void GetHeaderData(uint8_t* buff, const share_t& share,
+    //                    std::string_view nonce1) const = 0;
+    std::string_view GetNotifyMessage() const { return notify_buff_sv; }
+
     const bool is_payment;
-    const uint32_t height;
     const int64_t min_time;
-    const double target_diff;
-    const double expected_hashes;
     const int64_t block_reward;
-    mutable std::shared_mutex job_mutex;
+    const std::size_t tx_count;
 
    protected:
-    const std::string job_id;
     uint8_t static_header_data[BLOCK_HEADER_STATIC_SIZE];
-    char notify_buff[MAX_NOTIFY_MESSAGE_SIZE];
-    std::string_view notify_buff_sv;
     std::size_t tx_vi_length;
     std::vector<char> txs_hex;
-    const std::size_t tx_count;
+
+    char notify_buff[MAX_NOTIFY_MESSAGE_SIZE];
+    std::string_view notify_buff_sv;
 
    private:
     // arith_uint256 target;
-    uint64_t txAmountByteValue;
-
 };
 
-#if COIN == VRSC
+#if SICK_COIN == VRSC
 #include "job_vrsc.hpp"
-#elif COIN == SIN
+#elif SICK_COIN == SIN
 #include "job_btc.hpp"
+#elif SICK_COIN == ZANO
+#include "job_cryptonote.hpp"
 #endif
 #endif

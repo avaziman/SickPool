@@ -25,15 +25,15 @@ struct WorkerStats
 {
 
     // derived from the below
-    double average_hashrate = 0.f;
-    double interval_hashrate = 0.f;
+    double average_hashrate = 0.0;
+    double interval_hashrate = 0.0;
     
     uint32_t interval_valid_shares = 0;
     uint32_t interval_stale_shares = 0;
     uint32_t interval_invalid_shares = 0;
     
-    double average_hashrate_sum = 0.f;
-    double current_interval_effort = 0.f;
+    double average_hashrate_sum = 0.0;
+    double current_interval_effort = 0.0;
 
     uint32_t connection_count = 0;
 

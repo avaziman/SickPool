@@ -9,16 +9,16 @@
 #include <string>
 
 #include "block_template.hpp"
-#include "job.hpp"
+#include "job_base_btc.hpp"
 #include "static_config.hpp"
 #include "share.hpp"
 
-class JobVrsc : public Job
+class JobVrsc : public JobBaseBtc
 {
    public:
     JobVrsc(const std::string& jobId, const BlockTemplateVrsc& bTemplate,
             bool is_payment, bool clean = true)
-        : Job(jobId, bTemplate, is_payment)
+        : JobBaseBtc(jobId, bTemplate, is_payment)
     {
         char merkle_root_hex[MERKLE_ROOT_SIZE * 2];
 

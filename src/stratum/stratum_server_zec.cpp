@@ -267,8 +267,8 @@ RpcResult StratumServerZec::HandleSubmit(StratumClient *cli, WorkerContext *wc,
 void StratumServerZec::UpdateDifficulty(StratumClient *cli)
 {
     uint32_t diffBits = DiffToBits(cli->GetDifficulty());
-    uint256 diff256;
-    arith_uint256 arith256 = UintToArith256(diff256).SetCompact(diffBits);
+    arith_uint256 arith256;
+    arith256.SetCompact(diffBits);
 
     char request[512];
     int len = fmt::format_to_n(

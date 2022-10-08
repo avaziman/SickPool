@@ -70,11 +70,11 @@ bool RoundManager::LoadCurrentRound()
         // append commands are not locking but since its before threads are
         // starting its ok set round start time
         redis_manager->AppendSetMinerEffort(chain,
-                                            RedisManager::ROUND_START_TIME_KEY,
+                                            PrefixKey<Prefix::ROUND_START_TIME>(),
                                             round_type, round.round_start_ms);
         // reset round effort if we are starting it now hadn't started
         redis_manager->AppendSetMinerEffort(
-            chain, RedisManager::TOTAL_EFFORT_KEY, round_type, 0);
+            chain, PrefixKey<Prefix::TOTAL_EFFORT>(), round_type, 0);
 
         if (!redis_manager->GetReplies())
         {

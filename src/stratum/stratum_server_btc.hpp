@@ -23,6 +23,9 @@ class StratumServerBtc : public StratumServer
     void HandleReq(Connection<StratumClient>* conn, WorkerContext* wc,
                    std::string_view req) override;
     void UpdateDifficulty(Connection<StratumClient>* conn) override;
+
+    void BroadcastJob(Connection<StratumClient>* conn,
+                                        const job_t* job) const;
 };
 
 using stratum_server_t = StratumServerBtc;

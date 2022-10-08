@@ -98,7 +98,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
     std::vector<std::pair<std::string, double>> remove_worker_hashrates;
     bool res = redis_manager->TsMrange(remove_worker_hashrates, "worker"sv,
-                                       RedisManager::HASHRATE_KEY, remove_time,
+                                       PrefixKey<Prefix::HASHRATE>(), remove_time,
                                        remove_time);
 
     {
@@ -116,12 +116,12 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             ws.interval_hashrate =
                 GetExpectedHashes(ws.current_interval_effort) / (double)hashrate_interval_seconds;
 
-            std::string addr = worker.substr(0, ADDRESS_LEN);
-
             ws.average_hashrate_sum += ws.interval_hashrate;
 
             ws.average_hashrate = ws.average_hashrate_sum /
                                   average_interval_ratio;
+
+            std::string addr = worker.substr(0, ADDRESS_LEN);
 
             auto& miner_stats = miner_stats_map[addr];
             miner_stats.average_hashrate += ws.average_hashrate;
@@ -131,7 +131,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
             miner_stats.interval_stale_shares += ws.interval_stale_shares;
 
-            if (ws.interval_hashrate > 0) miner_stats.worker_count++;
+            if (ws.interval_hashrate > 0.d) miner_stats.worker_count++;
         }
     }
     return redis_manager->UpdateIntervalStats(worker_stats_map, miner_stats_map,
@@ -184,7 +184,7 @@ void StatsManager::AddShare(const std::string& worker_full,
         worker_stats->current_interval_effort += diff;
 
         Logger::Log(LogType::Debug, LogField::StatsManager,
-                    "Logged share with diff: {}", diff);
+                    "Logged share with diff: {} for {} total diff: {}", diff, worker_full, worker_stats->current_interval_effort);
         // Logger::Log(LogType::Debug, LogField::StatsManager,
         //             "Logged share with diff: {}, hashes: {}", diff,
         //             expected_shares);

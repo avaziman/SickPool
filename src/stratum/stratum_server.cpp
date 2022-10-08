@@ -3,7 +3,8 @@
 StratumServer::StratumServer(const CoinConfig &conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(conf),
-      redis_manager("127.0.0.1", (int)conf.redis_port, conf.hashrate_ttl_seconds * 1000),
+      redis_manager("127.0.0.1", (int)conf.redis_port,
+                    conf.hashrate_ttl_seconds * 1000),
       clients_mutex(),
       clients(),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
@@ -214,27 +215,28 @@ void StratumServer::HandleBlockNotify()
     redis_manager.SetNewBlockStats(chain, curtime_ms, net_est_hr,
                                    new_job->target_diff);
 
-    Logger::Log(
-        LogType::Info, LogField::JobManager,
-        "Broadcasted new job: \n"
-        "┌{0:─^{9}}┐\n"
-        "│{1: ^{9}}│\n"
-        "│{2: <{9}}│\n"
-        "│{3: <{9}}│\n"
-        "│{4: <{9}}│\n"
-        "│{5: <{9}}│\n"
-        "│{6: <{9}}│\n"
-        "│{7: <{9}}│\n"
-        "│{8: <{9}}│\n"
-        "└{0:─^{9}}┘\n",
-        "", fmt::format("Job #{}", new_job->GetId()),
-        fmt::format("Height: {}", new_job->height),
-        fmt::format("Min time: {}", new_job->min_time),
-        fmt::format("Difficulty: {}", new_job->target_diff),
-        fmt::format("Est. shares: {}", new_job->expected_hashes),
-        fmt::format("Block reward: {}", new_job->block_reward),
-        fmt::format("Transaction count: {}", new_job->GetTransactionCount()),
-        fmt::format("Block size: {}", new_job->GetBlockSizeHex()), 40);
+    Logger::Log(LogType::Info, LogField::JobManager,
+                "Broadcasted new job: \n"
+                "┌{0:─^{8}}┐\n"
+                "│{1: ^{8}}│\n"
+                "│{2: <{8}}│\n"
+                "│{3: <{8}}│\n"
+                "│{4: <{8}}│\n"
+                "│{5: <{8}}│\n"
+                "│{6: <{8}}│\n"
+                "│{7: <{8}}│\n"
+                // "│{8: <{9}}│\n"
+                // "└{0:─^{9}}┘\n",
+                "└{0:─^{8}}┘\n",
+                "",
+                fmt::format("Job #{}", new_job->GetId()),
+                fmt::format("Height: {}", new_job->height),
+                // fmt::format("Min time: {}", new_job->min_time),
+                fmt::format("Difficulty: {}", new_job->target_diff),
+                fmt::format("Est. shares: {}", new_job->expected_hashes),
+                fmt::format("Block reward: {}", new_job->block_reward),
+                fmt::format("Transaction count: {}", new_job->tx_count),
+                fmt::format("Block size: {}", new_job->block_size * 2), 40);
 }
 
 // use wallletnotify with "%b %s %w" arg (block hash, txid, wallet address),
@@ -385,7 +387,8 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 
     ShareResult share_res;
     RpcResult rpc_res(ResCode::OK);
-    const job_t *job = job_manager.GetJob(share.jobId);
+    // const job_t *job = job_manager.GetJob(share.jobId);
+    const job_t *job = job_manager.GetLastJob();
     // to make sure the job isn't removed while we are using it,
     // and at the same time allow multiple threads to use same job
     std::shared_lock<std::shared_mutex> job_read_lock;
@@ -403,28 +406,32 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
         // share_res.code = ResCode::VALID_BLOCK;
     }
 
-    if (unlikely(share_res.code == ResCode::VALID_BLOCK))
+    if (unlikely_cond(share_res.code == ResCode::VALID_BLOCK))
     {
         // > add share stats before submission to have accurate effort (its
         // fast)
         round_manager_pow.AddRoundShare(cli->GetAddress(),
                                         share_res.difficulty);
 
-        std::size_t blockSize = job->GetBlockSizeHex();
+        std::size_t blockSize = job->block_size * 2;
         char blockData[blockSize];
 
-#ifndef STRATUM_PROTOCOL_BTC
+#ifdef STRATUM_PROTOCOL_ZEC
         job->GetBlockHex(blockData, wc->block_header);
-#else
+#elif defined(STRATUM_PROTOCOL_BTC)
         job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
                          share.extranonce2);
+#else
+
 #endif
 
+#ifndef STRATUM_PROTOCOL_CN
         if (job->is_payment)
         {
             payment_manager.finished_payment.reset(
                 payment_manager.pending_payment.release());
         }
+#endif
 
         // submit ASAP
         auto block_hex = std::string_view(blockData, blockSize);
@@ -437,10 +444,20 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
         const std::string_view worker_full(cli->GetFullWorkerName());
         const auto chain_round = round_manager_pow.GetChainRound();
         const uint64_t duration_ms = time - chain_round.round_start_ms;
-        const auto type =
-            job->is_payment ? BlockType::POW_PAYMENT : BlockType::POW;
+        const BlockType type = BlockType::POW;
+#ifndef STRATUM_PROTOCOL_CN
+        if (job->is_payment)
+        {
+            type = BlockType::POW_PAYMENT;
+        }
+#else
+
+#endif
         const double dur = time - chain_round.round_start_ms;
-        const double effort_percent = ((chain_round.total_effort - share_res.difficulty) / job->target_diff) * 100.f;
+        const double effort_percent =
+            ((chain_round.total_effort - share_res.difficulty) /
+             job->target_diff) *
+            100.f;
 
 #if HASH_ALGO == HASH_ALGO_X25X
         HashWrapper::X22I(share_res.hash_bytes.data(), wc->block_header);
@@ -457,15 +474,15 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
         submission_manager.AddImmatureBlock(std::move(submission),
                                             coin_config.pow_fee);
     }
-    else if (likely(share_res.code == ResCode::VALID_SHARE))
+    else if (likely_cond(share_res.code == ResCode::VALID_SHARE))
     {
         round_manager_pow.AddRoundShare(cli->GetAddress(),
                                         share_res.difficulty);
     }
     else
     {
-        Logger::Log(LogType::Warn, LogField::Stratum,
-                    "Received bad share for job id: {}", share.jobId);
+        // Logger::Log(LogType::Warn, LogField::Stratum,
+        //             "Received bad share for job id: {}", share.jobId);
 
         rpc_res = RpcResult(share_res.code, share_res.message);
     }
@@ -483,14 +500,6 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     //     share_res.difficulty, (int)share_res.code);
 
     return rpc_res;
-}
-
-void StratumServer::BroadcastJob(Connection<StratumClient> *conn,
-                                 const job_t *job) const
-{
-    // auto res =
-    auto notifyMsg = job->GetNotifyMessage();
-    SendRaw(conn->sock, notifyMsg.data(), notifyMsg.size());
 }
 
 // the shared pointer makes sure the client won't be freed as long as we are

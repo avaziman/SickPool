@@ -16,7 +16,7 @@ struct TxRes {
 };
 
 // in the order they appear, in the type they appear
-struct BlockTemplateRes
+struct BlockTemplateResSin
 {
     simdjson::ondemand::document doc;
 

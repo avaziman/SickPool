@@ -14,10 +14,10 @@ class JobManagerSin : public JobManager
     BlockTemplateBtc block_template = BlockTemplateBtc();
 
     const job_t* GetNewJob() /*override*/;
-    const job_t* GetNewJob(const BlockTemplateRes& btemplate) /*override*/;
+    const job_t* GetNewJob(const BlockTemplateResSin& btemplate) /*override*/;
 
     std::size_t GetCoinbaseTx(TransactionBtc& coinbase_tx,
-                              const BlockTemplateRes& rpctemplate);
+                              const BlockTemplateResSin& rpctemplate);
     std::size_t AddCoinbaseInput(TransactionBtc& tx, const uint32_t height);
 };
 

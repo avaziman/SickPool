@@ -4,7 +4,6 @@
 #include <mutex>
 #include <fmt/color.h>
 #include <fmt/format.h>
-
 #include <cstdio>
 
 enum LogType
@@ -76,7 +75,7 @@ class Logger
 
     template <typename... T>
     static inline void Log(LogType type, LogField field,
-                          fmt::format_string<T...> message, T&&... args)
+                           fmt::format_string<T...> message, T&&... args)
     {
         std::scoped_lock lock(log_mutex);
         const char* field_str = ToString(field);
@@ -99,7 +98,7 @@ class Logger
                 break;
         }
 
-        fmt::print(message, args...);
+        fmt::print(message, std::forward<T>(args)...);
         printf("\n");
     }
 };

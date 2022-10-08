@@ -48,7 +48,21 @@ class DaemonRpc
         return fmt::format("\"{}\"", arg);
     }
 
-    static std::string ToJsonStr(std::pair<std::string_view, auto> arg)
+    static std::string ToJsonStr(
+        std::initializer_list<std::pair<std::string_view, auto>> obj)
+    {
+        std::string res = "{";
+        for (auto x : obj)
+        {
+            res += ToJsonStr(x);
+            res += ",";
+        }
+        res[res.size() - 1] = '}';
+        return res;
+    }
+
+    template <typename T>
+    static std::string ToJsonStr(std::pair<std::string_view, T> arg)
     {
         return fmt::format("\"{}\":{}", arg.first, ToJsonStr(arg.second));
     }
@@ -71,7 +85,8 @@ class DaemonRpc
     }
 
     int SendRequest(std::string& result, int id, std::string_view method,
-                    std::string_view params_json) /*const*/
+                    std::string_view params_json,
+                    std::string_view type = "POST /") /*const*/
     {
         // int errCode;
         int res_code;
@@ -99,22 +114,22 @@ class DaemonRpc
         std::size_t bodyLen = params_json.size() + 64;
         auto body = std::make_unique<char[]>(bodyLen);
 
-        body_size =
-            fmt::format_to_n(body.get(), bodyLen,
-                             "{{\"id\":{},\"method\":\"{}\",\"params\":{}}}",
-                             id, method, params_json)
-                .size;
+        body_size = fmt::format_to_n(body.get(), bodyLen,
+                                     "{{\"jsonrpc\":\"2.0\",\"id\":{},"
+                                     "\"method\":\"{}\",\"params\":{}}}",
+                                     id, method, params_json)
+                        .size;
 
         const std::size_t send_buffer_len = body_size + 256;
         auto send_buffer = std::make_unique<char[]>(body_size + 256);
         send_size = fmt::format_to_n(send_buffer.get(), send_buffer_len,
-                                     "POST / HTTP/1.1\r\n"
+                                     "{} HTTP/1.1\r\n"
                                      "Host: {}\r\n"
                                      "Authorization: Basic {}\r\n"
                                      "Content-Type: application/json\r\n"
                                      "Content-Length: {}\r\n\r\n"
                                      "{}\r\n\r\n",
-                                     host_header, auth_header, body_size,
+                                     type, host_header, auth_header, body_size,
                                      std::string_view(body.get(), body_size))
                         .size;
 
@@ -162,7 +177,7 @@ class DaemonRpc
 
         // simd json parser requires some extra bytes
         result.reserve(content_length + simdjson::SIMDJSON_PADDING);
-        result.resize(content_length - 1);
+        result.resize(content_length);
 
         // sometimes we will get 404 message after the json
         // (its length not included in content-length)
@@ -172,9 +187,8 @@ class DaemonRpc
         // receive http body if it wasn't already
         while (content_received < content_length)
         {
-            std::size_t recvRes =
-                recv(sockfd, result.data() + content_received,
-                     content_length - content_received, 0);
+            std::size_t recvRes = recv(sockfd, result.data() + content_received,
+                                       content_length - content_received, 0);
             if (recvRes <= 0)
             {
                 return res_code;

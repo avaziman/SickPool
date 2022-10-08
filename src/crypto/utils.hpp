@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+// #include <source_location>
+#include <experimental/source_location>
 #include <string>
 #include <thread>
 #include <vector>
@@ -20,15 +22,58 @@
     std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
 #define TIME_NOW() std::chrono::steady_clock::now()
 
-#define unlikely(expr) (__builtin_expect(!!(expr), 0))
-#define likely(expr) (__builtin_expect(!!(expr), 1))
+#define unlikely_cond(expr) (__builtin_expect(!!(expr), 0))
+#define likely_cond(expr) (__builtin_expect(!!(expr), 1))
 
-inline int64_t GetCurrentTimeMs()
+template <std::string_view const&... Strs>
+struct join
+{
+    // Join all strings into a single std::array of chars
+    static constexpr auto impl() noexcept
+    {
+        constexpr std::size_t len = (Strs.size() + ... + 0);
+        std::array<char, len + 1> arr{};
+        auto append = [i = 0, &arr](auto const& s) mutable
+        {
+            for (auto c : s) arr[i++] = c;
+        };
+        (append(Strs), ...);
+        arr[len] = 0;
+        return arr;
+    }
+    // Give the joined string static storage
+    static constexpr auto arr = impl();
+    // View as a std::string_view
+    static constexpr std::string_view value{arr.data(), arr.size() - 1};
+};
+// Helper to get the value out
+template <std::string_view const&... Strs>
+static constexpr auto join_v = join<Strs...>::value;
+
+
+// based on teos
+template <auto T>
+constexpr std::string_view EnumName()
+{
+    // std::string_view name(std::source_location::current().function_name());
+    std::string_view name(std::experimental::source_location::current().function_name());
+    auto var_pos = name.find('=') + 2;
+    name = name.substr(var_pos,
+                       std::min(name.find(';'), name.find(']')) - var_pos);
+
+    // shortened
+    name = name.substr(name.find("::") + 2);
+    return name;
+}
+
+inline uint64_t GetCurrentTimeUs()
 {
     struct timeval time_now;
     gettimeofday(&time_now, nullptr);
-    return (time_now.tv_sec * 1000) + (time_now.tv_usec / 1000);
+    return (time_now.tv_sec * 1000 * 1000) + (time_now.tv_usec);
 }
+
+inline uint64_t GetCurrentTimeMs() { return GetCurrentTimeUs() / 1000; }
 
 inline int fast_atoi(const char* str, int size)
 {
@@ -83,9 +128,9 @@ inline char GetHex(char c)
     return 0;
 }
 
-inline uint32_t HexToUint(const char* hex, std::size_t size)
+inline uint64_t HexToUint(const char* hex, std::size_t size)
 {
-    uint32_t val = 0;
+    uint64_t val = 0;
     for (int i = 0; i < size; i++)
     {
         val *= 16;
@@ -129,7 +174,8 @@ constexpr auto Hexlify()
     return arr;
 }
 
-inline void PrintHex(const uint8_t* b, std::size_t size, std::string comment = "")
+inline void PrintHex(const uint8_t* b, std::size_t size,
+                     std::string comment = "")
 {
     std::cout << comment << ": ";
     for (int i = 0; i < size; i++)
@@ -139,7 +185,7 @@ inline void PrintHex(const uint8_t* b, std::size_t size, std::string comment = "
     std::cout << std::endl;
 }
 
-inline void Unhexlify(unsigned char* dest, const char* src, size_t size)
+inline void Unhexlify(unsigned char* dest, const char* src, const size_t size)
 {
     // each byte is 2 characters in hex
     for (int i = 0; i < size / 2; i++)

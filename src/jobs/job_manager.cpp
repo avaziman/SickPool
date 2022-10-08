@@ -42,7 +42,7 @@ transaction_t JobManager::GetCoinbaseTx(int64_t value, uint32_t height,
     coinbaseTx.AddInput(prevTxIn, UINT32_MAX, signature, UINT32_MAX);
     coinbaseTx.AddP2PKHOutput(pool_addr, value);
 
-#if COIN == VRSCTEST
+#if SICK_COIN == VRSCTEST
 //TODO: do this as extra output
     coinbaseTx.AddFeePoolOutput(
         rpc_coinbase);  // without this gives bad-blk-fees

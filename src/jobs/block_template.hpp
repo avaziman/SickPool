@@ -97,7 +97,10 @@ struct BlockTemplate
           coinbase_value(cb_val),
           min_time(min_time),
           bits(bits),
-          height(height)
+          height(height),
+          target_diff(BitsToDiff(bits)),
+          expected_hashes(GetExpectedHashes(target_diff)),
+          tx_count(max_tx_count - 1)
     {
     }
 
@@ -108,6 +111,11 @@ struct BlockTemplate
     int64_t min_time;
     uint32_t bits;
     uint32_t height;
+    uint32_t block_size;
+    uint32_t tx_count;
+
+    double target_diff;
+    double expected_hashes;
 };
 
 // in the order they appear in the rpc response

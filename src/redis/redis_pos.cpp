@@ -38,7 +38,7 @@ bool RedisManager::AddStakingPoints(std::string_view chain, int64_t duration_ms)
         }
 
         AppendCommand({"HINCRBY"sv, fmt::format("{}:pos:round-effort", chain),
-                       TOTAL_EFFORT_KEY, std::to_string(pool_staking_days)});
+                       PrefixKey<Prefix::TOTAL_EFFORT>(), std::to_string(pool_staking_days)});
     }
     return GetReplies();
 }

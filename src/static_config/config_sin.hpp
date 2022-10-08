@@ -10,7 +10,9 @@ namespace CoinConstantsSin
 {
 static constexpr uint32_t EXTRANONCE2_SIZE = 4;
 
+// static constexpr uint32_t DIFF1_BITS = 0x1d00ffff;
 static constexpr uint32_t DIFF1_BITS = 0x1d00ffff;
+
 static constexpr uint32_t MAX_BLOCK_SIZE = 32000000;
 static constexpr uint32_t HASH_SIZE = 32;
 static constexpr uint32_t PREVHASH_SIZE = HASH_SIZE;
