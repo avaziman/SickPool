@@ -7,8 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-// #include <source_location>
-#include <experimental/source_location>
+#include <source_location>
 #include <string>
 #include <thread>
 #include <vector>
@@ -25,17 +24,29 @@
 #define unlikely_cond(expr) (__builtin_expect(!!(expr), 0))
 #define likely_cond(expr) (__builtin_expect(!!(expr), 1))
 
+// Helper function that converts a character to lowercase on compile time
+constexpr char charToLower(const char c)
+{
+    return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
+}
+
 template <std::string_view const&... Strs>
 struct join
 {
     // Join all strings into a single std::array of chars
     static constexpr auto impl() noexcept
     {
-        constexpr std::size_t len = (Strs.size() + ... + 0);
+        // add space for ';'
+        constexpr std::size_t len =
+            (Strs.size() + ...) + (sizeof...(Strs)) - 1;
         std::array<char, len + 1> arr{};
         auto append = [i = 0, &arr](auto const& s) mutable
         {
-            for (auto c : s) arr[i++] = c;
+            for (char c : s)
+            {
+                arr[i++] = c;
+            }
+            arr[i++] = ':';
         };
         (append(Strs), ...);
         arr[len] = 0;
@@ -56,13 +67,20 @@ template <auto T>
 constexpr std::string_view EnumName()
 {
     // std::string_view name(std::source_location::current().function_name());
-    std::string_view name(std::experimental::source_location::current().function_name());
+    std::string_view name(std::source_location::current().function_name());
     auto var_pos = name.find('=') + 2;
     name = name.substr(var_pos,
                        std::min(name.find(';'), name.find(']')) - var_pos);
-
     // shortened
     name = name.substr(name.find("::") + 2);
+
+    // for (int i = 0; i < name.size(); i ++)
+    // {
+    //     // replace underscored with -, and make lowercase
+    //     char* c = (char*)(name.data() + i);
+    //     if (*c == '_') *c = '-';
+    //     *c = charToLower(*c);
+    // }
     return name;
 }
 

@@ -46,7 +46,7 @@ class SubmissionManager
         bool added = false;
         for (int i = 0; i < submis_retries; ++i)
         {
-            added = SubmitBlock(block_hex);
+            added = daemon_manager->SubmitBlock(block_hex, httpParser);
             if (added)
             {
                 break;
@@ -63,9 +63,6 @@ class SubmissionManager
     static uint32_t block_number;
 
    private:
-    bool SubmitBlock(
-        std::string_view block_hex);  // TODO: make const when we wrapped rpc
-                                      // func, same for trysubmit
     int64_t last_matured_time = 0;
     const int submis_retries = 10;
 

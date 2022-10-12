@@ -1,5 +1,7 @@
 #include "redis_manager.hpp"
 
+using enum Prefix;
+
 void RedisManager::AppendIntervalStatsUpdate(std::string_view addr,
                                              std::string_view prefix,
                                              int64_t update_time_ms,
@@ -7,21 +9,21 @@ void RedisManager::AppendIntervalStatsUpdate(std::string_view addr,
 {
     // miner hashrate
     std::string prefix_addr = fmt::format("{}:{}", prefix, addr);
-    std::string key = fmt::format("hashrate:{}", prefix_addr);
+    std::string key = fmt::format("{}:{}", PrefixKey<HASHRATE>(), prefix_addr);
     AppendTsAdd(key, update_time_ms, ws.interval_hashrate);
 
     // average hashrate
-    key = fmt::format("hashrate:average:{}", prefix_addr);
+    key = fmt::format("{}:{}", PrefixKey<HASHRATE, AVERAGE>(), prefix_addr);
     AppendTsAdd(key, update_time_ms, ws.average_hashrate);
 
     // shares
-    key = fmt::format("shares:valid:{}", prefix_addr);
+    key = fmt::format("{}:{}", PrefixKey<SHARES, VALID>(), prefix_addr);
     AppendTsAdd(key, update_time_ms, ws.interval_valid_shares);
 
-    key = fmt::format("shares:invalid:{}", prefix_addr);
+    key = fmt::format("{}:{}", PrefixKey<SHARES, INVALID>(), prefix_addr);
     AppendTsAdd(key, update_time_ms, ws.interval_invalid_shares);
 
-    key = fmt::format("shares:stale:{}", prefix_addr);
+    key = fmt::format("{}:{}", PrefixKey<SHARES, STALE>(), prefix_addr);
     AppendTsAdd(key, update_time_ms, ws.interval_stale_shares);
 }
 
@@ -33,10 +35,10 @@ bool RedisManager::UpdateEffortStats(efforts_map_t &miner_stats_map,
 
     for (auto &[miner_addr, miner_effort] : miner_stats_map)
     {
-        AppendSetMinerEffort(COIN_SYMBOL, miner_addr, "pow", miner_effort);
+        AppendSetMinerEffort(COIN_SYMBOL, miner_addr, EnumName<POW>(), miner_effort);
     }
 
-    AppendSetMinerEffort(COIN_SYMBOL, PrefixKey<Prefix::TOTAL_EFFORT>(), "pow",
+    AppendSetMinerEffort(COIN_SYMBOL, PrefixKey<Prefix::TOTAL_EFFORT>(), EnumName<POW>(),
                          total_effort);
     stats_mutex.unlock();
 
@@ -79,10 +81,10 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
 
             AppendCommand(
                 {"ZADD"sv,
-                 fmt::format("solver-index:{}", PrefixKey<Prefix::HASHRATE>()),
+                 PrefixKey<SOLVER, INDEX, HASHRATE>(),
                  hr_str, miner_addr});
 
-            AppendHset(fmt::format("solver:{}", miner_addr),
+            AppendHset(fmt::format("{}:{}", PrefixKey<SOLVER>(), miner_addr),
                        PrefixKey<Prefix::HASHRATE>(), hr_str);
 
             AppendUpdateWorkerCount(miner_addr, miner_stats.worker_count,
@@ -93,12 +95,11 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
             miner_stats.ResetInterval();
         }
     }
-
-    AppendTsAdd("hashrate:pool", update_time_ms, pool_hr);
-    AppendTsAdd(fmt::format("{}:{}", PrefixKey<Prefix::WORKER_COUNT>(), "pool"),
-                update_time_ms, pool_miner_count);
-    AppendTsAdd(fmt::format("{}:{}", PrefixKey<Prefix::MINER_COUNT>(), "pool"),
-                update_time_ms, pool_worker_count);
+    AppendTsAdd(PrefixKey<HASHRATE, POOL>(), update_time_ms, pool_hr);
+    AppendTsAdd(PrefixKey<WORKER_COUNT, POOL>(), update_time_ms,
+                pool_miner_count);
+    AppendTsAdd(PrefixKey<MINER_COUNT, POOL>(), update_time_ms,
+                pool_worker_count);
 
     return GetReplies();
 }
@@ -114,7 +115,7 @@ bool RedisManager::LoadAverageHashrateSum(
         .type = "SUM",
         .time_bucket_ms =
             StatsManager::average_hashrate_interval_seconds * 1000};
-    return TsMrange(hashrate_sums, prefix, PrefixKey<Prefix::HASHRATE>(), from,
+    return TsMrange(hashrate_sums, prefix, PrefixKey<HASHRATE>(), from,
                     hr_time, &aggregation);
 }
 

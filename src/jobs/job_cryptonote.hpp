@@ -12,28 +12,16 @@
 #include <string_view>
 #include <vector>
 
-#include "block_template.hpp"
 #include "cn/currency_core/currency_basic.h"
+#include "block_template.hpp"
 #include "currency_format_utils_blocks.h"
 #include "daemon_responses_cryptonote.hpp"
 #include "job_base_btc.hpp"
 #include "serialization/serialization.h"
 #include "share.hpp"
 #include "static_config.hpp"
-#include "utils.hpp"
 #include "stratum_client.hpp"
-
-#pragma pack(push, 1)
-struct BlockHeaderCN
-{
-    uint8_t major_version;
-    uint8_t minor_version;
-    uint64_t timestamp;
-    std::string_view prev_id;
-    uint64_t nonce;
-    uint8_t flags;
-};
-#pragma pack(pop)
+#include "utils.hpp"
 
 struct BlockTemplateCn
 {
@@ -46,6 +34,7 @@ struct BlockTemplateCn
     /*const*/ uint32_t block_size;
     uint64_t coinbase_value;
     uint32_t tx_count;
+    currency::block block;
 
     // BlockTemplateCn& operator=(const BlockTemplateCn&& other){
     //     prev_hash = other.prev_hash;
@@ -85,6 +74,8 @@ struct BlockTemplateCn
         bool res = t_unserializable_object_from_blob<currency::block>(
             cnblock, template_bin);
 
+        block = cnblock;
+
         coinbase_value = cnblock.miner_tx.vout[0].amount;
         tx_count = cnblock.tx_hashes.size() + 1;
 
@@ -104,11 +95,15 @@ class JobCryptoNote : public JobBase
         : JobBase(jobId, bTemplate),
           height(bTemplate.height),
           target_diff(bTemplate.target_diff),
-          block_template_hash(bTemplate.template_hash,
-                              bTemplate.template_hash + HASH_SIZE),
-          seed_hash(bTemplate.seed)
+          seed_hash(bTemplate.seed),
+          block(bTemplate.block)
     {
+        memcpy(block_template_hash, bTemplate.template_hash, HASH_SIZE);
         Hexlify(block_template_hash_hex, bTemplate.template_hash, HASH_SIZE);
+
+        Logger::Log(LogType::Info, LogField::JobManager,
+                    "Blocktemplate hash hex: {}",
+                    std::string_view(block_template_hash_hex, HASH_SIZE_HEX));
 
         // ReverseHex(prev_block_rev_hex, bTemplate.prev_block_hash.data(),
         //            PREVHASH_SIZE * 2);
@@ -130,23 +125,17 @@ class JobCryptoNote : public JobBase
     void GetHeaderData(uint8_t* buff, const ShareCn& share,
                        std::string_view extranonce1) const /* override*/
     {
+        // nothing to do
     }
 
-    inline void GetBlockHex(char* res, const uint8_t* header,
-                            const std::string_view extra_nonce1,
-                            const std::string_view extra_nonce2) const
+
+    inline void GetBlockHex(std::string& res, uint64_t nonce)
     {
-        // Hexlify(res, header, BLOCK_HEADER_SIZE);
-        // memcpy(res + (BLOCK_HEADER_SIZE * 2), txs_hex.data(),
-        // txs_hex.size());
-        // // emplace the coinbase data hex
-        // memcpy(res + (BLOCK_HEADER_SIZE + coinb1.size() + tx_vi_length) * 2,
-        //        extra_nonce1.data(), EXTRANONCE_SIZE * 2);
-        // memcpy(res + (BLOCK_HEADER_SIZE + coinb1.size() + tx_vi_length +
-        //               EXTRANONCE_SIZE) *
-        //                  2,
-        //        extra_nonce2.data(), EXTRANONCE2_SIZE * 2);
+        this->block.nonce = nonce;
+        auto bin = t_serializable_object_to_blob(block);
+        Hexlify(res.data(), bin.data(), bin.size());
     }
+
     uint8_t coinbase_tx_id[HASH_SIZE];
 
     std::size_t GetWorkMessage(char* buff, StratumClient* cli, int id) const
@@ -173,22 +162,23 @@ class JobCryptoNote : public JobBase
         arith_uint256 arith256;
         arith256.SetCompact(diffBits);
 
-        size_t len =
-            fmt::format_to_n(
-                buff, MAX_NOTIFY_MESSAGE_SIZE,
-                "{{\"jsonrpc\":\"2.0\",\"result\":[\"0x{"
-                "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}",
-                std::string_view(block_template_hash_hex, HASH_SIZE_HEX),
-                seed_hash, arith256.GetHex(), height)
-                .size;
+        size_t len = fmt::format_to_n(buff, MAX_NOTIFY_MESSAGE_SIZE,
+                                      "{{\"jsonrpc\":\"2.0\",\"result\":[\"0x{"
+                                      "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}",
+                                      std::string_view(block_template_hash_hex,
+                                                       HASH_SIZE_HEX),
+                                      seed_hash, arith256.GetHex(), height)
+                         .size;
 
         return len;
     }
     const uint64_t target_diff;
     const uint32_t height;
     // const std::string block_template_hash;
-    const std::string block_template_hash;
+    uint8_t block_template_hash[HASH_SIZE];
     char block_template_hash_hex[HASH_SIZE_HEX];
+    // changes if we find block
+    /*mutable*/ currency::block block;
 
    private:
     const std::string seed_hash;

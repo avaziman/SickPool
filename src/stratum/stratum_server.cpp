@@ -4,7 +4,8 @@ StratumServer::StratumServer(const CoinConfig &conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(conf),
       redis_manager("127.0.0.1", (int)conf.redis_port,
-                    conf.hashrate_ttl_seconds * 1000),
+                    conf.hashrate_ttl_seconds * 1000,
+                    conf.hashrate_interval_seconds * 1000),
       clients_mutex(),
       clients(),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
@@ -43,7 +44,7 @@ StratumServer::StratumServer(const CoinConfig &conf)
     // redis_manager.UpdatePoS(0, GetCurrentTimeMs());
 
     stats_thread =
-        std::jthread(std::bind_front(&StatsManager::Start, &stats_manager));
+    std::jthread(std::bind_front(&StatsManager::Start, &stats_manager));
     stats_thread.detach();
 
     control_server.Start(coin_config.control_port);
@@ -414,13 +415,19 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
                                         share_res.difficulty);
 
         std::size_t blockSize = job->block_size * 2;
-        char blockData[blockSize];
+        std::string blockData;
+        blockData.reserve(blockSize);
 
 #ifdef STRATUM_PROTOCOL_ZEC
         job->GetBlockHex(blockData, wc->block_header);
 #elif defined(STRATUM_PROTOCOL_BTC)
         job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
                          share.extranonce2);
+#elif defined (STRATUM_PROTOCOL_CN)
+        //TODO: find way to upgrade to exclusive lock
+        // std::unique_lock<std::shared_mutex> job_write(job->job_mutex);
+        job_t *job_mutable = const_cast<job_t *>(job);
+        job_mutable->GetBlockHex(blockData, wc->nonce);
 #else
 
 #endif
@@ -434,11 +441,11 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 #endif
 
         // submit ASAP
-        auto block_hex = std::string_view(blockData, blockSize);
+        auto block_hex = std::string_view(blockData.data(), blockSize);
         submission_manager.TrySubmit(chain, block_hex);
 
         Logger::Log(LogType::Info, LogField::StatsManager, "Block hex: {}",
-                    std::string_view(blockData, blockSize));
+                    std::string_view(blockData.data(), blockSize));
 
         // job will remain safe thanks to the lock.
         const std::string_view worker_full(cli->GetFullWorkerName());

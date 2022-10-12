@@ -1,4 +1,5 @@
 #include "hash_algo.hpp"
+#include "crypto/verushash/uint256.h"
 
 #define STRATUM_PROTOCOL_CN 1
 #define HASH_ALGO HASH_ALGO_PROGPOW
@@ -9,6 +10,9 @@ using namespace CoinConstantsCryptoNote;
 namespace CoinConstantsZano
 {
 // 0xffffff0000000000000000000000000000000000000000000000000000000000
+
+static const uint256 DIFF1 = uint256S(
+    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 static constexpr uint32_t DIFF1_BITS = 0x20ffffff;
 static constexpr uint32_t MAX_BLOCK_SIZE = 64000000;
 static constexpr uint32_t HASH_SIZE = 32;
@@ -37,4 +41,4 @@ static constexpr uint32_t BLOCK_HEADER_SIZE = 81;
 
 static constexpr uint32_t BLOCK_HEADER_STATIC_SIZE =
     VERSION_SIZE + PREVHASH_SIZE;
-};  // namespace CoinConstantSin
+};  // namespace CoinConstantsZano

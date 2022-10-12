@@ -73,11 +73,15 @@ class ShareProcessor
         HashWrapper::X25X(result.hash_bytes.data(), headerData,
                           BLOCK_HEADER_SIZE);
 #elif HASH_ALGO == HASH_ALGO_PROGPOW
-        uint64_t nonce = HexToUint(share.nonce.data(), sizeof(uint64_t));
-        currency::get_block_longhash(static_cast<uint64_t>(job->height),
-                                     *reinterpret_cast<const crypto::hash*>(
-                                         job->block_template_hash.data()),
-                                     nonce);
+        // skip 0x
+        uint64_t nonce = HexToUint(share.nonce.data() + 2, sizeof(uint64_t) * 2);
+        wc->nonce = nonce;
+        currency::get_block_longhash_sick(
+            result.hash_bytes.data(), static_cast<uint64_t>(job->height),
+            //  *reinterpret_cast<const
+            //  crypto::hash*>(job->block_template_hash.data()),
+            job->block_template_hash, nonce);
+        std::reverse(result.hash_bytes.begin(), result.hash_bytes.end());
 #else
 #error "Missing hash function";
 #endif
@@ -90,7 +94,7 @@ class ShareProcessor
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
-        auto shareEnd = static_cast<uint32_t>(hash.GetCheapHash());
+        auto shareEnd = *reinterpret_cast<uint32_t*>(hash.begin());
 
         if (!cli->SetLastShare(shareEnd, curTime))
         {

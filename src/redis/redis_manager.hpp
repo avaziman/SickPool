@@ -36,36 +36,98 @@ struct TsAggregation
     int64_t time_bucket_ms;
 };
 
+// couldn't make nested enums...pp
 enum class Prefix
 {
     POW,
-    BLOCK_NUMBER,
     PAYOUTS,
     ADDRESS_MAP,
     PAYOUT_THRESHOLD,
     IDENTITY,
-    HASHRATE,
     JOIN_TIME,
-    WORKER_COUNT,
-    MATURE_BALANCE,
-    IMMATURE_BALANCE,
     SCRIPT_PUB_KEY,
     ROUND_EFFORT,
+    WORKER_COUNT,
     MINER_COUNT,
     TOTAL_EFFORT,
     ESTIMATED_EFFORT,
     ROUND_START_TIME,
-    IMMATURE_REWARD,
-    NETWORK_HASHRATE,
-};
-static constexpr std::string_view coin_symbol = COIN_SYMBOL;
-static constexpr std::string_view separator = ":";
 
-template <auto T>
+    MATURE_BALANCE,
+    IMMATURE_BALANCE,
+    MATURE,
+    IMMATURE,
+    REWARD,
+
+    HASHRATE,
+    SHARES,
+
+    BLOCK,
+
+    NETWORK,
+    POOL,
+
+    AVERAGE,
+    VALID,
+    INVALID,
+    STALE,
+
+    EFFORT_PERCENT,
+
+    SOLVER,
+    INDEX,
+    DURATION,
+    EFFORT,
+    DIFFICULTY,
+
+    TYPE,
+    NUMBER,
+    CHAIN,
+    STATS,
+    COMPACT,
+};
+
+static constexpr std::string_view coin_symbol = COIN_SYMBOL;
+
+// i couldn't make it with packed template...
+template <Prefix T>
 constexpr std::string_view PrefixKey()
 {
     static constexpr std::string_view name = EnumName<T>();
-    return join_v<coin_symbol, name, separator>;
+    return join_v<coin_symbol, name>;
+}
+
+template <Prefix T1, Prefix T2>
+constexpr std::string_view PrefixKey()
+{
+    static constexpr std::string_view name1 = EnumName<T1>();
+    static constexpr std::string_view name2 = EnumName<T2>();
+    return join_v<coin_symbol, name1, name2>;
+}
+
+template <Prefix T1, Prefix T2, Prefix T3>
+constexpr std::string_view PrefixKey()
+{
+    static constexpr std::string_view name1 = EnumName<T1>();
+    static constexpr std::string_view name2 = EnumName<T2>();
+    static constexpr std::string_view name3 = EnumName<T3>();
+    return join_v<coin_symbol, name1, name2, name3>;
+}
+
+template <Prefix T1, Prefix T2, Prefix T3, Prefix T4>
+constexpr std::string_view PrefixKey()
+{
+    static constexpr std::string_view name1 = EnumName<T1>();
+    static constexpr std::string_view name2 = EnumName<T2>();
+    static constexpr std::string_view name3 = EnumName<T3>();
+    static constexpr std::string_view name4 = EnumName<T4>();
+    return join_v<coin_symbol, name1, name2, name3, name4>;
+}
+
+template <const std::string_view &...sview>
+constexpr std::string_view PrefixKeySv()
+{
+    return join_v<coin_symbol, sview...>;
 }
 
 class RedisTransaction;
@@ -74,7 +136,7 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    RedisManager(const std::string &ip, int port, int hrttl);
+    RedisManager(const std::string &ip, int port, int hrttl, int hrinterval);
     ~RedisManager();
 
     /* block */
@@ -141,8 +203,6 @@ class RedisManager
     bool AddPayout(const PaymentInfo *payment);
 
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
-
-    void AppendAddNetworkHr(std::string_view chain, int64_t time, double hr);
 
     std::string hget(std::string_view key, std::string_view field);
 

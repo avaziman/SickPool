@@ -16,7 +16,8 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
 
     auto start = std::chrono::steady_clock::now();
 
-    bool is_submit_work = method == "eth_submitWork";
+    bool is_submit_work = false;
+    
     bool is_login = false;
 
     // std::cout << "last char -> " << (int)buffer[]
@@ -30,7 +31,7 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
         id = static_cast<int>(req["id"].get_int64());
         method = req["method"].get_string();
         
-        if (is_submit_work || (is_login = method == "eth_submitLogin"))
+        if ((is_submit_work = method == "eth_submitWork") || (is_login = method == "eth_submitLogin"))
         {
             worker = req["worker"].get_string();
         }

@@ -52,3 +52,38 @@ bool DaemonManagerZano::GetBlockTemplate(BlockTemplateResCn& templateRes,
 
     return true;
 }
+
+bool DaemonManagerZano::SubmitBlock(std::string_view block_hex,
+                                         simdjson::ondemand::parser& parser)
+{
+    std::string result_body;
+
+    int res_code = SendRpcReq(result_body, 1, "submitblock"sv,
+                              DaemonRpc::GetParamsStr(block_hex), "POST /json_rpc");
+
+    if (res_code != 200)
+    {
+        Logger::Log(LogType::Warn, LogField::DaemonManager,
+                    "Failed to submitblock, rescode: {}, response: {}",
+                    res_code, result_body);
+        return false;
+    }
+
+    ondemand::object res;
+    try
+    {
+        auto doc = parser.iterate(result_body.data(), result_body.size(),
+                                         result_body.capacity());
+
+        res = doc["result"].get_object();
+    }
+    catch (const simdjson_error& err)
+    {
+        Logger::Log(LogType::Warn, LogField::DaemonManager,
+                    "Failed to parse submitblock response: {}, {}",
+                    err.what(), result_body);
+        return false;
+    }
+
+    return true;
+}

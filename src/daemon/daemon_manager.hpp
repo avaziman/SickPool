@@ -71,6 +71,68 @@ class DaemonManager
         }
     }
 
+
+    bool SubmitBlock(const std::string_view block_hex,
+                     simdjson::ondemand::parser& parser)
+    {
+        std::string resultBody;
+        int resCode = SendRpcReq(
+            resultBody, 1, "submitblock", DaemonRpc::GetParamsStr(block_hex));
+
+        if (resCode != 200)
+        {
+            Logger::Log(
+                LogType::Critical, LogField::SubmissionManager,
+                "Failed to send block submission, http code: {}, res: {}",
+                resCode, resultBody);
+            return false;
+        }
+
+        try
+        {
+            using namespace simdjson;
+            ondemand::document doc = parser.iterate(
+                resultBody.data(), resultBody.size(), resultBody.capacity());
+
+            ondemand::object res = doc.get_object();
+            ondemand::value resultField = res["result"];
+            ondemand::value errorField = res["error"];
+
+            if (!errorField.is_null())
+            {
+                std::string_view res = errorField.get_string();
+                Logger::Log(LogType::Critical, LogField::SubmissionManager,
+                            "Block submission rejected, rpc error: {}", res);
+                return false;
+            }
+
+            if (!resultField.is_null())
+            {
+                std::string_view result = resultField.get_string();
+                Logger::Log(LogType::Critical, LogField::SubmissionManager,
+                            "Block submission rejected, rpc result: {}",
+                            result);
+
+                if (result == "inconclusive")
+                {
+                    Logger::Log(
+                        LogType::Warn, LogField::SubmissionManager,
+                        "Submitted inconclusive block, waiting for result...");
+                    return true;
+                }
+                return false;
+            }
+        }
+        catch (const simdjson::simdjson_error& err)
+        {
+            // Logger::Log(LogType::Critical, LogField::SubmissionManager,
+            //             "Submit block response parse error: {}", err.what());
+            return false;
+        }
+
+        return true;
+    }
+
     double GetNetworkHashPs(simdjson::ondemand::parser& parser)
     {
         using namespace simdjson;

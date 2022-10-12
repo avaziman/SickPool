@@ -38,8 +38,12 @@ typedef ShareCn share_t;
 struct WorkerContext
 {
     uint32_t current_height;
-    uint8_t block_header[BLOCK_HEADER_SIZE];
     simdjson::ondemand::parser json_parser;
+    uint8_t block_header[BLOCK_HEADER_SIZE];
+
+    #ifdef STRATUM_PROTOCOL_CN
+    uint64_t nonce;
+    #endif
 
     #if HASH_ALGO == HASH_ALGO_VERUSHASH
     CVerusHashV2 hasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
