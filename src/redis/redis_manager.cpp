@@ -2,9 +2,8 @@
 
 using enum Prefix;
 
-RedisManager::RedisManager(const std::string &ip, int port, int hashrate_ttl_ms,
-                           int hashrate_interval_ms)
-    : rc(redisConnect(ip.c_str(), port))
+RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf)
+    : rc(redisConnect(ip.c_str(), conf->redis.redis_port)), conf(&conf->redis)
 {
     using namespace std::string_view_literals;
 
@@ -15,6 +14,9 @@ RedisManager::RedisManager(const std::string &ip, int port, int hashrate_ttl_ms,
         redisFree(rc);
         throw std::runtime_error("Failed to connect to redis");
     }
+
+    const int64_t hashrate_ttl_ms = conf->redis.hashrate_ttl_seconds * 1000;
+    const int64_t hashrate_interval_ms = conf->stats.hashrate_interval_seconds * 1000;
 
     // AppendCommand({
     //     "round_effort_percent"sv,
@@ -30,7 +32,9 @@ RedisManager::RedisManager(const std::string &ip, int port, int hashrate_ttl_ms,
           std::make_pair(PrefixKey<WORKER_COUNT, POOL>(),
                          PrefixKey<WORKER_COUNT, POOL, COMPACT>()),
           std::make_pair(PrefixKey<MINER_COUNT, POOL>(),
-                         PrefixKey<MINER_COUNT, POOL, COMPACT>())})
+                         PrefixKey<MINER_COUNT, POOL, COMPACT>()),
+          std::make_pair(PrefixKey<DIFFICULTY>(),
+                         PrefixKey<DIFFICULTY, COMPACT>())})
     {
         AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
                        std::to_string(hashrate_ttl_ms)});
@@ -39,11 +43,15 @@ RedisManager::RedisManager(const std::string &ip, int port, int hashrate_ttl_ms,
         AppendCommand({"TS.CREATE"sv, key_compact_name, "RETENTION"sv,
                        std::to_string(hashrate_ttl_ms * 7)});
 
-        // we want 12 times less points to fit in 7 days
+        // we want 12 times less points to fit in 7 days (1 hr instead of 5min)
         AppendCommand({"TS.CREATERULE"sv, key_name, key_compact_name,
                        "AGGREGATION"sv, "AVG"sv,
                        std::to_string(hashrate_interval_ms * 12)});
     }
+
+    // only compact needed.
+    AppendCommand({"TS.CREATE"sv, PrefixKey<BLOCK, NUMBER, COMPACT>(), "RETENTION"sv,
+                   std::to_string(hashrate_ttl_ms * 7)});
 
     // AppendCommand({"TS.CREATE"sv, PrefixKey<HASHRATE, POOL, NETWORK>(),
     //                "RETENTION"sv, std::to_string(hashrate_ttl_ms)});
@@ -114,7 +122,7 @@ bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t curtime_ms,
 {
     std::scoped_lock lock(rc_mutex);
 
-    AppendTsAdd(PrefixKey<HASHRATE, NETWORK>(), curtime_ms, net_est_hr);
+    // AppendTsAdd(PrefixKey<HASHRATE, NETWORK>(), curtime_ms, net_est_hr);
     AppendSetMinerEffort(chain, EnumName<ESTIMATED_EFFORT>(), "pow",
                          target_diff);
     return GetReplies();
@@ -131,7 +139,7 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
     auto reply = Command(
         {"HGETALL"sv,
          fmt::format("{}:{}", PrefixKey<IMMATURE, REWARD>(), block_num)});
-
+ 
     double matured_funds = 0;
     // either mature everything or nothing
     {
@@ -301,7 +309,7 @@ bool RedisManager::AddNewMiner(std::string_view address,
 
         AppendTsCreate(worker_count_key, "miner"sv, PrefixKey<WORKER_COUNT>(),
                        addr_lowercase, id_tag,
-                       StatsManager::hashrate_ttl_seconds * 1000);
+                       conf->hashrate_ttl_seconds * 1000);
 
         // reset worker count
         AppendTsAdd(worker_count_key, curtime, 0);
@@ -435,7 +443,7 @@ void RedisManager::AppendCreateStatsTs(std::string_view addrOrWorker,
         addr_lowercase_sv = std::string_view(addr_lowercase);
     }
 
-    auto retention = StatsManager::hashrate_ttl_seconds * 1000;
+    auto retention = conf->hashrate_ttl_seconds * 1000;
 
     for (auto key_type :
          {PrefixKey<HASHRATE>(), PrefixKey<HASHRATE, AVERAGE>(),

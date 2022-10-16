@@ -3,9 +3,25 @@
 #include <string_view>
 #include <vector>
 
-struct RpcConfig{
+struct RpcConfig
+{
     std::string host;
     std::string auth;
+};
+
+struct RedisConfig
+{
+    uint16_t redis_port;
+    uint32_t hashrate_ttl_seconds;
+};
+
+struct StatsConfig
+{
+    uint32_t hashrate_interval_seconds;
+    uint32_t effort_interval_seconds;
+    uint32_t average_hashrate_interval_seconds;
+    uint32_t mined_blocks_interval;
+    uint32_t diff_adjust_seconds;
 };
 
 struct CoinConfig
@@ -16,18 +32,15 @@ struct CoinConfig
     double default_difficulty;
     double target_shares_rate;
     double minimum_difficulty;
-    int64_t stratum_port;
-    int64_t control_port;
-    int64_t redis_port;
+    uint16_t stratum_port;
+    uint16_t control_port;
     std::vector<RpcConfig> rpcs;
 
-    int64_t hashrate_interval_seconds;
-    int64_t effort_interval_seconds;
-    int64_t average_hashrate_interval_seconds;  
-    int64_t hashrate_ttl_seconds;
-    int64_t diff_adjust_seconds;
-    int64_t socket_recv_timeout_seconds;
-    int64_t payment_interval_seconds;
-    int64_t min_payout_threshold;
+    RedisConfig redis;
+    StatsConfig stats;
+
+    uint32_t socket_recv_timeout_seconds;
+    uint32_t payment_interval_seconds;
+    uint32_t min_payout_threshold;
 };
 #endif

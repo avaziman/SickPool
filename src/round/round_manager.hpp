@@ -2,6 +2,7 @@
 #define ROUND_MANAGER_HPP
 
 #include <mutex>
+#include <atomic>
 
 #include "block_submission.hpp"
 #include "payment_manager.hpp"
@@ -29,6 +30,9 @@ class RoundManager
 
     bool UpdateEffortStats(int64_t update_time_ms);
 
+    std::atomic<uint32_t> blocks_found;
+    std::atomic<double> netwrok_hr;
+    std::atomic<double> difficulty;
 
    private:
     bool LoadEfforts();

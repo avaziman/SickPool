@@ -47,7 +47,8 @@ bool RedisManager::UpdateEffortStats(efforts_map_t &miner_stats_map,
 
 bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
                                        miner_map &miner_stats_map,
-                                       std::mutex *stats_mutex,
+                                       std::mutex *stats_mutex, double net_hr, double diff,
+                                       uint32_t blocks_found,
                                        int64_t update_time_ms)
 {
     using namespace std::string_view_literals;
@@ -95,6 +96,13 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
             miner_stats.ResetInterval();
         }
     }
+    // net hr
+    AppendTsAdd(PrefixKey<HASHRATE, NETWORK>(), update_time_ms, net_hr);
+
+    // diff
+    AppendTsAdd(PrefixKey<DIFFICULTY>(), update_time_ms, diff);
+
+    // pool hr, workers, miners
     AppendTsAdd(PrefixKey<HASHRATE, POOL>(), update_time_ms, pool_hr);
     AppendTsAdd(PrefixKey<WORKER_COUNT, POOL>(), update_time_ms,
                 pool_miner_count);

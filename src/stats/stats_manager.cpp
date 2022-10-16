@@ -3,25 +3,23 @@
 int StatsManager::hashrate_interval_seconds;
 int StatsManager::effort_interval_seconds;
 int StatsManager::average_hashrate_interval_seconds;
-int StatsManager::hashrate_ttl_seconds;
 int StatsManager::diff_adjust_seconds;
+
 double StatsManager::average_interval_ratio;
 
 StatsManager::StatsManager(RedisManager* redis_manager,
                            DifficultyManager* diff_manager,
-                           RoundManager* round_manager, int hr_interval,
-                           int effort_interval, int avg_hr_interval,
-                           int diff_adjust_seconds, int hashrate_ttl)
+                           RoundManager* round_manager, const StatsConfig* cc)
     : redis_manager(redis_manager),
       diff_manager(diff_manager),
       round_manager(round_manager)
 {
-    StatsManager::hashrate_interval_seconds = hr_interval;
-    StatsManager::effort_interval_seconds = effort_interval;
-    StatsManager::average_hashrate_interval_seconds = avg_hr_interval;
-    StatsManager::diff_adjust_seconds = diff_adjust_seconds;
-    StatsManager::hashrate_ttl_seconds = hashrate_ttl;
-    StatsManager::average_interval_ratio = (double)avg_hr_interval / hr_interval;
+    StatsManager::hashrate_interval_seconds = cc->hashrate_interval_seconds;
+    StatsManager::effort_interval_seconds = cc->effort_interval_seconds;
+    StatsManager::average_hashrate_interval_seconds = cc->average_hashrate_interval_seconds;
+    StatsManager::diff_adjust_seconds = cc->diff_adjust_seconds;
+    StatsManager::average_interval_ratio =
+        (double)average_hashrate_interval_seconds / hashrate_interval_seconds;
 }
 void StatsManager::Start(std::stop_token st)
 {
@@ -98,8 +96,8 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
     std::vector<std::pair<std::string, double>> remove_worker_hashrates;
     bool res = redis_manager->TsMrange(remove_worker_hashrates, "worker"sv,
-                                       PrefixKey<Prefix::HASHRATE>(), remove_time,
-                                       remove_time);
+                                       PrefixKey<Prefix::HASHRATE>(),
+                                       remove_time, remove_time);
 
     {
         // only lock after receiving the hashrates to remove
@@ -114,12 +112,13 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         for (auto& [worker, ws] : worker_stats_map)
         {
             ws.interval_hashrate =
-                GetExpectedHashes(ws.current_interval_effort) / (double)hashrate_interval_seconds;
+                GetExpectedHashes(ws.current_interval_effort) /
+                (double)hashrate_interval_seconds;
 
             ws.average_hashrate_sum += ws.interval_hashrate;
 
-            ws.average_hashrate = ws.average_hashrate_sum /
-                                  average_interval_ratio;
+            ws.average_hashrate =
+                ws.average_hashrate_sum / average_interval_ratio;
 
             std::string addr = worker.substr(0, ADDRESS_LEN);
 
@@ -134,8 +133,10 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             if (ws.interval_hashrate > 0.d) miner_stats.worker_count++;
         }
     }
-    return redis_manager->UpdateIntervalStats(worker_stats_map, miner_stats_map,
-                                              &stats_map_mutex, update_time_ms);
+    return redis_manager->UpdateIntervalStats(
+        worker_stats_map, miner_stats_map, &stats_map_mutex,
+        round_manager->netwrok_hr, round_manager->difficulty,
+        round_manager->blocks_found, update_time_ms);
 }
 
 bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
@@ -184,7 +185,8 @@ void StatsManager::AddShare(const std::string& worker_full,
         worker_stats->current_interval_effort += diff;
 
         Logger::Log(LogType::Debug, LogField::StatsManager,
-                    "Logged share with diff: {} for {} total diff: {}", diff, worker_full, worker_stats->current_interval_effort);
+                    "Logged share with diff: {} for {} total diff: {}", diff,
+                    worker_full, worker_stats->current_interval_effort);
         // Logger::Log(LogType::Debug, LogField::StatsManager,
         //             "Logged share with diff: {}, hashes: {}", diff,
         //             expected_shares);

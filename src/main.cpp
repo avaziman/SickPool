@@ -87,8 +87,9 @@ int main(int argc, char** argv)
 }
 
 #define CONFIG_PRINT_WIDTH 40
+template <typename Doc>
 void AssignJson(const char* name, std::string& obj,
-                simdjson::ondemand::document& doc)
+                Doc& doc)
 {
     try
     {
@@ -104,48 +105,81 @@ void AssignJson(const char* name, std::string& obj,
                 CONFIG_PRINT_WIDTH, obj);
 }
 
-template <typename T>
-void AssignJson(const char* name, T& obj, simdjson::ondemand::document& doc)
+template <typename Doc>
+void AssignJson(const char* name, double& obj, Doc& doc)
 {
     try
     {
-        obj = doc[name].get<T>();
+        obj = doc[name].get_double();
     }
     catch (...)
     {
-        throw std::runtime_error(fmt::format("Invalid or no \"{}\" variable in config file", name));
+        throw std::runtime_error(fmt::format(
+            "Invalid or no \"{}\" (expected double) variable in config file",
+            name));
     }
     Logger::Log(LogType::Info, LogField::Config, "{:<{}}: {}", name,
                 CONFIG_PRINT_WIDTH, obj);
 }
 
+template <typename T, typename Doc>
+void AssignJson(const char* name, T& obj, Doc& doc)
+{
+    try
+    {
+        obj = static_cast<T>(doc[name].get_int64());
+    }
+    catch (...)
+    {
+        throw std::runtime_error(fmt::format(
+            "Invalid or no \"{}\" (expected integer) variable in config file",
+            name));
+    }
+    Logger::Log(LogType::Info, LogField::Config, "{:<{}}: {}", name,
+                CONFIG_PRINT_WIDTH, obj);
+}
+
+
+
 void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg)
 {
-    simdjson::ondemand::parser confParser;
-    simdjson::ondemand::document configDoc = confParser.iterate(json);
+    using namespace simdjson;
+    ondemand::parser confParser;
+    ondemand::document configDoc = confParser.iterate(json);
 
     AssignJson("stratum_port", cnfg.stratum_port, configDoc);
     AssignJson("control_port", cnfg.control_port, configDoc);
-    AssignJson("redis_port", cnfg.redis_port, configDoc);
-    AssignJson("hashrate_interval_seconds", cnfg.hashrate_interval_seconds,
-               configDoc);
-    AssignJson("effort_interval_seconds", cnfg.effort_interval_seconds,
-               configDoc);
+
+    ondemand::object ob = configDoc["redis"].get_object();
+
+    AssignJson("redis_port", cnfg.redis.redis_port, ob);
+    AssignJson("hashrate_ttl", cnfg.redis.hashrate_ttl_seconds, ob);
+
+    ob = configDoc["stats"].get_object();
+
+    AssignJson("hashrate_interval_seconds",
+                        cnfg.stats.hashrate_interval_seconds, ob);
+
+    AssignJson("effort_interval_seconds",
+                        cnfg.stats.effort_interval_seconds, ob);
     AssignJson("average_hashrate_interval_seconds",
-               cnfg.average_hashrate_interval_seconds, configDoc);
-    AssignJson("hashrate_ttl", cnfg.hashrate_ttl_seconds, configDoc);
-    AssignJson("socket_recv_timeout_seconds", cnfg.socket_recv_timeout_seconds,
-               configDoc);
-    AssignJson("diff_adjust_seconds", cnfg.diff_adjust_seconds, configDoc);
+                        cnfg.stats.average_hashrate_interval_seconds, ob);
+    AssignJson("mined_blocks_interval", cnfg.stats.mined_blocks_interval, ob);
+    AssignJson("diff_adjust_seconds", cnfg.stats.diff_adjust_seconds,
+                        ob);
+
+    AssignJson("socket_recv_timeout_seconds",
+                        cnfg.socket_recv_timeout_seconds, configDoc);
     AssignJson("pow_fee", cnfg.pow_fee, configDoc);
     AssignJson("pos_fee", cnfg.pos_fee, configDoc);
     AssignJson("default_difficulty", cnfg.default_difficulty, configDoc);
     AssignJson("minimum_difficulty", cnfg.minimum_difficulty, configDoc);
     AssignJson("target_shares_rate", cnfg.target_shares_rate, configDoc);
     AssignJson("pool_addr", cnfg.pool_addr, configDoc);
-    AssignJson("payment_interval_seconds", cnfg.payment_interval_seconds,
-               configDoc);
-    AssignJson("min_payout_threshold", cnfg.min_payout_threshold, configDoc);
+    AssignJson("payment_interval_seconds",
+                        cnfg.payment_interval_seconds, configDoc);
+    AssignJson("min_payout_threshold", cnfg.min_payout_threshold,
+                        configDoc);
 
     try
     {

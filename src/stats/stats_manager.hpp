@@ -28,9 +28,8 @@ class RoundManager;
 class StatsManager
 {
    public:
-    StatsManager(RedisManager* redis_manager, DifficultyManager* diff_manager, RoundManager* round_manager,
-                 int hr_interval, int effort_interval, int avg_hr_interval,
-                 int diff_adjust_seconds, int hashrate_ttl);
+    StatsManager(RedisManager* redis_manager, DifficultyManager* diff_manager,
+                 RoundManager* round_manager, const StatsConfig* cc);
 
     // Every hashrate_interval_seconds we need to write:
     // ) worker hashrate
@@ -54,7 +53,6 @@ class StatsManager
     static int effort_interval_seconds;
     static int average_hashrate_interval_seconds;
     static int diff_adjust_seconds;
-    static int hashrate_ttl_seconds;
     static double average_interval_ratio;
 
    private:

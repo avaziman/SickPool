@@ -136,8 +136,10 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    RedisManager(const std::string &ip, int port, int hrttl, int hrinterval);
+    RedisManager(const std::string &ip, const CoinConfig *cc);
     ~RedisManager();
+
+    const RedisConfig *conf;
 
     /* block */
 
@@ -189,7 +191,9 @@ class RedisManager
 
     bool UpdateIntervalStats(worker_map &worker_stats_map,
                              miner_map &miner_stats_map,
-                             std::mutex *stats_mutex, int64_t update_time_ms);
+                             std::mutex *stats_mutex, double net_hr,
+                             double diff, uint32_t blocks_found,
+                             int64_t update_time_ms);
     bool TsMrange(std::vector<std::pair<std::string, double>> &last_averages,
                   std::string_view prefix, std::string_view type, int64_t from,
                   int64_t to, const TsAggregation *aggregation = nullptr);

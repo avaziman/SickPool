@@ -3,20 +3,13 @@
 StratumServer::StratumServer(const CoinConfig &conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(conf),
-      redis_manager("127.0.0.1", (int)conf.redis_port,
-                    conf.hashrate_ttl_seconds * 1000,
-                    conf.hashrate_interval_seconds * 1000),
+      redis_manager("127.0.0.1", &conf),
       clients_mutex(),
       clients(),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
       round_manager_pow(&redis_manager, "pow"),
       round_manager_pos(&redis_manager, "pos"),
-      stats_manager(&redis_manager, &diff_manager, &round_manager_pow,
-                    (int)coin_config.hashrate_interval_seconds,
-                    (int)coin_config.effort_interval_seconds,
-                    (int)coin_config.average_hashrate_interval_seconds,
-                    (int)coin_config.diff_adjust_seconds,
-                    (int)coin_config.hashrate_ttl_seconds),
+      stats_manager(&redis_manager, &diff_manager, &round_manager_pow, &conf.stats),
       daemon_manager(coin_config.rpcs),
       payment_manager(&redis_manager, &daemon_manager, coin_config.pool_addr,
                       coin_config.payment_interval_seconds,
@@ -44,7 +37,7 @@ StratumServer::StratumServer(const CoinConfig &conf)
     // redis_manager.UpdatePoS(0, GetCurrentTimeMs());
 
     stats_thread =
-    std::jthread(std::bind_front(&StatsManager::Start, &stats_manager));
+        std::jthread(std::bind_front(&StatsManager::Start, &stats_manager));
     stats_thread.detach();
 
     control_server.Start(coin_config.control_port);
@@ -210,6 +203,8 @@ void StratumServer::HandleBlockNotify()
 
     // the estimated share amount is supposed to be meet at block time
     const double net_est_hr = new_job->expected_hashes / BLOCK_TIME;
+    round_manager_pow.netwrok_hr = net_est_hr;
+    round_manager_pow.difficulty = new_job->target_diff;
 
     submission_manager.CheckImmatureSubmissions();
 
@@ -229,8 +224,7 @@ void StratumServer::HandleBlockNotify()
                 // "│{8: <{9}}│\n"
                 // "└{0:─^{9}}┘\n",
                 "└{0:─^{8}}┘\n",
-                "",
-                fmt::format("Job #{}", new_job->GetId()),
+                "", fmt::format("Job #{}", new_job->GetId()),
                 fmt::format("Height: {}", new_job->height),
                 // fmt::format("Min time: {}", new_job->min_time),
                 fmt::format("Difficulty: {}", new_job->target_diff),
@@ -423,9 +417,9 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 #elif defined(STRATUM_PROTOCOL_BTC)
         job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
                          share.extranonce2);
-#elif defined (STRATUM_PROTOCOL_CN)
-        //TODO: find way to upgrade to exclusive lock
-        // std::unique_lock<std::shared_mutex> job_write(job->job_mutex);
+#elif defined(STRATUM_PROTOCOL_CN)
+        // TODO: find way to upgrade to exclusive lock
+        //  std::unique_lock<std::shared_mutex> job_write(job->job_mutex);
         job_t *job_mutable = const_cast<job_t *>(job);
         job_mutable->GetBlockHex(blockData, wc->nonce);
 #else

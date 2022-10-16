@@ -27,6 +27,7 @@ bool RoundManager::CloseRound(const ExtendedSubmission* submission, double fee)
 
     round.round_start_ms = submission->time_ms;
     round.total_effort = 0;
+    blocks_found++;
 
     ResetRoundEfforts();
 
