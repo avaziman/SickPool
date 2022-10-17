@@ -38,7 +38,7 @@ bool RedisManager::UpdateEffortStats(efforts_map_t &miner_stats_map,
         AppendSetMinerEffort(COIN_SYMBOL, miner_addr, EnumName<POW>(), miner_effort);
     }
 
-    AppendSetMinerEffort(COIN_SYMBOL, PrefixKey<Prefix::TOTAL_EFFORT>(), EnumName<POW>(),
+    AppendSetMinerEffort(COIN_SYMBOL, EnumName<TOTAL_EFFORT>(), EnumName<POW>(),
                          total_effort);
     stats_mutex.unlock();
 
@@ -65,8 +65,8 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
 
         for (auto &[worker_name, worker_stats] : worker_stats_map)
         {
-            AppendIntervalStatsUpdate(worker_name, "worker", update_time_ms,
-                                      worker_stats);
+            AppendIntervalStatsUpdate(worker_name, EnumName<WORKER>(),
+                                      update_time_ms, worker_stats);
             if (worker_stats.interval_hashrate > 0) pool_worker_count++;
 
             worker_stats.ResetInterval();
@@ -77,7 +77,7 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
         {
             std::string hr_str = std::to_string(miner_stats.interval_hashrate);
 
-            AppendIntervalStatsUpdate(miner_addr, "miner", update_time_ms,
+            AppendIntervalStatsUpdate(miner_addr, EnumName<MINER>(), update_time_ms,
                                       miner_stats);
 
             AppendCommand(
@@ -86,7 +86,7 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
                  hr_str, miner_addr});
 
             AppendHset(fmt::format("{}:{}", PrefixKey<SOLVER>(), miner_addr),
-                       PrefixKey<Prefix::HASHRATE>(), hr_str);
+                       EnumName<Prefix::HASHRATE>(), hr_str);
 
             AppendUpdateWorkerCount(miner_addr, miner_stats.worker_count,
                                     update_time_ms);
@@ -220,4 +220,11 @@ bool RedisManager::TsMrange(
     }
 
     return true;
+}
+
+bool RedisManager::UpdateBlockNumber(int64_t time, uint32_t number)
+{
+    std::scoped_lock lock(rc_mutex);
+    AppendTsAdd(PrefixKey<BLOCK, STATS, NUMBER, COMPACT>(), time, number);
+    return GetReplies();
 }

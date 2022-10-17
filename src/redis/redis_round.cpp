@@ -5,7 +5,7 @@ void RedisManager::AppendSetMinerEffort(std::string_view chain,
                                         std::string_view miner,
                                         std::string_view type, double effort)
 {
-    AppendHset(fmt::format("{}:{}:{}:{}", coin_symbol, chain, type, EnumName<Prefix::ROUND_EFFORT>()), miner,
+    AppendHset(fmt::format("{}:{}:{}:{}", coin_symbol, chain, type, EnumName<ROUND_EFFORT>()), miner,
                std::to_string(effort));
 }
 
@@ -13,11 +13,11 @@ void RedisManager::LoadCurrentRound(std::string_view chain,
                                     std::string_view type, Round *rnd)
 {
     std::string round_effort_key =
-        fmt::format("{}:{}:{}", chain, type, EnumName<Prefix::ROUND_EFFORT>());
+        fmt::format("{}:{}:{}", chain, type, EnumName<ROUND_EFFORT>());
 
-    std::string total_effort_str = hget(round_effort_key, EnumName<Prefix::TOTAL_EFFORT>());
+    std::string total_effort_str = hget(round_effort_key, EnumName<TOTAL_EFFORT>());
 
-    std::string start_time_str = hget(round_effort_key, EnumName<Prefix::ROUND_START_TIME>());
+    std::string start_time_str = hget(round_effort_key, EnumName<START_TIME>());
 
     std::string estimated_effort_str =
         hget(round_effort_key, EnumName<Prefix::ESTIMATED_EFFORT>());
@@ -63,9 +63,9 @@ bool RedisManager::CloseRound(std::string_view chain, std::string_view type,
         AppendAddBlockSubmission(submission);
         AppendAddRoundShares(chain, submission, round_shares);
         // set round start time
-        AppendSetMinerEffort(chain, PrefixKey<Prefix::ROUND_START_TIME>(), type, time_ms);
+        AppendSetMinerEffort(chain, EnumName<START_TIME>(), type, time_ms);
         // reset round total effort
-        AppendSetMinerEffort(chain, PrefixKey<Prefix::TOTAL_EFFORT>(), type, 0);
+        AppendSetMinerEffort(chain, EnumName<TOTAL_EFFORT>(), type, 0);
 
         // reset miners efforts
         for (auto &[addr, _] : round_shares)

@@ -22,7 +22,7 @@ void RedisManager::AppendAddBlockSubmission(
         // bandwidth, as the indexes are added manually anyway no need for
         // hash
         AppendCommand(
-            {"SET"sv, fmt::format("block:{}", block_id),
+            {"SET"sv, fmt::format("{}:{}", block_id, PrefixKey<BLOCK>()),
              std::string_view((char *)submission, sizeof(BlockSubmission))});
         /* sortable indexes */
         // block no. and block time will always be same order
@@ -62,10 +62,10 @@ void RedisManager::AppendAddBlockSubmission(
         AppendTsAdd(PrefixKey<BLOCK, STATS, EFFORT_PERCENT>(),
                     submission->time_ms, submission->effort_percent);
 
-        AppendTsAdd(PrefixKey<BLOCK, STATS, DURATION>(), submission->time_ms,
-                    submission->duration_ms);
+        // block number is written on interval.
+        // AppendTsAdd(PrefixKey<BLOCK, STATS, DURATION>(), submission->time_ms,
+        //             submission->duration_ms);
 
-        AppendTsAdd(PrefixKey<BLOCK, STATS, NUMBER>(), submission->time_ms, 1);
     }
 }
 

@@ -1,7 +1,18 @@
 {
     "control_port": 1111,
     "stratum_port": 4444,
-    "redis_port": 6379,
+    "redis": {
+        "redis_port": 6379,
+        "hashrate_ttl": 86400
+    },
+    "stats": {
+        "hashrate_interval_seconds": 1,
+        "hashrate_interval_seconds1": 10,
+        "effort_interval_seconds": 10,
+        "average_hashrate_interval_seconds": 180,
+        "diff_adjust_seconds": 30000,
+        "mined_blocks_interval": 1
+    },
     "pow_fee": 0.01,
     "pos_fee": 0.01,
     "default_difficulty": 10000000.0,
@@ -9,12 +20,6 @@
     "target_shares_rate": 100.0,
     "pool_addr": "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp",
     "redis_host": "127.0.0.1:6379",
-    "hashrate_interval_seconds": 1,
-    "hashrate_interval_seconds1": 10,
-    "effort_interval_seconds": 10,
-    "average_hashrate_interval_seconds": 180,
-    "diff_adjust_seconds": 30000,
-    "hashrate_ttl": 86400,
     "socket_recv_timeout_seconds": 3,
     "payment_interval_seconds": 0,
     "min_payout_threshold": 10000000000000,

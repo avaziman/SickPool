@@ -12,7 +12,8 @@ StatsManager::StatsManager(RedisManager* redis_manager,
                            RoundManager* round_manager, const StatsConfig* cc)
     : redis_manager(redis_manager),
       diff_manager(diff_manager),
-      round_manager(round_manager)
+      round_manager(round_manager),
+      conf(cc)
 {
     StatsManager::hashrate_interval_seconds = cc->hashrate_interval_seconds;
     StatsManager::effort_interval_seconds = cc->effort_interval_seconds;
@@ -39,6 +40,9 @@ void StatsManager::Start(std::stop_token st)
     int64_t next_diff_update =
         now - (now % diff_adjust_seconds) + diff_adjust_seconds;
 
+    int64_t next_block_update =
+        now - (now % conf->mined_blocks_interval) + conf->mined_blocks_interval;
+
     if (!LoadAvgHashrateSums(next_interval_update * 1000))
     {
         Logger::Log(LogType::Critical, LogField::StatsManager,
@@ -47,11 +51,14 @@ void StatsManager::Start(std::stop_token st)
 
     while (!st.stop_requested())
     {
-        Logger::Log(LogType::Info, LogField::StatsManager,
-                    "Next stats update in: {}", next_effort_update);
 
-        int64_t next_update = std::min(
-            {next_interval_update, next_effort_update, next_diff_update});
+        int64_t next_update =
+            std::min({next_interval_update, next_effort_update,
+                      next_diff_update, next_block_update});
+
+        Logger::Log(LogType::Info, LogField::StatsManager,
+                    "Next stats update in: {}", next_update);
+                    
         int64_t update_time_ms = next_update * 1000;
 
         std::this_thread::sleep_until(system_clock::from_time_t(next_update));
@@ -73,6 +80,14 @@ void StatsManager::Start(std::stop_token st)
         {
             diff_manager->Adjust(diff_adjust_seconds, next_diff_update);
             next_diff_update += diff_adjust_seconds;
+        }
+
+        if(next_update == next_block_update){
+            uint32_t block_number = round_manager->blocks_found.load();
+            redis_manager->UpdateBlockNumber(update_time_ms, block_number);
+            round_manager->blocks_found.store(0);
+
+            next_block_update += conf->mined_blocks_interval;
         }
 
         auto startChrono = system_clock::now();
@@ -120,7 +135,8 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             ws.average_hashrate =
                 ws.average_hashrate_sum / average_interval_ratio;
 
-            std::string addr = worker.substr(0, ADDRESS_LEN);
+            // std::string addr = worker.substr(0, ADDRESS_LEN);
+            std::string addr = worker.substr(0, worker.find('.'));
 
             auto& miner_stats = miner_stats_map[addr];
             miner_stats.average_hashrate += ws.average_hashrate;

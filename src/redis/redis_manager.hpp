@@ -46,12 +46,13 @@ enum class Prefix
     IDENTITY,
     JOIN_TIME,
     SCRIPT_PUB_KEY,
-    ROUND_EFFORT,
+    ROUND,
+    EFFORT,
     WORKER_COUNT,
     MINER_COUNT,
     TOTAL_EFFORT,
     ESTIMATED_EFFORT,
-    ROUND_START_TIME,
+    START_TIME,
 
     MATURE_BALANCE,
     IMMATURE_BALANCE,
@@ -77,9 +78,11 @@ enum class Prefix
     SOLVER,
     INDEX,
     DURATION,
-    EFFORT,
     DIFFICULTY,
+    ROUND_EFFORT,
 
+    MINER,
+    WORKER,
     TYPE,
     NUMBER,
     CHAIN,
@@ -214,6 +217,8 @@ class RedisManager
                           Round *rnd);
     bool LoadImmatureBlocks(
         std::vector<std::unique_ptr<ExtendedSubmission>> &submsissions);
+
+    bool UpdateBlockNumber(int64_t time, uint32_t number);
 
     inline bool GetReplies(redis_unique_ptr *last_reply = nullptr)
     {

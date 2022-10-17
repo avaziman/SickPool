@@ -1,5 +1,7 @@
 #include "round_manager.hpp"
 
+using enum Prefix;
+
 RoundManager::RoundManager(RedisManager* rm, const std::string& round_type)
     : redis_manager(rm), round_type(round_type)
 {
@@ -71,11 +73,11 @@ bool RoundManager::LoadCurrentRound()
         // append commands are not locking but since its before threads are
         // starting its ok set round start time
         redis_manager->AppendSetMinerEffort(chain,
-                                            PrefixKey<Prefix::ROUND_START_TIME>(),
+                                            PrefixKey<ROUND, START_TIME>(),
                                             round_type, round.round_start_ms);
         // reset round effort if we are starting it now hadn't started
         redis_manager->AppendSetMinerEffort(
-            chain, PrefixKey<Prefix::TOTAL_EFFORT>(), round_type, 0);
+            chain, EnumName<TOTAL_EFFORT>(), round_type, 0);
 
         if (!redis_manager->GetReplies())
         {

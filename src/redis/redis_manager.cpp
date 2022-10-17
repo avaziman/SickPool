@@ -16,7 +16,8 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf)
     }
 
     const int64_t hashrate_ttl_ms = conf->redis.hashrate_ttl_seconds * 1000;
-    const int64_t hashrate_interval_ms = conf->stats.hashrate_interval_seconds * 1000;
+    const int64_t hashrate_interval_ms =
+        conf->stats.hashrate_interval_seconds * 1000;
 
     // AppendCommand({
     //     "round_effort_percent"sv,
@@ -49,9 +50,22 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf)
                        std::to_string(hashrate_interval_ms * 12)});
     }
 
-    // only compact needed.
-    AppendCommand({"TS.CREATE"sv, PrefixKey<BLOCK, NUMBER, COMPACT>(), "RETENTION"sv,
+    // mined blocks, only compact needed.
+    AppendCommand({"TS.CREATE"sv, PrefixKey<BLOCK, NUMBER, COMPACT>(),
+                   "RETENTION"sv, std::to_string(hashrate_ttl_ms * 7)});
+
+    // effort percent
+    auto key_name = PrefixKey<BLOCK, STATS, EFFORT_PERCENT>();
+    auto key_compact_name = PrefixKey<BLOCK, STATS, EFFORT_PERCENT, COMPACT>();
+    AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
                    std::to_string(hashrate_ttl_ms * 7)});
+
+    AppendCommand({"TS.CREATE"sv, key_compact_name, "RETENTION"sv,
+                   std::to_string(hashrate_ttl_ms * 7)});
+
+    AppendCommand({"TS.CREATERULE"sv, key_name, key_compact_name,
+                   "AGGREGATION"sv, "AVG"sv,
+                   std::to_string(hashrate_interval_ms * 12)});
 
     // AppendCommand({"TS.CREATE"sv, PrefixKey<HASHRATE, POOL, NETWORK>(),
     //                "RETENTION"sv, std::to_string(hashrate_ttl_ms)});
@@ -139,7 +153,7 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
     auto reply = Command(
         {"HGETALL"sv,
          fmt::format("{}:{}", PrefixKey<IMMATURE, REWARD>(), block_num)});
- 
+
     double matured_funds = 0;
     // either mature everything or nothing
     {
@@ -327,10 +341,10 @@ bool RedisManager::AddNewMiner(std::string_view address,
         AppendCommand(
             {"ZADD"sv, PrefixKey<SOLVER, INDEX, HASHRATE>(), "0", address});
 
-        auto solver_key = fmt::format("solver:{}", address);
-        AppendCommand({"HSET"sv, solver_key, PrefixKey<JOIN_TIME>(),
-                       curtime_str, PrefixKey<SCRIPT_PUB_KEY>(), script_pub_key,
-                       PrefixKey<PAYOUT_THRESHOLD>(),
+        auto solver_key = fmt::format("{}:{}", PrefixKey<SOLVER>(), address);
+        AppendCommand({"HSET"sv, solver_key, EnumName<JOIN_TIME>(), curtime_str,
+                       EnumName<SCRIPT_PUB_KEY>(), script_pub_key,
+                       EnumName<PAYOUT_THRESHOLD>(),
                        std::to_string(PaymentManager::minimum_payout_threshold),
                        EnumName<HASHRATE>(), "0"sv, EnumName<MATURE_BALANCE>(),
                        "0"sv, EnumName<IMMATURE_BALANCE>(), "0"sv,
