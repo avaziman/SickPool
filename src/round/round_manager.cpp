@@ -7,14 +7,14 @@ RoundManager::RoundManager(RedisManager* rm, const std::string& round_type)
 {
     if (!LoadCurrentRound())
     {
-        Logger::Log(LogType::Critical, LogField::RoundManager,
+        logger.Log<LogType::Critical>( 
                     "Failed to load current round!");
     }
 
     if (!redis_manager->ResetMinersWorkerCounts(efforts_map,
                                                 GetCurrentTimeMs()))
     {
-        Logger::Log(LogType::Critical, LogField::RoundManager,
+        logger.Log<LogType::Critical>( 
                     "Failed to reset worker counts!");
     }
 }
@@ -56,7 +56,7 @@ bool RoundManager::LoadCurrentRound()
 {
     if (!LoadEfforts())
     {
-        Logger::Log(LogType::Critical, LogField::StatsManager,
+        logger.Log<LogType::Critical>( 
                     "Failed to load current round efforts!");
         return false;
     }
@@ -81,13 +81,13 @@ bool RoundManager::LoadCurrentRound()
 
         if (!redis_manager->GetReplies())
         {
-            Logger::Log(LogType::Critical, LogField::RoundManager,
+            logger.Log<LogType::Critical>( 
                         "Failed to reset round effort and start time");
             return false;
         }
     }
 
-    Logger::Log(LogType::Info, LogField::RoundManager,
+    logger.Log<LogType::Info>(
                 "Loaded round chain: {}, effort of: {}, started at: {}", chain,
                 round.total_effort, round.round_start_ms);
     return true;
@@ -129,7 +129,7 @@ bool RoundManager::LoadEfforts()
         }
         else
         {
-            Logger::Log(LogType::Info, LogField::StatsManager,
+            logger.Log<LogType::Info>(
                         "Loaded {} effort for address {} of {}", round_type,
                         addr, effort);
         }

@@ -49,6 +49,7 @@ class Server
     virtual void HandleDisconnected(connection_it* conn) = 0;
 
    private:
+    Logger<LogField::Server> logger;
     std::mutex connections_mutex;
     std::list<std::shared_ptr<Connection<T>>> connections;
 

@@ -19,8 +19,8 @@ class Benchmark
     {
         auto end = std::chrono::steady_clock::now();
         T duration = std::chrono::duration_cast<T>(end - start);
-        Logger::Log(LogType::Debug, LogField::Benchmark,
-                    "Bench \"{}\" took: {} units", name, duration.count());
+        // logger.Log<LogType::Debug>( LogField::Benchmark,
+        //             "Bench \"{}\" took: {} units", name, duration.count());
     }
 
    private:

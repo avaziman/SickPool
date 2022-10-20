@@ -41,7 +41,7 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
     catch (const simdjson::simdjson_error &err)
     {
         SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
-        Logger::Log(LogType::Error, LogField::Stratum,
+        logger.Log<LogType::Error>(
                     "Request JSON parse error: {}\nRequest: {}\n", err.what(),
                     req);
         return;
@@ -71,7 +71,7 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
     else
     {
         res = RpcResult(ResCode::UNKNOWN, "Unknown method");
-        Logger::Log(LogType::Warn, LogField::Stratum,
+        logger.Log<LogType::Warn>(
                     "Unknown request method: {}", method);
     }
 
@@ -117,7 +117,7 @@ RpcResult StratumServerCn::HandleSubmit(StratumClient *cli, WorkerContext *wc,
 
     if (!parse_error.empty())
     {
-        Logger::Log(LogType::Critical, LogField::Stratum,
+        logger.Log<LogType::Critical>( 
                     "Failed to parse submit: {}", parse_error);
         return RpcResult(ResCode::UNKNOWN, parse_error);
     }
@@ -141,7 +141,7 @@ RpcResult StratumServerCn::HandleAuthorize(StratumClient *cli,
     }
     catch (const simdjson_error &err)
     {
-        Logger::Log(LogType::Error, LogField::Stratum,
+        logger.Log<LogType::Error>(
                     "No address provided in authorization. err: {}",
                     err.what());
 
@@ -183,7 +183,7 @@ RpcResult StratumServerCn::HandleAuthorize(StratumClient *cli,
     }
     cli->SetAuthorized();
 
-    Logger::Log(LogType::Info, LogField::Stratum,
+    logger.Log<LogType::Info>(
                 "Authorized worker: {}, address: {}", worker, given_addr);
 
     return RpcResult(ResCode::OK);

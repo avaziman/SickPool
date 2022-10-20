@@ -19,12 +19,15 @@ FetchContent_MakeAvailable(fmt)
 # optimized hash function
 add_subdirectory(crypto/cn)
 add_subdirectory(crypto/verushash)
+add_subdirectory(daemon)
 # add_subdirectory(crypto/x25x)
 find_path(HIREDIS_HEADER hiredis)
 
 file(GLOB SRC_FILES
+    "shares/*.cpp"
     "stratum/*.cpp"
     "crypto/*.cpp"
+
     # "crypto/cn/crypto/*.c"
     # "crypto/cn/ethash/*.c"
     "stats/*.cpp"
@@ -59,3 +62,5 @@ target_link_libraries(
     sickverushash
     # sickx25x
 )
+
+add_subdirectory(blocks)

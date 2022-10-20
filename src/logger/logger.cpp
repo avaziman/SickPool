@@ -1,3 +1,3 @@
 #include "logger.hpp"
 
-std::mutex Logger::log_mutex;
+// std::mutex Logger::log_mutex;

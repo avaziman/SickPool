@@ -56,6 +56,7 @@ class StatsManager
     static double average_interval_ratio;
 
    private:
+    Logger<LogField::StatsManager> logger;
     const StatsConfig* conf;
     RedisManager* redis_manager;
     DifficultyManager* diff_manager;

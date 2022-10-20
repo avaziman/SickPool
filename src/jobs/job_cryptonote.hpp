@@ -101,9 +101,9 @@ class JobCryptoNote : public JobBase
         memcpy(block_template_hash, bTemplate.template_hash, HASH_SIZE);
         Hexlify(block_template_hash_hex, bTemplate.template_hash, HASH_SIZE);
 
-        Logger::Log(LogType::Info, LogField::JobManager,
-                    "Blocktemplate hash hex: {}",
-                    std::string_view(block_template_hash_hex, HASH_SIZE_HEX));
+        // logger.Log<LogType::Info>( 
+        //             "Blocktemplate hash hex: {}",
+        //             std::string_view(block_template_hash_hex, HASH_SIZE_HEX));
 
         // ReverseHex(prev_block_rev_hex, bTemplate.prev_block_hash.data(),
         //            PREVHASH_SIZE * 2);

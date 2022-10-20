@@ -8,7 +8,7 @@
 
 //     if (resCode != 200)
 //     {
-//         Logger::Log(LogType::Critical, LogField::JobManager,
+//         logger.Log<LogType::Critical>( 
 //                     "Failed to get block template, http code: {}, response: {}",
 //                     strerror(resCode), json);
 //         // TODO: make sock err negative maybe http positive to diffrinciate

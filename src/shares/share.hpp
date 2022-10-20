@@ -6,7 +6,6 @@
 #include <simdjson.h>
 
 #include "static_config.hpp"
-#include "verushash/verus_hash.h"
 
 // as in order of appearance
 #ifdef STRATUM_PROTOCOL_ZEC

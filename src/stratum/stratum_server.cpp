@@ -7,22 +7,22 @@ StratumServer::StratumServer(const CoinConfig &conf)
       clients_mutex(),
       clients(),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
-      round_manager_pow(&redis_manager, "pow"),
-      round_manager_pos(&redis_manager, "pos"),
-      stats_manager(&redis_manager, &diff_manager, &round_manager_pow, &conf.stats),
+      round_manager(&redis_manager, "pow"),
+      stats_manager(&redis_manager, &diff_manager, &round_manager,
+                    &conf.stats),
       daemon_manager(coin_config.rpcs),
       payment_manager(&redis_manager, &daemon_manager, coin_config.pool_addr,
                       coin_config.payment_interval_seconds,
                       coin_config.min_payout_threshold),
       job_manager(&daemon_manager, &payment_manager, coin_config.pool_addr),
-      submission_manager(&redis_manager, &daemon_manager, &payment_manager,
-                         &round_manager_pow, &round_manager_pos)
+      block_submitter(&redis_manager, &daemon_manager,
+                      &round_manager)
 {
     auto error = httpParser.allocate(HTTP_REQ_ALLOCATE, MAX_HTTP_JSON_DEPTH);
 
     if (error != simdjson::SUCCESS)
     {
-        Logger::Log(LogType::Critical, LogField::Stratum,
+        logger.Log<LogType::Critical>( 
                     "Failed to allocate http parser buffer: {}",
                     simdjson::error_message(error));
         exit(EXIT_FAILURE);
@@ -49,7 +49,7 @@ StratumServer::StratumServer(const CoinConfig &conf)
 StratumServer::~StratumServer()
 {
     Stop();
-    Logger::Log(LogType::Info, LogField::Stratum, "Stratum destroyed.");
+    logger.Log<LogType::Info>( "Stratum destroyed.");
 }
 
 void StratumServer::HandleControlCommands(std::stop_token st)
@@ -59,7 +59,7 @@ void StratumServer::HandleControlCommands(std::stop_token st)
     {
         ControlCommands cmd = control_server.GetNextCommand(buff, sizeof(buff));
         HandleControlCommand(cmd, buff);
-        Logger::Log(LogType::Info, LogField::ControlServer,
+        logger.Log<LogType::Info>( 
                     "Processed control command: {}", buff);
     }
 }
@@ -71,16 +71,16 @@ void StratumServer::HandleControlCommand(ControlCommands cmd, char buff[])
         case ControlCommands::BLOCK_NOTIFY:
             HandleBlockNotify();
             break;
-        case ControlCommands::WALLET_NOTFIY:
-        {
-            // format: %b%s%w (block hash, txid, wallet address)
-            WalletNotify *wallet_notify =
-                reinterpret_cast<WalletNotify *>(buff + 2);
-            HandleWalletNotify(wallet_notify);
-            break;
-        }
+        // case ControlCommands::WALLET_NOTFIY:
+        // {
+        //     // format: %b%s%w (block hash, txid, wallet address)
+        //     WalletNotify *wallet_notify =
+        //         reinterpret_cast<WalletNotify *>(buff + 2);
+        //     // HandleWalletNotify(wallet_notify);
+        //     break;
+        // }
         default:
-            Logger::Log(LogType::Warn, LogField::StatsManager,
+            logger.Log<LogType::Warn>(
                         "Unknown control command {} received.", (int)cmd);
             break;
     }
@@ -120,7 +120,7 @@ void StratumServer::Stop()
 
 void StratumServer::ServiceSockets(std::stop_token st)
 {
-    Logger::Log(LogType::Info, LogField::Stratum,
+    logger.Log<LogType::Info>(
                 "Starting servicing sockets on thread {}", gettid());
 
     while (!st.stop_requested())
@@ -148,8 +148,8 @@ void StratumServer::HandleBlockNotify()
         }
         new_job = job_manager.GetNewJob();
 
-        Logger::Log(
-            LogType::Critical, LogField::Stratum,
+        logger.Log<
+            LogType::Critical>(
             "Block update error: Failed to generate new job! retrying...");
 
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
@@ -199,19 +199,19 @@ void StratumServer::HandleBlockNotify()
         // TODO: reset shares
     }
 
-    payment_manager.UpdatePayouts(&round_manager_pow, curtime_ms);
+    payment_manager.UpdatePayouts(&round_manager, curtime_ms);
 
     // the estimated share amount is supposed to be meet at block time
     const double net_est_hr = new_job->expected_hashes / BLOCK_TIME;
-    round_manager_pow.netwrok_hr = net_est_hr;
-    round_manager_pow.difficulty = new_job->target_diff;
+    round_manager.netwrok_hr = net_est_hr;
+    round_manager.difficulty = new_job->target_diff;
 
-    submission_manager.CheckImmatureSubmissions();
+    // submission_manager.CheckImmatureSubmissions();
 
     redis_manager.SetNewBlockStats(chain, curtime_ms, net_est_hr,
                                    new_job->target_diff);
 
-    Logger::Log(LogType::Info, LogField::JobManager,
+    logger.Log<LogType::Info>( 
                 "Broadcasted new job: \n"
                 "┌{0:─^{8}}┐\n"
                 "│{1: ^{8}}│\n"
@@ -237,141 +237,141 @@ void StratumServer::HandleBlockNotify()
 // use wallletnotify with "%b %s %w" arg (block hash, txid, wallet address),
 // check if block hash is smaller than current job's difficulty to check whether
 // its pos block.
-void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
-{
-    using namespace simdjson;
-    std::string_view block_hash(wal_notify->block_hash,
-                                sizeof(wal_notify->block_hash));
-    std::string_view tx_id(wal_notify->txid, sizeof(wal_notify->txid));
-    std::string_view address(wal_notify->wallet_address,
-                             sizeof(wal_notify->wallet_address));
+// void StratumServer::HandleWalletNotify(WalletNotify *wal_notify)
+// {
+//     using namespace simdjson;
+//     std::string_view block_hash(wal_notify->block_hash,
+//                                 sizeof(wal_notify->block_hash));
+//     std::string_view tx_id(wal_notify->txid, sizeof(wal_notify->txid));
+//     std::string_view address(wal_notify->wallet_address,
+//                              sizeof(wal_notify->wallet_address));
 
-    auto bhash256 = UintToArith256(uint256S(block_hash.data()));
-    double bhashDiff = BitsToDiff(bhash256.GetCompact());
+//     auto bhash256 = UintToArith256(uint256S(block_hash.data()));
+//     double bhashDiff = BitsToDiff(bhash256.GetCompact());
 
-    if (job_manager.GetLastJob() == nullptr) return;
+//     if (job_manager.GetLastJob() == nullptr) return;
 
-    double pow_diff = job_manager.GetLastJob()->target_diff;
+//     double pow_diff = job_manager.GetLastJob()->target_diff;
 
-    Logger::Log(LogType::Info, LogField::Stratum,
-                "Received PoS TxId: {}, block hash: {}", tx_id, block_hash);
+//     logger.Log<LogType::Info>(
+//                 "Received PoS TxId: {}, block hash: {}", tx_id, block_hash);
 
-    if (bhashDiff >= pow_diff)
-    {
-        return;  // pow block
-    }
+//     if (bhashDiff >= pow_diff)
+//     {
+//         return;  // pow block
+//     }
 
-    if (address != coin_config.pool_addr)
-    {
-        Logger::Log(LogType::Error, LogField::Stratum,
-                    "CheckAcceptedBlock error: Wrong address: {}, block: {}",
-                    address, block_hash);
-        return;
-    }
+//     if (address != coin_config.pool_addr)
+//     {
+//         logger.Log<LogType::Error>(
+//                     "CheckAcceptedBlock error: Wrong address: {}, block: {}",
+//                     address, block_hash);
+//         return;
+//     }
 
-    // now make sure we actually staked the PoS block and not just received a tx
-    // inside one.
+//     // now make sure we actually staked the PoS block and not just received a tx
+//     // inside one.
 
-    std::string resBody;
-    int64_t reward_value;
+//     std::string resBody;
+//     int64_t reward_value;
 
-    int resCode =
-        daemon_manager.SendRpcReq(resBody, 1, "getrawtransaction",
-                                  DaemonRpc::GetParamsStr(tx_id,
-                                                          1));  // verboose
+//     int resCode =
+//         daemon_manager.SendRpcReq(resBody, 1, "getrawtransaction",
+//                                   DaemonRpc::GetParamsStr(tx_id,
+//                                                           1));  // verboose
 
-    if (resCode != 200)
-    {
-        Logger::Log(LogType::Error, LogField::Stratum,
-                    "CheckAcceptedBlock error: Failed to getrawtransaction, "
-                    "http code: %d",
-                    resCode);
-        return;
-    }
+//     if (resCode != 200)
+//     {
+//         logger.Log<LogType::Error>(
+//                     "CheckAcceptedBlock error: Failed to getrawtransaction, "
+//                     "http code: %d",
+//                     resCode);
+//         return;
+//     }
 
-    try
-    {
-        ondemand::document doc = httpParser.iterate(
-            resBody.data(), resBody.size(), resBody.capacity());
+//     try
+//     {
+//         ondemand::document doc = httpParser.iterate(
+//             resBody.data(), resBody.size(), resBody.capacity());
 
-        ondemand::object res = doc["result"].get_object();
+//         ondemand::object res = doc["result"].get_object();
 
-        ondemand::array vout = res["vout"].get_array();
-        auto output1 = (*vout.begin());
-        reward_value = output1["valueSat"].get_int64();
+//         ondemand::array vout = res["vout"].get_array();
+//         auto output1 = (*vout.begin());
+//         reward_value = output1["valueSat"].get_int64();
 
-        auto addresses = output1["scriptPubKey"]["addresses"];
-        address = (*addresses.begin()).get_string();
-    }
-    catch (const simdjson_error &err)
-    {
-        Logger::Log(LogType::Error, LogField::Stratum,
-                    "HandleWalletNotify: Failed to parse json, error: {}",
-                    err.what());
-        return;
-    }
+//         auto addresses = output1["scriptPubKey"]["addresses"];
+//         address = (*addresses.begin()).get_string();
+//     }
+//     catch (const simdjson_error &err)
+//     {
+//         logger.Log<LogType::Error>(
+//                     "HandleWalletNotify: Failed to parse json, error: {}",
+//                     err.what());
+//         return;
+//     }
 
-    // double check
-    if (address != coin_config.pool_addr)
-    {
-        Logger::Log(LogType::Error, LogField::Stratum,
-                    "CheckAcceptedBlock error: Wrong address: {}, block: {}",
-                    address, block_hash);
-    }
+//     // double check
+//     if (address != coin_config.pool_addr)
+//     {
+//         logger.Log<LogType::Error>(
+//                     "CheckAcceptedBlock error: Wrong address: {}, block: {}",
+//                     address, block_hash);
+//     }
 
-    BlockRes block_res;
-    bool getblock_res =
-        daemon_manager.GetBlock(block_res, httpParser, block_hash);
+//     BlockRes block_res;
+//     bool getblock_res =
+//         daemon_manager.GetBlock(block_res, httpParser, block_hash);
 
-    if (!getblock_res)
-    {
-        Logger::Log(LogType::Error, LogField::Stratum, "Failed to getblock {}!",
-                    block_hash);
-        return;
-    }
+//     if (!getblock_res)
+//     {
+//         logger.Log<LogType::Error>( "Failed to getblock {}!",
+//                     block_hash);
+//         return;
+//     }
 
-    if (block_res.validation_type != ValidationType::STAKE)
-    {
-        Logger::Log(LogType::Critical, LogField::Stratum,
-                    "Double PoS block check failed! block hash: {}",
-                    block_hash);
-        return;
-    }
-    if (!block_res.tx_ids.size() || block_res.tx_ids[0] != tx_id)
-    {
-        Logger::Log(LogType::Critical, LogField::Stratum,
-                    "TxId is not coinbase, block hash: {}", block_hash);
-        return;
-    }
-    // we have verified:
-    //  block is PoS (twice),
-    // the txid is ours (got its value),
-    // the txid is indeed the coinbase tx
+//     if (block_res.validation_type != ValidationType::STAKE)
+//     {
+//         logger.Log<LogType::Critical>( 
+//                     "Double PoS block check failed! block hash: {}",
+//                     block_hash);
+//         return;
+//     }
+//     if (!block_res.tx_ids.size() || block_res.tx_ids[0] != tx_id)
+//     {
+//         logger.Log<LogType::Critical>( 
+//                     "TxId is not coinbase, block hash: {}", block_hash);
+//         return;
+//     }
+//     // we have verified:
+//     //  block is PoS (twice),
+//     // the txid is ours (got its value),
+//     // the txid is indeed the coinbase tx
 
-    Round round = round_manager_pos.GetChainRound();
-    const auto now_ms = GetCurrentTimeMs();
-    const uint64_t duration_ms = now_ms - round.round_start_ms;
-    const double effort_percent =
-        round.total_effort / round.estimated_effort * 100.f;
+//     Round round = round_manager_pos.GetChainRound();
+//     const auto now_ms = GetCurrentTimeMs();
+//     const uint64_t duration_ms = now_ms - round.round_start_ms;
+//     const double effort_percent =
+//         round.total_effort / round.estimated_effort * 100.f;
 
-    uint8_t block_hash_bin[HASH_SIZE];
-    uint8_t tx_id_bin[HASH_SIZE];
+//     uint8_t block_hash_bin[HASH_SIZE];
+//     uint8_t tx_id_bin[HASH_SIZE];
 
-    Unhexlify(block_hash_bin, block_hash.data(), block_hash.size());
+//     Unhexlify(block_hash_bin, block_hash.data(), block_hash.size());
 
-    Unhexlify(tx_id_bin, tx_id.data(), tx_id.size());
+//     Unhexlify(tx_id_bin, tx_id.data(), tx_id.size());
 
-    auto submission = std::make_unique<ExtendedSubmission>(
-        std::string_view(chain), std::string_view(coin_config.pool_addr),
-        BlockType::POS, block_res.height, reward_value, duration_ms, now_ms,
-        SubmissionManager::block_number, 0.d, 0.d, block_hash_bin, tx_id_bin);
+//     auto submission = std::make_unique<ExtendedSubmission>(
+//         std::string_view(chain), std::string_view(coin_config.pool_addr),
+//         BlockType::POS, block_res.height, reward_value, duration_ms, now_ms,
+//         SubmissionManager::block_number, 0.d, 0.d, block_hash_bin, tx_id_bin);
 
-    submission_manager.AddImmatureBlock(std::move(submission),
-                                        coin_config.pos_fee);
+//     submission_manager.AddImmatureBlock(std::move(submission),
+//                                         coin_config.pos_fee);
 
-    Logger::Log(LogType::Info, LogField::Stratum,
-                "Added immature PoS Block! hash: {}", block_hash);
-}
+//     logger.Log<LogType::Info>(
+//                 "Added immature PoS Block! hash: {}", block_hash);
+// }
 
 RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
                                      share_t &share)
@@ -405,7 +405,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     {
         // > add share stats before submission to have accurate effort (its
         // fast)
-        round_manager_pow.AddRoundShare(cli->GetAddress(),
+        round_manager.AddRoundShare(cli->GetAddress(),
                                         share_res.difficulty);
 
         std::size_t blockSize = job->block_size * 2;
@@ -436,14 +436,14 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 
         // submit ASAP
         auto block_hex = std::string_view(blockData.data(), blockSize);
-        submission_manager.TrySubmit(chain, block_hex);
+        block_submitter.TrySubmit(chain, block_hex, httpParser);
 
-        Logger::Log(LogType::Info, LogField::StatsManager, "Block hex: {}",
+        logger.Log<LogType::Info>( "Block hex: {}",
                     std::string_view(blockData.data(), blockSize));
 
         // job will remain safe thanks to the lock.
         const std::string_view worker_full(cli->GetFullWorkerName());
-        const auto chain_round = round_manager_pow.GetChainRound();
+        const auto chain_round = round_manager.GetChainRound();
         const uint64_t duration_ms = time - chain_round.round_start_ms;
         const BlockType type = BlockType::POW;
 #ifndef STRATUM_PROTOCOL_CN
@@ -468,21 +468,21 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 
         auto submission = std::make_unique<ExtendedSubmission>(
             chain, worker_full, type, job->height, job->block_reward,
-            duration_ms, time, SubmissionManager::block_number,
+            duration_ms, time, redis_manager.GetBlockNumber(),
             share_res.difficulty, effort_percent, share_res.hash_bytes.data(),
             job->coinbase_tx_id);
 
-        submission_manager.AddImmatureBlock(std::move(submission),
+        block_submitter.AddImmatureBlock(std::move(submission),
                                             coin_config.pow_fee);
     }
     else if (likely_cond(share_res.code == ResCode::VALID_SHARE))
     {
-        round_manager_pow.AddRoundShare(cli->GetAddress(),
+        round_manager.AddRoundShare(cli->GetAddress(),
                                         share_res.difficulty);
     }
     else
     {
-        // Logger::Log(LogType::Warn, LogField::Stratum,
+        // logger.Log<LogType::Warn>(
         //             "Received bad share for job id: {}", share.jobId);
 
         rpc_res = RpcResult(share_res.code, share_res.message);
@@ -493,8 +493,8 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 
     auto end = TIME_NOW();
 
-    // Logger::Log(
-    //     LogType::Debug, LogField::Stratum,
+    // logger.Log<
+    //     LogType::Debug>( 
     //     "Share processed in {}us, diff: {}, res: {}",
     //     std::chrono::duration_cast<std::chrono::microseconds>(end - start)
     //         .count(),
@@ -574,7 +574,7 @@ void StratumServer::DisconnectClient(
     std::unique_lock lock(clients_mutex);
     clients.erase(conn_ptr);
 
-    Logger::Log(LogType::Info, LogField::StatsManager,
+    logger.Log<LogType::Info>(
                 "Stratum client disconnected. sock: {}", sock);
 }
 

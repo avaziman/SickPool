@@ -2,8 +2,6 @@
 #define STRATUM_SERVER_HPP_
 #include <simdjson.h>
 
-#include <type_traits>
-#include <any>
 #include <chrono>
 #include <deque>
 #include <functional>
@@ -11,13 +9,12 @@
 #include <map>
 #include <mutex>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 
+#include "block_submitter.hpp"
 #include "../sock_addr.hpp"
 #include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
-#include "blocks/block_submission_manager.hpp"
 #include "connection.hpp"
 #include "control/control_server.hpp"
 #include "jobs/job_manager.hpp"
@@ -40,6 +37,7 @@ class StratumServer : public Server<StratumClient>
    protected:
     CoinConfig coin_config;
     std::string chain{COIN_SYMBOL};
+    Logger<LogField::Stratum> logger;
 
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(HTTP_REQ_ALLOCATE);
@@ -53,12 +51,11 @@ class StratumServer : public Server<StratumClient>
     RedisManager redis_manager;
     StatsManager stats_manager;
     daemon_manager_t daemon_manager;
-    SubmissionManager submission_manager;
     DifficultyManager diff_manager;
     PaymentManager payment_manager;
+    BlockSubmitter block_submitter;
 
-    RoundManager round_manager_pow;
-    RoundManager round_manager_pos;
+    RoundManager round_manager;
 
     // O(log n) delete + insert
     // saving the pointer in epoll gives us O(1) access!
@@ -72,7 +69,7 @@ class StratumServer : public Server<StratumClient>
     virtual void HandleReq(Connection<StratumClient>* conn, WorkerContext* wc,
                            std::string_view req) = 0;
     void HandleBlockNotify();
-    void HandleWalletNotify(WalletNotify* wal_notify);
+    // void HandleWalletNotify(WalletNotify* wal_notify);
 
     RpcResult HandleShare(StratumClient* cli, WorkerContext* wc,
                           share_t& share);
@@ -126,7 +123,7 @@ class StratumServer : public Server<StratumClient>
 
         if (res == -1)
         {
-            Logger::Log(LogType::Error, LogField::Stratum,
+            logger.Log<LogType::Error>(
                         "Failed to send on sock fd {}, errno: {} -> {}", sock,
                         errno, std::strerror(errno));
         }

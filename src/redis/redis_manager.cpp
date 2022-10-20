@@ -9,7 +9,7 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf)
 
     if (rc->err)
     {
-        Logger::Log(LogType::Critical, LogField::Redis,
+        logger.Log<LogType::Critical>(
                     "Failed to connect to redis: {}", rc->errstr);
         redisFree(rc);
         throw std::runtime_error("Failed to connect to redis");
@@ -89,7 +89,7 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf)
 
     if (!GetReplies())
     {
-        Logger::Log(LogType::Critical, LogField::Redis,
+        logger.Log<LogType::Critical>(
                     "Failed to connect to add pool timeserieses", rc->errstr);
         throw std::runtime_error("Failed to connect to add pool timeserieses");
     }
@@ -183,7 +183,7 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
                    sizeof(block_num));
 
             std::string mature_shares_key =
-                fmt::format("mature-shares:{}", addr);
+                fmt::format("{}:{}", PrefixKey<MATURE, SHARES>(), addr);
             AppendCommand({"LPUSH"sv, mature_shares_key,
                            std::string_view((char *)round_share_block_num,
                                             sizeof(round_share_block_num))});
@@ -220,7 +220,7 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
              fmt::format("{}:{}", PrefixKey<IMMATURE, REWARD>(), block_num)});
     }
 
-    Logger::Log(LogType::Info, LogField::Redis, "{} funds have matured!",
+    logger.Log<LogType::Info>("{} funds have matured!",
                 matured_funds);
     return GetReplies();
 }

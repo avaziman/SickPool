@@ -7,9 +7,9 @@
 #include <string_view>
 #include <vector>
 
-#include "hash_wrapper.hpp"
 #include "static_config/static_config.hpp"
 #include "utils.hpp"
+#include "hash_wrapper.hpp"
 
 struct TransactionData
 {

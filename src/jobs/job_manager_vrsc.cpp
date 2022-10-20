@@ -50,7 +50,7 @@ const job_t* JobManagerVrsc::GetNewJob(const std::string& json_template)
 
             if (!blockTemplate.tx_list.AddTxData(td))
             {
-                Logger::Log(LogType::Warn, LogField::JobManager,
+                logger.Log<LogType::Warn, 
                             "Block template is full! block size is {} bytes",
                             blockTemplate.tx_list.byteCount);
                 break;
@@ -89,7 +89,7 @@ const job_t* JobManagerVrsc::GetNewJob(const std::string& json_template)
     }
     catch (const simdjson::simdjson_error& err)
     {
-        Logger::Log(LogType::Critical, LogField::JobManager,
+        logger.Log<LogType::Critical>( 
                     "Failed to parse block template: {}, json: {}", err.what(),
                     json_template);
     }

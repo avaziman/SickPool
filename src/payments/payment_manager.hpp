@@ -9,6 +9,7 @@
 #include "round_manager.hpp"
 #include "round_share.hpp"
 #include "stats.hpp"
+#include "transaction.hpp"
 #include "block_template.hpp"
 
 class RoundManager;
@@ -40,6 +41,7 @@ class PaymentManager
         std::vector<uint8_t>& bytes,
         const std::vector<std::pair<std::string, PayeeInfo>>& rewards);
     // void ResetPayment();
+    static Logger<LogField::PaymentManager> logger;
     RedisManager* redis_manager;
     daemon_manager_t* daemon_manager;
     std::string pool_addr;

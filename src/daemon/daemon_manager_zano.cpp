@@ -17,10 +17,9 @@ bool DaemonManagerZano::GetBlockTemplate(BlockTemplateResCn& templateRes,
 
     if (res_code != 200)
     {
-        Logger::Log(LogType::Warn, LogField::DaemonManager,
-                    "Failed to getblocktemplate, rescode: {}, response: {}",
-                    res_code, result_body);
-        return false;
+        throw std::runtime_error(
+            fmt::format("Failed to getblocktemplate, rescode: {}, response: {}",
+                        res_code, result_body));
     }
 
     ondemand::object res;
@@ -44,9 +43,8 @@ bool DaemonManagerZano::GetBlockTemplate(BlockTemplateResCn& templateRes,
     }
     catch (const simdjson_error& err)
     {
-        Logger::Log(LogType::Warn, LogField::DaemonManager,
-                    "Failed to parse getblocktemplate response: {}, {}",
-                    err.what(), result_body);
+        throw std::runtime_error(fmt::format(
+            "Failed to parse signrawtransaction response: {}", err.what()));
         return false;
     }
 
@@ -63,9 +61,9 @@ bool DaemonManagerZano::SubmitBlock(std::string_view block_hex,
 
     if (res_code != 200)
     {
-        Logger::Log(LogType::Warn, LogField::DaemonManager,
-                    "Failed to submitblock, rescode: {}, response: {}",
-                    res_code, result_body);
+        throw std::runtime_error(
+            fmt::format("Failed to getblocktemplate, rescode: {}, response: {}",
+                        res_code, result_body));
         return false;
     }
 
@@ -79,9 +77,8 @@ bool DaemonManagerZano::SubmitBlock(std::string_view block_hex,
     }
     catch (const simdjson_error& err)
     {
-        Logger::Log(LogType::Warn, LogField::DaemonManager,
-                    "Failed to parse submitblock response: {}, {}",
-                    err.what(), result_body);
+        throw std::runtime_error(fmt::format(
+            "Failed to parse signrawtransaction response: {}", err.what()));
         return false;
     }
 

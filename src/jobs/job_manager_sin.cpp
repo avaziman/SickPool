@@ -67,7 +67,7 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateResSin& rpctemplate)
         TransactionData td(tx_res.data, tx_res.hash);
         block_template.tx_list.AddTxData(td);
 
-        Logger::Log(LogType::Info, LogField::JobManager,
+        logger.Log<LogType::Info>( 
                     "Included txid: {}, data: {}",
                     std::string_view(td.hash_hex, HASH_SIZE_HEX), td.data_hex);
     }
@@ -78,7 +78,7 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateResSin& rpctemplate)
     }
 
 
-    Logger::Log(LogType::Info, LogField::JobManager,
+    logger.Log<LogType::Info>( 
                 "Coinbase txid: {}, tx: {}", cb_txd.hash_hex, cb_txd.data_hex);
 
     std::size_t coinb2_pos = coinb1_pos + EXTRANONCE_SIZE + EXTRANONCE2_SIZE;
@@ -100,7 +100,7 @@ const job_t* JobManagerSin::GetNewJob()
     BlockTemplateResSin res;
     if (!daemon_manager->GetBlockTemplate(res, jsonParser))
     {
-        Logger::Log(LogType::Critical, LogField::JobManager,
+        logger.Log<LogType::Critical>( 
                     "Failed to get block template :(");
         // TODO: make sock err negative maybe http positive to diffrinciate
         return nullptr;

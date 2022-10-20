@@ -12,9 +12,9 @@ bool DaemonManagerSin::GetBlockTemplate(BlockTemplateResSin& templateRes,
 
     if (res_code != 200)
     {
-        Logger::Log(LogType::Warn, LogField::DaemonManager,
+        throw std::runtime_error(fmt::format(
                     "Failed to getblocktemplate, rescode: {}, response: {}",
-                    res_code, result_body);
+                    res_code, result_body));
         return false;
     }
 
@@ -70,9 +70,9 @@ bool DaemonManagerSin::GetBlockTemplate(BlockTemplateResSin& templateRes,
     }
     catch (const simdjson_error& err)
     {
-        Logger::Log(LogType::Warn, LogField::DaemonManager,
+        throw std::runtime_error(fmt::format(
                     "Failed to parse signrawtransaction response: {}",
-                    err.what());
+                    err.what()));
         return false;
     }
 

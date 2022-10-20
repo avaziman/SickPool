@@ -51,6 +51,7 @@ endif()
 if (DEFINED WITH_NOTIFIER)
     add_subdirectory(stratum_notifier)
 endif()
+# add_subdirectory(src/blocks)
 
 add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME_CORE})

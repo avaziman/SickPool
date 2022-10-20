@@ -37,6 +37,7 @@ class RoundManager
    private:
     bool LoadEfforts();
 
+    Logger<LogField::RoundManager> logger;
     RedisManager* redis_manager;
     const std::string round_type;
 

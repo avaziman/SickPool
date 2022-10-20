@@ -19,7 +19,7 @@ Server<T>::Server(int port)
         throw std::runtime_error(
             "Stratum server failed to enter listenning state.");
 
-    Logger::Log(LogType::Info, LogField::Stratum,
+    logger.Log<LogType::Info>(
                 "Created listening socket on port: {}", port);
 }
 
@@ -33,7 +33,7 @@ Server<T>::~Server()
     close(listening_fd);
     close(epoll_fd);
 
-    Logger::Log(LogType::Info, LogField::Stratum,
+    logger.Log<LogType::Info>(
                 "Server destroyed. Connections closed.");
 }
 
@@ -54,7 +54,7 @@ void Server<T>::Service()
         else
         {
             // EINTR, ignore
-            Logger::Log(LogType::Error, LogField::Stratum,
+            logger.Log<LogType::Error>(
                         "Failed to epoll_wait: {} -> {}", errno,
                         std::strerror(errno));
             return;
@@ -79,7 +79,7 @@ void Server<T>::Service()
                 if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void *)&error,
                                &errlen) == 0)
                 {
-                    Logger::Log(LogType::Warn, LogField::Stratum,
+                    logger.Log<LogType::Warn>(
                                 "Received epoll error on socket fd {}, "
                                 "errno: {} -> {}",
                                 sockfd, error, std::strerror(error));
@@ -121,7 +121,7 @@ void Server<T>::HandleReadable(connection_it *it)
             {
                 EraseClient(it);
 
-                Logger::Log(LogType::Warn, LogField::Stratum,
+                logger.Log<LogType::Warn>(
                             "Client with ip {} disconnected because of socket (fd:"
                             "{}) error: {} -> {}.",
                             ip, sockfd, errno, std::strerror(errno));
@@ -140,7 +140,7 @@ void Server<T>::HandleReadable(connection_it *it)
             // should happened on flooded buffer
             EraseClient(it);
 
-            Logger::Log(LogType::Info, LogField::Stratum,
+            logger.Log<LogType::Info>(
                         "Client with ip {} (sock {}) disconnected.", ip, sockfd);
             return;
         }
@@ -157,7 +157,7 @@ void Server<T>::HandleNewConnection()
 
     if (conn_fd < 0)
     {
-        Logger::Log(LogType::Warn, LogField::Stratum,
+        logger.Log<LogType::Warn>(
                     "Failed to accept socket to errno: {} "
                     "-> errno: {}. ",
                     conn_fd, errno);
@@ -192,15 +192,15 @@ void Server<T>::HandleNewConnection()
     {
         EraseClient(conn_it);
 
-        Logger::Log(
-            LogType::Warn, LogField::Stratum,
+        logger.Log<
+            LogType::Warn>(
             "Failed to add socket of client with ip {} to epoll list errno: {} "
             "-> errno: {}. ",
             ip, conn_fd, errno);
         return;
     }
 
-    Logger::Log(LogType::Info, LogField::Stratum,
+    logger.Log<LogType::Info>(
                 "Tcp client connected, ip: {}, sock {}", ip, conn_fd);
 }
 
@@ -223,7 +223,7 @@ bool Server<T>::RearmSocket(connection_it *it)
 
         EraseClient(it);
 
-        Logger::Log(LogType::Warn, LogField::Stratum,
+        logger.Log<LogType::Warn>(
                     "Failed to rearm socket (fd: {}) of client with ip {} to"
                     "epoll list errno: {} "
                     "-> errno: {}. ",
@@ -259,14 +259,14 @@ void Server<T>::EraseClient(connection_it *it)
     const int sockfd = (*it)->get()->sock;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, sockfd, nullptr) == -1)
     {
-        Logger::Log(LogType::Warn, LogField::Stratum,
+        logger.Log<LogType::Warn>(
                     "Failed to remove socket {} from epoll list errno: {} "
                     "-> errno: {}. ",
                     sockfd, errno, std::strerror(errno));
     }
     if (close(sockfd) == -1)
     {
-        Logger::Log(LogType::Warn, LogField::Stratum,
+        logger.Log<LogType::Warn>(
                     "Failed to close socket {} errno: {} "
                     "-> errno: {}. ",
                     sockfd, errno, std::strerror(errno));

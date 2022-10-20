@@ -8,12 +8,11 @@
 #include "static_config.hpp"
 #include "shares/share.hpp"
 #include "stats/round.hpp"
-#include "utils.hpp"
+#include "utils/hex_utils.hpp"
 
 enum class BlockType : uint8_t
 {
     POW = 0b1,
-    POS = 0b10,
     PAYMENT = 0b100,
     POW_PAYMENT = POW | PAYMENT
 };

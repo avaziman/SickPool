@@ -7,9 +7,7 @@
 #include <type_traits>
 
 #include <fmt/format.h>
-#include "../coin_config.hpp"
 #include "../daemon/daemon_rpc.hpp"
-#include "logger.hpp"
 
 enum class ValidationType
 {
@@ -60,6 +58,12 @@ struct SignRawTransactionRes
     std::string_view hex;
     bool complete;
 };
+
+struct RpcConfig
+{
+    std::string host;
+    std::string auth;
+};
 class DaemonManager
 {
    public:
@@ -81,10 +85,9 @@ class DaemonManager
 
         if (resCode != 200)
         {
-            Logger::Log(
-                LogType::Critical, LogField::SubmissionManager,
+            throw std::runtime_error(fmt::format(
                 "Failed to send block submission, http code: {}, res: {}",
-                resCode, resultBody);
+                resCode, resultBody));
             return false;
         }
 
@@ -101,23 +104,22 @@ class DaemonManager
             if (!errorField.is_null())
             {
                 std::string_view res = errorField.get_string();
-                Logger::Log(LogType::Critical, LogField::SubmissionManager,
-                            "Block submission rejected, rpc error: {}", res);
+                throw std::runtime_error(fmt::format(
+                            "Block submission rejected, rpc error: {}", res));
                 return false;
             }
 
             if (!resultField.is_null())
             {
                 std::string_view result = resultField.get_string();
-                Logger::Log(LogType::Critical, LogField::SubmissionManager,
+                throw std::runtime_error(fmt::format(
                             "Block submission rejected, rpc result: {}",
-                            result);
+                            result));
 
                 if (result == "inconclusive")
                 {
-                    Logger::Log(
-                        LogType::Warn, LogField::SubmissionManager,
-                        "Submitted inconclusive block, waiting for result...");
+                    throw std::runtime_error(fmt::format(
+                        "Submitted inconclusive block, waiting for result..."));
                     return true;
                 }
                 return false;
@@ -125,7 +127,7 @@ class DaemonManager
         }
         catch (const simdjson::simdjson_error& err)
         {
-            // Logger::Log(LogType::Critical, LogField::SubmissionManager,
+            // throw std::runtime_error(
             //             "Submit block response parse error: {}", err.what());
             return false;
         }
@@ -156,8 +158,8 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Warn, LogField::DaemonManager,
-                        "Failed to parse getnetworkhashps response: {}", err.what());
+            throw std::runtime_error(fmt::format(
+                        "Failed to parse getnetworkhashps response: {}", err.what()));
             return 0;
         }
 
@@ -177,9 +179,9 @@ class DaemonManager
 
         if (res_code != 200)
         {
-            Logger::Log(LogType::Warn, LogField::DaemonManager,
+            throw std::runtime_error(fmt::format(
                         "Failed to signrawtransaction, response: {}, rawtx: {}",
-                        result_body, funded_tx);
+                        result_body, funded_tx));
             return false;
         }
 
@@ -196,8 +198,8 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Warn, LogField::DaemonManager,
-                        "Failed to parse signrawtransaction response: {}", err.what());
+            throw std::runtime_error(fmt::format(
+                        "Failed to parse signrawtransaction response: {}", err.what()));
             return false;
         }
 
@@ -217,8 +219,8 @@ class DaemonManager
 
         if (res_code != 200)
         {
-            Logger::Log(LogType::Warn, LogField::DaemonManager,
-                        "Failed to fundrawtransaction, response: {}", result_body);
+            throw std::runtime_error(fmt::format(
+                        "Failed to fundrawtransaction, response: {}", result_body));
             return false;
         }
 
@@ -236,8 +238,8 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Warn, LogField::DaemonManager,
-                            "Failed to parse fundrawtransaction response: {}, body: {}", err.what(), result_body);
+            throw std::runtime_error(fmt::format(
+                            "Failed to parse fundrawtransaction response: {}, body: {}", err.what(), result_body));
                     
             return false;
         }
@@ -271,9 +273,9 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Warn, LogField::DaemonManager,
+            throw std::runtime_error(fmt::format(
                         "Failed to parse getidentity response: {}",
-                        err.what());
+                        err.what()));
             return false;
         }
 
@@ -312,9 +314,9 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Warn, LogField::DaemonManager,
+            throw std::runtime_error(fmt::format(
                         "Authorize RPC (validateaddress) failed: {}",
-                        err.what());
+                        err.what()));
             return false;
         }
 
@@ -356,9 +358,9 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            Logger::Log(LogType::Error, LogField::Stratum,
+            throw std::runtime_error(fmt::format(
                         "Failed to parse getblock response, error: {}",
-                        err.what());
+                        err.what()));
             return false;
         }
         return true;

@@ -2,12 +2,7 @@
 #define COIN_CONFIG_HPP
 #include <string_view>
 #include <vector>
-
-struct RpcConfig
-{
-    std::string host;
-    std::string auth;
-};
+#include "daemon_manager.hpp"
 
 struct RedisConfig
 {

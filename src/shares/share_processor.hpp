@@ -7,11 +7,11 @@
 #include <iostream>
 #include <memory>
 
+#include "static_config/static_config.hpp"
 #include "cn/currency_core/basic_pow_helpers.h"
 #include "jobs/job_manager.hpp"
 #include "logger.hpp"
 #include "share.hpp"
-#include "static_config/static_config.hpp"
 #include "stratum_client.hpp"
 #include "stratum_server.hpp"
 #include "utils.hpp"
@@ -47,6 +47,7 @@ class ShareProcessor
         return true;
     }
 
+    static Logger<LogField::ShareProcessor> logger;
     inline static void Process(ShareResult& result, StratumClient* cli,
                                WorkerContext* wc, const job_t* job,
                                const share_t& share, int64_t curTime)
@@ -87,7 +88,7 @@ class ShareProcessor
 #endif
 
         uint256 hash(result.hash_bytes);
-        Logger::Log(LogType::Debug, LogField::ShareProcessor, "Share hash: {} ",
+        logger.Log<LogType::Debug>(  "Share hash: {} ",
                     hash.GetHex());
 
         // arith_uint256 hashArith = UintToArith256(hash);
@@ -122,10 +123,10 @@ class ShareProcessor
             char blockHeaderHex[BLOCK_HEADER_SIZE * 2];
             Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
 
-            // Logger::Log(LogType::Debug, LogField::ShareProcessor,
+            // logger.Log<LogType::Debug>( 
             //             "Low difficulty share diff: {}, hash: {}",
             //             result.Diff, hash.GetHex().c_str());
-            // Logger::Log(LogType::Debug, LogField::ShareProcessor,
+            // logger.Log<LogType::Debug>( 
             //             "Block header: {}", BLOCK_HEADER_SIZE * 2,
             // blockHeaderHex);
             return;

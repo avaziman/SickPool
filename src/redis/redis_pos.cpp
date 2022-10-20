@@ -28,7 +28,7 @@ bool RedisManager::AddStakingPoints(std::string_view chain, int64_t duration_ms)
                                   ((double)duration_ms / (1000 * 60 * 60 * 24));
             pool_staking_days += staking_days;
 
-            Logger::Log(LogType::Info, LogField::Redis,
+            logger.Log<LogType::Info>(
                         "Staker {} has earned {} staking minutes this round.",
                         addr, staking_days);
 

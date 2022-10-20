@@ -17,7 +17,7 @@ const job_t* JobManagerCryptoNote::GetNewJob()
     BlockTemplateResCn res;
     if (!daemon_manager->GetBlockTemplate(res, pool_addr, std::string_view(hex_extra.data(), hex_extra.size()), jsonParser))
     {
-        Logger::Log(LogType::Critical, LogField::JobManager,
+        logger.Log<LogType::Critical>(
                     "Failed to get block template :(");
         // TODO: make sock err negative maybe http positive to diffrinciate
         return nullptr;

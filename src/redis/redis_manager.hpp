@@ -15,10 +15,10 @@
 
 #include "benchmark.hpp"
 #include "blocks/block_submission.hpp"
+#include "coin_config.hpp"
 #include "logger.hpp"
-#include "payments/payment_manager.hpp"
+#include "payments/round_share.hpp"
 #include "redis_transaction.hpp"
-#include "round_share.hpp"
 #include "shares/share.hpp"
 #include "static_config/static_config.hpp"
 #include "stats/stats.hpp"
@@ -228,8 +228,8 @@ class RedisManager
         {
             if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
             {
-                Logger::Log(LogType::Critical, LogField::Redis,
-                            "Failed to get reply: {}", rc->errstr);
+                logger.Log<LogType::Critical>("Failed to get reply: {}",
+                                              rc->errstr);
                 res = false;
             }
 
@@ -238,8 +238,8 @@ class RedisManager
 
         if (command_count > 0 && redisGetReply(rc, (void **)&reply) != REDIS_OK)
         {
-            Logger::Log(LogType::Critical, LogField::Redis,
-                        "Failed to get reply: {}", rc->errstr);
+            logger.Log<LogType::Critical>("Failed to get reply: {}",
+                                          rc->errstr);
             res = false;
         }
 
@@ -261,6 +261,7 @@ class RedisManager
     std::mutex rc_mutex;
 
    private:
+    Logger<LogField::Redis> logger;
     redisContext *rc;
     int command_count = 0;
     void AppendCommand(std::initializer_list<std::string_view> args)

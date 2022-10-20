@@ -64,7 +64,7 @@ class JobManager
 
    protected:
     // multiple jobs can use the same block template, (append transactions only)
-
+    Logger<LogField::JobManager> logger;
     daemon_manager_t* daemon_manager;
     PaymentManager* payment_manager;
 
@@ -77,7 +77,7 @@ class JobManager
     simdjson::ondemand::parser jsonParser;
 
     static constexpr std::string_view coinbase_extra = "SickPool.io"sv;
-    
+
     std::string last_job_id_hex;
     std::string pool_addr;
 

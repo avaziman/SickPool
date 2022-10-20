@@ -26,7 +26,7 @@ void StatsManager::Start(std::stop_token st)
 {
     using namespace std::chrono;
 
-    Logger::Log(LogType::Info, LogField::StatsManager,
+    logger.Log<LogType::Info>(
                 "Started stats manager...");
     int64_t now = std::time(nullptr);
 
@@ -45,7 +45,7 @@ void StatsManager::Start(std::stop_token st)
 
     if (!LoadAvgHashrateSums(next_interval_update * 1000))
     {
-        Logger::Log(LogType::Critical, LogField::StatsManager,
+        logger.Log<LogType::Critical>( 
                     "Failed to load hashrate sums!");
     }
 
@@ -56,7 +56,7 @@ void StatsManager::Start(std::stop_token st)
             std::min({next_interval_update, next_effort_update,
                       next_diff_update, next_block_update});
 
-        Logger::Log(LogType::Info, LogField::StatsManager,
+        logger.Log<LogType::Info>(
                     "Next stats update in: {}", next_update);
                     
         int64_t update_time_ms = next_update * 1000;
@@ -101,7 +101,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 {
     using namespace std::string_view_literals;
 
-    // Logger::Log(LogType::Info, LogField::StatsManager,
+    // logger.Log<LogType::Info>(
     //             "Updating interval stats for, {} workers",
     //             worker_stats_map.size());
 
@@ -162,7 +162,7 @@ bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
 
     if (!res)
     {
-        Logger::Log(LogType::Critical, LogField::StatsManager,
+        logger.Log<LogType::Critical>( 
                     "Failed to load average hashrate sum!");
         return false;
     }
@@ -170,7 +170,7 @@ bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
     for (const auto& [worker, avg_hr_sum] : vec)
     {
         worker_stats_map[worker].average_hashrate_sum = avg_hr_sum;
-        Logger::Log(LogType::Info, LogField::StatsManager,
+        logger.Log<LogType::Info>(
                     "Loaded worker hashrate sum for {} of {}", worker,
                     avg_hr_sum);
     }
@@ -200,10 +200,10 @@ void StatsManager::AddShare(const std::string& worker_full,
         // worker_stats->current_interval_effort += expected_shares;
         worker_stats->current_interval_effort += diff;
 
-        Logger::Log(LogType::Debug, LogField::StatsManager,
+        logger.Log<LogType::Debug>( 
                     "Logged share with diff: {} for {} total diff: {}", diff,
                     worker_full, worker_stats->current_interval_effort);
-        // Logger::Log(LogType::Debug, LogField::StatsManager,
+        // logger.Log<LogType::Debug>( 
         //             "Logged share with diff: {}, hashes: {}", diff,
         //             expected_shares);
     }
@@ -230,17 +230,17 @@ bool StatsManager::AddWorker(const std::string& address,
     // 100% new, as we loaded all existing miners
     if (new_miner)
     {
-        Logger::Log(LogType::Info, LogField::StatsManager,
+        logger.Log<LogType::Info>(
                     "New miner has spawned: {}", address);
         if (redis_manager->AddNewMiner(address, addr_lowercase, worker_full,
                                        idTag, script_pub_key, curtime))
         {
-            Logger::Log(LogType::Info, LogField::StatsManager,
+            logger.Log<LogType::Info>(
                         "Miner {} added to database.", address);
         }
         else
         {
-            Logger::Log(LogType::Critical, LogField::StatsManager,
+            logger.Log<LogType::Critical>( 
                         "Failed to add Miner {} to database.", address);
             return false;
         }
@@ -251,12 +251,12 @@ bool StatsManager::AddWorker(const std::string& address,
         if (redis_manager->AddNewWorker(address, addr_lowercase, worker_full,
                                         idTag))
         {
-            Logger::Log(LogType::Info, LogField::StatsManager,
+            logger.Log<LogType::Info>(
                         "Worker {} added to database.", worker_full);
         }
         else
         {
-            Logger::Log(LogType::Critical, LogField::StatsManager,
+            logger.Log<LogType::Critical>( 
                         "Failed to add worker {} to database.", worker_full);
             return false;
         }

@@ -8,6 +8,7 @@
 #include <vector>
 #include <shared_mutex>
 
+#include "logger.hpp"
 #include "block_template.hpp"
 #include "merkle_tree.hpp"
 #include "static_config.hpp"
@@ -44,8 +45,8 @@ class JobBaseBtc : public JobBase
              written += txData.data_hex.size();
         }
 
-        Logger::Log(LogType::Debug, LogField::JobManager, "tx hex: {}",
-                    std::string_view(txs_hex.data(), txs_hex.size()));
+        // logger.Log<LogType::Debug>(  "tx hex: {}",
+        //             std::string_view(txs_hex.data(), txs_hex.size()));
     }
 
     // inline virtual void GetBlockHex(const WorkerContext* wc, char* res) const

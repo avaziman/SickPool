@@ -48,7 +48,7 @@ void hash_process(union hash_state *state, const uint8_t *buf, size_t count);
 #endif
 
 
-#define HASH_SIZE  32
+#define HASH_SIZE 32
 #define HASH_DATA_AREA 136
 
 

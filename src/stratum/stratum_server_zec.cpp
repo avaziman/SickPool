@@ -28,7 +28,7 @@ void StratumServerZec::HandleReq(StratumClient *cli, WorkerContext *wc,
     catch (const simdjson::simdjson_error &err)
     {
         SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
-        Logger::Log(LogType::Error, LogField::Stratum,
+        logger.Log<LogType::Error>(
                     "Request JSON parse error: {}\nRequest: {}\n", err.what(),
                     req);
         return;
@@ -61,7 +61,7 @@ void StratumServerZec::HandleReq(StratumClient *cli, WorkerContext *wc,
 
             if (job == nullptr)
             {
-                Logger::Log(LogType::Critical, LogField::Stratum,
+                logger.Log<LogType::Critical>( 
                             "No jobs to broadcast!");
                 return;
             }
@@ -73,7 +73,7 @@ void StratumServerZec::HandleReq(StratumClient *cli, WorkerContext *wc,
     else
     {
         res = RpcResult(ResCode::UNKNOWN, "Unknown method");
-        Logger::Log(LogType::Warn, LogField::Stratum,
+        logger.Log<LogType::Warn>(
                     "Unknown request method: {}", method);
     }
 
@@ -94,7 +94,7 @@ RpcResult StratumServerZec::HandleSubscribe(StratumClient *cli,
 
     // we don't send session id
 
-    Logger::Log(LogType::Info, LogField::Stratum, "client subscribed!");
+    logger.Log<LogType::Info>( "client subscribed!");
     
     return RpcResult(ResCode::OK,
                      fmt::format("[null,\"{}\"]", cli->extra_nonce_sv));
@@ -120,7 +120,7 @@ RpcResult StratumServerZec::HandleAuthorize(StratumClient *cli,
     }
     catch (const simdjson_error &err)
     {
-        Logger::Log(LogType::Error, LogField::Stratum,
+        logger.Log<LogType::Error>(
                     "No worker name provided in authorization. err: {}",
                     err.what());
 
@@ -173,7 +173,7 @@ RpcResult StratumServerZec::HandleAuthorize(StratumClient *cli,
             GetIdentityRes id_res;
             if (!daemon_manager.GetIdentity(id_res, httpParser, given_addr))
             {
-                Logger::Log(LogType::Critical, LogField::Stratum,
+                logger.Log<LogType::Critical>( 
                             "Authorize RPC (getidentity) failed!");
 
                 return RpcResult(
@@ -208,7 +208,7 @@ RpcResult StratumServerZec::HandleAuthorize(StratumClient *cli,
     }
     cli->SetAuthorized();
 
-    Logger::Log(LogType::Info, LogField::Stratum,
+    logger.Log<LogType::Info>(
                 "Authorized worker: {}, address: {}, id: {}", worker,
                 va_res.valid_addr, id_tag);
 
@@ -256,7 +256,7 @@ RpcResult StratumServerZec::HandleSubmit(StratumClient *cli, WorkerContext *wc,
 
     if (!parse_error.empty())
     {
-        Logger::Log(LogType::Critical, LogField::Stratum,
+        logger.Log<LogType::Critical>( 
                     "Failed to parse submit: {}", parse_error);
         return RpcResult(ResCode::UNKNOWN, parse_error);
     }
@@ -279,7 +279,7 @@ void StratumServerZec::UpdateDifficulty(StratumClient *cli)
 
     SendRaw(cli->sock, request, len);
 
-    Logger::Log(LogType::Debug, LogField::Stratum,
+    logger.Log<LogType::Debug>( 
                 "Set difficulty for {} to {}", cli->GetFullWorkerName(),
                 arith256.GetHex());
 }
