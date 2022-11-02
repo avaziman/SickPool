@@ -1,13 +1,14 @@
 #ifndef DAEMON_MANAGER_HPP
 #define DAEMON_MANAGER_HPP
+#include <fmt/format.h>
 #include <simdjson/simdjson.h>
 
 #include <mutex>
 #include <tuple>
 #include <type_traits>
 
-#include <fmt/format.h>
-#include "../daemon/daemon_rpc.hpp"
+#include "daemon_rpc.hpp"
+#include "logger.hpp"
 
 enum class ValidationType
 {
@@ -23,6 +24,7 @@ struct BlockRes
     int confirmations;
     uint32_t height;
     std::vector<std::string_view> tx_ids;
+    std::string err;
 };
 
 struct ValidateAddressRes
@@ -32,7 +34,7 @@ struct ValidateAddressRes
     bool is_valid;
     std::string_view valid_addr;
     std::string_view script_pub_key;
-    // bool is_mine;
+    std::string err;
 };
 
 struct GetIdentityRes
@@ -40,6 +42,7 @@ struct GetIdentityRes
     simdjson::ondemand::document doc;
 
     std::string_view name;
+    std::string_view err;
 };
 
 struct FundRawTransactionRes
@@ -49,6 +52,7 @@ struct FundRawTransactionRes
     std::string_view hex;
     int changepos;
     double fee;
+    std::string err;
 };
 
 struct SignRawTransactionRes
@@ -57,6 +61,7 @@ struct SignRawTransactionRes
 
     std::string_view hex;
     bool complete;
+    std::string err;
 };
 
 struct RpcConfig
@@ -64,10 +69,12 @@ struct RpcConfig
     std::string host;
     std::string auth;
 };
+
+#define LOG_PARSE_ERR(method, err) logger.Log<LogType::Error>("Failed to parse {} response: {}", method, err.what())
 class DaemonManager
 {
    public:
-    DaemonManager(const std::vector<RpcConfig>& rpc_configs): rpc_mutex()
+    explicit DaemonManager(const std::vector<RpcConfig>& rpc_configs)
     {
         for (const auto& config : rpc_configs)
         {
@@ -75,19 +82,19 @@ class DaemonManager
         }
     }
 
-
     bool SubmitBlock(const std::string_view block_hex,
                      simdjson::ondemand::parser& parser)
     {
         std::string resultBody;
-        int resCode = SendRpcReq(
-            resultBody, 1, "submitblock", DaemonRpc::GetParamsStr(block_hex));
+        constexpr std::string_view method = "submitblock";
+        int resCode = SendRpcReq(resultBody, 1, method,
+                                 DaemonRpc::GetParamsStr(block_hex));
 
         if (resCode != 200)
         {
-            throw std::runtime_error(fmt::format(
+            logger.Log<LogType::Error>(
                 "Failed to send block submission, http code: {}, res: {}",
-                resCode, resultBody));
+                resCode, resultBody);
             return false;
         }
 
@@ -99,27 +106,26 @@ class DaemonManager
 
             ondemand::object res = doc.get_object();
             ondemand::value resultField = res["result"];
-            ondemand::value errorField = res["error"];
 
-            if (!errorField.is_null())
+            if (ondemand::value errorField = res["error"];
+                !errorField.is_null())
             {
-                std::string_view res = errorField.get_string();
-                throw std::runtime_error(fmt::format(
-                            "Block submission rejected, rpc error: {}", res));
+                std::string_view err_res = errorField.get_string();
+                logger.Log<LogType::Error>(
+                    "Block submission rejected, rpc error: {}", err_res);
                 return false;
             }
 
             if (!resultField.is_null())
             {
                 std::string_view result = resultField.get_string();
-                throw std::runtime_error(fmt::format(
-                            "Block submission rejected, rpc result: {}",
-                            result));
+                logger.Log<LogType::Error>(
+                    "Block submission rejected, rpc result: {}", result);
 
                 if (result == "inconclusive")
                 {
-                    throw std::runtime_error(fmt::format(
-                        "Submitted inconclusive block, waiting for result..."));
+                    logger.Log<LogType::Error>(
+                        "Submitted inconclusive block, waiting for result...");
                     return true;
                 }
                 return false;
@@ -127,8 +133,7 @@ class DaemonManager
         }
         catch (const simdjson::simdjson_error& err)
         {
-            // throw std::runtime_error(
-            //             "Submit block response parse error: {}", err.what());
+            LOG_PARSE_ERR(method, err);
             return false;
         }
 
@@ -140,8 +145,9 @@ class DaemonManager
         using namespace simdjson;
         using namespace std::string_view_literals;
 
+        constexpr std::string_view method = "getnetworkhashps";
         std::string result_body;
-        int res_code = SendRpcReq(result_body, 1, "getnetworkhashps");
+        int res_code = SendRpcReq(result_body, 1, method);
 
         if (res_code != 200)
         {
@@ -151,15 +157,14 @@ class DaemonManager
         ondemand::object res;
         try
         {
-            auto doc = parser.iterate(
-                result_body.data(), result_body.size(), result_body.capacity());
+            auto doc = parser.iterate(result_body.data(), result_body.size(),
+                                      result_body.capacity());
 
             return doc["result"].get_double();
         }
         catch (const simdjson_error& err)
         {
-            throw std::runtime_error(fmt::format(
-                        "Failed to parse getnetworkhashps response: {}", err.what()));
+            LOG_PARSE_ERR(method, err);
             return 0;
         }
 
@@ -174,14 +179,15 @@ class DaemonManager
         using namespace std::string_view_literals;
 
         std::string result_body;
-        int res_code = SendRpcReq(result_body, 1, "signrawtransactionwithwallet",
+        constexpr std::string_view method = "signrawtransactionwithwallet";
+        int res_code = SendRpcReq(result_body, 1, method,
                                   DaemonRpc::GetParamsStr(funded_tx));
 
         if (res_code != 200)
         {
-            throw std::runtime_error(fmt::format(
-                        "Failed to signrawtransaction, response: {}, rawtx: {}",
-                        result_body, funded_tx));
+            logger.Log<LogType::Error>(
+                "Failed to signrawtransaction, response: {}, rawtx: {}",
+                result_body, funded_tx);
             return false;
         }
 
@@ -198,8 +204,7 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            throw std::runtime_error(fmt::format(
-                        "Failed to parse signrawtransaction response: {}", err.what()));
+            LOG_PARSE_ERR(method, err);
             return false;
         }
 
@@ -208,27 +213,30 @@ class DaemonManager
 
     bool FundRawTransaction(FundRawTransactionRes& fund_res,
                             simdjson::ondemand::parser& parser,
-                            std::string_view raw_tx, int fee_rate, std::string_view change_addr)
+                            std::string_view raw_tx, int fee_rate,
+                            std::string_view change_addr)
     {
         using namespace simdjson;
 
+        constexpr std::string_view method = "fundrawtransaction";
         std::string result_body;
         std::string params =
-            fmt::format("[\"{}\",{{\"fee_rate\":{},\"changeAddress\":\"{}\"}}]", raw_tx, fee_rate, change_addr);
-        int res_code = SendRpcReq(result_body, 1, "fundrawtransaction", params);
+            fmt::format("[\"{}\",{{\"fee_rate\":{},\"changeAddress\":\"{}\"}}]",
+                        raw_tx, fee_rate, change_addr);
+        int res_code = SendRpcReq(result_body, 1, method, params);
 
         if (res_code != 200)
         {
-            throw std::runtime_error(fmt::format(
-                        "Failed to fundrawtransaction, response: {}", result_body));
+            logger.Log<LogType::Error>(
+                "Failed to fundrawtransaction, response: {}", result_body);
             return false;
         }
 
         ondemand::object res;
         try
         {
-            fund_res.doc = parser.iterate(result_body.data(), result_body.size(),
-                                        result_body.capacity());
+            fund_res.doc = parser.iterate(
+                result_body.data(), result_body.size(), result_body.capacity());
 
             res = fund_res.doc["result"].get_object();
 
@@ -238,9 +246,7 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            throw std::runtime_error(fmt::format(
-                            "Failed to parse fundrawtransaction response: {}, body: {}", err.what(), result_body));
-                    
+            LOG_PARSE_ERR(method, err);
             return false;
         }
 
@@ -252,15 +258,15 @@ class DaemonManager
     {
         using namespace simdjson;
 
-
+        constexpr std::string_view method = "getidentity";
         std::string result_body;
-        int res_code = SendRpcReq(result_body, 1, "getidentity",
+        int res_code = SendRpcReq(result_body, 1, method,
                                   DaemonRpc::GetParamsStr(addr));
         if (res_code != 200)
         {
             return false;
         }
-        
+
         ondemand::object res;
         try
         {
@@ -273,9 +279,8 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            throw std::runtime_error(fmt::format(
-                        "Failed to parse getidentity response: {}",
-                        err.what()));
+            LOG_PARSE_ERR(method, err);
+
             return false;
         }
 
@@ -288,10 +293,10 @@ class DaemonManager
     {
         using namespace simdjson;
 
+        constexpr std::string_view method = "validateaddress";
         std::string result_body;
-        int res_code =
-            SendRpcReq(result_body, 1, "validateaddress",
-                                 DaemonRpc::GetParamsStr(addr));
+        int res_code = SendRpcReq(result_body, 1, method,
+                                  DaemonRpc::GetParamsStr(addr));
 
         if (res_code != 200)
         {
@@ -314,9 +319,7 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            throw std::runtime_error(fmt::format(
-                        "Authorize RPC (validateaddress) failed: {}",
-                        err.what()));
+            LOG_PARSE_ERR(method, err);
             return false;
         }
 
@@ -330,9 +333,11 @@ class DaemonManager
     {
         using namespace simdjson;
 
-        std::string res_body;
-        int res_code = SendRpcReq(
-            res_body, 1, std::string_view("getblock"), DaemonRpc::GetParamsStr(block));
+        constexpr std::string_view method = "getblock";
+
+            std::string res_body;
+        int res_code = SendRpcReq(res_body, 1, method,
+                                  DaemonRpc::GetParamsStr(block));
 
         if (res_code != 200)
         {
@@ -358,15 +363,16 @@ class DaemonManager
         }
         catch (const simdjson_error& err)
         {
-            throw std::runtime_error(fmt::format(
-                        "Failed to parse getblock response, error: {}",
-                        err.what()));
+            LOG_PARSE_ERR(method, err);
+
             return false;
         }
         return true;
     }
 
-    int SendRpcReq(std::string& result, int id, std::string_view method, std::string_view params = "[]", std::string_view type = "POST /")
+    int SendRpcReq(std::string& result, int id, std::string_view method,
+                   std::string_view params = "[]",
+                   std::string_view type = "POST /")
     {
         std::unique_lock rpc_lock(rpc_mutex);
         for (DaemonRpc& rpc : rpcs)
@@ -378,10 +384,13 @@ class DaemonManager
         return -2;
     }
 
+   protected:
+    static constexpr std::string_view logger_field = "DaemonManager";
+    const Logger<logger_field> logger;
+
    private:
     std::vector<DaemonRpc> rpcs;
     std::mutex rpc_mutex;
 };
-
 
 #endif

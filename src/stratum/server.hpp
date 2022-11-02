@@ -29,6 +29,7 @@
 //     ConnectionEventType type;
 //     T* ptr;
 // };
+static constexpr std::string_view field_str = "Server";
 
 template <typename T>
 class Server
@@ -49,7 +50,8 @@ class Server
     virtual void HandleDisconnected(connection_it* conn) = 0;
 
    private:
-    Logger<LogField::Server> logger;
+
+    Logger<field_str> logger;
     std::mutex connections_mutex;
     std::list<std::shared_ptr<Connection<T>>> connections;
 

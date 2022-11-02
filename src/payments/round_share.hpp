@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include "transaction.hpp"
 #include "block_template.hpp"
 
@@ -21,7 +22,7 @@ struct RoundShare
 struct PaymentSettings
 {
     int64_t threshold;
-    // bool pool_block_only;
+    bool pool_block_only;
 };
 
 struct PayeeInfo
@@ -37,7 +38,7 @@ struct PaymentInfo{
     int64_t total_paid = 0;
     reward_map_t rewards;
     std::string raw_transaction_hex;
-    char block_hash_hex[64];
+    char block_hash_hex[HASH_SIZE_HEX];
     TransactionData td;
     transaction_t tx;
 };
@@ -50,7 +51,7 @@ struct FinishedPayment
     int64_t total_paid_amount;
     int64_t time_ms;
     int64_t fee;
-    uint32_t total_payees;
+    size_t total_payees;
 };
 
 struct UserPayment
@@ -63,6 +64,6 @@ struct UserPayment
 #pragma pack(pop)
 
 
-typedef std::vector<std::pair<std::string, RoundShare>> round_shares_t;
+typedef std::unordered_map<std::string, RoundShare> round_shares_t;
 
 #endif

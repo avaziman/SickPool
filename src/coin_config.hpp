@@ -21,6 +21,7 @@ struct StatsConfig
 
 struct CoinConfig
 {
+    std::string symbol;
     std::string pool_addr;
     double pow_fee;
     double pos_fee;
@@ -30,6 +31,7 @@ struct CoinConfig
     uint16_t stratum_port;
     uint16_t control_port;
     std::vector<RpcConfig> rpcs;
+    std::vector<RpcConfig> payment_rpcs;
 
     RedisConfig redis;
     StatsConfig stats;

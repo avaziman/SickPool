@@ -1,3 +1,3 @@
 #include "share_processor.hpp"
 
-Logger<LogField::ShareProcessor> ShareProcessor::logger;
+Logger<ShareProcessor::field_str> ShareProcessor::logger;

@@ -29,4 +29,10 @@ struct BlockTemplateResCn
     std::string_view seed;
 };
 
+struct TransferResCn {
+    std::string_view txid;
+    std::size_t tx_size;
+    // std::string_view txhex;
+};
+
 #endif

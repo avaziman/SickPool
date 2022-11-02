@@ -1,41 +1,51 @@
 #include "redis_manager.hpp"
 
+#include "payment_manager.hpp"
+
 using enum Prefix;
 
-RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf)
-    : rc(redisConnect(ip.c_str(), conf->redis.redis_port)), conf(&conf->redis)
-{
-    using namespace std::string_view_literals;
+redis_unique_ptr_context RedisManager::rc_unique;
+redisContext *RedisManager::rc;
+std::mutex RedisManager::rc_mutex;
 
+RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf, int db_index)
+    : 
+      conf(conf),
+      key_names(conf->symbol)
+{
+    RedisManager::rc_unique = redis_unique_ptr_context(
+        redisConnect(ip.c_str(), conf->redis.redis_port), redisFree);
+    RedisManager::rc = rc_unique.get();
+
+    Command({"SELECT", std::to_string(db_index)});
     if (rc->err)
     {
-        logger.Log<LogType::Critical>(
-                    "Failed to connect to redis: {}", rc->errstr);
-        redisFree(rc);
+        logger.Log<LogType::Critical>("Failed to connect to redis: {}",
+                                      rc->errstr);
+        // redisFree(rc);
         throw std::runtime_error("Failed to connect to redis");
     }
+}
+void RedisManager::Init()
+{
+    using namespace std::string_view_literals;
 
     const int64_t hashrate_ttl_ms = conf->redis.hashrate_ttl_seconds * 1000;
     const int64_t hashrate_interval_ms =
         conf->stats.hashrate_interval_seconds * 1000;
 
-    // AppendCommand({
-    //     "round_effort_percent"sv,
-    // });
-    AppendCommand({"TS.CREATE"sv, PrefixKey<HASHRATE, POOL>(), "RETENTION"sv,
+    AppendCommand({"TS.CREATE"sv, key_names.hashrate_pool, "RETENTION"sv,
                    std::to_string(hashrate_ttl_ms)});
 
-    for (auto [key_name, key_compact_name] :
-         {std::make_pair(PrefixKey<HASHRATE, POOL>(),
-                         PrefixKey<HASHRATE, POOL, COMPACT>()),
-          std::make_pair(PrefixKey<HASHRATE, NETWORK>(),
-                         PrefixKey<HASHRATE, NETWORK, COMPACT>()),
-          std::make_pair(PrefixKey<WORKER_COUNT, POOL>(),
-                         PrefixKey<WORKER_COUNT, POOL, COMPACT>()),
-          std::make_pair(PrefixKey<MINER_COUNT, POOL>(),
-                         PrefixKey<MINER_COUNT, POOL, COMPACT>()),
-          std::make_pair(PrefixKey<DIFFICULTY>(),
-                         PrefixKey<DIFFICULTY, COMPACT>())})
+    for (const auto &[key_name, key_compact_name] :
+         {std::make_pair(key_names.hashrate_pool,
+                         key_names.hashrate_pool_compact),
+          std::make_pair(key_names.hashrate_network,
+                         key_names.hashrate_network_compact),
+          std::make_pair(key_names.worker_count_pool,
+                         key_names.worker_countp_compact),
+          std::make_pair(key_names.miner_count, key_names.miner_count_compact),
+          std::make_pair(key_names.difficulty, key_names.difficulty_compact)})
     {
         AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
                        std::to_string(hashrate_ttl_ms)});
@@ -51,12 +61,12 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf)
     }
 
     // mined blocks, only compact needed.
-    AppendCommand({"TS.CREATE"sv, PrefixKey<BLOCK, NUMBER, COMPACT>(),
-                   "RETENTION"sv, std::to_string(hashrate_ttl_ms * 7)});
+    AppendCommand({"TS.CREATE"sv, key_names.block_number_compact, "RETENTION"sv,
+                   std::to_string(hashrate_ttl_ms * 7)});
 
     // effort percent
-    auto key_name = PrefixKey<BLOCK, STATS, EFFORT_PERCENT>();
-    auto key_compact_name = PrefixKey<BLOCK, STATS, EFFORT_PERCENT, COMPACT>();
+    auto key_name = key_names.block_effort_percent;
+    auto key_compact_name = key_names.block_effort_percent_compact;
     AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
                    std::to_string(hashrate_ttl_ms * 7)});
 
@@ -67,35 +77,15 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf)
                    "AGGREGATION"sv, "AVG"sv,
                    std::to_string(hashrate_interval_ms * 12)});
 
-    // AppendCommand({"TS.CREATE"sv, PrefixKey<HASHRATE, POOL, NETWORK>(),
-    //                "RETENTION"sv, std::to_string(hashrate_ttl_ms)});
-
-    // AppendCommand({"TS.CREATE"sv, PrefixKey<HASHRATE, POOL, NETWORK,
-    // COMPACT>(),
-    //                "RETENTION"sv, std::to_string(hashrate_ttl_ms * 12)});
-
-    // AppendCommand({"TS.CREATE"sv, PrefixKey<WORKER_COUNT, POOL>(),
-    //                "RETENTION"sv, std::to_string(hashrate_ttl_ms)});
-
-    // AppendCommand({"TS.CREATE"sv, PrefixKey<WORKER_COUNT, POOL, COMPACT>(),
-    //                "RETENTION"sv, std::to_string(hashrate_ttl_ms * 12)});
-
-    // AppendCommand({"TS.CREATE"sv, PrefixKey<MINER_COUNT, POOL>(),
-    // "RETENTION"sv,
-    //                std::to_string(hashrate_ttl_ms)});
-
-    // AppendCommand({"TS.CREATE"sv, PrefixKey<MINER_COUNT, POOL, COMPACT>(),
-    //                "RETENTION"sv, std::to_string(hashrate_ttl_ms * 12)});
-
     if (!GetReplies())
     {
         logger.Log<LogType::Critical>(
-                    "Failed to connect to add pool timeserieses", rc->errstr);
+            "Failed to connect to add pool timeserieses", rc->errstr);
         throw std::runtime_error("Failed to connect to add pool timeserieses");
     }
 }
 
-RedisManager::~RedisManager() { redisFree(rc); }
+RedisManager::~RedisManager() { }
 
 // TODO: think of smt else
 bool RedisManager::DoesAddressExist(std::string_view addrOrId,
@@ -136,9 +126,10 @@ bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t curtime_ms,
 {
     std::scoped_lock lock(rc_mutex);
 
-    // AppendTsAdd(PrefixKey<HASHRATE, NETWORK>(), curtime_ms, net_est_hr);
-    AppendSetMinerEffort(chain, EnumName<ESTIMATED_EFFORT>(), "pow",
-                         target_diff);
+    // AppendTsAdd(key_name.hashrate_network, curtime_ms, net_est_hr);
+
+    // AppendSetMinerEffort(chain, EnumName<ESTIMATED_EFFORT>(), "pow",
+    //                      target_diff);
     return GetReplies();
 }
 
@@ -151,17 +142,15 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
     std::scoped_lock lock(rc_mutex);
 
     auto reply = Command(
-        {"HGETALL"sv,
-         fmt::format("{}:{}", PrefixKey<IMMATURE, REWARD>(), block_num)});
+        {"HGETALL"sv, Format({key_names.reward_immature, std::to_string(block_num)})});
 
-    double matured_funds = 0;
+    int64_t matured_funds = 0;
     // either mature everything or nothing
     {
         RedisTransaction update_rewards_tx(this);
 
         for (int i = 0; i < reply->elements; i += 2)
         {
-            double minerReward = 0;
             std::string_view addr(reply->element[i]->str,
                                   reply->element[i]->len);
 
@@ -182,13 +171,13 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
             memcpy(round_share_block_num + sizeof(miner_share), &block_num,
                    sizeof(block_num));
 
-            std::string mature_shares_key =
-                fmt::format("{}:{}", PrefixKey<MATURE, SHARES>(), addr);
-            AppendCommand({"LPUSH"sv, mature_shares_key,
+            std::string mature_rewards_key =
+                Format({key_names.reward_mature, addr});
+            AppendCommand({"LPUSH"sv, mature_rewards_key,
                            std::string_view((char *)round_share_block_num,
                                             sizeof(round_share_block_num))});
 
-            AppendCommand({"LTRIM"sv, mature_shares_key, "0"sv,
+            AppendCommand({"LTRIM"sv, mature_rewards_key, "0"sv,
                            std::to_string(ROUND_SHARES_LIMIT)});
 
             std::string reward_str = std::to_string(miner_share->reward);
@@ -198,12 +187,11 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
             // AppendCommand({"HSET"sv, fmt::format("mature-rewards:{}", addr),
             //                std::to_string(block_num), reward_sv});
 
-            AppendCommand({"ZINCRBY"sv,
-                           PrefixKey<SOLVER, INDEX, MATURE_BALANCE>(),
-                           reward_sv, addr});
+            AppendCommand(
+                {"ZINCRBY"sv, key_names.solver_index_mature, reward_sv, addr});
 
             std::string_view solver_key =
-                fmt::format("{}:{}", PrefixKey<SOLVER>(), addr);
+                fmt::format("{}:{}", key_names.solver, addr);
 
             AppendCommand({"HINCRBY"sv, solver_key, EnumName<MATURE_BALANCE>(),
                            reward_sv});
@@ -211,23 +199,37 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
                            EnumName<IMMATURE_BALANCE>(),
                            fmt::format("-{}", reward_sv)});
 
+            // for payment manager...
+            AppendCommand({"PUBLISH", key_names.block_mature_channel, "OK"});
+
             matured_funds += miner_share->reward;
         }
 
         // we pushed it to mature round shares list
         AppendCommand(
-            {"UNLINK"sv,
-             fmt::format("{}:{}", PrefixKey<IMMATURE, REWARD>(), block_num)});
+            {"UNLINK"sv, Format({key_names.reward_immature, std::to_string(block_num)})});
     }
 
-    logger.Log<LogType::Info>("{} funds have matured!",
-                matured_funds);
+    logger.Log<LogType::Info>("{} funds have matured!", matured_funds);
     return GetReplies();
 }
 
-bool RedisManager::LoadUnpaidRewards(
-    std::vector<std::pair<std::string, PayeeInfo>> &rewards,
-    const efforts_map_t &efforts, std::mutex *efforts_mutex)
+bool RedisManager::GetAddresses(std::vector<std::string> &addresses)
+{
+    auto cmd = Command({"SMEMBERS", key_names.address_map});
+
+    addresses.reserve(cmd->elements);
+    for (int i = 0; i < cmd->elements; i++)
+    {
+        std::string key(cmd->element[i]->str, cmd->element[i]->str);
+
+        addresses.push_back(key);
+    }
+    return cmd.get();
+}
+
+bool RedisManager::LoadUnpaidRewards(payees_info_t &rewards,
+                                     const std::vector<std::string> &addresses)
 {
     using namespace std::string_view_literals;
 
@@ -235,17 +237,16 @@ bool RedisManager::LoadUnpaidRewards(
 
     {
         RedisTransaction tx(this);
-        std::scoped_lock lock(*efforts_mutex);
 
-        rewards.reserve(efforts.size());
+        rewards.reserve(addresses.size());
 
-        for (const auto &[addr, _] : efforts)
+        for (const std::string &addr : addresses)
         {
-            AppendCommand({"HMGET"sv, fmt::format("solver:{}", addr),
-                           PrefixKey<MATURE_BALANCE>(),
-                           PrefixKey<PAYOUT_THRESHOLD>(),
-                           PrefixKey<SCRIPT_PUB_KEY>()});
-            rewards.emplace_back(addr, 0);
+            AppendCommand({"HMGET"sv, Format({key_names.solver, addr}),
+                           EnumName<MATURE_BALANCE>(),
+                           EnumName<PAYOUT_THRESHOLD>(),
+                           EnumName<PAYOUT_FEELESS>()});
+            // rewards.emplace_back(addr, 0);
         }
     }
 
@@ -261,19 +262,20 @@ bool RedisManager::LoadUnpaidRewards(
         {
             continue;
         }
+        rewards[i].first = addresses[i];
+        rewards[i].second = PayeeInfo{
+            .amount =
+                std::strtoll(reply->element[i]->element[0]->str, nullptr, 10),
+            .settings = {.threshold = std::strtoll(
+                             reply->element[i]->element[1]->str, nullptr, 10),
+                         .pool_block_only =
+                             reply->element[i]->element[2]->str[0] == '1'}};
+        // const auto script_reply = reply->element[i]->element[2];
+        // const auto script_len = script_reply->len;
 
-        rewards[i].second.amount =
-            std::strtoll(reply->element[i]->element[0]->str, nullptr, 10);
-
-        rewards[i].second.settings.threshold =
-            std::strtoll(reply->element[i]->element[1]->str, nullptr, 10);
-
-        const auto script_reply = reply->element[i]->element[2];
-        const auto script_len = script_reply->len;
-
-        rewards[i].second.script_pub_key.resize(script_len / 2);
-        Unhexlify(rewards[i].second.script_pub_key.data(), script_reply->str,
-                  script_len);
+        // rewards[i].second.script_pub_key.resize(script_len / 2);
+        // Unhexlify(rewards[i].second.script_pub_key.data(), script_reply->str,
+        //           script_len);
     }
     return true;
 }
@@ -315,52 +317,48 @@ bool RedisManager::AddNewMiner(std::string_view address,
         auto chain = std::string_view(COIN_SYMBOL);
 
         AppendCommand(
-            {"HSET"sv, PrefixKey<ADDRESS_MAP>(), addr_lowercase, address});
+            {"HSET"sv, key_names.address_map, addr_lowercase, address});
 
         // create worker count ts
         std::string worker_count_key =
-            fmt::format("{}:{}", PrefixKey<WORKER_COUNT>(), address);
+            Format({key_names.worker_count, address});
 
-        AppendTsCreate(worker_count_key, "miner"sv, PrefixKey<WORKER_COUNT>(),
+        AppendTsCreate(worker_count_key, "miner"sv, EnumName<WORKER_COUNT>(),
                        addr_lowercase, id_tag,
-                       conf->hashrate_ttl_seconds * 1000);
+                       conf->redis.hashrate_ttl_seconds * 1000);
 
         // reset worker count
         AppendTsAdd(worker_count_key, curtime, 0);
 
         std::string curtime_str = std::to_string(curtime);
         // don't override if it exists
-        AppendCommand({"ZADD"sv, PrefixKey<SOLVER, INDEX, JOIN_TIME>(), "NX",
+        AppendCommand({"ZADD"sv, key_names.solver_index_jointime, "NX",
                        curtime_str, address});
 
         // reset all indexes of new miner
         AppendCommand(
-            {"ZADD"sv, PrefixKey<SOLVER, INDEX, WORKER_COUNT>(), "0", address});
-        AppendCommand({"ZADD"sv, PrefixKey<SOLVER, INDEX, MATURE_BALANCE>(),
-                       "0", address});
+            {"ZADD"sv, key_names.solver_index_worker_count, "0", address});
+        AppendCommand({"ZADD"sv, key_names.solver_index_mature, "0", address});
         AppendCommand(
-            {"ZADD"sv, PrefixKey<SOLVER, INDEX, HASHRATE>(), "0", address});
+            {"ZADD"sv, key_names.solver_index_hashrate, "0", address});
 
-        auto solver_key = fmt::format("{}:{}", PrefixKey<SOLVER>(), address);
-        AppendCommand({"HSET"sv, solver_key, EnumName<JOIN_TIME>(), curtime_str,
-                       EnumName<SCRIPT_PUB_KEY>(), script_pub_key,
-                       EnumName<PAYOUT_THRESHOLD>(),
+        auto solver_key = Format({key_names.solver, address});
+        AppendCommand({"HSET"sv, solver_key, EnumName<START_TIME>(),
+                       curtime_str, EnumName<PAYOUT_THRESHOLD>(),
                        std::to_string(PaymentManager::minimum_payout_threshold),
-                       EnumName<HASHRATE>(), "0"sv, EnumName<MATURE_BALANCE>(),
-                       "0"sv, EnumName<IMMATURE_BALANCE>(), "0"sv,
+                       EnumName<PAYOUT_FEELESS>(), "0"sv, EnumName<HASHRATE>(),
+                       "0"sv, EnumName<MATURE_BALANCE>(), "0"sv,
+                       EnumName<IMMATURE_BALANCE>(), "0"sv,
                        EnumName<WORKER_COUNT>(), "0"sv});
 
         if (id_tag != "null")
         {
-            AppendCommand(
-                {"HSET"sv, PrefixKey<ADDRESS_MAP>(), id_tag, address});
-            AppendCommand(
-                {"HSET"sv, solver_key, PrefixKey<IDENTITY>(), id_tag});
+            // AppendCommand(
+            //     {"HSET"sv, key_names.address_map, id_tag, address});
+            // AppendCommand(
+            //     {"HSET"sv, solver_key, PrefixKey<IDENTITY>(), id_tag});
         }
-        // set round effort to 0
-        AppendSetMinerEffort(chain, address, "pow", 0);
-        AppendSetMinerEffort(chain, address, "pos", 0);
-
+        
         // to be accessible by lowercase addr
         AppendCreateStatsTs(address, id_tag, "miner"sv, addr_lowercase);
     }
@@ -392,14 +390,13 @@ void RedisManager::AppendUpdateWorkerCount(std::string_view address, int amount,
     using namespace std::string_view_literals;
     std::string amount_str = std::to_string(amount);
 
-    AppendCommand({"ZADD"sv, PrefixKey<SOLVER, INDEX, WORKER_COUNT>(), address,
-                   amount_str});
+    AppendCommand(
+        {"ZADD"sv, key_names.solver_index_worker_count, address, amount_str});
 
-    AppendCommand({"HSET"sv, fmt::format("{}:{}", PrefixKey<SOLVER>(), address),
+    AppendCommand({"HSET"sv, fmt::format("{}:{}", key_names.solver, address),
                    EnumName<WORKER_COUNT>(), amount_str});
 
-    AppendCommand({"TS.ADD"sv,
-                   fmt::format("{}:{}", PrefixKey<WORKER_COUNT>(), address),
+    AppendCommand({"TS.ADD"sv, Format({key_names.worker_count, address}),
                    std::to_string(update_time_ms), amount_str});
 }
 
@@ -457,12 +454,12 @@ void RedisManager::AppendCreateStatsTs(std::string_view addrOrWorker,
         addr_lowercase_sv = std::string_view(addr_lowercase);
     }
 
-    auto retention = conf->hashrate_ttl_seconds * 1000;
+    auto retention = conf->redis.hashrate_ttl_seconds * 1000;
 
-    for (auto key_type :
-         {PrefixKey<HASHRATE>(), PrefixKey<HASHRATE, AVERAGE>(),
-          PrefixKey<SHARES, VALID>(), PrefixKey<SHARES, STALE>(),
-          PrefixKey<SHARES, INVALID>()})
+    for (std::string_view key_type :
+         {key_names.hashrate, key_names.hashrate_average,
+          key_names.shares_valid, key_names.shares_stale,
+          key_names.shares_invalid})
     {
         auto key = fmt::format("{}:{}:{}", key_type, prefix, addrOrWorker);
         AppendTsCreate(key, prefix, key_type, addr_lowercase_sv, id, retention);

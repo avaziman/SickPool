@@ -12,6 +12,7 @@ using namespace StratumConstants;
 #define ZANO 6
 
 #define SICK_COIN ZANO
+#define PAYMENT_SCHEME PAYMENT_SCHEME_PPLNS
 
 #if SICK_COIN == VRSC
 #define SICK_COIN_SYMBOL "VRSC"

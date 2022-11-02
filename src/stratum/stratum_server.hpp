@@ -37,7 +37,8 @@ class StratumServer : public Server<StratumClient>
    protected:
     CoinConfig coin_config;
     std::string chain{COIN_SYMBOL};
-    Logger<LogField::Stratum> logger;
+    static constexpr std::string_view field_str = "Stratum";
+    Logger<field_str> logger;
 
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(HTTP_REQ_ALLOCATE);

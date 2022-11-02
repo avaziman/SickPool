@@ -4,10 +4,8 @@ StratumServer::StratumServer(const CoinConfig &conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(conf),
       redis_manager("127.0.0.1", &conf),
-      clients_mutex(),
-      clients(),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
-      round_manager(&redis_manager, "pow"),
+      round_manager(redis_manager, "pow"),
       stats_manager(&redis_manager, &diff_manager, &round_manager,
                     &conf.stats),
       daemon_manager(coin_config.rpcs),
@@ -199,7 +197,7 @@ void StratumServer::HandleBlockNotify()
         // TODO: reset shares
     }
 
-    payment_manager.UpdatePayouts(&round_manager, curtime_ms);
+    // payment_manager.UpdatePayouts(&round_manager, curtime_ms);
 
     // the estimated share amount is supposed to be meet at block time
     const double net_est_hr = new_job->expected_hashes / BLOCK_TIME;

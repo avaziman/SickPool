@@ -46,8 +46,9 @@ class ShareProcessor
 
         return true;
     }
-
-    static Logger<LogField::ShareProcessor> logger;
+    
+    static constexpr std::string_view field_str = "ShareProcessor";
+    static Logger<field_str> logger;
     inline static void Process(ShareResult& result, StratumClient* cli,
                                WorkerContext* wc, const job_t* job,
                                const share_t& share, int64_t curTime)

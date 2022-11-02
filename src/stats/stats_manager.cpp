@@ -17,17 +17,24 @@ StatsManager::StatsManager(RedisManager* redis_manager,
 {
     StatsManager::hashrate_interval_seconds = cc->hashrate_interval_seconds;
     StatsManager::effort_interval_seconds = cc->effort_interval_seconds;
-    StatsManager::average_hashrate_interval_seconds = cc->average_hashrate_interval_seconds;
+    StatsManager::average_hashrate_interval_seconds =
+        cc->average_hashrate_interval_seconds;
     StatsManager::diff_adjust_seconds = cc->diff_adjust_seconds;
     StatsManager::average_interval_ratio =
         (double)average_hashrate_interval_seconds / hashrate_interval_seconds;
+
+    #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
+    // get the last share
+    auto [res, rep] = round_manager->GetSharesBetween(-static_cast<ssize_t>(sizeof(Share)) - 1, -1);
+    round_progress = res.front().progress;
+#endif
 }
+
 void StatsManager::Start(std::stop_token st)
 {
     using namespace std::chrono;
 
-    logger.Log<LogType::Info>(
-                "Started stats manager...");
+    logger.Log<LogType::Info>("Started stats manager...");
     int64_t now = std::time(nullptr);
 
     // rounded to the nearest divisible effort_internval_seconds
@@ -45,20 +52,18 @@ void StatsManager::Start(std::stop_token st)
 
     if (!LoadAvgHashrateSums(next_interval_update * 1000))
     {
-        logger.Log<LogType::Critical>( 
-                    "Failed to load hashrate sums!");
+        logger.Log<LogType::Critical>("Failed to load hashrate sums!");
     }
 
     while (!st.stop_requested())
     {
-
         int64_t next_update =
             std::min({next_interval_update, next_effort_update,
                       next_diff_update, next_block_update});
 
-        logger.Log<LogType::Info>(
-                    "Next stats update in: {}", next_update);
-                    
+        // logger.Log<LogType::Info>(
+        //             "Next stats update in: {}", next_update);
+
         int64_t update_time_ms = next_update * 1000;
 
         std::this_thread::sleep_until(system_clock::from_time_t(next_update));
@@ -74,6 +79,11 @@ void StatsManager::Start(std::stop_token st)
         {
             next_effort_update += effort_interval_seconds;
             round_manager->UpdateEffortStats(update_time_ms);
+
+#if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
+            round_manager->AddPendingShares(pending_shares);
+            pending_shares.clear();
+#endif
         }
 
         if (next_update == next_diff_update)
@@ -82,7 +92,8 @@ void StatsManager::Start(std::stop_token st)
             next_diff_update += diff_adjust_seconds;
         }
 
-        if(next_update == next_block_update){
+        if (next_update == next_block_update)
+        {
             uint32_t block_number = round_manager->blocks_found.load();
             redis_manager->UpdateBlockNumber(update_time_ms, block_number);
             round_manager->blocks_found.store(0);
@@ -111,7 +122,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
     std::vector<std::pair<std::string, double>> remove_worker_hashrates;
     bool res = redis_manager->TsMrange(remove_worker_hashrates, "worker"sv,
-                                       PrefixKey<Prefix::HASHRATE>(),
+                                       redis_manager->key_names.hashrate,
                                        remove_time, remove_time);
 
     {
@@ -119,7 +130,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         // to avoid unnecessary locking
         std::scoped_lock lock(stats_map_mutex);
 
-        for (auto& [worker, worker_hr] : remove_worker_hashrates)
+        for (const auto& [worker, worker_hr] : remove_worker_hashrates)
         {
             worker_stats_map[worker].average_hashrate_sum -= worker_hr;
         }
@@ -162,17 +173,15 @@ bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
 
     if (!res)
     {
-        logger.Log<LogType::Critical>( 
-                    "Failed to load average hashrate sum!");
+        logger.Log<LogType::Critical>("Failed to load average hashrate sum!");
         return false;
     }
 
     for (const auto& [worker, avg_hr_sum] : vec)
     {
         worker_stats_map[worker].average_hashrate_sum = avg_hr_sum;
-        logger.Log<LogType::Info>(
-                    "Loaded worker hashrate sum for {} of {}", worker,
-                    avg_hr_sum);
+        logger.Log<LogType::Info>("Loaded worker hashrate sum for {} of {}",
+                                  worker, avg_hr_sum);
     }
     return true;
 }
@@ -200,10 +209,30 @@ void StatsManager::AddShare(const std::string& worker_full,
         // worker_stats->current_interval_effort += expected_shares;
         worker_stats->current_interval_effort += diff;
 
-        logger.Log<LogType::Debug>( 
-                    "Logged share with diff: {} for {} total diff: {}", diff,
-                    worker_full, worker_stats->current_interval_effort);
-        // logger.Log<LogType::Debug>( 
+#if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
+        round_progress += diff;
+        // // reserve much TODO
+        // const auto reload = 1000;
+        // if (pending_share_count % reload)
+        // {
+        //     auto newpend =
+        //         std::make_unique<Share[]>(pending_share_count + reload);
+        //     memcpy(pending_shares.get(), newpend.get(),
+        //            pending_share_count * sizeof(Share));
+        //     pending_shares.swap(newpend);
+        // }
+
+        Share curshare;
+        curshare.progress = round_progress;
+        memcpy(curshare.addr, miner_addr.data(), ADDRESS_LEN);
+
+        pending_shares.push_back(std::move(curshare));
+#endif
+
+        logger.Log<LogType::Debug>(
+            "Logged share with diff: {} for {} total diff: {}", diff,
+            worker_full, worker_stats->current_interval_effort);
+        // logger.Log<LogType::Debug>(
         //             "Logged share with diff: {}, hashes: {}", diff,
         //             expected_shares);
     }
@@ -223,25 +252,28 @@ bool StatsManager::AddWorker(const std::string& address,
         !new_worker && !worker_stats_map[worker_full].connection_count;
 
     std::string addr_lowercase(address);
+    // std::transform(addr_lowercase.begin(), addr_lowercase.end(),
+    //                addr_lowercase.begin(),
+    //                [](unsigned char c) { return std::tolower(c); });
+
     std::transform(addr_lowercase.begin(), addr_lowercase.end(),
                    addr_lowercase.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
+// std::ranges::transform()
     // 100% new, as we loaded all existing miners
     if (new_miner)
     {
-        logger.Log<LogType::Info>(
-                    "New miner has spawned: {}", address);
+        logger.Log<LogType::Info>("New miner has spawned: {}", address);
         if (redis_manager->AddNewMiner(address, addr_lowercase, worker_full,
                                        idTag, script_pub_key, curtime))
         {
-            logger.Log<LogType::Info>(
-                        "Miner {} added to database.", address);
+            logger.Log<LogType::Info>("Miner {} added to database.", address);
         }
         else
         {
-            logger.Log<LogType::Critical>( 
-                        "Failed to add Miner {} to database.", address);
+            logger.Log<LogType::Critical>("Failed to add Miner {} to database.",
+                                          address);
             return false;
         }
     }
@@ -251,13 +283,13 @@ bool StatsManager::AddWorker(const std::string& address,
         if (redis_manager->AddNewWorker(address, addr_lowercase, worker_full,
                                         idTag))
         {
-            logger.Log<LogType::Info>(
-                        "Worker {} added to database.", worker_full);
+            logger.Log<LogType::Info>("Worker {} added to database.",
+                                      worker_full);
         }
         else
         {
-            logger.Log<LogType::Critical>( 
-                        "Failed to add worker {} to database.", worker_full);
+            logger.Log<LogType::Critical>(
+                "Failed to add worker {} to database.", worker_full);
             return false;
         }
     }

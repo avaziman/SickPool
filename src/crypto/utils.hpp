@@ -82,7 +82,6 @@ constexpr std::string_view EnumName()
     // }
     return name;
 }
-
 inline uint64_t GetCurrentTimeUs()
 {
     struct timeval time_now;

@@ -3,6 +3,7 @@
 #include <deque>
 #include <unordered_map>
 
+#include "block_template.hpp"
 #include "daemon_manager_t.hpp"
 #include "logger.hpp"
 #include "redis_manager.hpp"
@@ -10,21 +11,31 @@
 #include "round_share.hpp"
 #include "stats.hpp"
 #include "transaction.hpp"
-#include "block_template.hpp"
 
 class RoundManager;
 class RedisManager;
 
+enum class PaymentStatus
+{
+    PENDING_INDEPENDENT,
+    BROADCASTED
+};
+
 class PaymentManager
 {
    public:
-    PaymentManager(RedisManager* rm, daemon_manager_t* dm, const std::string& pool_addr, int payout_age_s,
+    PaymentManager(RedisManager* rm, daemon_manager_t* dm,
+                   const std::string& pool_addr, int payout_age_s,
                    int64_t minimum_payout_threshold);
-    static bool GetRewardsProp(round_shares_t& miner_shares,
+
+    static bool GetRewardsPPLNS(round_shares_t& miner_shares,
+                                        const std::span<Share> shares,
+                                        const int64_t block_reward,
+                                        const double n);
+    static bool GetRewardsPROP(round_shares_t& miner_shares,
                                int64_t block_reward,
-                               efforts_map_t& miner_efforts,
+                               const efforts_map_t& miner_efforts,
                                double total_effort, double fee);
-    bool GeneratePayout(RoundManager* round_manager, int64_t time_now);
 
     static uint32_t payment_counter;
     static int payout_age_seconds;
@@ -34,14 +45,14 @@ class PaymentManager
     std::unique_ptr<PaymentInfo> pending_payment;
     std::unique_ptr<PaymentInfo> finished_payment;
 
-    void UpdatePayouts(RoundManager* round_manager, int64_t curtime_ms);
+    // void UpdatePayouts(RoundManager* round_manager, int64_t curtime_ms);
 
    private:
-    bool GeneratePayoutTx(
-        std::vector<uint8_t>& bytes,
-        const std::vector<std::pair<std::string, PayeeInfo>>& rewards);
+    bool GeneratePayoutTx(std::vector<uint8_t>& bytes,
+                          const payees_info_t& rewards);
     // void ResetPayment();
-    static Logger<LogField::PaymentManager> logger;
+    static constexpr std::string_view field_str = "PaymentManager";
+    static Logger<field_str> logger;
     RedisManager* redis_manager;
     daemon_manager_t* daemon_manager;
     std::string pool_addr;

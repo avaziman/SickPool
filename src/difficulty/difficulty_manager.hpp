@@ -23,7 +23,7 @@ class DifficultyManager
     {
     }
 
-    void Adjust(const int passed_seconds, const int curtime_ms)
+    void Adjust(const int passed_seconds, const int64_t curtime_ms)
     {
         std::shared_lock read_lock(*clients_mutex);
         for (auto& [conn, _] : *clients)
@@ -66,7 +66,8 @@ class DifficultyManager
     // static std::mutex clients_mutex;
 
    private:
-    Logger<LogField::DiffManager> logger;
+    static constexpr std::string_view field_str = "DiffManager";
+    Logger<field_str> logger;
     const double target_share_rate;
     std::map<std::shared_ptr<Connection<StratumClient>>, double>* clients;
     std::shared_mutex* clients_mutex;

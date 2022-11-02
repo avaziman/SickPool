@@ -4,16 +4,16 @@
 
 #include "round.hpp"
 
-struct StringHash
+// thought about hashing the address to produce shorter identifier for storage efficiency but it neglects the cryptocurrency's intent and requires another hash to addr mapping...
+#pragma pack(push, 1)
+struct Share
 {
-    using is_transparent = void;  // enables heterogenous lookup
+    std::byte addr[ADDRESS_LEN];
+    double progress;
 
-    std::size_t operator()(std::string_view sv) const
-    {
-        std::hash<std::string_view> hasher;
-        return hasher(sv);
-    }
-};
+    operator std::string() const { return std::string((char*)addr); }
+ };
+#pragma pack(pop)
 
 enum class BadDiff
 {
@@ -49,6 +49,15 @@ struct WorkerStats
 struct MinerStats : public WorkerStats
 {
     uint32_t worker_count = 0;
+};
+
+struct string_hash
+{
+    using transparent_key_equal = std::equal_to<>;  // Pred to use
+    using hash_type = std::hash<std::string_view>;  // just a helper local type
+    size_t operator()(std::string_view txt) const { return hash_type{}(txt); }
+    size_t operator()(const std::string& txt) const { return hash_type{}(txt); }
+    size_t operator()(const char* txt) const { return hash_type{}(txt); }
 };
 
 typedef std::unordered_map<std::string, WorkerStats>

@@ -30,7 +30,8 @@ class BlockWatcher
 
     void CheckImmatureSubmissions();
    private:
-    Logger<LogField::BlockWatcher> logger;
+    static constexpr std::string_view logger_field = "BlockWatcher";
+    Logger<logger_field> logger;
     std::mutex blocks_lock;
     RedisManager* redis_manager;
     daemon_manager_t* daemon_manager;

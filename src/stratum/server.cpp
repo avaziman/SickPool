@@ -19,8 +19,7 @@ Server<T>::Server(int port)
         throw std::runtime_error(
             "Stratum server failed to enter listenning state.");
 
-    logger.Log<LogType::Info>(
-                "Created listening socket on port: {}", port);
+    logger.Log<LogType::Info>("Created listening socket on port: {}", port);
 }
 
 template <class T>
@@ -33,8 +32,7 @@ Server<T>::~Server()
     close(listening_fd);
     close(epoll_fd);
 
-    logger.Log<LogType::Info>(
-                "Server destroyed. Connections closed.");
+    logger.Log<LogType::Info>("Server destroyed. Connections closed.");
 }
 
 template <class T>
@@ -51,12 +49,11 @@ void Server<T>::Service()
             throw std::runtime_error(fmt::format(
                 "Failed to epoll_wait: {} -> {}", errno, std::strerror(errno)));
         }
-        else
+        else if (errno != EINTR)
         {
             // EINTR, ignore
-            logger.Log<LogType::Error>(
-                        "Failed to epoll_wait: {} -> {}", errno,
-                        std::strerror(errno));
+            logger.Log<LogType::Error>("Failed to epoll_wait: {} -> {}", errno,
+                                       std::strerror(errno));
             return;
         }
     }
@@ -71,7 +68,6 @@ void Server<T>::Service()
             auto *conn_it = (connection_it *)(event.data.ptr);
             int sockfd = (*conn_it)->get()->sock;
 
-
             if (flags & EPOLLERR)
             {
                 int error = 0;
@@ -80,9 +76,9 @@ void Server<T>::Service()
                                &errlen) == 0)
                 {
                     logger.Log<LogType::Warn>(
-                                "Received epoll error on socket fd {}, "
-                                "errno: {} -> {}",
-                                sockfd, error, std::strerror(error));
+                        "Received epoll error on socket fd {}, "
+                        "errno: {} -> {}",
+                        sockfd, error, std::strerror(error));
                 }
 
                 EraseClient(conn_it);
@@ -122,9 +118,9 @@ void Server<T>::HandleReadable(connection_it *it)
                 EraseClient(it);
 
                 logger.Log<LogType::Warn>(
-                            "Client with ip {} disconnected because of socket (fd:"
-                            "{}) error: {} -> {}.",
-                            ip, sockfd, errno, std::strerror(errno));
+                    "Client with ip {} disconnected because of socket (fd:"
+                    "{}) error: {} -> {}.",
+                    ip, sockfd, errno, std::strerror(errno));
             }
             return;
         }
@@ -141,7 +137,7 @@ void Server<T>::HandleReadable(connection_it *it)
             EraseClient(it);
 
             logger.Log<LogType::Info>(
-                        "Client with ip {} (sock {}) disconnected.", ip, sockfd);
+                "Client with ip {} (sock {}) disconnected.", ip, sockfd);
             return;
         }
     }
@@ -158,9 +154,9 @@ void Server<T>::HandleNewConnection()
     if (conn_fd < 0)
     {
         logger.Log<LogType::Warn>(
-                    "Failed to accept socket to errno: {} "
-                    "-> errno: {}. ",
-                    conn_fd, errno);
+            "Failed to accept socket to errno: {} "
+            "-> errno: {}. ",
+            conn_fd, errno);
         return;
     }
 
@@ -192,16 +188,15 @@ void Server<T>::HandleNewConnection()
     {
         EraseClient(conn_it);
 
-        logger.Log<
-            LogType::Warn>(
+        logger.Log<LogType::Warn>(
             "Failed to add socket of client with ip {} to epoll list errno: {} "
             "-> errno: {}. ",
             ip, conn_fd, errno);
         return;
     }
 
-    logger.Log<LogType::Info>(
-                "Tcp client connected, ip: {}, sock {}", ip, conn_fd);
+    logger.Log<LogType::Info>("Tcp client connected, ip: {}, sock {}", ip,
+                              conn_fd);
 }
 
 // ptr should point to struct that has Connection as its first member
@@ -224,10 +219,10 @@ bool Server<T>::RearmSocket(connection_it *it)
         EraseClient(it);
 
         logger.Log<LogType::Warn>(
-                    "Failed to rearm socket (fd: {}) of client with ip {} to"
-                    "epoll list errno: {} "
-                    "-> errno: {}. ",
-                    sockfd, ip, errno, std::strerror(errno));
+            "Failed to rearm socket (fd: {}) of client with ip {} to"
+            "epoll list errno: {} "
+            "-> errno: {}. ",
+            sockfd, ip, errno, std::strerror(errno));
         return false;
     }
 
@@ -260,16 +255,16 @@ void Server<T>::EraseClient(connection_it *it)
     if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, sockfd, nullptr) == -1)
     {
         logger.Log<LogType::Warn>(
-                    "Failed to remove socket {} from epoll list errno: {} "
-                    "-> errno: {}. ",
-                    sockfd, errno, std::strerror(errno));
+            "Failed to remove socket {} from epoll list errno: {} "
+            "-> errno: {}. ",
+            sockfd, errno, std::strerror(errno));
     }
     if (close(sockfd) == -1)
     {
         logger.Log<LogType::Warn>(
-                    "Failed to close socket {} errno: {} "
-                    "-> errno: {}. ",
-                    sockfd, errno, std::strerror(errno));
+            "Failed to close socket {} errno: {} "
+            "-> errno: {}. ",
+            sockfd, errno, std::strerror(errno));
     }
 
     HandleDisconnected(it);

@@ -22,45 +22,45 @@ void RedisManager::AppendAddBlockSubmission(
         // bandwidth, as the indexes are added manually anyway no need for
         // hash
         AppendCommand(
-            {"SET"sv, fmt::format("{}:{}", PrefixKey<BLOCK>(), block_id),
-             std::string_view((char *)submission, sizeof(BlockSubmission))});
+            {"SET"sv, fmt::format("{}:{}", key_names.block, block_id),
+             std::string_view(reinterpret_cast<const char*>(submission), sizeof(BlockSubmission))});
         /* sortable indexes */
         // block no. and block time will always be same order
         // so only one index is required to sort by either of them
         // (block num value is smaller)
-        AppendCommand({"ZADD"sv, PrefixKey<BLOCK, INDEX, NUMBER>(),
+        AppendCommand({"ZADD"sv, key_names.block_index_number,
                        std::to_string(submission->number), block_id_sv});
 
-        AppendCommand({"ZADD"sv, PrefixKey<BLOCK, INDEX, REWARD>(),
+        AppendCommand({"ZADD"sv, key_names.block_index_reward,
                        std::to_string(submission->block_reward), block_id_sv});
 
-        AppendCommand({"ZADD"sv, PrefixKey<BLOCK, INDEX, DIFFICULTY>(),
+        AppendCommand({"ZADD"sv, key_names.block_index_difficulty,
                        std::to_string(submission->difficulty), block_id_sv});
 
-        AppendCommand({"ZADD"sv, PrefixKey<BLOCK, INDEX, EFFORT>(),
+        AppendCommand({"ZADD"sv, key_names.block_index_effort,
                        std::to_string(submission->effort_percent),
                        block_id_sv});
 
-        AppendCommand({"ZADD"sv, PrefixKey<BLOCK, INDEX, DURATION>(),
+        AppendCommand({"ZADD"sv, key_names.block_index_duration,
                        std::to_string(submission->duration_ms), block_id_sv});
 
         /* non-sortable indexes */
         AppendCommand({"SADD"sv,
-                       fmt::format("{}:{}", PrefixKey<BLOCK, INDEX, CHAIN>(),
-                                   submission->chain_sv),
+                       Format({key_names.block_index_chain,
+                                   submission->chain_sv}),
                        block_id_sv});
+
+        // AppendCommand(
+        //     {"SADD"sv, PrefixKey<BLOCK, INDEX, TYPE, POW>(), block_id_sv});
 
         AppendCommand(
-            {"SADD"sv, PrefixKey<BLOCK, INDEX, TYPE, POW>(), block_id_sv});
-
-        AppendCommand({"SADD"sv,
-                       fmt::format("{}:{}", PrefixKey<BLOCK, INDEX, SOLVER>(),
-                                   submission->miner_sv),
-                       block_id_sv});
+            {"SADD"sv,
+             Format({key_names.block_index_solver, submission->miner_sv}),
+             block_id_sv});
 
         /* other block statistics */
-        AppendTsAdd(PrefixKey<BLOCK, STATS, EFFORT_PERCENT>(),
-                    submission->time_ms, submission->effort_percent);
+        // AppendTsAdd(PrefixKey<BLOCK, STATS, EFFORT_PERCENT>(),
+        //             submission->time_ms, submission->effort_percent);
 
         // block number is written on interval.
         // AppendTsAdd(PrefixKey<BLOCK, STATS, DURATION>(), submission->time_ms,
@@ -75,10 +75,10 @@ bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,
     using namespace std::string_view_literals;
     std::scoped_lock lock(rc_mutex);
     // redis bitfield uses be so gotta swap em
-    return Command({"BITFIELD"sv,
-                    fmt::format("{}:{}", PrefixKey<BLOCK>(), block_id), "SET"sv,
-                    "i32"sv, "0"sv, std::to_string(bswap_32(confirmations))})
-               .get() == nullptr;
+    return Command({
+               "BITFIELD"sv, Format({key_names.block, block_id}), "SET"sv,
+                   "i32"sv, "0"sv, std::to_string(bswap_32(confirmations))
+           }).get() == nullptr;
 }
 
 bool RedisManager::LoadImmatureBlocks(
@@ -86,7 +86,7 @@ bool RedisManager::LoadImmatureBlocks(
 
 {
     auto reply =
-        Command({"KEYS", fmt::format("{}*", PrefixKey<IMMATURE, REWARD>())});
+        Command({"KEYS", fmt::format("{}*", key_names.reward_immature)});
 
     for (int i = 0; i < reply->elements; i++)
     {
@@ -96,7 +96,7 @@ bool RedisManager::LoadImmatureBlocks(
             block_id.substr(block_id.find_last_of(":") + 1, block_id.size());
 
         auto block_reply = Command(
-            {"GET", fmt::format("{}:{}", PrefixKey<BLOCK>(), block_id)});
+            {"GET", fmt::format("{}:{}", key_names.block, block_id)});
 
         if (block_reply->type != REDIS_REPLY_STRING)
         {
@@ -104,7 +104,7 @@ bool RedisManager::LoadImmatureBlocks(
         }
 
         auto submission = (BlockSubmission *)block_reply->str;
-        std::unique_ptr<ExtendedSubmission> extended =
+        auto extended =
             std::make_unique<ExtendedSubmission>(*submission);
 
         submissions.emplace_back(std::move(extended));

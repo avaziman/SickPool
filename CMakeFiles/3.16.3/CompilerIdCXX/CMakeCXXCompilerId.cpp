@@ -303,17 +303,17 @@
    getting matched.  Store it in a pointer rather than an array
    because some compilers will just produce instructions to fill the
    array rather than assigning a pointer to a static array.  */
-char const* info_compiler = "INFO" ":" "compiler[" COMPILER_ID "]";
+char const* info_compiler = LogType::Info ":" "compiler[" COMPILER_ID "]";
 #ifdef SIMULATE_ID
-char const* info_simulate = "INFO" ":" "simulate[" SIMULATE_ID "]";
+char const* info_simulate = LogType::Info ":" "simulate[" SIMULATE_ID "]";
 #endif
 
 #ifdef __QNXNTO__
-char const* qnxnto = "INFO" ":" "qnxnto[]";
+char const* qnxnto = LogType::Info ":" "qnxnto[]";
 #endif
 
 #if defined(__CRAYXE) || defined(__CRAYXC)
-char const *info_cray = "INFO" ":" "compiler_wrapper[CrayPrgEnv]";
+char const *info_cray = LogType::Info ":" "compiler_wrapper[CrayPrgEnv]";
 #endif
 
 #define STRINGIFY_HELPER(X) #X
@@ -596,8 +596,8 @@ char const info_simulate_version[] = {
    getting matched.  Store it in a pointer rather than an array
    because some compilers will just produce instructions to fill the
    array rather than assigning a pointer to a static array.  */
-char const* info_platform = "INFO" ":" "platform[" PLATFORM_ID "]";
-char const* info_arch = "INFO" ":" "arch[" ARCHITECTURE_ID "]";
+char const* info_platform = LogType::Info ":" "platform[" PLATFORM_ID "]";
+char const* info_arch = LogType::Info ":" "arch[" ARCHITECTURE_ID "]";
 
 
 
@@ -618,7 +618,7 @@ char const* info_arch = "INFO" ":" "arch[" ARCHITECTURE_ID "]";
 #  define CXX_STD __cplusplus
 #endif
 
-const char* info_language_dialect_default = "INFO" ":" "dialect_default["
+const char* info_language_dialect_default = LogType::Info ":" "dialect_default["
 #if CXX_STD > 201703L
   "20"
 #elif CXX_STD >= 201703L

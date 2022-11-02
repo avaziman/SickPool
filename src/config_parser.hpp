@@ -4,11 +4,12 @@
 #include "coin_config.hpp"
 #include "logger.hpp"
 #include "simdjson/simdjson.h"
+static constexpr std::string_view config_field_str = "Config";
 
 #define CONFIG_PRINT_WIDTH 40
 template <typename Doc>
 void AssignJson(const char* name, std::string& obj, Doc& doc,
-                Logger<LogField::Config>& logger)
+                Logger<config_field_str>& logger)
 {
     try
     {
@@ -27,7 +28,7 @@ void AssignJson(const char* name, std::string& obj, Doc& doc,
 
 template <typename Doc>
 void AssignJson(const char* name, double& obj, Doc& doc,
-                Logger<LogField::Config>& logger)
+                Logger<config_field_str>& logger)
 {
     try
     {
@@ -44,7 +45,7 @@ void AssignJson(const char* name, double& obj, Doc& doc,
 
 template <typename T, typename Doc>
 void AssignJson(const char* name, T& obj, Doc& doc,
-                Logger<LogField::Config>& logger)
+                Logger<config_field_str>& logger)
 {
     try
     {
@@ -60,7 +61,7 @@ void AssignJson(const char* name, T& obj, Doc& doc,
 }
 
 void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg,
-                     Logger<LogField::Config>& logger)
+                     Logger<config_field_str>& logger)
 {
     using namespace simdjson;
     ondemand::parser confParser;
@@ -115,6 +116,17 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg,
             rpcConf.host = std::string(host_sv);
             rpcConf.auth = std::string(auth_sv);
             cnfg.rpcs.push_back(rpcConf);
+        }
+
+        rpcs = configDoc["payment_rpcs"].get_array();
+        for (auto rpc : rpcs)
+        {
+            RpcConfig rpcConf;
+            std::string_view host_sv = rpc["host"].get_string();
+            std::string_view auth_sv = rpc["auth"].get_string();
+            rpcConf.host = std::string(host_sv);
+            rpcConf.auth = std::string(auth_sv);
+            cnfg.payment_rpcs.push_back(rpcConf);
         }
     }
     catch (...)

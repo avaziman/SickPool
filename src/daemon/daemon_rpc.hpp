@@ -48,15 +48,17 @@ class DaemonRpc
         return fmt::format("\"{}\"", arg);
     }
 
-    static std::string ToJsonStr(
-        std::initializer_list<std::pair<std::string_view, auto>> obj)
+    template <typename... KeyVal>
+    static std::string ToJsonStr(KeyVal... obj)
     {
         std::string res = "{";
-        for (auto x : obj)
+        auto append = [&res](auto x)
         {
             res += ToJsonStr(x);
             res += ",";
-        }
+        };
+
+        (append(obj), ...);
         res[res.size() - 1] = '}';
         return res;
     }

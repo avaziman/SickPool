@@ -1,29 +1,28 @@
 #include "block_watcher.hpp"
+#include "config_parser.hpp"
 
 int main(int argc, char** argv)
 {
-    Logger<LogField::BlockWatcher> logger;
+    static constexpr std::string_view logger_field = "BlockWatcher";
+    Logger<logger_field> logger;
     if (argc < 2)
     {
         logger.Log<LogType::Critical>("Not enough parameters.");
         return -1;
     }
 
-    std::string coin(argv[1]);
+    Logger<config_field_str> conf_logger;
+    CoinConfig coinConfig;
+    simdjson::padded_string json = simdjson::padded_string::load(argv[1]);
+    ParseCoinConfig(json, coinConfig, conf_logger);
 
     std::vector<std::unique_ptr<ExtendedSubmission>> immature_block_submissions;
     const std::string ip = "127.0.0.1";
-    const CoinConfig c = CoinConfig{.redis = RedisConfig{.redis_port = 6379}};
-    RedisManager redis_manager(ip, &c);
+    RedisManager redis_manager(ip, &coinConfig);
+    daemon_manager_t daemon_manager(coinConfig.rpcs);
+    BlockWatcher block_watcher(&redis_manager, &daemon_manager);
 
-    redis_manager.LoadImmatureBlocks(immature_block_submissions);
-
-    for (std::unique_ptr<ExtendedSubmission>& sub : immature_block_submissions)
-    {
-        logger.Log<LogType::Info>(
-            "Block watcher loaded immature block id: {}, hash: {}", sub->number,
-            std::string_view((char*)sub->hash_hex, HASH_SIZE_HEX));
-    }
+    block_watcher.CheckImmatureSubmissions();
 
     return 0;
 }

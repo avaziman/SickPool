@@ -56,11 +56,18 @@ class StatsManager
     static double average_interval_ratio;
 
    private:
-    Logger<LogField::StatsManager> logger;
+    static constexpr std::string_view field_str = "StatsManager";
+    Logger<field_str> logger;
     const StatsConfig* conf;
     RedisManager* redis_manager;
     DifficultyManager* diff_manager;
     RoundManager* round_manager;
+
+    #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
+    double round_progress; // PPLNS
+    // use raw bytes, to pass directly to redis in one command
+    std::vector<Share> pending_shares;
+    #endif
 
     std::mutex stats_map_mutex;
     // worker -> stats

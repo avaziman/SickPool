@@ -21,7 +21,8 @@
 // void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg);
 
 stratum_server_t* stratum_server_ptr;
-Logger<LogField::Config> logger;
+
+Logger<config_field_str> logger;
 
 void SigintHandler(int sig)
 {

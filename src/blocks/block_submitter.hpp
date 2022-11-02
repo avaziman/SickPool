@@ -1,9 +1,10 @@
 #ifndef BLOCK_SUBMITTER_HPP_
 #define BLOCK_SUBMITTER_HPP_
 
+#include <mutex>
+
 #include "logger.hpp"
 #include "round_manager.hpp"
-#include <mutex>
 
 class BlockSubmitter
 {
@@ -11,7 +12,8 @@ class BlockSubmitter
     RoundManager* round_manager;
     daemon_manager_t* daemon_manager;
     RedisManager* redis_manager;
-    Logger<LogField::BlockSubmitter> logger;
+    static constexpr std::string_view field_str = "BlockSubmitter";
+    Logger<field_str> logger;
 
    public:
     BlockSubmitter(RedisManager* redis_manager,
@@ -21,7 +23,6 @@ class BlockSubmitter
           daemon_manager(daemon_manager),
           round_manager(round_manager)
     {
-        
     }
 
     inline bool TrySubmit(const std::string_view chain,
@@ -33,6 +34,7 @@ class BlockSubmitter
         for (int i = 0; i < submit_retries; ++i)
         {
             added = daemon_manager->SubmitBlock(block_hex, parser);
+
             if (added)
             {
                 break;
@@ -46,13 +48,10 @@ class BlockSubmitter
     {
         std::scoped_lock lock(blocks_lock);
 
+        // block number increased here.
         round_manager->CloseRound(submission.get(), pow_fee);
 
-        // TODO: incrblockcount somewhere
-        //  redis_manager->IncrBlockCount();
-
-        logger.Log<
-        LogType::Info>(
+        logger.Log<LogType::Info>(
             "Added new block submission: \n"
             "┌{0:─^{12}}┐\n"
             "│{1: ^{12}}│\n"
@@ -86,8 +85,8 @@ class BlockSubmitter
             72);
 
         logger.Log<LogType::Info>(
-                    "Closed round for block submission no {} (immature).",
-                    submission->number);
+            "Closed round for block submission no {} (immature).",
+            submission->number);
         // immature_block_submissions.push_back(std::move(submission));
 
         return true;

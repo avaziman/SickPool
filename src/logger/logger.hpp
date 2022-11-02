@@ -5,7 +5,6 @@
 #include <fmt/color.h>
 #include <fmt/format.h>
 #include <cstdio>
-#include "utils.hpp"
 
 enum class LogType
 {
@@ -16,34 +15,13 @@ enum class LogType
     Critical = 4,
 };
 
-enum class LogField
-{
-
-    Config,
-    Stratum,
-    JobManager,
-    ShareProcessor,
-    DaemonManager,
-    Redis,
-    StatsManager,
-    ControlServer,
-    SubmissionManager,
-    PaymentManager,
-    DiffManager,
-    RoundManager,
-    Benchmark,
-    BlockWatcher,
-    BlockSubmitter,
-    Server,
-};
-
-template <LogField field>
+template <std::string_view const& field_str>
 class Logger
 {
    public:
+    Logger() = default;
+    Logger(const Logger& _logger) {}
     mutable std::mutex log_mutex;
-
-    static constexpr std::string_view field_name = EnumName<field>();
 
     // Logger(){
 
@@ -52,29 +30,37 @@ class Logger
     template <LogType type, typename... T>
     /*static*/ inline void Log(fmt::format_string<T...> message, T&&... args) const
     {
+        using enum fmt::color;
+
         std::scoped_lock lock(log_mutex);
         fmt::v9::text_style color;
         switch (type)
         {
             case LogType::Debug:
-                color = fg(fmt::color::green);
+                color = fg(green);
+                fmt::print(color, "[DEBUG]");
                 break;
             case LogType::Info:
-                color = fg(fmt::color::dodger_blue);
+                color = fg(dodger_blue);
+                fmt::print(color, "[INFO]");
                 break;
             case LogType::Warn:
-                color = fg(fmt::color::yellow);
+                color = fg(yellow);
+                fmt::print(color, "[WARN]");
                 break;
             case LogType::Error:
-                color = fg(fmt::color::red);
+                color = fg(red);
+                fmt::print(color, "[ERROR]");
                 break;
             case LogType::Critical:
-                color = fg(fmt::color::red);
+                color = fg(red);
+                fmt::print(color, "[CRITICAL]");
                 break;
         }
 
-        fmt::print(color, fmt::format("[{}][{}]{}\n", EnumName<type>(), field_name, message), std::forward<T>(args)...);
-        printf("\n");
+        fmt::print(color, "[{}] ", field_str);
+        fmt::print(message, std::forward<T>(args)...);
+        fmt::print("\n");
     }
 };
 

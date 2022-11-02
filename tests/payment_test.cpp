@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <span>
+
 #include "payments/payment_manager.hpp"
+#include "round_share.hpp"
+#include "test_utils.hpp"
 
 TEST(Payment, CalculateRewardsProp)
 {
@@ -12,8 +16,8 @@ TEST(Payment, CalculateRewardsProp)
     miners.emplace("y", 2000);
     miners.emplace("z", 2000);
 
-    std::vector<std::pair<std::string, RoundShare>> shares;
-    PaymentManager::GetRewardsProp(shares, 10e8, miners, total_effort, 0.01);
+    round_shares_t shares;
+    PaymentManager::GetRewardsPROP(shares, 10e8, miners, total_effort, 0.01);
     ASSERT_EQ(shares.size(), miners.size());
 
     for (const auto& share : shares)
@@ -29,6 +33,34 @@ TEST(Payment, CalculateRewardsProp)
             ASSERT_EQ(share.second.reward, 396000000);
         }
     }
+}
+
+TEST(Payment, CalculateRewardsPPLNS)
+{
+    double total_effort = 5000;
+    std::string chain = "GTEST";
+
+    double progress = 3.0;
+    std::vector<Share> shares = {Share{{std::byte{1}}, 0.9},
+                                 Share{{std::byte{2}}, 1.5},
+                                 Share{{std::byte{3}}, progress}};
+
+    const double n = 2;
+    const int64_t block_reward = 100'000'000;
+    round_shares_t rewards;
+    PaymentManager::GetRewardsPPLNS(rewards, std::span<Share>(shares),
+                                    block_reward, n);
+    // two shares:
+    // '\3' -> 1.5 -> block reward * 0.75
+    // '\2' -> 0.5 -> block_reward * 0.25
+
+    ASSERT_EQ(rewards.size(), 2);
+    auto rew1 = RoundShare{1, 0.75, static_cast<int64_t>(0.75 * block_reward)};
+    auto rew2 = RoundShare{1, 0.25, static_cast<int64_t>(0.25 * block_reward)};
+    ASSERT_FALSE(memcmp(&rewards["\3"], &rew1, sizeof(RoundShare)));
+    ASSERT_FALSE(memcmp(&rewards["\2"], &rew2, sizeof(RoundShare)));
+    // ASSERT_EQ(rewards["\2"], RoundShare{1, 0.25, 0.25 * block_reward});
+
 }
 
 // TEST(Payment, GenerateTx)
@@ -50,7 +82,9 @@ TEST(Payment, CalculateRewardsProp)
 //     Hexlify(hex, bytes.data(), bytes.size());
 
 //     // verus -chain=VRSCTEST createrawtransaction
-//     // "[{\"txid\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"vout\":0}]" 0 0
+//     //
+//     "[{\"txid\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"vout\":0}]"
+//     0 0
 //     // "{\"RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC\":1}"
 //     //  locktime 0 expiryheight 0
 

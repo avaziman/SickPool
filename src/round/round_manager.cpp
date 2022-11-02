@@ -2,20 +2,19 @@
 
 using enum Prefix;
 
-RoundManager::RoundManager(RedisManager* rm, const std::string& round_type)
-    : redis_manager(rm), round_type(round_type)
+RoundManager::RoundManager(const RedisManager& rm,
+                           const std::string& round_type)
+    : RedisRound(rm), round_type(round_type)
 {
     if (!LoadCurrentRound())
     {
-        logger.Log<LogType::Critical>( 
-                    "Failed to load current round!");
+        logger.Log<LogType::Critical>("Failed to load current round!");
     }
 
-    if (!redis_manager->ResetMinersWorkerCounts(efforts_map,
+    if (!ResetMinersWorkerCounts(efforts_map,
                                                 GetCurrentTimeMs()))
     {
-        logger.Log<LogType::Critical>( 
-                    "Failed to reset worker counts!");
+        logger.Log<LogType::Critical>("Failed to reset worker counts!");
     }
 }
 
@@ -24,7 +23,7 @@ bool RoundManager::CloseRound(const ExtendedSubmission* submission, double fee)
     std::scoped_lock round_lock(round_map_mutex);
 
     round_shares_t round_shares;
-    PaymentManager::GetRewardsProp(round_shares, submission->block_reward,
+    PaymentManager::GetRewardsPROP(round_shares, submission->block_reward,
                                    efforts_map, round.total_effort, fee);
 
     round.round_start_ms = submission->time_ms;
@@ -33,13 +32,12 @@ bool RoundManager::CloseRound(const ExtendedSubmission* submission, double fee)
 
     ResetRoundEfforts();
 
-    return redis_manager->CloseRound(submission->chain_sv, round_type,
+    return SetClosedRound(submission->chain_sv, round_type,
                                      submission, round_shares,
                                      submission->time_ms);
 }
 
-void RoundManager::AddRoundShare(
-                                 const std::string& miner, const double effort)
+void RoundManager::AddRoundShare(const std::string& miner, const double effort)
 {
     std::scoped_lock round_lock(efforts_map_mutex);
 
@@ -47,24 +45,18 @@ void RoundManager::AddRoundShare(
     round.total_effort += effort;
 }
 
-Round RoundManager::GetChainRound()
-{
-    return round;
-}
-
 bool RoundManager::LoadCurrentRound()
 {
     if (!LoadEfforts())
     {
-        logger.Log<LogType::Critical>( 
-                    "Failed to load current round efforts!");
+        logger.Log<LogType::Critical>("Failed to load current round efforts!");
         return false;
     }
 
     auto chain = std::string(COIN_SYMBOL);
 
     // no need mutex here
-    redis_manager->LoadCurrentRound(chain, round_type, &round);
+    GetCurrentRound(&round, chain, round_type);
 
     if (round.round_start_ms == 0)
     {
@@ -72,24 +64,24 @@ bool RoundManager::LoadCurrentRound()
 
         // append commands are not locking but since its before threads are
         // starting its ok set round start time
-        redis_manager->AppendSetMinerEffort(chain,
-                                            PrefixKey<ROUND, START_TIME>(),
-                                            round_type, round.round_start_ms);
+        AppendSetMinerEffort(chain,
+                                            EnumName<START_TIME>(),
+                                            round_type, static_cast<double>(round.round_start_ms));
         // reset round effort if we are starting it now hadn't started
-        redis_manager->AppendSetMinerEffort(
-            chain, EnumName<TOTAL_EFFORT>(), round_type, 0);
+        AppendSetMinerEffort(chain, EnumName<TOTAL_EFFORT>(),
+                                            round_type, 0);
 
-        if (!redis_manager->GetReplies())
+        if (!GetReplies())
         {
-            logger.Log<LogType::Critical>( 
-                        "Failed to reset round effort and start time");
+            logger.Log<LogType::Critical>(
+                "Failed to reset round effort and start time");
             return false;
         }
     }
 
     logger.Log<LogType::Info>(
-                "Loaded round chain: {}, effort of: {}, started at: {}", chain,
-                round.total_effort, round.round_start_ms);
+        "Loaded round chain: {}, effort of: {}, started at: {}", chain,
+        round.total_effort, round.round_start_ms);
     return true;
 }
 
@@ -102,22 +94,18 @@ void RoundManager::ResetRoundEfforts()
     }
 }
 
-bool RoundManager::UpdateEffortStats(int64_t update_time_ms)
+bool RoundManager::UpdateEffortStats([[maybe_unused]] int64_t update_time_ms)
 {
     // (with mutex)
     std::unique_lock round_lock(round_map_mutex);
     const double total_effort = round.total_effort;
 
-    return redis_manager->UpdateEffortStats(efforts_map, total_effort,
-                                            std::move(round_lock));
+    return SetEffortStats(efforts_map, total_effort, std::move(round_lock));
 }
 
 bool RoundManager::LoadEfforts()
 {
-    bool res =
-        redis_manager->LoadMinersEfforts(COIN_SYMBOL, round_type, efforts_map);
-
-    auto it = efforts_map.begin();
+    bool res = GetMinerEfforts(efforts_map, COIN_SYMBOL, round_type);
 
     std::vector<std::string> to_remove;
     for (auto& [addr, effort] : efforts_map)
@@ -129,9 +117,8 @@ bool RoundManager::LoadEfforts()
         }
         else
         {
-            logger.Log<LogType::Info>(
-                        "Loaded {} effort for address {} of {}", round_type,
-                        addr, effort);
+            logger.Log<LogType::Info>("Loaded {} effort for address {} of {}",
+                                      round_type, addr, effort);
         }
     }
 
@@ -147,12 +134,4 @@ bool RoundManager::IsMinerIn(const std::string& addr)
 {
     std::scoped_lock lock(efforts_map_mutex);
     return efforts_map.contains(addr);
-}
-// TODO: make this only for singular chain
-
-bool RoundManager::LoadUnpaidRewards(
-    std::vector<std::pair<std::string, PayeeInfo>>& rewards)
-{
-    return redis_manager->LoadUnpaidRewards(rewards, efforts_map,
-                                            &efforts_map_mutex);
 }

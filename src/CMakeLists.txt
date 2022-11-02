@@ -19,7 +19,7 @@ FetchContent_MakeAvailable(fmt)
 # optimized hash function
 add_subdirectory(crypto/cn)
 add_subdirectory(crypto/verushash)
-add_subdirectory(daemon)
+# add_subdirectory(daemon)
 # add_subdirectory(crypto/x25x)
 find_path(HIREDIS_HEADER hiredis)
 
@@ -64,3 +64,5 @@ target_link_libraries(
 )
 
 add_subdirectory(blocks)
+add_subdirectory(daemon)
+add_subdirectory(payments)

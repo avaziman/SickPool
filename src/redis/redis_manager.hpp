@@ -22,14 +22,18 @@
 #include "shares/share.hpp"
 #include "static_config/static_config.hpp"
 #include "stats/stats.hpp"
-#include "stats/stats_manager.hpp"
 #include "utils.hpp"
 
-#define xstr(s) str(s)
-#define STRM(s) #s
+#define STRR(s) #s
+#define xSTRR(s) STRR(s)
 
 typedef std::unique_ptr<redisReply, std::function<void(redisReply *)>>
     redis_unique_ptr;
+typedef std::unique_ptr<redisContext, std::function<void(redisContext *)>>
+    redis_unique_ptr_context;
+
+typedef std::vector<std::pair<std::string, PayeeInfo>> payees_info_t;
+
 struct TsAggregation
 {
     std::string type;
@@ -40,12 +44,13 @@ struct TsAggregation
 enum class Prefix
 {
     POW,
+    PAYOUT,
+    PAYOUT_FEELESS,
     PAYOUTS,
     ADDRESS_MAP,
+    ALIAS_MAP,
     PAYOUT_THRESHOLD,
     IDENTITY,
-    JOIN_TIME,
-    SCRIPT_PUB_KEY,
     ROUND,
     EFFORT,
     WORKER_COUNT,
@@ -81,6 +86,12 @@ enum class Prefix
     DIFFICULTY,
     ROUND_EFFORT,
 
+    PAYEES,
+    FEE_PAYEES,
+    PENDING_AMOUNT,
+    PENDING_AMOUNT_FEE,
+    PENDING,
+    FEELESS,
     MINER,
     WORKER,
     TYPE,
@@ -90,48 +101,8 @@ enum class Prefix
     COMPACT,
 };
 
+// TODO: update pending payout on payment settings change
 static constexpr std::string_view coin_symbol = COIN_SYMBOL;
-
-// i couldn't make it with packed template...
-template <Prefix T>
-constexpr std::string_view PrefixKey()
-{
-    static constexpr std::string_view name = EnumName<T>();
-    return join_v<coin_symbol, name>;
-}
-
-template <Prefix T1, Prefix T2>
-constexpr std::string_view PrefixKey()
-{
-    static constexpr std::string_view name1 = EnumName<T1>();
-    static constexpr std::string_view name2 = EnumName<T2>();
-    return join_v<coin_symbol, name1, name2>;
-}
-
-template <Prefix T1, Prefix T2, Prefix T3>
-constexpr std::string_view PrefixKey()
-{
-    static constexpr std::string_view name1 = EnumName<T1>();
-    static constexpr std::string_view name2 = EnumName<T2>();
-    static constexpr std::string_view name3 = EnumName<T3>();
-    return join_v<coin_symbol, name1, name2, name3>;
-}
-
-template <Prefix T1, Prefix T2, Prefix T3, Prefix T4>
-constexpr std::string_view PrefixKey()
-{
-    static constexpr std::string_view name1 = EnumName<T1>();
-    static constexpr std::string_view name2 = EnumName<T2>();
-    static constexpr std::string_view name3 = EnumName<T3>();
-    static constexpr std::string_view name4 = EnumName<T4>();
-    return join_v<coin_symbol, name1, name2, name3, name4>;
-}
-
-template <const std::string_view &...sview>
-constexpr std::string_view PrefixKeySv()
-{
-    return join_v<coin_symbol, sview...>;
-}
 
 class RedisTransaction;
 class RedisManager
@@ -139,12 +110,20 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    RedisManager(const std::string &ip, const CoinConfig *cc);
+    RedisManager(const std::string &ip, const CoinConfig *cc, int db_index = 0);
+    RedisManager(const RedisManager &rm)
+        : conf(rm.conf), logger(rm.logger), key_names(rm.key_names)
+    {
+    }
     ~RedisManager();
-
-    const RedisConfig *conf;
-
+    void Init();
     /* block */
+
+    // bool GetPendingPayouts(reward_map_t &payouts) {
+    //     AppendCommand()
+    // }
+
+    // manual binary search :)
 
     void AppendAddBlockSubmission(const ExtendedSubmission *submission);
     bool UpdateBlockConfirmations(std::string_view block_id,
@@ -163,34 +142,18 @@ class RedisManager
     // bool PopWorker(std::string_view address);
 
     /* round */
-    bool LoadUnpaidRewards(
-        std::vector<std::pair<std::string, PayeeInfo>> &rewards,
-        const efforts_map_t &efforts, std::mutex *efforts_mutex);
-    void AppendSetMinerEffort(std::string_view chain, std::string_view miner,
-                              std::string_view type, double effort);
-    void AppendAddRoundShares(std::string_view chain,
-                              const BlockSubmission *submission,
-                              const round_shares_t &miner_shares);
+    bool LoadUnpaidRewards(payees_info_t &rewards,
+                           const std::vector<std::string> &addresses);
+    bool GetAddresses(std::vector<std::string> &addresses);
+
+    /* stats */
     bool SetNewBlockStats(std::string_view chain, int64_t curtime,
                           double net_hr, double estimated_shares);
     bool ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
                                  int64_t time_now);
-
-    bool CloseRound(std::string_view chain, std::string_view type,
-                    const ExtendedSubmission *submission,
-                    round_shares_t &round_shares, int64_t time_ms);
-
-    /* stats */
     bool LoadAverageHashrateSum(
         std::vector<std::pair<std::string, double>> &hashrate_sums,
         std::string_view prefix, int64_t hr_time);
-
-    bool LoadMinersEfforts(std::string_view chain, std::string_view type,
-                           efforts_map_t &efforts);
-
-    bool UpdateEffortStats(efforts_map_t &miner_stats_map,
-                           const double total_effort,
-                           std::unique_lock<std::mutex> stats_mutex);
 
     bool UpdateIntervalStats(worker_map &worker_stats_map,
                              miner_map &miner_stats_map,
@@ -213,8 +176,6 @@ class RedisManager
 
     std::string hget(std::string_view key, std::string_view field);
 
-    void LoadCurrentRound(std::string_view chain, std::string_view type,
-                          Round *rnd);
     bool LoadImmatureBlocks(
         std::vector<std::unique_ptr<ExtendedSubmission>> &submsissions);
 
@@ -256,14 +217,158 @@ class RedisManager
         return res;
     }
 
+    bool AddPendingPayees(payees_info_t &payees)
+    {
+        using enum Prefix;
+        AppendCommand({"UNLINK", key_names.pending_payout});
+
+        int total_payees = 0, fee_payees = 0;
+        int64_t pending_amount = 0, pending_amount_fee = 0;
+
+        for (const auto &[addr, payee_info] : payees)
+        {
+            total_payees++;
+            pending_amount += payee_info.amount;
+            if (payee_info.settings.pool_block_only)
+            {
+                // minus represents feeless
+                AppendCommand({"HSET", key_names.pending_payout, addr,
+                               std::to_string(-payee_info.amount)});
+            }
+            else
+            {
+                AppendCommand({"HSET", key_names.pending_payout, addr,
+                               std::to_string(payee_info.amount)});
+                pending_amount_fee += payee_info.amount;
+                fee_payees++;
+            }
+        }
+
+        AppendCommand({"HSET", key_names.pending_payout, EnumName<PAYEES>(),
+                       std::to_string(total_payees)});
+        AppendCommand({"HSET", key_names.pending_payout, EnumName<FEE_PAYEES>(),
+                       std::to_string(fee_payees)});
+
+        AppendCommand({"HSET", key_names.pending_payout,
+                       EnumName<PENDING_AMOUNT>(),
+                       std::to_string(pending_amount)});
+        AppendCommand({"HSET", key_names.pending_payout,
+                       EnumName<PENDING_AMOUNT_FEE>(),
+                       std::to_string(pending_amount_fee)});
+
+        return GetReplies();
+    }
+
     static constexpr int ROUND_SHARES_LIMIT = 100;
 
-    std::mutex rc_mutex;
+    static redis_unique_ptr_context rc_unique;
+    static redisContext *rc;
+    static std::mutex rc_mutex;
+    const CoinConfig *conf;
 
-   private:
-    Logger<LogField::Redis> logger;
-    redisContext *rc;
-    int command_count = 0;
+    // TODO: make private...
+    struct KeyNames
+    {
+       private:
+        const std::string coin;
+
+       public:
+        explicit KeyNames(std::string_view coin) : coin(coin) {}
+        using enum Prefix;
+
+        const std::string round = Format({coin, EnumName<ROUND>()});
+        const std::string round_shares = Format({round, EnumName<SHARES>()});
+        const std::string round_efforts = Format({round, EnumName<EFFORT>()});
+
+        const std::string block = Format({coin, EnumName<BLOCK>()});
+        const std::string block_effort_percent =
+            Format({block, EnumName<EFFORT_PERCENT>()});
+        const std::string block_effort_percent_compact =
+            Format({block_effort_percent, EnumName<COMPACT>()});
+        const std::string block_number_compact =
+            Format({block, EnumName<NUMBER>(), EnumName<COMPACT>()});
+
+        // derived
+        const std::string block_index = Format({block, EnumName<INDEX>()});
+        const std::string block_index_number =
+            Format({block_index, EnumName<NUMBER>()});
+        const std::string block_index_reward =
+            Format({block_index, EnumName<REWARD>()});
+        const std::string block_index_difficulty =
+            Format({block_index, EnumName<DIFFICULTY>()});
+        const std::string block_index_effort =
+            Format({block_index, EnumName<EFFORT>()});
+        const std::string block_index_duration =
+            Format({block_index, EnumName<DURATION>()});
+        const std::string block_index_chain =
+            Format({block_index, EnumName<CHAIN>()});
+        const std::string block_index_solver =
+            Format({block_index, EnumName<SOLVER>()});
+        const std::string block_mature_channel =
+            Format({block, EnumName<MATURE>()});
+
+        const std::string shares = Format({coin, EnumName<SHARES>()});
+        const std::string shares_valid = Format({shares, EnumName<VALID>()});
+        const std::string shares_stale = Format({shares, EnumName<STALE>()});
+        const std::string shares_invalid =
+            Format({shares, EnumName<INVALID>()});
+
+        const std::string hashrate = Format({coin, EnumName<HASHRATE>()});
+        const std::string hashrate_average =
+            Format({hashrate, EnumName<AVERAGE>()});
+        const std::string hashrate_network =
+            Format({hashrate, EnumName<NETWORK>()});
+        const std::string hashrate_network_compact =
+            Format({hashrate_network, EnumName<COMPACT>()});
+        const std::string hashrate_pool = Format({hashrate, EnumName<POOL>()});
+        const std::string hashrate_pool_compact =
+            Format({hashrate_pool, EnumName<COMPACT>()});
+
+        const std::string worker_count =
+            Format({coin, EnumName<WORKER_COUNT>()});
+        const std::string worker_count_pool =
+            Format({worker_count, EnumName<POOL>()});
+        const std::string worker_countp_compact =
+            Format({worker_count_pool, EnumName<COMPACT>()});
+
+        const std::string miner_count =
+            Format({coin, EnumName<MINER_COUNT>(), EnumName<POOL>()});
+        const std::string miner_count_compact =
+            Format({miner_count, EnumName<COMPACT>()});
+
+        const std::string difficulty = Format({coin, EnumName<DIFFICULTY>()});
+        const std::string difficulty_compact =
+            Format({difficulty, EnumName<COMPACT>()});
+
+        const std::string solver = Format({coin, EnumName<SOLVER>()});
+        const std::string solver_index = Format({solver, EnumName<INDEX>()});
+        const std::string solver_index_mature =
+            Format({solver_index, EnumName<MATURE_BALANCE>()});
+        const std::string solver_index_worker_count =
+            Format({solver_index, EnumName<WORKER_COUNT>()});
+        const std::string solver_index_hashrate =
+            Format({solver_index, EnumName<HASHRATE>()});
+        const std::string solver_index_jointime =
+            Format({solver_index, EnumName<START_TIME>()});
+
+        const std::string reward = Format({coin, EnumName<REWARD>()});
+        const std::string reward_immature =
+            Format({reward, EnumName<IMMATURE>()});
+        const std::string reward_mature = Format({reward, EnumName<MATURE>()});
+
+        const std::string address_map = Format({coin, EnumName<ADDRESS_MAP>()});
+        const std::string block_number =
+            Format({coin, EnumName<BLOCK>(), EnumName<NUMBER>()});
+
+        const std::string payout = Format({coin, EnumName<PAYOUT>()});
+        const std::string pending_payout =
+            Format({payout, EnumName<PENDING>()});
+    };
+    const KeyNames key_names;
+
+   protected:
+    static constexpr std::string_view logger_field = "Redis";
+    const Logger<logger_field> logger;
     void AppendCommand(std::initializer_list<std::string_view> args)
     {
         using namespace std::string_literals;
@@ -279,7 +384,7 @@ class RedisManager
             i++;
         }
 
-        redisAppendCommandArgv(rc, argc, argv, args_len);
+        redisAppendCommandArgv(rc, static_cast<int>(argc), argv, args_len);
         command_count++;
     }
 
@@ -289,6 +394,35 @@ class RedisManager
         redis_unique_ptr rptr;
         bool res = GetReplies(&rptr);
         return rptr;
+    }
+
+    struct Stringable
+    {
+        const std::string_view val;
+
+        // explicit(false) Stringable(Prefix p) : val(STRR(p)) {}
+        explicit(false) Stringable(std::string_view p) : val(p) {}
+        explicit(false) Stringable(const std::string &p) : val(p) {}
+
+        explicit(false) operator std::string_view() const { return val; }
+    };
+
+    using Args = std::initializer_list<Stringable>;
+
+    static std::string Format(Args args)
+    {
+        // assert(args.size() > 0);
+
+        std::string res;
+        for (const auto &a : args)
+        {
+            res += a;
+            res += ':';
+        }
+
+        res.pop_back();
+
+        return res;
     }
 
     void AppendTsCreate(std::string_view key, std::string_view prefix,
@@ -311,6 +445,9 @@ class RedisManager
                                    std::string_view prefix,
                                    int64_t update_time_ms,
                                    const WorkerStats &ws);
+
+   private:
+    int command_count = 0;
 };
 
 #endif

@@ -13,7 +13,7 @@ set(CMAKE_CXX_COMPILER /usr/bin/g++-12)
 project("SickPool" CXX C)
 set(PROJECT_NAME_CORE ${PROJECT_NAME}_core)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -38,9 +38,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3")
 else()
     # -g3 maximum debugging information
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -Wsubobject-linkage")
     add_compile_definitions(SIMDJSON_DEVELOPMENT_CHECKS)
 endif()
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory(src)
 

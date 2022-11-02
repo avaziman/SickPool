@@ -1,6 +1,6 @@
 #include "payment_manager.hpp"
 
-Logger<LogField::PaymentManager> PaymentManager::logger;
+Logger<PaymentManager::field_str> PaymentManager::logger;
 
 int PaymentManager::payout_age_seconds;
 int64_t PaymentManager::minimum_payout_threshold;
@@ -16,9 +16,50 @@ PaymentManager::PaymentManager(RedisManager* rm, daemon_manager_t* dm,
     PaymentManager::minimum_payout_threshold = min_threshold;
 }
 
-bool PaymentManager::GetRewardsProp(round_shares_t& miner_shares,
-                                    int64_t block_reward,
-                                    efforts_map_t& miner_efforts,
+inline void AddShare(round_shares_t& miner_shares, double& score_sum,
+                     const double n, const double score,
+                     const int64_t block_reward, const std::string& addr)
+{
+    const double share_ratio = score / n;
+    const auto reward =
+        static_cast<int64_t>(share_ratio * static_cast<double>(block_reward));
+
+    score_sum += score;
+
+    miner_shares[addr].reward += reward;
+    miner_shares[addr].share += share_ratio;
+    miner_shares[addr].effort += 1;
+}
+
+bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
+                                     const std::span<Share> shares,
+                                     const int64_t block_reward, const double n)
+{
+    double score_sum = 0;
+    miner_shares.reserve(shares.size());
+    for (size_t i = shares.size() - 1; i > 1; i--)
+    {
+        const double score = shares[i].progress - shares[i - 1].progress;
+        
+        AddShare(miner_shares, score_sum, n, score, block_reward,
+                 shares[i]);
+    }
+
+    if (score_sum >= n){
+        return false;
+    }
+
+    const double last_score = n - score_sum;
+
+    AddShare(miner_shares, score_sum, n, last_score, block_reward,
+             shares[0]);
+
+    return true;
+}
+
+bool PaymentManager::GetRewardsPROP(round_shares_t& miner_shares,
+                                    const int64_t block_reward,
+                                    const efforts_map_t& miner_efforts,
                                     double total_effort, double fee)
 {
     int64_t substracted_reward =
@@ -26,8 +67,7 @@ bool PaymentManager::GetRewardsProp(round_shares_t& miner_shares,
 
     if (total_effort == 0)
     {
-        logger.Log<LogType::Critical>(
-                    "Round effort is 0!");
+        logger.Log<LogType::Critical>("Round effort is 0!");
         return false;
     }
     miner_shares.reserve(miner_efforts.size());
@@ -39,150 +79,109 @@ bool PaymentManager::GetRewardsProp(round_shares_t& miner_shares,
         round_share.share = round_share.effort / total_effort;
         round_share.reward = static_cast<int64_t>(
             round_share.share * static_cast<double>(substracted_reward));
-        miner_shares.emplace_back(addr, round_share);
+        miner_shares.try_emplace(addr, round_share);
 
         logger.Log<LogType::Info>(
-                    "Miner round share: {}, effort: {}, share: {}, reward: "
-                    "{}, total effort: {}",
-                    addr, round_share.effort, round_share.share,
-                    round_share.reward, total_effort);
+            "Miner round share: {}, effort: {}, share: {}, reward: "
+            "{}, total effort: {}",
+            addr, round_share.effort, round_share.share, round_share.reward,
+            total_effort);
     }
 
     return true;
 }
 
-bool PaymentManager::GeneratePayout(RoundManager* round_manager,
-                                    int64_t time_now_ms)
-{
-    // add new payments
-    std::vector<uint8_t> payout_bytes;
-    std::vector<std::pair<std::string, PayeeInfo>> rewards;
-    round_manager->LoadUnpaidRewards(rewards);
+// bool PaymentManager::GeneratePayout(RoundManager* round_manager,
+//                                     int64_t time_now_ms)
+// {
+//     // add new payments
+//     std::vector<uint8_t> payout_bytes;
+//     payees_info_t rewards;
+//     // round_manager->LoadUnpaidRewards(rewards);
 
-    for (const auto& [addr, info] : rewards)
-    {
-        logger.Log<LogType::Info>(
-                    "Pending reward to {} -> {}, threshold: {}.", addr,
-                    info.amount, info.settings.threshold);
-    }
+//     for (const auto& [addr, info] : rewards)
+//     {
+//         logger.Log<LogType::Info>(
+//                     "Pending reward to {} -> {}, threshold: {}.", addr,
+//                     info.amount, info.settings.threshold);
+//     }
 
-    if (!GeneratePayoutTx(payout_bytes, rewards))
-    {
-        return false;
-    }
+//     if (!GeneratePayoutTx(payout_bytes, rewards))
+//     {
+//         return false;
+//     }
 
-    char bytes_hex[payout_bytes.size() * 2];
-    Hexlify(bytes_hex, payout_bytes.data(), payout_bytes.size());
-    std::string_view unfunded_rawtx(bytes_hex, sizeof(bytes_hex));
+//     //TODO: createrawtransaction
 
-    FundRawTransactionRes fund_res;
-    // 0 fees
-    if (!daemon_manager->FundRawTransaction(fund_res, parser, unfunded_rawtx, 0, pool_addr))
-        {
-            logger.Log<LogType::Info>(
-                        "Failed to fund rawtransaction. {}", unfunded_rawtx);
-            return false;
-        }
+//     char bytes_hex[payout_bytes.size() * 2];
+//     Hexlify(bytes_hex, payout_bytes.data(), payout_bytes.size());
+//     std::string_view unfunded_rawtx(bytes_hex, sizeof(bytes_hex));
 
-    SignRawTransactionRes sign_res;
-    if (!daemon_manager->SignRawTransaction(sign_res, parser, fund_res.hex))
-    {
-        logger.Log<LogType::Info>(
-                    "Failed to sign rawtransaction.");
-        return false;
-    }
+//     FundRawTransactionRes fund_res;
+//     // 0 fees
+//     if (!daemon_manager->FundRawTransaction(fund_res, parser, unfunded_rawtx,
+//     0, pool_addr))
+//         {
+//             logger.Log<LogType::Info>(
+//                         "Failed to fund rawtransaction. {}", unfunded_rawtx);
+//             return false;
+//         }
 
-    pending_payment->raw_transaction_hex = sign_res.hex;
-    pending_payment->td = TransactionData(pending_payment->raw_transaction_hex);
+//     SignRawTransactionRes sign_res;
+//     if (!daemon_manager->SignRawTransaction(sign_res, parser, fund_res.hex))
+//     {
+//         logger.Log<LogType::Info>(
+//                     "Failed to sign rawtransaction.");
+//         return false;
+//     }
 
-    return true;
-}
+//     pending_payment->raw_transaction_hex = sign_res.hex;
+//     pending_payment->td =
+//     TransactionData(pending_payment->raw_transaction_hex);
 
-bool PaymentManager::GeneratePayoutTx(
-    std::vector<uint8_t>& bytes,
-    const std::vector<std::pair<std::string, PayeeInfo>>& rewards)
-{
-    // inputs will be added in fundrawtransaction
-    // change will be auto added in fundrawtransaction
-    pending_payment = std::make_unique<PaymentInfo>(payment_counter);
+//     return true;
+// }
 
-    for (auto& [addr, reward_info] : rewards)
-    {
-        // check if passed threshold
-        if (reward_info.amount < reward_info.settings.threshold ||
-            reward_info.amount == 0)
-        {
-            logger.Log<LogType::Info>(
-                        "Skipping {} in payment insufficient threshold: {}/{}",
-                        addr, reward_info.amount,
-                        reward_info.settings.threshold);
-            continue;
-        }
+// void PaymentManager::UpdatePayouts(RoundManager* round_manager,
+//                                    int64_t curtime_ms)
+// {
+//     if (finished_payment)
+//     {
+//         // will be freed after here, since we moved
+//         auto complete_tx = std::move(finished_payment);
 
-        // leave 50000 bytes for funding inputs and change and other
-        // transactions in the block
-        if (pending_payment->tx.GetTxLen() + 50000 > MAX_BLOCK_SIZE)
-        {
-            break;
-        }
-        pending_payment->rewards.emplace_back(addr, reward_info.amount);
-        // allows us to support more than just p2pkh transaction
-        pending_payment->tx.AddOutput(reward_info.script_pub_key,
-                                      reward_info.amount);
+//         redis_manager->AddPayout(complete_tx.get());
 
-        pending_payment->total_paid += reward_info.amount;
-    }
+//         last_payout_ms = curtime_ms;
+//         payment_counter++;
 
-    if (pending_payment->tx.vout.empty())
-    {
-        return false;
-    }
+//         finished_payment.release();
 
-    pending_payment->tx.GetBytes(bytes);
+//         logger.Log<
+//             LogType::Info>(
+//             "Payment has been included in block and added to database!");
+//     }
 
-    return true;
-}
-
-void PaymentManager::UpdatePayouts(RoundManager* round_manager,
-                                   int64_t curtime_ms)
-{
-    if (finished_payment)
-    {
-        // will be freed after here, since we moved
-        auto complete_tx = std::move(finished_payment);
-
-        redis_manager->AddPayout(complete_tx.get());
-
-        last_payout_ms = curtime_ms;
-        payment_counter++;
-
-        finished_payment.release();
-
-        logger.Log<
-            LogType::Info>(
-            "Payment has been included in block and added to database!");
-    }
-
-    // make sure there is no currently pending payment or an unprocessed
-    // finished payment
-    if (!pending_payment.get() && !finished_payment.get() &&
-        curtime_ms > last_payout_ms + (payout_age_seconds * 1000))
-    {
-        if (GeneratePayout(round_manager, curtime_ms))
-        {
-            logger.Log<
-                LogType::Info>(
-                "Generated payout txid: {}, data: {}",
-                std::string_view(pending_payment->td.hash_hex, HASH_SIZE_HEX),
-                pending_payment->td.data_hex);
-        }
-        else
-        {
-            pending_payment.release();
-            logger.Log<LogType::Info>(
-                        "Failed to generate payout Tx.");
-            // std::string_view(pending_tx->td.hash_hex, HASH_SIZE_HEX),
-            // pending_tx->td.data_hex);
-        }
-    }
-}
+//     // make sure there is no currently pending payment or an unprocessed
+//     // finished payment
+//     if (!pending_payment.get() && !finished_payment.get() &&
+//         curtime_ms > last_payout_ms + (payout_age_seconds * 1000))
+//     {
+//         if (GeneratePayout(round_manager, curtime_ms))
+//         {
+//             logger.Log<
+//                 LogType::Info>(
+//                 "Generated payout txid: {}, data: {}",
+//                 std::string_view(pending_payment->td.hash_hex,
+//                 HASH_SIZE_HEX), pending_payment->td.data_hex);
+//         }
+//         else
+//         {
+//             pending_payment.release();
+//             logger.Log<LogType::Info>(
+//                         "Failed to generate payout Tx.");
+//             // std::string_view(pending_tx->td.hash_hex, HASH_SIZE_HEX),
+//             // pending_tx->td.data_hex);
+//         }
+//     }
+// }

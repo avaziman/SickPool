@@ -54,7 +54,7 @@ redis.register_function(
         for _, index in ipairs(indexes) 
         do
                 
-            local solver = {index, unpack(redis.call("HMGET", KEYS[2]..index, "HASHRATE", "MATURE_BALANCE", "JOIN_TIME", "WORKER_COUNT"))}
+            local solver = {index, unpack(redis.call("HMGET", KEYS[2]..index, "HASHRATE", "MATURE_BALANCE", "START_TIME", "WORKER_COUNT"))}
             table.insert(
                 result[2],
                 solver

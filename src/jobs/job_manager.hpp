@@ -64,7 +64,8 @@ class JobManager
 
    protected:
     // multiple jobs can use the same block template, (append transactions only)
-    Logger<LogField::JobManager> logger;
+    static constexpr std::string_view field_str = "JobManager";
+    Logger<field_str> logger;
     daemon_manager_t* daemon_manager;
     PaymentManager* payment_manager;
 

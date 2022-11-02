@@ -152,7 +152,7 @@ RpcResult StratumServerCn::HandleAuthorize(StratumClient *cli,
     {
         return RpcResult(
             ResCode::UNAUTHORIZED_WORKER,
-            "Worker name too long! (max " STRM(MAX_WORKER_NAME_LEN) " chars)");
+            "Worker name too long! (max " xSTRR(MAX_WORKER_NAME_LEN) " chars)");
     }
 
     currency::blobdata addr_blob =

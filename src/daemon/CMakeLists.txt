@@ -23,4 +23,4 @@ file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}
 
 add_library(${PROJECT_NAME} STATIC ${SRC_FILES})
 target_link_libraries(${PROJECT_NAME} simdjson fmt::fmt)
-target_include_directories(${PROJECT_NAME} PUBLIC .)
+target_include_directories(${PROJECT_NAME} PUBLIC . ../logger)

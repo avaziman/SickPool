@@ -1,4 +1,6 @@
 todo:
+make pay per last N timeframes round scheme
+instant payout (0.5% fee or fixed)!
 fix bug where diff is adjusted even if miner is too new
 maybe average remove is one before ts
 fix bad merkle root on paymentff
