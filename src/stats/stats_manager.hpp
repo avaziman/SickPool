@@ -63,12 +63,6 @@ class StatsManager
     DifficultyManager* diff_manager;
     RoundManager* round_manager;
 
-    #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
-    double round_progress; // PPLNS
-    // use raw bytes, to pass directly to redis in one command
-    std::vector<Share> pending_shares;
-    #endif
-
     std::mutex stats_map_mutex;
     // worker -> stats
     worker_map worker_stats_map;

@@ -46,7 +46,8 @@ class Server
     void HandleNewConnection();
 
     virtual void HandleConsumeable(connection_it* conn) = 0;
-    virtual void HandleConnected(connection_it* conn) = 0;
+    // returns whether to reject the connection;
+    virtual bool HandleConnected(connection_it* conn) = 0;
     virtual void HandleDisconnected(connection_it* conn) = 0;
 
    private:

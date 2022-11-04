@@ -41,15 +41,15 @@ TEST(Payment, CalculateRewardsPPLNS)
     std::string chain = "GTEST";
 
     double progress = 3.0;
-    std::vector<Share> shares = {Share{{std::byte{1}}, 0.9},
-                                 Share{{std::byte{2}}, 1.5},
+    std::vector<Share> shares = {Share{{std::byte{2}}, 1.5},
                                  Share{{std::byte{3}}, progress}};
 
     const double n = 2;
     const int64_t block_reward = 100'000'000;
     round_shares_t rewards;
+    const double fee = 0;
     PaymentManager::GetRewardsPPLNS(rewards, std::span<Share>(shares),
-                                    block_reward, n);
+                                    block_reward, fee, n);
     // two shares:
     // '\3' -> 1.5 -> block reward * 0.75
     // '\2' -> 0.5 -> block_reward * 0.25
@@ -59,8 +59,21 @@ TEST(Payment, CalculateRewardsPPLNS)
     auto rew2 = RoundShare{1, 0.25, static_cast<int64_t>(0.25 * block_reward)};
     ASSERT_FALSE(memcmp(&rewards["\3"], &rew1, sizeof(RoundShare)));
     ASSERT_FALSE(memcmp(&rewards["\2"], &rew2, sizeof(RoundShare)));
-    // ASSERT_EQ(rewards["\2"], RoundShare{1, 0.25, 0.25 * block_reward});
 
+    // try with fee
+    rewards.clear();
+    const double fee1 = 0.01;
+    PaymentManager::GetRewardsPPLNS(rewards, std::span<Share>(shares),
+                                    block_reward, fee, n);
+    ASSERT_EQ(rewards.size(), 2);
+    auto rew11 = RoundShare{
+        1, 0.75, static_cast<int64_t>((1 - fee1) * 0.75 * block_reward)};
+    auto rew22 = RoundShare{
+        1, 0.25, static_cast<int64_t>((1 - fee1) * 0.25 * block_reward)};
+    ASSERT_FALSE(memcmp(&rewards["\3"], &rew1, sizeof(RoundShare)));
+    ASSERT_FALSE(memcmp(&rewards["\2"], &rew2, sizeof(RoundShare)));
+
+    // ASSERT_EQ(rewards["\2"], RoundShare{1, 0.25, 0.25 * block_reward});
 }
 
 // TEST(Payment, GenerateTx)

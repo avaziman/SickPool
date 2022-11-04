@@ -104,6 +104,7 @@ enum class Prefix
 // TODO: update pending payout on payment settings change
 static constexpr std::string_view coin_symbol = COIN_SYMBOL;
 
+
 class RedisTransaction;
 class RedisManager
 {
@@ -112,7 +113,7 @@ class RedisManager
    public:
     RedisManager(const std::string &ip, const CoinConfig *cc, int db_index = 0);
     RedisManager(const RedisManager &rm)
-        : conf(rm.conf), logger(rm.logger), key_names(rm.key_names)
+        : conf(rm.conf), key_names(rm.key_names)
     {
     }
     ~RedisManager();
@@ -368,7 +369,8 @@ class RedisManager
 
    protected:
     static constexpr std::string_view logger_field = "Redis";
-    const Logger<logger_field> logger;
+    static const Logger<logger_field> logger;
+
     void AppendCommand(std::initializer_list<std::string_view> args)
     {
         using namespace std::string_literals;

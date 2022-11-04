@@ -1,5 +1,7 @@
     #ifndef REDIS_ROUND_HPP_
 #define REDIS_ROUND_HPP_
+#include <mutex>
+
 #include "redis_manager.hpp"
 class RedisRound : public RedisManager
 {
@@ -7,24 +9,32 @@ class RedisRound : public RedisManager
     explicit RedisRound(const RedisManager &rm) : RedisManager(rm) {}
 
     std::pair<std::span<Share>, redis_unique_ptr> GetLastNShares(double progress,
-                                                        size_t n)
+                                                        double n)
     {
-        auto res = Command({"STRLEN", key_names.round_shares});
+        std::unique_lock lock(rc_mutex);
 
-        size_t len = res->integer / sizeof(Share);
+        redis_unique_ptr res = Command({"STRLEN", key_names.round_shares});
+        lock.unlock();
+
+        const size_t len = res->integer / sizeof(Share);
         size_t low = 0;
         size_t high = len;
         ssize_t mid;
 
         // we need the shares from the latest to the last one which sums is
         // bigger or equal to progress - n
-        double target = progress - static_cast<double>(n);
+        double target = progress - n;
         double share_progress;
 
         do
         {
             mid = std::midpoint(low, high);
             auto [share, resp] = GetSharesBetween(mid, mid + 1);
+
+
+            if(share.empty()) {
+                return std::make_pair(std::span<Share>(), redis_unique_ptr());
+            } 
 
             share_progress = share.front().progress;
             if (share_progress > target)
@@ -37,14 +47,14 @@ class RedisRound : public RedisManager
             }
             else
             {
-                mid--;
+                mid++;
                 break;
             }
 
         } while (low < high);
 
-        mid++;
-        size_t share_count = mid + 1;
+        size_t share_count = len - mid;
+        lock.lock();
         res = Command({"GETRANGE", key_names.round_shares,
                        std::to_string(-static_cast<ssize_t>(share_count) *
                                       static_cast<ssize_t>(sizeof(Share))),
@@ -70,6 +80,8 @@ class RedisRound : public RedisManager
     std::pair<std::span<Share>, redis_unique_ptr> GetSharesBetween(ssize_t start,
                                                           ssize_t end)
     {
+        std::scoped_lock _(rc_mutex);
+
         ssize_t start_index = start * sizeof(Share);
         ssize_t end_index = end * sizeof(Share) - 1;
         if (end < 0) end_index = end; // we want till the end

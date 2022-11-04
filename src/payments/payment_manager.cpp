@@ -18,11 +18,11 @@ PaymentManager::PaymentManager(RedisManager* rm, daemon_manager_t* dm,
 
 inline void AddShare(round_shares_t& miner_shares, double& score_sum,
                      const double n, const double score,
-                     const int64_t block_reward, const std::string& addr)
+                     const int64_t block_reward, const double fee, const std::string& addr)
 {
     const double share_ratio = score / n;
     const auto reward =
-        static_cast<int64_t>(share_ratio * static_cast<double>(block_reward));
+        static_cast<int64_t>(share_ratio * (1.0  - fee) * static_cast<double>(block_reward));
 
     score_sum += score;
 
@@ -33,15 +33,16 @@ inline void AddShare(round_shares_t& miner_shares, double& score_sum,
 
 bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
                                      const std::span<Share> shares,
-                                     const int64_t block_reward, const double n)
+                                     const int64_t block_reward,
+                                     const double fee, const double n)
 {
     double score_sum = 0;
     miner_shares.reserve(shares.size());
-    for (size_t i = shares.size() - 1; i > 1; i--)
+    for (ssize_t i = shares.size() - 1; i > 0; i--)
     {
         const double score = shares[i].progress - shares[i - 1].progress;
         
-        AddShare(miner_shares, score_sum, n, score, block_reward,
+        AddShare(miner_shares, score_sum, n, score, block_reward, fee,
                  shares[i]);
     }
 
@@ -51,7 +52,7 @@ bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
 
     const double last_score = n - score_sum;
 
-    AddShare(miner_shares, score_sum, n, last_score, block_reward,
+    AddShare(miner_shares, score_sum, n, last_score, block_reward, fee,
              shares[0]);
 
     return true;

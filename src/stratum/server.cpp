@@ -182,7 +182,10 @@ void Server<T>::HandleNewConnection()
 
     // only add to the interest list after all the connection data has been
     // created to avoid data races
-    HandleConnected(conn_it);
+    if (!HandleConnected(conn_it)){
+        EraseClient(conn_it);
+        return;
+    }
 
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_fd, &conn_ev) == -1)
     {
@@ -259,6 +262,7 @@ void Server<T>::EraseClient(connection_it *it)
             "-> errno: {}. ",
             sockfd, errno, std::strerror(errno));
     }
+
     if (close(sockfd) == -1)
     {
         logger.Log<LogType::Warn>(

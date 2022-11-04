@@ -19,8 +19,7 @@
 //     "C:\\projects\\pool\\pool-server\\config\\coins\\VRSC.json"
 
 // void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg);
-
-stratum_server_t* stratum_server_ptr;
+StratumBase* stratum_bserver_ptr;
 
 Logger<config_field_str> logger;
 
@@ -33,7 +32,7 @@ void SigintHandler(int sig)
     // if(pass == "1234"){
     logger.Log<LogType::Info>("Stopping stratum server...");
 
-    stratum_server_ptr->Stop();
+    stratum_bserver_ptr->Stop();
     // }
 }
 
@@ -53,6 +52,8 @@ int main(int argc, char** argv)
 
     logger.Log<LogType::Info>("Loading dynamic config...");
 
+    logger.Log<LogType::Info>("Diff1: {}", DIFF1);
+
     if (signal(SIGINT, SigintHandler) == SIG_ERR)
     {
         logger.Log<LogType::Error>("Failed to register SIGINT...");
@@ -69,9 +70,13 @@ int main(int argc, char** argv)
         simdjson::padded_string json = simdjson::padded_string::load(argv[1]);
         ParseCoinConfig(json, coinConfig, logger);
 
-        stratum_server_t stratum_server(coinConfig);
-        stratum_server_ptr = &stratum_server;
-        stratum_server.Listen();
+        if (coinConfig.symbol == "ZANO"){
+            StratumServerCn<HashAlgo::PROGPOWZ> stratum_server(std::move(coinConfig));
+            stratum_bserver_ptr = dynamic_cast<StratumBase*>(&stratum_server);
+            stratum_server.Listen();
+        }else {
+            logger.Log<LogType::Error>("Unknown coin symbol: {} exitting...", coinConfig.symbol);
+        }
     }
     catch (const std::runtime_error& e)
     {

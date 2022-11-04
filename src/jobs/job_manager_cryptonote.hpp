@@ -22,7 +22,7 @@ class JobManagerCryptoNote : public JobManager
     BlockTemplateCn block_template;
 
     const job_t* GetNewJob() /*override*/;
-    const job_t* GetNewJob(/*const*/ BlockTemplateResCn& btemplate) /*override*/;
+    const job_t* GetNewJob(const BlockTemplateResCn& btemplate) /*override*/;
 
    private:
     static constexpr auto hex_extra = Hexlify<coinbase_extra>();

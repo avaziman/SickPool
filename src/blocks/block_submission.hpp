@@ -73,13 +73,12 @@ struct ExtendedSubmission : public BlockSubmission
                        const int64_t reward, const uint64_t dur,
                        const int64_t time, const uint32_t number,
                        const double diff, const double effort_percent,
-                       const uint8_t* hash, const uint8_t* cb_txid)
+                       const uint8_t* hash)
         : chain_sv(chainsv),
           miner_sv(worker_full.data(), ADDRESS_LEN),
           BlockSubmission(chainsv, worker_full, blocktype, height, reward,
                           dur, time, number, diff, effort_percent, hash)
     {
-        memcpy(coinbase_txid, cb_txid, sizeof(coinbase_txid));
     }
 
     ExtendedSubmission(BlockSubmission& submission) : BlockSubmission(submission)
@@ -92,8 +91,6 @@ struct ExtendedSubmission : public BlockSubmission
     // way easier to use than unsigned char pointer :)
     std::string_view chain_sv;
     std::string_view miner_sv;
-
-    uint8_t coinbase_txid[HASH_SIZE] = {0};
 };
 #pragma pack(pop)
 

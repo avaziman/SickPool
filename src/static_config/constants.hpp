@@ -31,7 +31,7 @@ static constexpr uint32_t MAX_HTTP_JSON_DEPTH = 3;
 static constexpr uint32_t REQ_BUFF_SIZE = 1024 * 5;
 static constexpr uint32_t REQ_BUFF_SIZE_REAL =
     REQ_BUFF_SIZE - simdjson::SIMDJSON_PADDING;
-static constexpr uint32_t MAX_CONNECTION_EVENTS = 10;
+static constexpr uint32_t MAX_CONNECTION_EVENTS = 32;
 static constexpr uint32_t EPOLL_TIMEOUT = 10000;  // ms
 static constexpr uint32_t MAX_CONNECTIONS_QUEUE = 64;
 

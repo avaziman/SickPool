@@ -48,7 +48,6 @@ constexpr void Hexlify(char* dest, const T* src, size_t srcSize)
     // each byte is 2 characters in hex
     for (int i = 0; i < srcSize; i++)
     {
-        // unsigned char val = src[i];
         unsigned char val = src[i];
 
         char c1 = '0', c2 = '0';
@@ -63,6 +62,14 @@ constexpr void Hexlify(char* dest, const T* src, size_t srcSize)
         dest[i * 2] = c1;
         dest[i * 2 + 1] = c2;
     }
+}
+
+template <size_t size>
+constexpr std::array<char, size * 2> Hexlify(const std::array<uint8_t, size>& src)
+{
+    std::array<char, size * 2> res;
+    Hexlify(res.data(), src.data(), size);
+    return res;
 }
 
 template <const std::string_view& src>
@@ -105,6 +112,5 @@ inline uint32_t FromHex(const char* str)
     ss >> val;
     return val;
 }
-
 
 #endif

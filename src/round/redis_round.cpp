@@ -1,5 +1,4 @@
 #include "redis_round.hpp"
-
 using enum Prefix;
 
 void RedisRound::AppendSetMinerEffort(std::string_view chain,

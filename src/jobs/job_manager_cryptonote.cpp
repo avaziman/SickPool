@@ -1,13 +1,13 @@
 #include "job_manager_cryptonote.hpp"
 
 const job_t* JobManagerCryptoNote::GetNewJob(
-    /*const*/ BlockTemplateResCn& rpctemplate)
+    const BlockTemplateResCn& rpctemplate)
 {
     block_template = BlockTemplateCn(rpctemplate);
     std::string jobIdHex = fmt::format("{:08x}", job_count);
 
     auto job =
-        std::make_unique<job_t>(jobIdHex, block_template);
+        std::make_unique<job_t>(jobIdHex, std::move(block_template));
 
     return SetNewJob(std::move(job));
 }

@@ -20,7 +20,6 @@ class Logger
 {
    public:
     Logger() = default;
-    Logger(const Logger& _logger) {}
     mutable std::mutex log_mutex;
 
     // Logger(){

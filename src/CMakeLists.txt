@@ -45,7 +45,7 @@ FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED )
 
 add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
 
-set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty)
+set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
 find_library(HIREDIS_LIB hiredis)
@@ -56,13 +56,13 @@ target_link_libraries(
     ${HIREDIS_LIB}
     ${Boost_LIBRARIES}
     pthread
+    cryptonote_utils
     simdjson
     fmt::fmt
-    cryptonote_utils
     sickverushash
     # sickx25x
 )
 
-add_subdirectory(blocks)
-add_subdirectory(daemon)
-add_subdirectory(payments)
+# add_subdirectory(blocks)
+# add_subdirectory(daemon)
+# add_subdirectory(payments)

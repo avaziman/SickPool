@@ -49,7 +49,7 @@ class JobManager
         last_job_id_hex = job->GetId();
         job_count++;
 
-        std::unique_lock<std::shared_mutex> jobs_lock(jobs_mutex);
+        std::unique_lock jobs_lock(jobs_mutex);
         while (jobs.size())
         {
             // incase a job is being used
@@ -65,7 +65,7 @@ class JobManager
    protected:
     // multiple jobs can use the same block template, (append transactions only)
     static constexpr std::string_view field_str = "JobManager";
-    Logger<field_str> logger;
+    const Logger<field_str> logger;
     daemon_manager_t* daemon_manager;
     PaymentManager* payment_manager;
 
@@ -80,7 +80,7 @@ class JobManager
     static constexpr std::string_view coinbase_extra = "SickPool.io"sv;
 
     std::string last_job_id_hex;
-    std::string pool_addr;
+    const std::string pool_addr;
 
     virtual transaction_t GetCoinbaseTx(int64_t value, uint32_t height,
                                         std::string_view rpc_cb);

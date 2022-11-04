@@ -11,20 +11,32 @@ RoundManager::RoundManager(const RedisManager& rm,
         logger.Log<LogType::Critical>("Failed to load current round!");
     }
 
-    if (!ResetMinersWorkerCounts(efforts_map,
-                                                GetCurrentTimeMs()))
+    if (!ResetMinersWorkerCounts(efforts_map, GetCurrentTimeMs()))
     {
         logger.Log<LogType::Critical>("Failed to reset worker counts!");
     }
+
+#if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
+    // get the last share
+    auto [res, rep] = GetSharesBetween(
+        -static_cast<ssize_t>(sizeof(Share)) - 1, -1);
+
+    round_progress = res.front().progress;
+#endif
 }
 
-bool RoundManager::CloseRound(const ExtendedSubmission* submission, double fee)
+bool RoundManager::CloseRound(const ExtendedSubmission* submission,
+                              const double fee)
 {
-    std::scoped_lock round_lock(round_map_mutex);
+    std::scoped_lock round_lock(round_map_mutex, efforts_map_mutex);
 
     round_shares_t round_shares;
-    PaymentManager::GetRewardsPROP(round_shares, submission->block_reward,
-                                   efforts_map, round.total_effort, fee);
+    // PaymentManager::GetRewardsPROP(round_shares, submission->block_reward,
+    //                                efforts_map, round.total_effort, fee);
+    const double n = 2;
+    auto [shares, resp] = GetLastNShares(round_progress, n);
+    PaymentManager::GetRewardsPPLNS(round_shares, shares,
+                                    submission->block_reward, n, fee);
 
     round.round_start_ms = submission->time_ms;
     round.total_effort = 0;
@@ -32,9 +44,8 @@ bool RoundManager::CloseRound(const ExtendedSubmission* submission, double fee)
 
     ResetRoundEfforts();
 
-    return SetClosedRound(submission->chain_sv, round_type,
-                                     submission, round_shares,
-                                     submission->time_ms);
+    return SetClosedRound(submission->chain_sv, round_type, submission,
+                          round_shares, submission->time_ms);
 }
 
 void RoundManager::AddRoundShare(const std::string& miner, const double effort)
@@ -43,6 +54,21 @@ void RoundManager::AddRoundShare(const std::string& miner, const double effort)
 
     efforts_map[miner] += effort;
     round.total_effort += effort;
+
+#if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
+    round_progress += effort;
+
+    if (pending_shares.capacity() == pending_shares.size())
+    {
+        pending_shares.reserve(pending_shares.size() + 1000);
+    }
+
+    Share curshare;
+    curshare.progress = round_progress;
+    memcpy(curshare.addr, miner.data(), ADDRESS_LEN);
+
+    pending_shares.push_back(std::move(curshare));
+#endif
 }
 
 bool RoundManager::LoadCurrentRound()
@@ -64,12 +90,10 @@ bool RoundManager::LoadCurrentRound()
 
         // append commands are not locking but since its before threads are
         // starting its ok set round start time
-        AppendSetMinerEffort(chain,
-                                            EnumName<START_TIME>(),
-                                            round_type, static_cast<double>(round.round_start_ms));
+        AppendSetMinerEffort(chain, EnumName<START_TIME>(), round_type,
+                             static_cast<double>(round.round_start_ms));
         // reset round effort if we are starting it now hadn't started
-        AppendSetMinerEffort(chain, EnumName<TOTAL_EFFORT>(),
-                                            round_type, 0);
+        AppendSetMinerEffort(chain, EnumName<TOTAL_EFFORT>(), round_type, 0);
 
         if (!GetReplies())
         {

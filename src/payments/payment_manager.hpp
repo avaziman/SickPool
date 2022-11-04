@@ -31,7 +31,7 @@ class PaymentManager
     static bool GetRewardsPPLNS(round_shares_t& miner_shares,
                                         const std::span<Share> shares,
                                         const int64_t block_reward,
-                                        const double n);
+                                        const double n, double fee);
     static bool GetRewardsPROP(round_shares_t& miner_shares,
                                int64_t block_reward,
                                const efforts_map_t& miner_efforts,

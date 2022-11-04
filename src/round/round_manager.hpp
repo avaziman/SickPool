@@ -21,13 +21,20 @@ class RoundManager : public RedisRound
     RoundManager(const RedisManager& rm, const std::string& round_type);
     bool LoadCurrentRound();
     void AddRoundShare(const std::string& miner, const double effort);
-    bool CloseRound(const ExtendedSubmission* submission, double fee);
+    bool CloseRound(const ExtendedSubmission* submission, const double fee);
     void ResetRoundEfforts();
 
     bool IsMinerIn(const std::string& addr);
 
     bool UpdateEffortStats(int64_t update_time_ms);
     inline Round GetChainRound() const { return round; };
+
+    void PushPendingShares() {
+        std::scoped_lock round_lock(efforts_map_mutex);
+        
+        AddPendingShares(pending_shares);
+        pending_shares.clear();
+    }
 
     std::atomic<uint32_t> blocks_found;
     std::atomic<double> netwrok_hr;
@@ -39,6 +46,12 @@ class RoundManager : public RedisRound
     static constexpr std::string_view field_str = "RoundManager";
     const Logger<field_str> logger;
     const std::string round_type;
+
+#if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
+    double round_progress = 0.0;  // PPLNS
+    // use raw bytes, to pass directly to redis in one command
+    std::vector<Share> pending_shares;
+#endif
 
     std::mutex round_map_mutex;
     Round round;

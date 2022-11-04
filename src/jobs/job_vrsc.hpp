@@ -94,8 +94,6 @@ class JobVrsc : public JobBaseBtc
                 .size;
         notify_buff_sv = std::string_view(notify_buff, len);
 
-        memcpy(coinbase_tx_id,
-               bTemplate.tx_list.transactions[0].data_hex.data(), HASH_SIZE);
     }
 
     template <typename T>
@@ -144,18 +142,6 @@ class JobVrsc : public JobBaseBtc
         WriteUnhex(buff + solution_pos, share.solution.data(),
                    (SOLUTION_LENGTH_SIZE + SOLUTION_SIZE) * 2);
     }
-    uint8_t coinbase_tx_id[HASH_SIZE];
-
-   private:
-
-
-    // char* GetVersion() { return version; }
-    // char* GetPrevBlockhash() { return hashPrevBlock; }
-    // char* GetTime() { return nTime; }
-    // char* GetBits() { return nBits; }
-
-   private:
-    int written = 0;
 };
 
 using job_t = JobVrsc;

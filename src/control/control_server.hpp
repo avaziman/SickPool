@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "static_config.hpp"
 
 enum class ControlCommands
 {

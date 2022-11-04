@@ -49,6 +49,7 @@ class BlockSubmitter
         std::scoped_lock lock(blocks_lock);
 
         // block number increased here.
+        // round_manager->CloseRound(submission.get(), pow_fee);
         round_manager->CloseRound(submission.get(), pow_fee);
 
         logger.Log<LogType::Info>(

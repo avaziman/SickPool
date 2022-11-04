@@ -4,6 +4,7 @@
 
 using enum Prefix;
 
+const Logger<RedisManager::logger_field> RedisManager::logger;
 redis_unique_ptr_context RedisManager::rc_unique;
 redisContext *RedisManager::rc;
 std::mutex RedisManager::rc_mutex;
@@ -17,7 +18,6 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf, int db
         redisConnect(ip.c_str(), conf->redis.redis_port), redisFree);
     RedisManager::rc = rc_unique.get();
 
-    Command({"SELECT", std::to_string(db_index)});
     if (rc->err)
     {
         logger.Log<LogType::Critical>("Failed to connect to redis: {}",
@@ -25,6 +25,8 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf, int db
         // redisFree(rc);
         throw std::runtime_error("Failed to connect to redis");
     }
+
+    Command({"SELECT", std::to_string(db_index)});
 }
 void RedisManager::Init()
 {

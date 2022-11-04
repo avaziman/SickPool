@@ -6,12 +6,13 @@
 #include <chrono>
 #include <iostream>
 #include <memory>
+#include <type_traits>
 
-#include "static_config/static_config.hpp"
 #include "cn/currency_core/basic_pow_helpers.h"
 #include "jobs/job_manager.hpp"
 #include "logger.hpp"
 #include "share.hpp"
+#include "static_config/static_config.hpp"
 #include "stratum_client.hpp"
 #include "stratum_server.hpp"
 #include "utils.hpp"
@@ -46,9 +47,11 @@ class ShareProcessor
 
         return true;
     }
-    
+
     static constexpr std::string_view field_str = "ShareProcessor";
-    static Logger<field_str> logger;
+    static const Logger<field_str> logger;
+
+    template <HashAlgo hash_algo>
     inline static void Process(ShareResult& result, StratumClient* cli,
                                WorkerContext* wc, const job_t* job,
                                const share_t& share, int64_t curTime)
@@ -67,38 +70,39 @@ class ShareProcessor
         // std::cout << "block header: " << std::endl;
         // PrintHex(headerData, BLOCK_HEADER_SIZE);
 
-#if HASH_ALGO == HASH_ALGO_VERUSHASH
-        // takes about 6-8 microseconds vs 8-12 on snomp
-        HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
-                                   BLOCK_HEADER_SIZE, &wc->hasher);
-#elif HASH_ALGO == HASH_ALGO_X25X
-        HashWrapper::X25X(result.hash_bytes.data(), headerData,
-                          BLOCK_HEADER_SIZE);
-#elif HASH_ALGO == HASH_ALGO_PROGPOW
-        // skip 0x
-        uint64_t nonce = HexToUint(share.nonce.data() + 2, sizeof(uint64_t) * 2);
-        wc->nonce = nonce;
-        currency::get_block_longhash_sick(
-            result.hash_bytes.data(), static_cast<uint64_t>(job->height),
-            //  *reinterpret_cast<const
-            //  crypto::hash*>(job->block_template_hash.data()),
-            job->block_template_hash, nonce);
-        std::reverse(result.hash_bytes.begin(), result.hash_bytes.end());
-#else
-#error "Missing hash function";
-#endif
+        if constexpr (hash_algo == HashAlgo::PROGPOWZ)
+        {
+            currency::get_block_longhash_sick(
+                result.hash_bytes.data(), static_cast<uint64_t>(job->height),
+                job->block_template_hash.data(), share.nonce);
+            std::ranges::reverse(result.hash_bytes.begin(),
+                                 result.hash_bytes.end());
+        }
+        else if constexpr (hash_algo == HashAlgo::VERUSHASH_V2b2)
+        {
+            // takes about 6-8 microseconds vs 8-12 on snomp
+            HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
+                                       BLOCK_HEADER_SIZE, &wc->hasher);
+        }
+        else if constexpr (hash_algo == HashAlgo::X25X)
+        {
+            HashWrapper::X25X(result.hash_bytes.data(), headerData,
+                              BLOCK_HEADER_SIZE);
+        }
+        else
+        {
+            throw std::runtime_error("Missing hash function");
+        }
 
         uint256 hash(result.hash_bytes);
-        logger.Log<LogType::Debug>(  "Share hash: {} ",
-                    hash.GetHex());
 
-        // arith_uint256 hashArith = UintToArith256(hash);
+        logger.Log<LogType::Debug>("Share hash: {} ", hash.GetHex());
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
-        auto shareEnd = *reinterpret_cast<uint32_t*>(hash.begin());
 
-        if (!cli->SetLastShare(shareEnd, curTime))
+        if (auto shareEnd = *reinterpret_cast<uint32_t*>(hash.begin());
+            !cli->SetLastShare(shareEnd, curTime))
         {
             result.code = ResCode::DUPLICATE_SHARE;
             result.message = "Duplicate share";
@@ -107,16 +111,14 @@ class ShareProcessor
             return;
         }
 
-        result.difficulty = BitsToDiff(UintToArith256(hash).GetCompact(false));
+        result.difficulty = DIFF1 / UintToArith256(hash).getdouble();
 
-        // if (hashArith >= *job->GetTarget())
-        if (unlikely_cond(result.difficulty >= job->target_diff))
+        if (result.difficulty >= job->target_diff) [[unlikely]]
         {
             result.code = ResCode::VALID_BLOCK;
             return;
         }
-        else if (unlikely_cond(result.difficulty / cli->GetDifficulty() <
-                               1.d))  // allow 5% below
+        else if (result.difficulty / cli->GetDifficulty() < 0.99)  // allow 5% below
         {
             result.code = ResCode::LOW_DIFFICULTY_SHARE;
             result.message =
@@ -124,17 +126,16 @@ class ShareProcessor
             char blockHeaderHex[BLOCK_HEADER_SIZE * 2];
             Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
 
-            // logger.Log<LogType::Debug>( 
+            // logger.Log<LogType::Debug>(
             //             "Low difficulty share diff: {}, hash: {}",
             //             result.Diff, hash.GetHex().c_str());
-            // logger.Log<LogType::Debug>( 
+            // logger.Log<LogType::Debug>(
             //             "Block header: {}", BLOCK_HEADER_SIZE * 2,
             // blockHeaderHex);
             return;
         }
 
         result.code = ResCode::VALID_SHARE;
-        return;
     }
 };
 #endif

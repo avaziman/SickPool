@@ -1,153 +1,61 @@
 #include "stratum_server.hpp"
+template class StratumServer<HashAlgo::PROGPOWZ>;
 
-StratumServer::StratumServer(const CoinConfig &conf)
-    : Server<StratumClient>(conf.stratum_port),
-      coin_config(conf),
-      redis_manager("127.0.0.1", &conf),
-      diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
-      round_manager(redis_manager, "pow"),
-      stats_manager(&redis_manager, &diff_manager, &round_manager,
-                    &conf.stats),
+template <HashAlgo hash_algo>
+StratumServer<hash_algo>::StratumServer(CoinConfig &&conf)
+    : StratumBase(std::move(conf)),
       daemon_manager(coin_config.rpcs),
       payment_manager(&redis_manager, &daemon_manager, coin_config.pool_addr,
                       coin_config.payment_interval_seconds,
                       coin_config.min_payout_threshold),
       job_manager(&daemon_manager, &payment_manager, coin_config.pool_addr),
-      block_submitter(&redis_manager, &daemon_manager,
-                      &round_manager)
+      block_submitter(&redis_manager, &daemon_manager, &round_manager)
 {
-    auto error = httpParser.allocate(HTTP_REQ_ALLOCATE, MAX_HTTP_JSON_DEPTH);
-
-    if (error != simdjson::SUCCESS)
+    if (auto error =
+            httpParser.allocate(HTTP_REQ_ALLOCATE, MAX_HTTP_JSON_DEPTH);
+        error != simdjson::SUCCESS)
     {
-        logger.Log<LogType::Critical>( 
-                    "Failed to allocate http parser buffer: {}",
-                    simdjson::error_message(error));
+        logger.Log<LogType::Critical>(
+            "Failed to allocate http parser buffer: {}",
+            simdjson::error_message(error));
         exit(EXIT_FAILURE);
     }
 
     // init hash functions if needed
     HashWrapper::InitSHA256();
-#if POW_ALGO == POW_ALGO_VERUSHASH
-    HashWrapper::InitVerusHash();
-#endif
 
-    // redis_manager.UpdatePoS(0, GetCurrentTimeMs());
-
-    stats_thread =
-        std::jthread(std::bind_front(&StatsManager::Start, &stats_manager));
-    stats_thread.detach();
-
-    control_server.Start(coin_config.control_port);
-    control_thread = std::jthread(
-        std::bind_front(&StratumServer::HandleControlCommands, this));
-    control_thread.detach();
-}
-
-StratumServer::~StratumServer()
-{
-    Stop();
-    logger.Log<LogType::Info>( "Stratum destroyed.");
-}
-
-void StratumServer::HandleControlCommands(std::stop_token st)
-{
-    char buff[256] = {0};
-    while (!st.stop_requested())
-    {
-        ControlCommands cmd = control_server.GetNextCommand(buff, sizeof(buff));
-        HandleControlCommand(cmd, buff);
-        logger.Log<LogType::Info>( 
-                    "Processed control command: {}", buff);
+    if(HASH_ALGO == HashAlgo::VERUSHASH_V2b2){
+        HashWrapper::InitVerusHash();
     }
 }
 
-void StratumServer::HandleControlCommand(ControlCommands cmd, char buff[])
+template <HashAlgo hash_algo>
+StratumServer<hash_algo>::~StratumServer()
 {
-    switch (cmd)
-    {
-        case ControlCommands::BLOCK_NOTIFY:
-            HandleBlockNotify();
-            break;
-        // case ControlCommands::WALLET_NOTFIY:
-        // {
-        //     // format: %b%s%w (block hash, txid, wallet address)
-        //     WalletNotify *wallet_notify =
-        //         reinterpret_cast<WalletNotify *>(buff + 2);
-        //     // HandleWalletNotify(wallet_notify);
-        //     break;
-        // }
-        default:
-            logger.Log<LogType::Warn>(
-                        "Unknown control command {} received.", (int)cmd);
-            break;
-    }
-}
-
-void StratumServer::Listen()
-{
-    // const auto worker_amount = 2;
-    const auto worker_amount = std::thread::hardware_concurrency();
-    processing_threads.reserve(worker_amount);
-
-    for (auto i = 0; i < worker_amount; i++)
-    {
-        processing_threads.emplace_back(std::bind_front(
-            &StratumServer::ServiceSockets, (StratumServer *)this));
-    }
-
-    HandleBlockNotify();
-
-    for (auto &t : processing_threads)
-    {
-        t.join();
-    }
-    stats_thread.join();
-    control_thread.join();
-}
-
-void StratumServer::Stop()
-{
-    stats_thread.request_stop();
-    control_thread.request_stop();
-    for (auto &t : processing_threads)
-    {
-        t.request_stop();
-    }
-}
-
-void StratumServer::ServiceSockets(std::stop_token st)
-{
-    logger.Log<LogType::Info>(
-                "Starting servicing sockets on thread {}", gettid());
-
-    while (!st.stop_requested())
-    {
-        Service();
-    }
+    this->logger.Log<LogType::Info>("Stratum destroyed.");
 }
 
 // TODO: test buffer too little
 // TODO: test buffer flooded
-
-void StratumServer::HandleBlockNotify()
+//TODO: pass stop token
+template <HashAlgo hash_algo>
+void StratumServer<hash_algo>::HandleBlockNotify()
 {
     int64_t curtime_ms = GetCurrentTimeMs();
 
     const job_t *new_job = job_manager.GetNewJob();
 
-    std::stop_token st = control_thread.get_stop_token();
+    // std::stop_token st = control_thread.get_stop_token();
 
     while (new_job == nullptr)
     {
-        if (st.stop_requested())
-        {
-            return;
-        }
+        // if (st.stop_requested())
+        // {
+        //     return;
+        // }
         new_job = job_manager.GetNewJob();
 
-        logger.Log<
-            LogType::Critical>(
+        logger.Log<LogType::Critical>(
             "Block update error: Failed to generate new job! retrying...");
 
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
@@ -182,7 +90,7 @@ void StratumServer::HandleBlockNotify()
             const auto cli_diff = cli->GetDifficulty();
             if (cli_diff < coin_config.minimum_difficulty)
             {
-                DisconnectClient(it->first);
+                this->DisconnectClient(it->first);
                 it++;
             }
             else
@@ -206,30 +114,30 @@ void StratumServer::HandleBlockNotify()
 
     // submission_manager.CheckImmatureSubmissions();
 
-    redis_manager.SetNewBlockStats(chain, curtime_ms, net_est_hr,
+    redis_manager.SetNewBlockStats(coin_config.symbol, curtime_ms, net_est_hr,
                                    new_job->target_diff);
 
-    logger.Log<LogType::Info>( 
-                "Broadcasted new job: \n"
-                "┌{0:─^{8}}┐\n"
-                "│{1: ^{8}}│\n"
-                "│{2: <{8}}│\n"
-                "│{3: <{8}}│\n"
-                "│{4: <{8}}│\n"
-                "│{5: <{8}}│\n"
-                "│{6: <{8}}│\n"
-                "│{7: <{8}}│\n"
-                // "│{8: <{9}}│\n"
-                // "└{0:─^{9}}┘\n",
-                "└{0:─^{8}}┘\n",
-                "", fmt::format("Job #{}", new_job->GetId()),
-                fmt::format("Height: {}", new_job->height),
-                // fmt::format("Min time: {}", new_job->min_time),
-                fmt::format("Difficulty: {}", new_job->target_diff),
-                fmt::format("Est. shares: {}", new_job->expected_hashes),
-                fmt::format("Block reward: {}", new_job->block_reward),
-                fmt::format("Transaction count: {}", new_job->tx_count),
-                fmt::format("Block size: {}", new_job->block_size * 2), 40);
+    logger.Log<LogType::Info>(
+        "Broadcasted new job: \n"
+        "┌{0:─^{8}}┐\n"
+        "│{1: ^{8}}│\n"
+        "│{2: <{8}}│\n"
+        "│{3: <{8}}│\n"
+        "│{4: <{8}}│\n"
+        "│{5: <{8}}│\n"
+        "│{6: <{8}}│\n"
+        "│{7: <{8}}│\n"
+        // "│{8: <{9}}│\n"
+        // "└{0:─^{9}}┘\n",
+        "└{0:─^{8}}┘\n",
+        "", fmt::format("Job #{}", new_job->GetId()),
+        fmt::format("Height: {}", new_job->height),
+        // fmt::format("Min time: {}", new_job->min_time),
+        fmt::format("Difficulty: {}", new_job->target_diff),
+        fmt::format("Est. shares: {}", new_job->expected_hashes),
+        fmt::format("Block reward: {}", new_job->block_reward),
+        fmt::format("Transaction count: {}", new_job->tx_count),
+        fmt::format("Block size: {}", new_job->block_size * 2), 40);
 }
 
 // use wallletnotify with "%b %s %w" arg (block hash, txid, wallet address),
@@ -267,7 +175,8 @@ void StratumServer::HandleBlockNotify()
 //         return;
 //     }
 
-//     // now make sure we actually staked the PoS block and not just received a tx
+//     // now make sure we actually staked the PoS block and not just received a
+//     tx
 //     // inside one.
 
 //     std::string resBody;
@@ -330,14 +239,14 @@ void StratumServer::HandleBlockNotify()
 
 //     if (block_res.validation_type != ValidationType::STAKE)
 //     {
-//         logger.Log<LogType::Critical>( 
+//         logger.Log<LogType::Critical>(
 //                     "Double PoS block check failed! block hash: {}",
 //                     block_hash);
 //         return;
 //     }
 //     if (!block_res.tx_ids.size() || block_res.tx_ids[0] != tx_id)
 //     {
-//         logger.Log<LogType::Critical>( 
+//         logger.Log<LogType::Critical>(
 //                     "TxId is not coinbase, block hash: {}", block_hash);
 //         return;
 //     }
@@ -362,7 +271,8 @@ void StratumServer::HandleBlockNotify()
 //     auto submission = std::make_unique<ExtendedSubmission>(
 //         std::string_view(chain), std::string_view(coin_config.pool_addr),
 //         BlockType::POS, block_res.height, reward_value, duration_ms, now_ms,
-//         SubmissionManager::block_number, 0.d, 0.d, block_hash_bin, tx_id_bin);
+//         SubmissionManager::block_number, 0.d, 0.d, block_hash_bin,
+//         tx_id_bin);
 
 //     submission_manager.AddImmatureBlock(std::move(submission),
 //                                         coin_config.pos_fee);
@@ -371,7 +281,8 @@ void StratumServer::HandleBlockNotify()
 //                 "Added immature PoS Block! hash: {}", block_hash);
 // }
 
-RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
+template <HashAlgo hash_algo>
+RpcResult StratumServer<hash_algo>::HandleShare(StratumClient *cli, WorkerContext *wc,
                                      share_t &share)
 {
     int64_t time = GetCurrentTimeMs();
@@ -395,16 +306,15 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     else
     {
         job_read_lock = std::shared_lock<std::shared_mutex>(job->job_mutex);
-        ShareProcessor::Process(share_res, cli, wc, job, share, time);
+        ShareProcessor::Process<hash_algo>(share_res, cli, wc, job, share, time);
         // share_res.code = ResCode::VALID_BLOCK;
     }
 
-    if (unlikely_cond(share_res.code == ResCode::VALID_BLOCK))
+    if (share_res.code == ResCode::VALID_BLOCK) [[unlikely]]
     {
         // > add share stats before submission to have accurate effort (its
         // fast)
-        round_manager.AddRoundShare(cli->GetAddress(),
-                                        share_res.difficulty);
+        round_manager.AddRoundShare(cli->GetAddress(), share_res.difficulty);
 
         std::size_t blockSize = job->block_size * 2;
         std::string blockData;
@@ -416,10 +326,12 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
         job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
                          share.extranonce2);
 #elif defined(STRATUM_PROTOCOL_CN)
+        job_read_lock.unlock();
+
         // TODO: find way to upgrade to exclusive lock
-        //  std::unique_lock<std::shared_mutex> job_write(job->job_mutex);
-        job_t *job_mutable = const_cast<job_t *>(job);
-        job_mutable->GetBlockHex(blockData, wc->nonce);
+        // may be straved here
+        std::unique_lock job_write(job->job_mutex);
+        job->GetBlockHex(blockData, share.nonce);
 #else
 
 #endif
@@ -434,10 +346,10 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 
         // submit ASAP
         auto block_hex = std::string_view(blockData.data(), blockSize);
-        block_submitter.TrySubmit(chain, block_hex, httpParser);
+        block_submitter.TrySubmit(coin_config.symbol, block_hex, httpParser);
 
-        logger.Log<LogType::Info>( "Block hex: {}",
-                    std::string_view(blockData.data(), blockSize));
+        logger.Log<LogType::Info>(
+            "Block hex: {}", std::string_view(blockData.data(), blockSize));
 
         // job will remain safe thanks to the lock.
         const std::string_view worker_full(cli->GetFullWorkerName());
@@ -452,7 +364,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 #else
 
 #endif
-        const double dur = time - chain_round.round_start_ms;
+        const auto dur = time - chain_round.round_start_ms;
         const double effort_percent =
             ((chain_round.total_effort - share_res.difficulty) /
              job->target_diff) *
@@ -465,18 +377,16 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 #endif
 
         auto submission = std::make_unique<ExtendedSubmission>(
-            chain, worker_full, type, job->height, job->block_reward,
+            coin_config.symbol, worker_full, type, job->height, job->block_reward,
             duration_ms, time, redis_manager.GetBlockNumber(),
-            share_res.difficulty, effort_percent, share_res.hash_bytes.data(),
-            job->coinbase_tx_id);
+            share_res.difficulty, effort_percent, share_res.hash_bytes.data());
 
         block_submitter.AddImmatureBlock(std::move(submission),
-                                            coin_config.pow_fee);
+                                         coin_config.pow_fee);
     }
-    else if (likely_cond(share_res.code == ResCode::VALID_SHARE))
+    else if (share_res.code == ResCode::VALID_SHARE) [[likely]]
     {
-        round_manager.AddRoundShare(cli->GetAddress(),
-                                        share_res.difficulty);
+        round_manager.AddRoundShare(cli->GetAddress(), share_res.difficulty);
     }
     else
     {
@@ -492,7 +402,7 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
     auto end = TIME_NOW();
 
     // logger.Log<
-    //     LogType::Debug>( 
+    //     LogType::Debug>(
     //     "Share processed in {}us, diff: {}, res: {}",
     //     std::chrono::duration_cast<std::chrono::microseconds>(end - start)
     //         .count(),
@@ -504,7 +414,8 @@ RpcResult StratumServer::HandleShare(StratumClient *cli, WorkerContext *wc,
 // the shared pointer makes sure the client won't be freed as long as we are
 // processing it
 
-void StratumServer::HandleConsumeable(connection_it *it)
+template <HashAlgo hash_algo>
+void StratumServer<hash_algo>::HandleConsumeable(connection_it *it)
 {
     static thread_local WorkerContext wc;
 
@@ -517,7 +428,7 @@ void StratumServer::HandleConsumeable(connection_it *it)
     const char *last_req_end = nullptr;
     const char *req_start = nullptr;
     char *req_end = nullptr;
-    char *buffer = (char *)conn->req_buff;
+    char *buffer = conn->req_buff;
 
     req_end = std::strchr(buffer, '\n');
 
@@ -548,32 +459,27 @@ void StratumServer::HandleConsumeable(connection_it *it)
         last_req_end = nullptr;
     }
 }
-void StratumServer::HandleConnected(connection_it *it)
+
+template <HashAlgo hash_algo>
+bool StratumServer<hash_algo>::HandleConnected(connection_it *it)
 {
     std::shared_ptr<Connection<StratumClient>> conn = *(*it);
+
     conn->ptr = std::make_shared<StratumClient>(GetCurrentTimeMs(),
                                                 coin_config.default_difficulty);
+
+    if (job_manager.GetLastJob() == nullptr)
+    {
+        // disconnect if we don't have any jobs to not cause a crash, more
+        // efficient to check here than everytime we broadcast a job (there will
+        // not be case where job is empty after the first job.)
+        logger.Log<LogType::Warn>(
+            "Rejecting client connection, as there isn't a job!");
+        return false;
+    }
+
     std::unique_lock lock(clients_mutex);
-    clients.emplace(conn, 0);
+    clients.try_emplace(conn, 0);
+
+    return true;
 }
-
-void StratumServer::HandleDisconnected(connection_it *conn)
-{
-    auto conn_ptr = (*(*conn));
-    DisconnectClient(conn_ptr);
-}
-
-void StratumServer::DisconnectClient(
-    const std::shared_ptr<Connection<StratumClient>> conn_ptr)
-{
-    auto sock = conn_ptr->sock;
-    stats_manager.PopWorker(conn_ptr->ptr->GetFullWorkerName(),
-                            conn_ptr->ptr->GetAddress());
-    std::unique_lock lock(clients_mutex);
-    clients.erase(conn_ptr);
-
-    logger.Log<LogType::Info>(
-                "Stratum client disconnected. sock: {}", sock);
-}
-
-// TODO: add EPOLLERR, EPOLLHUP

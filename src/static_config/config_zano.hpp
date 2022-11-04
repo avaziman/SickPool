@@ -1,8 +1,9 @@
 #include "hash_algo.hpp"
 #include "crypto/verushash/uint256.h"
+#include "crypto/verushash/arith_uint256.h"
 
 #define STRATUM_PROTOCOL_CN 1
-#define HASH_ALGO HASH_ALGO_PROGPOW
+const HashAlgo HASH_ALGO = HashAlgo::PROGPOWZ;
 #define COIN_SYMBOL "ZANO"
 
 using namespace CoinConstantsCryptoNote;
@@ -11,11 +12,13 @@ namespace CoinConstantsZano
 {
 // 0xffffff0000000000000000000000000000000000000000000000000000000000
 
-static const uint256 DIFF1 = uint256S(
+static const uint256 TARGET1 = uint256S(
     "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+static const double DIFF1 = UintToArith256(TARGET1).getdouble();
 static constexpr uint32_t DIFF1_BITS = 0x20ffffff;
 static constexpr uint32_t MAX_BLOCK_SIZE = 64000000;
-static constexpr uint32_t HASH_SIZE = 32;
+// static constexpr uint32_t HASH_SIZE = 32;
+#define HASH_SIZE 32
 static constexpr uint32_t PREVHASH_SIZE = HASH_SIZE;
 static constexpr uint32_t MERKLE_ROOT_SIZE = HASH_SIZE;
 

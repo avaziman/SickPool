@@ -31,14 +31,14 @@ execute_process(
     OUTPUT_VARIABLE GIT_COMMIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set (CMAKE_BUILD_TYPE "DEBUG")
+# set (CMAKE_BUILD_TYPE "Release")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     # Makes the executable run the fastest on host cpu and enable optimizations
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3")
 else()
     # -g3 maximum debugging information
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -Wsubobject-linkage")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -Wsubobject-linkage -Wmissing-template-keyword")
     add_compile_definitions(SIMDJSON_DEVELOPMENT_CHECKS)
 endif()
 
@@ -46,9 +46,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory(src)
 
-if (DEFINED WITH_UNIT_TEST)
-    add_subdirectory(tests)
-endif()
+# if (DEFINED WITH_UNIT_TEST)
+#     add_subdirectory(tests)
+# endif()
 
 if (DEFINED WITH_NOTIFIER)
     add_subdirectory(stratum_notifier)

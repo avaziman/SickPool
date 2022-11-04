@@ -50,6 +50,7 @@ crypto::hash get_block_longhash(uint64_t height,
     return result;
 }
 
+//TODO: make context for each worker count
 void get_block_longhash_sick(uint8_t* res, const uint64_t height,
                              const uint8_t* block_header_hash,
                              const uint64_t nonce)
@@ -60,7 +61,7 @@ void get_block_longhash_sick(uint8_t* res, const uint64_t height,
     CHECK_AND_ASSERT_THROW_MES(
         p_context, "progpow::get_global_epoch_context_full returned null");
     auto res_eth = progpow::hash(*p_context, static_cast<int>(height),
-                                 *(ethash::hash256*)block_header_hash, nonce);
+                                 *reinterpret_cast<const ethash::hash256*>(block_header_hash), nonce);
     memcpy(res, &res_eth.final_hash, sizeof(res_eth.final_hash));
 }
 //---------------------------------------------------------------

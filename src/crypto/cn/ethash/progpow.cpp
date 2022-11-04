@@ -311,8 +311,8 @@ result hash(const epoch_context_full& context, int block_number, const hash256& 
     };
 
     const uint64_t seed = keccak_progpow_64(header_hash, nonce);
-    const hash256 mix_hash = hash_mix(context, block_number, seed, lazy_lookup);
-    const hash256 final_hash = keccak_progpow_256(header_hash, seed, mix_hash);
+    const hash256 mix_hash = hash_mix(context, block_number, seed, lazy_lookup); // leak
+    const hash256 final_hash = keccak_progpow_256(header_hash, seed, mix_hash); 
     return {final_hash, mix_hash};
 }
 

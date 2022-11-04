@@ -48,12 +48,12 @@ class HashWrapper
         x25x_hash(dest, in, size);
     }
 
-    inline static void X22I(uint8_t* dest, const uint8_t* in, int size = 80)
+    inline static void X22I(uint8_t* dest, const uint8_t* in, [[maybe_unused]] int size = 80)
     {
         x22i_hash(dest, in);
     }
 
-    inline static void CnFastHash(uint8_t* dest, const uint8_t* in, int size)
+    inline static void CnFastHash(uint8_t* dest, const uint8_t* in, size_t size)
     {
         // keccak(in, size, dest, HASH_SIZE);
         crypto::cn_fast_hash(in, size, (char*)dest);

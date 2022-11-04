@@ -3,9 +3,9 @@
 #include <hiredis/hiredis.h>
 
 #include "block_submission.hpp"
-#include "test_utils.hpp"
 #include "redis/redis_manager.hpp"
 #include "redis_round.hpp"
+#include "test_utils.hpp"
 class RedisTest : public ::testing::Test
 {
    protected:
@@ -62,7 +62,6 @@ TEST_F(RedisTest, GetLastNSharesExact)
                                             Share{{std::byte{3}}, progress}};
 
     const std::vector<Share> exp = {
-        Share{{std::byte{2}}, 1.0},
         Share{{std::byte{3}}, progress},
     };
     const size_t n = 2;
@@ -87,9 +86,7 @@ TEST_F(RedisTest, GetLastNSharesOdd)
                                             Share{{std::byte{2}}, 1.5},
                                             Share{{std::byte{3}}, progress}};
 
-    // should be 1.0 but as there is no exact we need 0.9
-    const std::vector<Share> exp = {Share{{std::byte{1}}, 0.9},
-                                    Share{{std::byte{2}}, 1.5},
+    const std::vector<Share> exp = {Share{{std::byte{2}}, 1.5},
                                     Share{{std::byte{3}}, progress}};
     const size_t n = 2;
     rr.AddPendingShares(test_shares);

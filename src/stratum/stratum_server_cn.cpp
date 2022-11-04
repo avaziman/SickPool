@@ -3,8 +3,12 @@
 #ifdef STRATUM_PROTOCOL_CN
 #include "stratum_server_cn.hpp"
 
-void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
-                                WorkerContext *wc, std::string_view req)
+template class StratumServerCn<HashAlgo::PROGPOWZ>;
+
+template <HashAlgo hash_algo>
+void StratumServerCn<hash_algo>::HandleReq(Connection<StratumClient> *conn,
+                                           WorkerContext *wc,
+                                           std::string_view req)
 {
     int id = 0;
     const int sock = conn->sock;
@@ -17,7 +21,6 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
     auto start = std::chrono::steady_clock::now();
 
     bool is_submit_work = false;
-    
     bool is_login = false;
 
     // std::cout << "last char -> " << (int)buffer[]
@@ -30,8 +33,9 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
         simdjson::ondemand::object req = doc.get_object();
         id = static_cast<int>(req["id"].get_int64());
         method = req["method"].get_string();
-        
-        if ((is_submit_work = method == "eth_submitWork") || (is_login = method == "eth_submitLogin"))
+
+        if ((is_submit_work = method == "eth_submitWork") ||
+            (is_login = method == "eth_submitLogin"))
         {
             worker = req["worker"].get_string();
         }
@@ -40,10 +44,10 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
     }
     catch (const simdjson::simdjson_error &err)
     {
-        SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
+
+        this->SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
         logger.Log<LogType::Error>(
-                    "Request JSON parse error: {}\nRequest: {}\n", err.what(),
-                    req);
+            "Request JSON parse error: {}\nRequest: {}\n", err.what(), req);
         return;
     }
     auto end = std::chrono::steady_clock::now();
@@ -61,7 +65,7 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
     }
     else if (method == "eth_getWork")
     {
-        BroadcastJob(conn, job_manager.GetLastJob(), id);
+        this->BroadcastJob(conn, this->job_manager.GetLastJob(), id);
     }
     // eth_submitLogin
     else if (is_login)
@@ -71,14 +75,14 @@ void StratumServerCn::HandleReq(Connection<StratumClient> *conn,
     else
     {
         res = RpcResult(ResCode::UNKNOWN, "Unknown method");
-        logger.Log<LogType::Warn>(
-                    "Unknown request method: {}", method);
+        logger.Log<LogType::Warn>("Unknown request method: {}", method);
     }
 
-    SendRes(sock, id, res);
+    this->SendRes(sock, id, res);
 }
 
-RpcResult StratumServerCn::HandleSubmit(StratumClient *cli, WorkerContext *wc,
+template <HashAlgo hash_algo>
+RpcResult StratumServerCn<hash_algo>::HandleSubmit(StratumClient *cli, WorkerContext *wc,
                                         simdjson::ondemand::array &params,
                                         std::string_view worker)
 {
@@ -97,8 +101,8 @@ RpcResult StratumServerCn::HandleSubmit(StratumClient *cli, WorkerContext *wc,
         return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Unauthorized worker");
     }
 
-    if (it == end || (error = (*it).get_string().get(share.nonce)) ||
-        share.nonce.size() != NONCE_SIZE * 2 + 2)
+    if (it == end || (error = (*it).get_string().get(share.nonce_sv)) ||
+        share.nonce_sv.size() != NONCE_SIZE * 2 + 2)
     {
         parse_error = "Bad nonce.";
     }
@@ -115,17 +119,20 @@ RpcResult StratumServerCn::HandleSubmit(StratumClient *cli, WorkerContext *wc,
         parse_error = "Bad mix digest.";
     }
 
+    share.nonce = HexToUint(share.nonce_sv.data() + 2, sizeof(share.nonce) * 2);
+
     if (!parse_error.empty())
     {
-        logger.Log<LogType::Critical>( 
-                    "Failed to parse submit: {}", parse_error);
+        logger.Log<LogType::Critical>("Failed to parse submit: {}",
+                                      parse_error);
         return RpcResult(ResCode::UNKNOWN, parse_error);
     }
 
-    return HandleShare(cli, wc, share);
+    return this->HandleShare(cli, wc, share);
 }
 
-RpcResult StratumServerCn::HandleAuthorize(StratumClient *cli,
+template <HashAlgo hash_algo>
+RpcResult StratumServerCn<hash_algo>::HandleAuthorize(StratumClient *cli,
                                            simdjson::ondemand::array &params,
                                            std::string_view worker)
 {
@@ -141,9 +148,8 @@ RpcResult StratumServerCn::HandleAuthorize(StratumClient *cli,
     }
     catch (const simdjson_error &err)
     {
-        logger.Log<LogType::Error>(
-                    "No address provided in authorization. err: {}",
-                    err.what());
+        this->logger.Log<LogType::Error>(
+            "No address provided in authorization. err: {}", err.what());
 
         return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
     }
@@ -172,9 +178,8 @@ RpcResult StratumServerCn::HandleAuthorize(StratumClient *cli,
     cli->SetAddress(worker_full_str, given_addr);
 
     // string-views to non-local string
-    bool added_to_db =
-        stats_manager.AddWorker(cli->GetAddress(), cli->GetFullWorkerName(),
-                                "", std::time(nullptr));
+    bool added_to_db = this->stats_manager.AddWorker(
+        cli->GetAddress(), cli->GetFullWorkerName(), "", std::time(nullptr));
 
     if (!added_to_db)
     {
@@ -183,29 +188,34 @@ RpcResult StratumServerCn::HandleAuthorize(StratumClient *cli,
     }
     cli->SetAuthorized();
 
-    logger.Log<LogType::Info>(
-                "Authorized worker: {}, address: {}", worker, given_addr);
+    logger.Log<LogType::Info>("Authorized worker: {}, address: {}", worker,
+                              given_addr);
 
     return RpcResult(ResCode::OK);
 }
 
-void StratumServerCn::BroadcastJob(Connection<StratumClient> *conn,
+
+template <HashAlgo hash_algo>
+void StratumServerCn<hash_algo>::BroadcastJob(Connection<StratumClient> *conn,
                                    const job_t *job, int id) const
 {
     char buff[MAX_NOTIFY_MESSAGE_SIZE];
     std::size_t len = job->GetWorkMessage(buff, conn->ptr.get(), id);
-    SendRaw(conn->sock, buff, len);
+    this->SendRaw(conn->sock, buff, len);
 }
 
-void StratumServerCn::BroadcastJob(Connection<StratumClient> *conn,
+template <HashAlgo hash_algo>
+void StratumServerCn<hash_algo>::BroadcastJob(Connection<StratumClient> *conn,
                                    const job_t *job) const
 {
     char buff[MAX_NOTIFY_MESSAGE_SIZE];
     std::size_t len = job->GetWorkMessage(buff, conn->ptr.get());
-    SendRaw(conn->sock, buff, len);
+    this->SendRaw(conn->sock, buff, len);
 }
 
-void StratumServerCn::UpdateDifficulty(Connection<StratumClient> *conn)
+
+template <HashAlgo hash_algo>
+void StratumServerCn<hash_algo>::UpdateDifficulty(Connection<StratumClient> *conn)
 {
     // nothing to be done; as it's sent on new job.
 }

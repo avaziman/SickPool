@@ -22,12 +22,6 @@ StatsManager::StatsManager(RedisManager* redis_manager,
     StatsManager::diff_adjust_seconds = cc->diff_adjust_seconds;
     StatsManager::average_interval_ratio =
         (double)average_hashrate_interval_seconds / hashrate_interval_seconds;
-
-    #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
-    // get the last share
-    auto [res, rep] = round_manager->GetSharesBetween(-static_cast<ssize_t>(sizeof(Share)) - 1, -1);
-    round_progress = res.front().progress;
-#endif
 }
 
 void StatsManager::Start(std::stop_token st)
@@ -81,8 +75,7 @@ void StatsManager::Start(std::stop_token st)
             round_manager->UpdateEffortStats(update_time_ms);
 
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
-            round_manager->AddPendingShares(pending_shares);
-            pending_shares.clear();
+            round_manager->PushPendingShares();
 #endif
         }
 
@@ -208,26 +201,6 @@ void StatsManager::AddShare(const std::string& worker_full,
         worker_stats->interval_valid_shares++;
         // worker_stats->current_interval_effort += expected_shares;
         worker_stats->current_interval_effort += diff;
-
-#if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
-        round_progress += diff;
-        // // reserve much TODO
-        // const auto reload = 1000;
-        // if (pending_share_count % reload)
-        // {
-        //     auto newpend =
-        //         std::make_unique<Share[]>(pending_share_count + reload);
-        //     memcpy(pending_shares.get(), newpend.get(),
-        //            pending_share_count * sizeof(Share));
-        //     pending_shares.swap(newpend);
-        // }
-
-        Share curshare;
-        curshare.progress = round_progress;
-        memcpy(curshare.addr, miner_addr.data(), ADDRESS_LEN);
-
-        pending_shares.push_back(std::move(curshare));
-#endif
 
         logger.Log<LogType::Debug>(
             "Logged share with diff: {} for {} total diff: {}", diff,

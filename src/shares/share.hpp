@@ -26,9 +26,12 @@ struct ShareCn
 {
     std::string_view worker;
     
-    std::string_view nonce;
+    std::string_view nonce_sv;
+    // used to identify job instead of JobId.
     std::string_view header_pow;
     std::string_view mix_digest;
+
+    uint64_t nonce;
 };
 typedef ShareCn share_t;
 
@@ -39,10 +42,6 @@ struct WorkerContext
     uint32_t current_height;
     simdjson::ondemand::parser json_parser;
     uint8_t block_header[BLOCK_HEADER_SIZE];
-
-    #ifdef STRATUM_PROTOCOL_CN
-    uint64_t nonce;
-    #endif
 
     #if HASH_ALGO == HASH_ALGO_VERUSHASH
     CVerusHashV2 hasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
