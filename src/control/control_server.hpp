@@ -32,10 +32,8 @@ class ControlServer
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(port);
 
-        int optval = 1;
-
-        if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval,
-                       sizeof(optval)) != 0)
+        if (int optval = 1; setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
+                                       &optval, sizeof(optval)) != 0)
         {
             throw std::runtime_error("Failed to set control server options");
         }
@@ -58,6 +56,22 @@ class ControlServer
         // one command per connection
         // we don't care about the address, as it must be local (is it
         // secure?)
+
+        fd_set rfds;
+        int val;
+        struct timeval timeout
+        {
+            .tv_sec = 1
+        };
+        FD_ZERO(&rfds);
+        FD_SET(sockfd, &rfds);
+
+        val = select(1, &rfds, nullptr, nullptr, &timeout);
+
+        if (val <= 0){
+            return ControlCommands::NONE;
+        }
+
         int connfd = accept(sockfd, nullptr, nullptr);
 
         if (recv(connfd, buf, size, 0) <= 0)
@@ -77,3 +91,5 @@ class ControlServer
 };
 
 #endif
+
+// TODO: set SO_PRIORITY

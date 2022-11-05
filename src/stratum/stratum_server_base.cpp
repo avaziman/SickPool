@@ -24,6 +24,8 @@ StratumBase::~StratumBase()
 
 void StratumBase::Stop()
 {
+    logger.Log<LogType::Info>("Stopping socket servicing...");
+
     stats_thread.request_stop();
     control_thread.request_stop();
     for (auto &t : processing_threads)
@@ -71,6 +73,9 @@ void StratumBase::HandleControlCommands(std::stop_token st)
     while (!st.stop_requested())
     {
         ControlCommands cmd = control_server.GetNextCommand(buff, sizeof(buff));
+
+        if (cmd == ControlCommands::NONE) continue;
+        
         HandleControlCommand(cmd, buff);
         logger.Log<LogType::Info>("Processed control command: {}", buff);
     }

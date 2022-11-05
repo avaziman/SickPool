@@ -3,10 +3,10 @@
 #ifdef STRATUM_PROTOCOL_CN
 #include "stratum_server_cn.hpp"
 
-template class StratumServerCn<HashAlgo::PROGPOWZ>;
+template class StratumServerCn<ZanoStatic>;
 
-template <HashAlgo hash_algo>
-void StratumServerCn<hash_algo>::HandleReq(Connection<StratumClient> *conn,
+template <StaticConf confs>
+void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
                                            WorkerContext *wc,
                                            std::string_view req)
 {
@@ -81,8 +81,8 @@ void StratumServerCn<hash_algo>::HandleReq(Connection<StratumClient> *conn,
     this->SendRes(sock, id, res);
 }
 
-template <HashAlgo hash_algo>
-RpcResult StratumServerCn<hash_algo>::HandleSubmit(StratumClient *cli, WorkerContext *wc,
+template <StaticConf confs>
+RpcResult StratumServerCn<confs>::HandleSubmit(StratumClient *cli, WorkerContext *wc,
                                         simdjson::ondemand::array &params,
                                         std::string_view worker)
 {
@@ -131,8 +131,8 @@ RpcResult StratumServerCn<hash_algo>::HandleSubmit(StratumClient *cli, WorkerCon
     return this->HandleShare(cli, wc, share);
 }
 
-template <HashAlgo hash_algo>
-RpcResult StratumServerCn<hash_algo>::HandleAuthorize(StratumClient *cli,
+template <StaticConf confs>
+RpcResult StratumServerCn<confs>::HandleAuthorize(StratumClient *cli,
                                            simdjson::ondemand::array &params,
                                            std::string_view worker)
 {
@@ -195,8 +195,8 @@ RpcResult StratumServerCn<hash_algo>::HandleAuthorize(StratumClient *cli,
 }
 
 
-template <HashAlgo hash_algo>
-void StratumServerCn<hash_algo>::BroadcastJob(Connection<StratumClient> *conn,
+template <StaticConf confs>
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
                                    const job_t *job, int id) const
 {
     char buff[MAX_NOTIFY_MESSAGE_SIZE];
@@ -204,8 +204,8 @@ void StratumServerCn<hash_algo>::BroadcastJob(Connection<StratumClient> *conn,
     this->SendRaw(conn->sock, buff, len);
 }
 
-template <HashAlgo hash_algo>
-void StratumServerCn<hash_algo>::BroadcastJob(Connection<StratumClient> *conn,
+template <StaticConf confs>
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
                                    const job_t *job) const
 {
     char buff[MAX_NOTIFY_MESSAGE_SIZE];
@@ -214,8 +214,8 @@ void StratumServerCn<hash_algo>::BroadcastJob(Connection<StratumClient> *conn,
 }
 
 
-template <HashAlgo hash_algo>
-void StratumServerCn<hash_algo>::UpdateDifficulty(Connection<StratumClient> *conn)
+template <StaticConf confs>
+void StratumServerCn<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
 {
     // nothing to be done; as it's sent on new job.
 }

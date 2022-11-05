@@ -237,11 +237,18 @@ constexpr uint64_t pow2(int power)
     return (1ULL << power);
 }
 
+constexpr double pow2d(int power)
+{
+    double res = 1.0;
+    for (int i = 0; i < power; i++) res *= 2;
+
+    return res;
+}
+
 inline double GetExpectedHashes(const double diff)
 {
-    constexpr uint64_t power = 256 - 8 * (DIFF1_EXPONENT - 3);
-    constexpr double hash_multiplier =
-        static_cast<double>(pow2(power)) / DIFF1_COEFFICIENT;
+    constexpr double u256_max = pow2d(256);
+    constexpr double hash_multiplier = u256_max / DIFF1;
 
     return diff * hash_multiplier;
     // for verus 2^ 24 / 0x0f0f0f = 17...

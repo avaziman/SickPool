@@ -1,8 +1,8 @@
 #include "stratum_server.hpp"
-template class StratumServer<HashAlgo::PROGPOWZ>;
+template class StratumServer<ZanoStatic>;
 
-template <HashAlgo hash_algo>
-StratumServer<hash_algo>::StratumServer(CoinConfig &&conf)
+template <StaticConf confs>
+StratumServer<confs>::StratumServer(CoinConfig &&conf)
     : StratumBase(std::move(conf)),
       daemon_manager(coin_config.rpcs),
       payment_manager(&redis_manager, &daemon_manager, coin_config.pool_addr,
@@ -29,8 +29,8 @@ StratumServer<hash_algo>::StratumServer(CoinConfig &&conf)
     }
 }
 
-template <HashAlgo hash_algo>
-StratumServer<hash_algo>::~StratumServer()
+template <StaticConf confs>
+StratumServer<confs>::~StratumServer()
 {
     this->logger.Log<LogType::Info>("Stratum destroyed.");
 }
@@ -38,8 +38,8 @@ StratumServer<hash_algo>::~StratumServer()
 // TODO: test buffer too little
 // TODO: test buffer flooded
 //TODO: pass stop token
-template <HashAlgo hash_algo>
-void StratumServer<hash_algo>::HandleBlockNotify()
+template <StaticConf confs>
+void StratumServer<confs>::HandleBlockNotify()
 {
     int64_t curtime_ms = GetCurrentTimeMs();
 
@@ -281,8 +281,8 @@ void StratumServer<hash_algo>::HandleBlockNotify()
 //                 "Added immature PoS Block! hash: {}", block_hash);
 // }
 
-template <HashAlgo hash_algo>
-RpcResult StratumServer<hash_algo>::HandleShare(StratumClient *cli, WorkerContext *wc,
+template <StaticConf confs>
+RpcResult StratumServer<confs>::HandleShare(StratumClient *cli, WorkerContext *wc,
                                      share_t &share)
 {
     int64_t time = GetCurrentTimeMs();
@@ -306,7 +306,7 @@ RpcResult StratumServer<hash_algo>::HandleShare(StratumClient *cli, WorkerContex
     else
     {
         job_read_lock = std::shared_lock<std::shared_mutex>(job->job_mutex);
-        ShareProcessor::Process<hash_algo>(share_res, cli, wc, job, share, time);
+        ShareProcessor::Process<confs>(share_res, cli, wc, job, share, time);
         // share_res.code = ResCode::VALID_BLOCK;
     }
 
@@ -414,8 +414,8 @@ RpcResult StratumServer<hash_algo>::HandleShare(StratumClient *cli, WorkerContex
 // the shared pointer makes sure the client won't be freed as long as we are
 // processing it
 
-template <HashAlgo hash_algo>
-void StratumServer<hash_algo>::HandleConsumeable(connection_it *it)
+template <StaticConf confs>
+void StratumServer<confs>::HandleConsumeable(connection_it *it)
 {
     static thread_local WorkerContext wc;
 
@@ -460,8 +460,8 @@ void StratumServer<hash_algo>::HandleConsumeable(connection_it *it)
     }
 }
 
-template <HashAlgo hash_algo>
-bool StratumServer<hash_algo>::HandleConnected(connection_it *it)
+template <StaticConf confs>
+bool StratumServer<confs>::HandleConnected(connection_it *it)
 {
     std::shared_ptr<Connection<StratumClient>> conn = *(*it);
 

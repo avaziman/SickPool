@@ -53,6 +53,7 @@ int main(int argc, char** argv)
     logger.Log<LogType::Info>("Loading dynamic config...");
 
     logger.Log<LogType::Info>("Diff1: {}", DIFF1);
+    logger.Log<LogType::Info>("Share multiplier: {}", pow2d(256) / DIFF1);
 
     if (signal(SIGINT, SigintHandler) == SIG_ERR)
     {
@@ -71,7 +72,7 @@ int main(int argc, char** argv)
         ParseCoinConfig(json, coinConfig, logger);
 
         if (coinConfig.symbol == "ZANO"){
-            StratumServerCn<HashAlgo::PROGPOWZ> stratum_server(std::move(coinConfig));
+            StratumServerCn<ZanoStatic> stratum_server(std::move(coinConfig));
             stratum_bserver_ptr = dynamic_cast<StratumBase*>(&stratum_server);
             stratum_server.Listen();
         }else {

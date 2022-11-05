@@ -1,6 +1,8 @@
 #ifndef HEX_UTILS_HPP
 #define HEX_UTILS_HPP
 #include <iostream>
+#include <array>
+#include <iomanip>
 
 inline void ReverseHex(char* dest, const char* input, uint32_t size)
 {
@@ -18,13 +20,15 @@ inline void ReverseHex(char* dest, const char* input, uint32_t size)
     }
 }
 
-inline char GetHex(char c)
+constexpr char GetHex(char c)
 {
     // assumes all hex is in lowercase
     if (c >= '0' && c <= '9')
         return c - '0';
     else if (c >= 'a' && c <= 'f')
         return 10 + (c - 'a');
+    else if (c >= 'A' && c <= 'F')
+        return 10 + (c - 'A');
 
     return 0;
 }
@@ -93,7 +97,7 @@ inline void PrintHex(const uint8_t* b, std::size_t size,
     std::cout << std::endl;
 }
 
-inline void Unhexlify(unsigned char* dest, const char* src, const size_t size)
+constexpr void Unhexlify(unsigned char* dest, const char* src, const size_t size)
 {
     // each byte is 2 characters in hex
     for (int i = 0; i < size / 2; i++)
@@ -102,6 +106,15 @@ inline void Unhexlify(unsigned char* dest, const char* src, const size_t size)
         unsigned char char2 = GetHex(src[i * 2 + 1]);
         dest[i] = char2 + char1 * 16;
     }
+}
+
+template <size_t size>
+constexpr std::array<uint8_t, size / 2> Unhexlify(
+    const std::array<char, size>& src)
+{
+    std::array<uint8_t, size / 2> res{};
+    Unhexlify(res.data(), src.data(), size);
+    return res;
 }
 
 inline uint32_t FromHex(const char* str)

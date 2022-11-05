@@ -51,7 +51,7 @@ class ShareProcessor
     static constexpr std::string_view field_str = "ShareProcessor";
     static const Logger<field_str> logger;
 
-    template <HashAlgo hash_algo>
+    template <StaticConf confs>
     inline static void Process(ShareResult& result, StratumClient* cli,
                                WorkerContext* wc, const job_t* job,
                                const share_t& share, int64_t curTime)
@@ -70,24 +70,23 @@ class ShareProcessor
         // std::cout << "block header: " << std::endl;
         // PrintHex(headerData, BLOCK_HEADER_SIZE);
 
-        if constexpr (hash_algo == HashAlgo::PROGPOWZ)
+        if constexpr (confs.HASH_ALGO == HashAlgo::PROGPOWZ)
         {
             currency::get_block_longhash_sick(
                 result.hash_bytes.data(), static_cast<uint64_t>(job->height),
                 job->block_template_hash.data(), share.nonce);
-            std::ranges::reverse(result.hash_bytes.begin(),
-                                 result.hash_bytes.end());
+            std::ranges::reverse(result.hash_bytes);
         }
-        else if constexpr (hash_algo == HashAlgo::VERUSHASH_V2b2)
+        else if constexpr (confs.HASH_ALGO == HashAlgo::VERUSHASH_V2b2)
         {
             // takes about 6-8 microseconds vs 8-12 on snomp
-            HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
-                                       BLOCK_HEADER_SIZE, &wc->hasher);
+            // HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
+            //                            BLOCK_HEADER_SIZE, &wc->hasher);
         }
-        else if constexpr (hash_algo == HashAlgo::X25X)
+        else if constexpr (confs.HASH_ALGO == HashAlgo::X25X)
         {
-            HashWrapper::X25X(result.hash_bytes.data(), headerData,
-                              BLOCK_HEADER_SIZE);
+            // HashWrapper::X25X(result.hash_bytes.data(), headerData,
+            //                   BLOCK_HEADER_SIZE);
         }
         else
         {

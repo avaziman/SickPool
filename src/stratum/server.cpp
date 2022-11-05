@@ -71,8 +71,9 @@ void Server<T>::Service()
             if (flags & EPOLLERR)
             {
                 int error = 0;
-                socklen_t errlen = sizeof(error);
-                if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void *)&error,
+
+                if (socklen_t errlen = sizeof(error);
+                    getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void *)&error,
                                &errlen) == 0)
                 {
                     logger.Log<LogType::Warn>(
@@ -182,7 +183,8 @@ void Server<T>::HandleNewConnection()
 
     // only add to the interest list after all the connection data has been
     // created to avoid data races
-    if (!HandleConnected(conn_it)){
+    if (!HandleConnected(conn_it))
+    {
         EraseClient(conn_it);
         return;
     }

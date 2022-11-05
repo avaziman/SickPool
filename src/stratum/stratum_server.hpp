@@ -25,7 +25,7 @@
 #include "stratum_server_base.hpp"
 static constexpr std::string_view field_str_stratum = "StratumServer";
 
-template <HashAlgo hash_algo>
+template <StaticConf confs>
 class StratumServer : public StratumBase
 {
    public:

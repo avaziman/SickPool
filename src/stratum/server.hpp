@@ -29,7 +29,7 @@
 //     ConnectionEventType type;
 //     T* ptr;
 // };
-static constexpr std::string_view field_str = "Server";
+inline constexpr std::string_view field_str = "Server";
 
 template <typename T>
 class Server
@@ -52,7 +52,7 @@ class Server
 
    private:
 
-    Logger<field_str> logger;
+    const Logger<field_str> logger;
     std::mutex connections_mutex;
     std::list<std::shared_ptr<Connection<T>>> connections;
 

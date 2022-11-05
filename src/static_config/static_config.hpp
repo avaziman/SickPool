@@ -13,6 +13,12 @@ using namespace StratumConstants;
 
 #define SICK_COIN ZANO
 #define PAYMENT_SCHEME PAYMENT_SCHEME_PPLNS
+#include "hash_algo.hpp"
+struct StaticConf{
+    const HashAlgo HASH_ALGO;
+    const double DIFF1;
+};
+// const double HASH_MULTIPLIER;  // how many hashes is a share of difficulty 1
 
 #if SICK_COIN == VRSC
 #define SICK_COIN_SYMBOL "VRSC"
@@ -31,7 +37,6 @@ using namespace CoinConstantsZano;
 #else
 #error "No SICK_COIN selected"
 #endif
-
 // SICK_COIN derived
 static constexpr uint32_t DIFF1_COEFFICIENT = DIFF1_BITS & 0x00ffffff;
 static constexpr uint32_t DIFF1_EXPONENT = DIFF1_BITS >> 24;

@@ -10,12 +10,12 @@
 
 static constexpr std::string_view field_str_cn = "StratumServerCn";
 
-template <HashAlgo hash_algo>
-class StratumServerCn : public StratumServer<hash_algo>
+template <StaticConf confs>
+class StratumServerCn : public StratumServer<confs>
 {
     public:
      using share_t = ShareCn;
-     explicit StratumServerCn(CoinConfig&& conf) : StratumServer<hash_algo>(std::move(conf)) {}
+     explicit StratumServerCn(CoinConfig&& conf) : StratumServer<confs>(std::move(conf)) {}
 
     private:
      const Logger<field_str_cn> logger;
