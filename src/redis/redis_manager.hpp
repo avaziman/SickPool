@@ -102,8 +102,6 @@ enum class Prefix
 };
 
 // TODO: update pending payout on payment settings change
-static constexpr std::string_view coin_symbol = COIN_SYMBOL;
-
 
 class RedisTransaction;
 class RedisManager
@@ -137,7 +135,8 @@ class RedisManager
 
     bool AddNewMiner(std::string_view address, std::string_view addr_lowercase,
                      std::string_view worker_full, std::string_view idTag,
-                     std::string_view script_pub_key, int64_t curtime);
+                    int64_t curtime);
+
     bool AddNewWorker(std::string_view address, std::string_view addr_lowercase,
                       std::string_view worker_full, std::string_view id_tag);
     // bool PopWorker(std::string_view address);
@@ -270,10 +269,8 @@ class RedisManager
     // TODO: make private...
     struct KeyNames
     {
-       private:
-        const std::string coin;
-
        public:
+        const std::string coin;
         explicit KeyNames(std::string_view coin) : coin(coin) {}
         using enum Prefix;
 

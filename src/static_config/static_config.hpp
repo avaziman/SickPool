@@ -4,18 +4,19 @@
 #include "constants.hpp"
 using namespace StratumConstants;
 
-#define BTC 1
+// #define BTC 1
 #define ZCASH 2
 #define VRSC 3
 #define VRSCTEST 4
 #define SIN 5
-#define ZANO 6
 
 #define SICK_COIN ZANO
 #define PAYMENT_SCHEME PAYMENT_SCHEME_PPLNS
 #include "hash_algo.hpp"
 struct StaticConf{
+    const Coin COIN_SYMBOL;
     const HashAlgo HASH_ALGO;
+    const StratumProtocol STRATUM_PROTOCOL;
     const double DIFF1;
 };
 // const double HASH_MULTIPLIER;  // how many hashes is a share of difficulty 1

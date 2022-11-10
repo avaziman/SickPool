@@ -17,11 +17,11 @@ bool RedisRound::SetEffortStats(const efforts_map_t &miner_stats_map,
 
     for (const auto &[miner_addr, miner_effort] : miner_stats_map)
     {
-        AppendSetMinerEffort(COIN_SYMBOL, miner_addr, EnumName<POW>(),
+        AppendSetMinerEffort(key_names.coin, miner_addr, EnumName<POW>(),
                              miner_effort);
     }
 
-    AppendSetMinerEffort(COIN_SYMBOL, EnumName<TOTAL_EFFORT>(), EnumName<POW>(),
+    AppendSetMinerEffort(key_names.coin, EnumName<TOTAL_EFFORT>(), EnumName<POW>(),
                          total_effort);
     stats_mutex.unlock();
 

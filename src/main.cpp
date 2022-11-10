@@ -47,13 +47,8 @@ int main(int argc, char** argv)
     logger.Log<LogType::Info>("Starting SickPool!");
     logger.Log<LogType::Info>("Git commit hash: {}", GIT_COMMIT_HASH);
 
-    logger.Log<LogType::Info>("Static config:");
-    logger.Log<LogType::Info>("Coin symbol: {}", COIN_SYMBOL);
 
     logger.Log<LogType::Info>("Loading dynamic config...");
-
-    logger.Log<LogType::Info>("Diff1: {}", DIFF1);
-    logger.Log<LogType::Info>("Share multiplier: {}", pow2d(256) / DIFF1);
 
     if (signal(SIGINT, SigintHandler) == SIG_ERR)
     {
@@ -71,8 +66,16 @@ int main(int argc, char** argv)
         simdjson::padded_string json = simdjson::padded_string::load(argv[1]);
         ParseCoinConfig(json, coinConfig, logger);
 
+        logger.Log<LogType::Info>("Coin symbol: {}", coinConfig.symbol);
+
         if (coinConfig.symbol == "ZANO"){
-            StratumServerCn<ZanoStatic> stratum_server(std::move(coinConfig));
+            static constexpr StaticConf confs = ZanoStatic;
+            logger.Log<LogType::Info>("Static config:");
+            logger.Log<LogType::Info>("Diff1: {}", confs.DIFF1);
+            logger.Log<LogType::Info>("Share multiplier: {}",
+                                      pow2d(256) / confs.DIFF1);
+
+            StratumServerCn<confs> stratum_server(std::move(coinConfig));
             stratum_bserver_ptr = dynamic_cast<StratumBase*>(&stratum_server);
             stratum_server.Listen();
         }else {

@@ -9,10 +9,9 @@ redis_unique_ptr_context RedisManager::rc_unique;
 redisContext *RedisManager::rc;
 std::mutex RedisManager::rc_mutex;
 
-RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf, int db_index)
-    : 
-      conf(conf),
-      key_names(conf->symbol)
+RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf,
+                           int db_index)
+    : conf(conf), key_names(conf->symbol)
 {
     RedisManager::rc_unique = redis_unique_ptr_context(
         redisConnect(ip.c_str(), conf->redis.redis_port), redisFree);
@@ -87,7 +86,7 @@ void RedisManager::Init()
     }
 }
 
-RedisManager::~RedisManager() { }
+RedisManager::~RedisManager() {}
 
 // TODO: think of smt else
 bool RedisManager::DoesAddressExist(std::string_view addrOrId,
@@ -95,32 +94,32 @@ bool RedisManager::DoesAddressExist(std::string_view addrOrId,
 {
     std::scoped_lock lock(rc_mutex);
 
-    redisReply *reply;
-    bool isId = addrOrId.ends_with("@");
+    // redisReply *reply;
+    // bool isId = addrOrId.ends_with("@");
 
-    if (isId)
-    {
-        reply =
-            (redisReply *)redisCommand(rc, "TS.QUERYINDEX id=%b type=hashrate",
-                                       addrOrId.data(), addrOrId.size());
-    }
-    else
-    {
-        reply = (redisReply *)redisCommand(
-            rc, "TS.QUERYINDEX address=%b type=hashrate", addrOrId.data(),
-            addrOrId.size());
-    }
+    // if (isId)
+    // {
+    //     reply =
+    //         (redisReply *)redisCommand(rc, "TS.QUERYINDEX id=%b type=hashrate",
+    //                                    addrOrId.data(), addrOrId.size());
+    // }
+    // else
+    // {
+    //     reply = (redisReply *)redisCommand(
+    //         rc, "TS.QUERYINDEX address=%b type=hashrate", addrOrId.data(),
+    //         addrOrId.size());
+    // }
 
-    bool exists = reply && reply->elements == 1;
-    bool res = false;
-    if (exists)
-    {
-        valid_addr =
-            reply->element[0]->str + sizeof(COIN_SYMBOL ":hashrate:") - 1;
-        res = true;
-    }
-    freeReplyObject(reply);
-    return res;
+    // bool exists = reply && reply->elements == 1;
+    // bool res = false;
+    // if (exists)
+    // {
+    //     valid_addr =
+    //         reply->element[0]->str + sizeof(COIN_SYMBOL ":hashrate:") - 1;
+    //     res = true;
+    // }
+    // freeReplyObject(reply);
+    return false;
 }
 
 bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t curtime_ms,
@@ -143,8 +142,8 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
     using namespace std::string_literals;
     std::scoped_lock lock(rc_mutex);
 
-    auto reply = Command(
-        {"HGETALL"sv, Format({key_names.reward_immature, std::to_string(block_num)})});
+    auto reply = Command({"HGETALL"sv, Format({key_names.reward_immature,
+                                               std::to_string(block_num)})});
 
     int64_t matured_funds = 0;
     // either mature everything or nothing
@@ -208,8 +207,8 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
         }
 
         // we pushed it to mature round shares list
-        AppendCommand(
-            {"UNLINK"sv, Format({key_names.reward_immature, std::to_string(block_num)})});
+        AppendCommand({"UNLINK"sv, Format({key_names.reward_immature,
+                                           std::to_string(block_num)})});
     }
 
     logger.Log<LogType::Info>("{} funds have matured!", matured_funds);
@@ -304,8 +303,7 @@ void RedisManager::AppendTsCreate(std::string_view key, std::string_view prefix,
 bool RedisManager::AddNewMiner(std::string_view address,
                                std::string_view addr_lowercase,
                                std::string_view worker_full,
-                               std::string_view id_tag,
-                               std::string_view script_pub_key, int64_t curtime)
+                               std::string_view id_tag, int64_t curtime)
 {
     using namespace std::string_view_literals;
 
@@ -316,7 +314,7 @@ bool RedisManager::AddNewMiner(std::string_view address,
 
         // 100% new, as we loaded all existing
         // miners
-        auto chain = std::string_view(COIN_SYMBOL);
+        auto chain = key_names.coin;
 
         AppendCommand(
             {"HSET"sv, key_names.address_map, addr_lowercase, address});
@@ -360,7 +358,7 @@ bool RedisManager::AddNewMiner(std::string_view address,
             // AppendCommand(
             //     {"HSET"sv, solver_key, PrefixKey<IDENTITY>(), id_tag});
         }
-        
+
         // to be accessible by lowercase addr
         AppendCreateStatsTs(address, id_tag, "miner"sv, addr_lowercase);
     }

@@ -1,16 +1,19 @@
 #include "stratum_server.hpp"
 template class StratumServer<ZanoStatic>;
 
-template <StaticConf confs>
-StratumServer<confs>::StratumServer(CoinConfig &&conf)
+template <StaticConf confs, StratumProtocol S>
+StratumServer<confs, S>::StratumServer(CoinConfig&& conf)
     : StratumBase(std::move(conf)),
       daemon_manager(coin_config.rpcs),
       payment_manager(&redis_manager, &daemon_manager, coin_config.pool_addr,
                       coin_config.payment_interval_seconds,
                       coin_config.min_payout_threshold),
       job_manager(&daemon_manager, &payment_manager, coin_config.pool_addr),
-      block_submitter(&redis_manager, &daemon_manager, &round_manager)
+      block_submitter(&redis_manager, &daemon_manager, &round_manager),
+      stats_manager(&redis_manager, &diff_manager, &round_manager, &conf.stats)
 {
+    static_assert(confs.DIFF1 != 0, "DIFF1 can't be zero!");
+
     if (auto error =
             httpParser.allocate(HTTP_REQ_ALLOCATE, MAX_HTTP_JSON_DEPTH);
         error != simdjson::SUCCESS)
@@ -24,22 +27,26 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
     // init hash functions if needed
     HashWrapper::InitSHA256();
 
-    if(HASH_ALGO == HashAlgo::VERUSHASH_V2b2){
+    if constexpr (confs.HASH_ALGO == HashAlgo::VERUSHASH_V2b2){
         HashWrapper::InitVerusHash();
     }
+
+    stats_thread =
+        std::jthread(std::bind_front(&StatsManager::Start<confs>, &stats_manager));
 }
 
-template <StaticConf confs>
-StratumServer<confs>::~StratumServer()
+template <StaticConf confs, StratumProtocol S>
+StratumServer<confs, S>::~StratumServer()
 {
+    stats_thread.request_stop();
     this->logger.Log<LogType::Info>("Stratum destroyed.");
 }
 
 // TODO: test buffer too little
 // TODO: test buffer flooded
 //TODO: pass stop token
-template <StaticConf confs>
-void StratumServer<confs>::HandleBlockNotify()
+template <StaticConf confs, StratumProtocol S>
+void StratumServer<confs, S>::HandleBlockNotify()
 {
     int64_t curtime_ms = GetCurrentTimeMs();
 
@@ -281,8 +288,8 @@ void StratumServer<confs>::HandleBlockNotify()
 //                 "Added immature PoS Block! hash: {}", block_hash);
 // }
 
-template <StaticConf confs>
-RpcResult StratumServer<confs>::HandleShare(StratumClient *cli, WorkerContext *wc,
+template <StaticConf confs, StratumProtocol S>
+RpcResult StratumServer<confs, S>::HandleShare(StratumClient *cli, WorkerContext *wc,
                                      share_t &share)
 {
     int64_t time = GetCurrentTimeMs();
@@ -414,8 +421,8 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli, WorkerContext *w
 // the shared pointer makes sure the client won't be freed as long as we are
 // processing it
 
-template <StaticConf confs>
-void StratumServer<confs>::HandleConsumeable(connection_it *it)
+template <StaticConf confs, StratumProtocol S>
+void StratumServer<confs, S>::HandleConsumeable(connection_it *it)
 {
     static thread_local WorkerContext wc;
 
@@ -460,8 +467,8 @@ void StratumServer<confs>::HandleConsumeable(connection_it *it)
     }
 }
 
-template <StaticConf confs>
-bool StratumServer<confs>::HandleConnected(connection_it *it)
+template <StaticConf confs, StratumProtocol S>
+bool StratumServer<confs, S>::HandleConnected(connection_it *it)
 {
     std::shared_ptr<Connection<StratumClient>> conn = *(*it);
 
@@ -482,4 +489,17 @@ bool StratumServer<confs>::HandleConnected(connection_it *it)
     clients.try_emplace(conn, 0);
 
     return true;
+}
+
+template <StaticConf confs, StratumProtocol S>
+void StratumServer<confs, S>::DisconnectClient(
+    const std::shared_ptr<Connection<StratumClient>> conn_ptr)
+{
+    auto sock = conn_ptr->sock;
+    stats_manager.PopWorker(conn_ptr->ptr->GetFullWorkerName(),
+                            conn_ptr->ptr->GetAddress());
+    std::unique_lock lock(clients_mutex);
+    clients.erase(conn_ptr);
+
+    logger.Log<LogType::Info>("Stratum client disconnected. sock: {}", sock);
 }

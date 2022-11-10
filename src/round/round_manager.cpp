@@ -79,7 +79,7 @@ bool RoundManager::LoadCurrentRound()
         return false;
     }
 
-    auto chain = std::string(COIN_SYMBOL);
+    auto chain = key_names.coin;
 
     // no need mutex here
     GetCurrentRound(&round, chain, round_type);
@@ -129,7 +129,7 @@ bool RoundManager::UpdateEffortStats([[maybe_unused]] int64_t update_time_ms)
 
 bool RoundManager::LoadEfforts()
 {
-    bool res = GetMinerEfforts(efforts_map, COIN_SYMBOL, round_type);
+    bool res = GetMinerEfforts(efforts_map, key_names.coin, round_type);
 
     std::vector<std::string> to_remove;
     for (auto& [addr, effort] : efforts_map)

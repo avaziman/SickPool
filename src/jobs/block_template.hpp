@@ -98,9 +98,10 @@ struct BlockTemplate
           min_time(min_time),
           bits(bits),
           height(height),
+          //TODO: fix
+          tx_count(static_cast<uint32_t>(max_tx_count - 1)),
           target_diff(BitsToDiff(bits)),
-          expected_hashes(GetExpectedHashes(target_diff)),
-          tx_count(max_tx_count - 1)
+          expected_hashes(/*GetExpectedHashes<confs>*/target_diff)
     {
     }
 
@@ -111,8 +112,8 @@ struct BlockTemplate
     int64_t min_time;
     uint32_t bits;
     uint32_t height;
-    uint32_t block_size;
     uint32_t tx_count;
+    uint32_t block_size;
 
     double target_diff;
     double expected_hashes;

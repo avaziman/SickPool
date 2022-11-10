@@ -245,10 +245,11 @@ constexpr double pow2d(int power)
     return res;
 }
 
+template <StaticConf confs>
 inline double GetExpectedHashes(const double diff)
 {
     constexpr double u256_max = pow2d(256);
-    constexpr double hash_multiplier = u256_max / DIFF1;
+    constexpr double hash_multiplier = u256_max / confs.DIFF1;
 
     return diff * hash_multiplier;
     // for verus 2^ 24 / 0x0f0f0f = 17...

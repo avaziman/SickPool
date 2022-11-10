@@ -5,10 +5,9 @@
 
 template class StratumServerCn<ZanoStatic>;
 
-template <StaticConf confs>
-void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
-                                           WorkerContext *wc,
-                                           std::string_view req)
+template <StaticConf confs, StratumProtocol S>
+void StratumServerCn<confs, S>::HandleReq(Connection<StratumClient> *conn,
+                                       WorkerContext *wc, std::string_view req)
 {
     int id = 0;
     const int sock = conn->sock;
@@ -44,7 +43,6 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
     }
     catch (const simdjson::simdjson_error &err)
     {
-
         this->SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
         logger.Log<LogType::Error>(
             "Request JSON parse error: {}\nRequest: {}\n", err.what(), req);
@@ -81,10 +79,10 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
     this->SendRes(sock, id, res);
 }
 
-template <StaticConf confs>
-RpcResult StratumServerCn<confs>::HandleSubmit(StratumClient *cli, WorkerContext *wc,
-                                        simdjson::ondemand::array &params,
-                                        std::string_view worker)
+template <StaticConf confs, StratumProtocol S>
+RpcResult StratumServerCn<confs, S>::HandleSubmit(
+    StratumClient *cli, WorkerContext *wc, simdjson::ondemand::array &params,
+    std::string_view worker)
 {
     using namespace simdjson;
     // parsing takes 0-1 us
@@ -131,10 +129,10 @@ RpcResult StratumServerCn<confs>::HandleSubmit(StratumClient *cli, WorkerContext
     return this->HandleShare(cli, wc, share);
 }
 
-template <StaticConf confs>
-RpcResult StratumServerCn<confs>::HandleAuthorize(StratumClient *cli,
-                                           simdjson::ondemand::array &params,
-                                           std::string_view worker)
+template <StaticConf confs, StratumProtocol S>
+RpcResult StratumServerCn<confs, S>::HandleAuthorize(
+    StratumClient *cli, simdjson::ondemand::array &params,
+    std::string_view worker)
 {
     using namespace simdjson;
 
@@ -179,7 +177,7 @@ RpcResult StratumServerCn<confs>::HandleAuthorize(StratumClient *cli,
 
     // string-views to non-local string
     bool added_to_db = this->stats_manager.AddWorker(
-        cli->GetAddress(), cli->GetFullWorkerName(), "", std::time(nullptr));
+        cli->GetAddress(), cli->GetFullWorkerName(), std::time(nullptr));
 
     if (!added_to_db)
     {
@@ -194,30 +192,31 @@ RpcResult StratumServerCn<confs>::HandleAuthorize(StratumClient *cli,
     return RpcResult(ResCode::OK);
 }
 
-
-template <StaticConf confs>
-void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
-                                   const job_t *job, int id) const
+template <StaticConf confs, StratumProtocol S>
+void StratumServerCn<confs, S>::BroadcastJob(Connection<StratumClient> *conn,
+                                          const job_t *job, int id) const
 {
     char buff[MAX_NOTIFY_MESSAGE_SIZE];
     std::size_t len = job->GetWorkMessage(buff, conn->ptr.get(), id);
     this->SendRaw(conn->sock, buff, len);
 }
 
-template <StaticConf confs>
-void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
-                                   const job_t *job) const
+template <StaticConf confs, StratumProtocol S>
+void StratumServerCn<confs, S>::BroadcastJob(Connection<StratumClient> *conn,
+                                          const job_t *job) const
 {
     char buff[MAX_NOTIFY_MESSAGE_SIZE];
     std::size_t len = job->GetWorkMessage(buff, conn->ptr.get());
     this->SendRaw(conn->sock, buff, len);
 }
 
-
 template <StaticConf confs>
-void StratumServerCn<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
+// template <typename S = confs.STRATUM_PROTOCOL>
+// typename std::enable_if_t<confs.STRATUM_PROTOCOL == StratumProtocol::CN,
+// void>
+void StratumServerCn<confs, Strat>::UpdateDifficulty(Connection<StratumClient> *conn)
 {
-    // nothing to be done; as it's sent on new job.
+    // nothing to be done; as difficulty is sent on new job.
 }
 
 #endif

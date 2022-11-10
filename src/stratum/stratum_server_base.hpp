@@ -20,14 +20,9 @@ class StratumBase : public Server<StratumClient>
     const Logger<field_str> logger;
 
     std::jthread control_thread;
-    std::jthread stats_thread;
     std::vector<std::jthread> processing_threads;
 
-    //  ControlServer control_server;
-    //  RedisManager redis_manager;
-    //  DifficultyManager diff_manager;
-    //  RoundManager round_manager;
-    //  StatsManager stats_manager;
+    ControlServer control_server;
 
     void ServiceSockets(std::stop_token st);
     void HandleControlCommands(std::stop_token st);
@@ -38,11 +33,9 @@ class StratumBase : public Server<StratumClient>
     void HandleDisconnected(connection_it* conn) override;
 
    protected:
-    ControlServer control_server;
     RedisManager redis_manager;
     DifficultyManager diff_manager;
     RoundManager round_manager;
-    StatsManager stats_manager;
 
     // O(log n) delete + insert
     // saving the pointer in epoll gives us O(1) access!
@@ -54,8 +47,8 @@ class StratumBase : public Server<StratumClient>
 
     virtual void HandleBlockNotify() = 0;
 
-    void DisconnectClient(
-        const std::shared_ptr<Connection<StratumClient>> conn_ptr);
+    virtual void DisconnectClient(
+        const std::shared_ptr<Connection<StratumClient>> conn_ptr) = 0;
 
     inline std::size_t SendRaw(int sock, const char* data,
                                std::size_t len) const

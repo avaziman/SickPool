@@ -59,14 +59,13 @@ class ControlServer
 
         fd_set rfds;
         int val;
-        struct timeval timeout
-        {
-            .tv_sec = 1
-        };
+        struct timeval timeout;
         FD_ZERO(&rfds);
         FD_SET(sockfd, &rfds);
 
-        val = select(1, &rfds, nullptr, nullptr, &timeout);
+        timeout.tv_sec = 1;
+
+        val = select(sockfd + 1, &rfds, nullptr, nullptr, &timeout);
 
         if (val <= 0){
             return ControlCommands::NONE;

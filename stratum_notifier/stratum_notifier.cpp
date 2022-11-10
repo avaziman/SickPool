@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
     int sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     connect(sockfd, (struct sockaddr*)&addr, sizeof(addr));
 
-    int res = send(sockfd, message, len, 0);
+    ssize_t res = send(sockfd, message, len, 0);
     close(sockfd);
 
     if (res == -1)

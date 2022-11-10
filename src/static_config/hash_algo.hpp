@@ -14,5 +14,17 @@ enum class HashAlgo
     PROGPOWZ
 };
 
+enum class StratumProtocol
+{
+    BTC,
+    ZEC,
+    CN,  // cryptonight
+};
+
+enum class Coin
+{
+    BTC,
+    ZANO
+};
 
 #endif

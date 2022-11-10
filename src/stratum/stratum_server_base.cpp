@@ -5,12 +5,8 @@ StratumBase::StratumBase(CoinConfig &&conf)
       coin_config(std::move(conf)),
       redis_manager("127.0.0.1", &conf),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
-      round_manager(redis_manager, "pow"),
-      stats_manager(&redis_manager, &diff_manager, &round_manager, &conf.stats)
+      round_manager(redis_manager, "pow")
 {
-    stats_thread =
-        std::jthread(std::bind_front(&StatsManager::Start, &stats_manager));
-
     control_server.Start(coin_config.control_port);
     control_thread = std::jthread(
         std::bind_front(&StratumBase::HandleControlCommands, this));
@@ -18,7 +14,8 @@ StratumBase::StratumBase(CoinConfig &&conf)
 
 StratumBase::~StratumBase()
 {
-    Stop();
+    // no need to stop, as stopping has caused this destruction...
+    // Stop();
     logger.Log<LogType::Info>("Stratum base destroyed.");
 }
 
@@ -26,7 +23,6 @@ void StratumBase::Stop()
 {
     logger.Log<LogType::Info>("Stopping socket servicing...");
 
-    stats_thread.request_stop();
     control_thread.request_stop();
     for (auto &t : processing_threads)
     {
@@ -43,6 +39,9 @@ void StratumBase::ServiceSockets(std::stop_token st)
     {
         Service();
     }
+
+    logger.Log<LogType::Info>("Stopped servicing sockets on thread {}",
+                              gettid());
 }
 
 void StratumBase::Listen()
@@ -54,7 +53,7 @@ void StratumBase::Listen()
     for (auto i = 0; i < worker_amount; i++)
     {
         processing_threads.emplace_back(
-            std::bind_front(&StratumBase::ServiceSockets, (StratumBase *)this));
+            std::bind_front(&StratumBase::ServiceSockets, this));
     }
 
     HandleBlockNotify();
@@ -63,7 +62,6 @@ void StratumBase::Listen()
     {
         t.join();
     }
-    stats_thread.join();
     control_thread.join();
 }
 
@@ -75,10 +73,13 @@ void StratumBase::HandleControlCommands(std::stop_token st)
         ControlCommands cmd = control_server.GetNextCommand(buff, sizeof(buff));
 
         if (cmd == ControlCommands::NONE) continue;
-        
+
         HandleControlCommand(cmd, buff);
         logger.Log<LogType::Info>("Processed control command: {}", buff);
     }
+
+    logger.Log<LogType::Info>("Stopped control server on thread {}",
+                              gettid());
 }
 
 void StratumBase::HandleControlCommand(ControlCommands cmd, char buff[])
@@ -107,16 +108,4 @@ void StratumBase::HandleDisconnected(connection_it *conn)
 {
     auto conn_ptr = *(*conn);
     DisconnectClient(conn_ptr);
-}
-
-void StratumBase::DisconnectClient(
-    const std::shared_ptr<Connection<StratumClient>> conn_ptr)
-{
-    auto sock = conn_ptr->sock;
-    stats_manager.PopWorker(conn_ptr->ptr->GetFullWorkerName(),
-                            conn_ptr->ptr->GetAddress());
-    std::unique_lock lock(clients_mutex);
-    clients.erase(conn_ptr);
-
-    logger.Log<LogType::Info>("Stratum client disconnected. sock: {}", sock);
 }

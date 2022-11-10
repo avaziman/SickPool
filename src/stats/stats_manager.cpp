@@ -1,5 +1,7 @@
 #include "./stats_manager.hpp"
 
+template void StatsManager::Start<ZanoStatic>(std::stop_token st);
+
 int StatsManager::hashrate_interval_seconds;
 int StatsManager::effort_interval_seconds;
 int StatsManager::average_hashrate_interval_seconds;
@@ -24,6 +26,7 @@ StatsManager::StatsManager(RedisManager* redis_manager,
         (double)average_hashrate_interval_seconds / hashrate_interval_seconds;
 }
 
+template <StaticConf confs>
 void StatsManager::Start(std::stop_token st)
 {
     using namespace std::chrono;
@@ -65,7 +68,7 @@ void StatsManager::Start(std::stop_token st)
         if (next_update == next_interval_update)
         {
             next_interval_update += hashrate_interval_seconds;
-            UpdateIntervalStats(update_time_ms);
+            UpdateIntervalStats<confs>(update_time_ms);
         }
 
         // possible that both need to be updated at the same time
@@ -99,8 +102,11 @@ void StatsManager::Start(std::stop_token st)
         auto endChrono = system_clock::now();
         auto duration = duration_cast<microseconds>(endChrono - startChrono);
     }
+
+    logger.Log<LogType::Info>("Stopped stats manager on thread {}", gettid());
 }
 
+template <StaticConf confs>
 bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 {
     using namespace std::string_view_literals;
@@ -131,7 +137,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         for (auto& [worker, ws] : worker_stats_map)
         {
             ws.interval_hashrate =
-                GetExpectedHashes(ws.current_interval_effort) /
+                GetExpectedHashes<confs>(ws.current_interval_effort) /
                 (double)hashrate_interval_seconds;
 
             ws.average_hashrate_sum += ws.interval_hashrate;
@@ -212,8 +218,7 @@ void StatsManager::AddShare(const std::string& worker_full,
 }
 
 bool StatsManager::AddWorker(const std::string& address,
-                             const std::string& worker_full,
-                             std::string_view script_pub_key, int64_t curtime,
+                             const std::string& worker_full, int64_t curtime,
                              const std::string& idTag)
 {
     using namespace std::literals;
@@ -229,17 +234,16 @@ bool StatsManager::AddWorker(const std::string& address,
     //                addr_lowercase.begin(),
     //                [](unsigned char c) { return std::tolower(c); });
 
-    std::transform(addr_lowercase.begin(), addr_lowercase.end(),
-                   addr_lowercase.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    std::ranges::transform(addr_lowercase, std::back_inserter(addr_lowercase),
+                           [](unsigned char c) { return std::tolower(c); });
 
-// std::ranges::transform()
+    // std::ranges::transform()
     // 100% new, as we loaded all existing miners
     if (new_miner)
     {
         logger.Log<LogType::Info>("New miner has spawned: {}", address);
         if (redis_manager->AddNewMiner(address, addr_lowercase, worker_full,
-                                       idTag, script_pub_key, curtime))
+                                       idTag, curtime))
         {
             logger.Log<LogType::Info>("Miner {} added to database.", address);
         }

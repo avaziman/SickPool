@@ -110,7 +110,7 @@ class ShareProcessor
             return;
         }
 
-        result.difficulty = DIFF1 / UintToArith256(hash).getdouble();
+        result.difficulty = confs.DIFF1 / UintToArith256(hash).getdouble();
 
         if (result.difficulty >= job->target_diff) [[unlikely]]
         {

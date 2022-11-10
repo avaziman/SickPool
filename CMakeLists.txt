@@ -31,7 +31,7 @@ execute_process(
     OUTPUT_VARIABLE GIT_COMMIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-# set (CMAKE_BUILD_TYPE "Release")
+set (CMAKE_BUILD_TYPE "Debug")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     # Makes the executable run the fastest on host cpu and enable optimizations

@@ -11,8 +11,6 @@
 #include <thread>
 #include <vector>
 
-#include "../sock_addr.hpp"
-#include "benchmark.hpp"
 #include "block_submitter.hpp"
 #include "blocks/block_submission.hpp"
 #include "connection.hpp"
@@ -25,7 +23,7 @@
 #include "stratum_server_base.hpp"
 static constexpr std::string_view field_str_stratum = "StratumServer";
 
-template <StaticConf confs>
+template <StaticConf confs, StratumProtocol S = confs.STRATUM_PROTOCOL>
 class StratumServer : public StratumBase
 {
    public:
@@ -34,6 +32,9 @@ class StratumServer : public StratumBase
 
    private:
     const Logger<field_str_stratum> logger;
+    // StatsManager stats_manager;
+    
+    std::jthread stats_thread;
 
    protected:
     simdjson::ondemand::parser httpParser =
@@ -43,11 +44,11 @@ class StratumServer : public StratumBase
     daemon_manager_t daemon_manager;
     PaymentManager payment_manager;
     BlockSubmitter block_submitter;
+    StatsManager stats_manager;
 
     virtual void HandleReq(Connection<StratumClient>* conn, WorkerContext* wc,
                            std::string_view req) = 0;
     void HandleBlockNotify() override;
-    // void HandleWalletNotify(WalletNotify* wal_notify);
 
     RpcResult HandleShare(StratumClient* cli, WorkerContext* wc,
                           share_t& share);
@@ -61,6 +62,9 @@ class StratumServer : public StratumBase
     //                  it);
     void HandleConsumeable(connection_it* conn) override;
     bool HandleConnected(connection_it* conn) override;
+
+    void DisconnectClient(
+        const std::shared_ptr<Connection<StratumClient>> conn_ptr) override;
 };
 
 #ifdef STRATUM_PROTOCOL_ZEC

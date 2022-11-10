@@ -4,30 +4,27 @@
 
 #define STRATUM_PROTOCOL_CN 1
 const HashAlgo HASH_ALGO = HashAlgo::PROGPOWZ;
-#define COIN_SYMBOL "ZANO"
 
 using namespace CoinConstantsCryptoNote;
 static constexpr std::string_view target = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
 constexpr StaticConf ZanoStatic = {
+    .COIN_SYMBOL = Coin::ZANO,
     .HASH_ALGO = HashAlgo::PROGPOWZ,
-    .DIFF1 = GetDiff1<target>(),
+    .STRATUM_PROTOCOL = StratumProtocol::BTC,
+    .DIFF1 = GetDiff1<target>()
 };
 
 namespace CoinConstantsZano
 {
 // 0xffffff0000000000000000000000000000000000000000000000000000000000
 
-static const uint256 TARGET1 = uint256S(
-    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
-// static const double DIFF1 = UintToArith256(TARGET1).getdouble();
-static constexpr std::string_view target = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
-static constexpr double DIFF1 = GetDiff1<target>();
-
-static_assert(DIFF1 != 0, "DIFF1 can't be zero!");
+// inline static const uint256 TARGET1 = uint256S(
+//     "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+// static constexpr std::string_view target = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+// static constexpr double DIFF1 = GetDiff1<target>();
 
 static constexpr uint32_t DIFF1_BITS = 0x20ffffff;
 static constexpr uint32_t MAX_BLOCK_SIZE = 64000000;
-// static constexpr uint32_t HASH_SIZE = 32;
 #define HASH_SIZE 32
 static constexpr uint32_t PREVHASH_SIZE = HASH_SIZE;
 static constexpr uint32_t MERKLE_ROOT_SIZE = HASH_SIZE;

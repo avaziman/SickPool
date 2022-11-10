@@ -52,7 +52,8 @@ struct BlockTemplateCn
           seed(btemplate.seed),
           height(btemplate.height),
           target_diff(btemplate.difficulty),
-          expected_hashes(GetExpectedHashes(static_cast<double>(target_diff))),
+          //TODO: fix..
+          expected_hashes(/*GetExpectedHashes*/(static_cast<double>(target_diff))),
           block_size(static_cast<uint32_t>(btemplate.blob.size() / 2))
     {
         std::string template_bin;
