@@ -16,13 +16,17 @@ int main(int argc, char** argv)
     simdjson::padded_string json = simdjson::padded_string::load(argv[1]);
     ParseCoinConfig(json, coinConfig, conf_logger);
 
-    std::vector<std::unique_ptr<ExtendedSubmission>> immature_block_submissions;
+    std::vector<std::unique_ptr<BlockSubmission>> immature_block_submissions;
     const std::string ip = "127.0.0.1";
     RedisManager redis_manager(ip, &coinConfig);
     daemon_manager_t daemon_manager(coinConfig.rpcs);
-    BlockWatcher block_watcher(&redis_manager, &daemon_manager);
 
-    block_watcher.CheckImmatureSubmissions();
+    if (coinConfig.symbol == "ZANO")
+    {
+        static constexpr StaticConf confs = ZanoStatic;
+        BlockWatcher<confs> block_watcher(&redis_manager, &daemon_manager);
+        block_watcher.CheckImmatureSubmissions();
+    }
 
     return 0;
 }

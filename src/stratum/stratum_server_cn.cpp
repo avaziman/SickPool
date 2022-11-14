@@ -5,9 +5,9 @@
 
 template class StratumServerCn<ZanoStatic>;
 
-template <StaticConf confs, StratumProtocol S>
-void StratumServerCn<confs, S>::HandleReq(Connection<StratumClient> *conn,
-                                       WorkerContext *wc, std::string_view req)
+template <StaticConf confs>
+void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
+                                       WorkerContextT *wc, std::string_view req)
 {
     int id = 0;
     const int sock = conn->sock;
@@ -29,17 +29,17 @@ void StratumServerCn<confs, S>::HandleReq(Connection<StratumClient> *conn,
         doc = wc->json_parser.iterate(req.data(), req.size(),
                                       req.size() + simdjson::SIMDJSON_PADDING);
 
-        simdjson::ondemand::object req = doc.get_object();
-        id = static_cast<int>(req["id"].get_int64());
-        method = req["method"].get_string();
+        simdjson::ondemand::object req_ob = doc.get_object();
+        id = static_cast<int>(req_ob["id"].get_int64());
+        method = req_ob["method"].get_string();
 
         if ((is_submit_work = method == "eth_submitWork") ||
             (is_login = method == "eth_submitLogin"))
         {
-            worker = req["worker"].get_string();
+            worker = req_ob["worker"].get_string();
         }
 
-        params = req["params"].get_array();
+        params = req_ob["params"].get_array();
     }
     catch (const simdjson::simdjson_error &err)
     {
@@ -79,9 +79,9 @@ void StratumServerCn<confs, S>::HandleReq(Connection<StratumClient> *conn,
     this->SendRes(sock, id, res);
 }
 
-template <StaticConf confs, StratumProtocol S>
-RpcResult StratumServerCn<confs, S>::HandleSubmit(
-    StratumClient *cli, WorkerContext *wc, simdjson::ondemand::array &params,
+template <StaticConf confs>
+RpcResult StratumServerCn<confs>::HandleSubmit(
+    StratumClient *cli, WorkerContextT *wc, simdjson::ondemand::array &params,
     std::string_view worker)
 {
     using namespace simdjson;
@@ -100,24 +100,24 @@ RpcResult StratumServerCn<confs, S>::HandleSubmit(
     }
 
     if (it == end || (error = (*it).get_string().get(share.nonce_sv)) ||
-        share.nonce_sv.size() != NONCE_SIZE * 2 + 2)
+        share.nonce_sv.size() != sizeof(share.nonce) * 2 + 2)
     {
         parse_error = "Bad nonce.";
     }
-    else if (++it == end ||
-             (error = (*it).get_string().get(share.header_pow)) ||
-             share.header_pow.size() != HASH_SIZE_HEX + 2)
+    else if (++it == end || (error = (*it).get_string().get(share.jobId)) ||
+             share.jobId.size() != confs.BLOCK_HASH_SIZE * 2 + 2)
     {
         parse_error = "Bad header pow hash.";
     }
     else if (++it == end ||
              (error = (*it).get_string().get(share.mix_digest)) ||
-             share.mix_digest.size() != HASH_SIZE_HEX + 2)
+             share.mix_digest.size() != confs.BLOCK_HASH_SIZE * 2 + 2)
     {
         parse_error = "Bad mix digest.";
     }
 
     share.nonce = HexToUint(share.nonce_sv.data() + 2, sizeof(share.nonce) * 2);
+    share.jobId = share.jobId.substr(2); // remove the hex prefix as we don't save it.
 
     if (!parse_error.empty())
     {
@@ -129,8 +129,8 @@ RpcResult StratumServerCn<confs, S>::HandleSubmit(
     return this->HandleShare(cli, wc, share);
 }
 
-template <StaticConf confs, StratumProtocol S>
-RpcResult StratumServerCn<confs, S>::HandleAuthorize(
+template <StaticConf confs>
+RpcResult StratumServerCn<confs>::HandleAuthorize(
     StratumClient *cli, simdjson::ondemand::array &params,
     std::string_view worker)
 {
@@ -192,31 +192,29 @@ RpcResult StratumServerCn<confs, S>::HandleAuthorize(
     return RpcResult(ResCode::OK);
 }
 
-template <StaticConf confs, StratumProtocol S>
-void StratumServerCn<confs, S>::BroadcastJob(Connection<StratumClient> *conn,
+template <StaticConf confs>
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
                                           const job_t *job, int id) const
 {
-    char buff[MAX_NOTIFY_MESSAGE_SIZE];
-    std::size_t len = job->GetWorkMessage(buff, conn->ptr.get(), id);
-    this->SendRaw(conn->sock, buff, len);
+    std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get(), id);
+    this->SendRaw(conn->sock, msg.data(), msg.size());
 }
 
-template <StaticConf confs, StratumProtocol S>
-void StratumServerCn<confs, S>::BroadcastJob(Connection<StratumClient> *conn,
+template <StaticConf confs>
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
                                           const job_t *job) const
 {
-    char buff[MAX_NOTIFY_MESSAGE_SIZE];
-    std::size_t len = job->GetWorkMessage(buff, conn->ptr.get());
-    this->SendRaw(conn->sock, buff, len);
+    std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get());
+    this->SendRaw(conn->sock, msg.data(), msg.size());
 }
 
 template <StaticConf confs>
 // template <typename S = confs.STRATUM_PROTOCOL>
 // typename std::enable_if_t<confs.STRATUM_PROTOCOL == StratumProtocol::CN,
 // void>
-void StratumServerCn<confs, Strat>::UpdateDifficulty(Connection<StratumClient> *conn)
+void StratumServerCn<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
 {
-    // nothing to be done; as difficulty is sent on new job.
+    // nothing to be done; as it's sent on new job.
 }
 
 #endif

@@ -258,9 +258,6 @@ uint256 ArithToUint256(const arith_uint256& a)
     for (int x = 0; x < a.WIDTH; ++x) WriteLE32(b.begin() + x * 4, a.pn[x]);
     return b;
 }
-arith_uint256 UintToArith256(const uint256& a)
-{
-    arith_uint256 b;
-    for (int x = 0; x < b.WIDTH; ++x) b.pn[x] = ReadLE32(a.begin() + x * 4);
-    return b;
-}
+
+// constexpr uint256 TWO = uint256S("2");
+// constinit arith_uint256 TWOA = UintToArith256(TWO);

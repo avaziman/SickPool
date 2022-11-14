@@ -18,14 +18,13 @@ RoundManager::RoundManager(const RedisManager& rm,
 
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
     // get the last share
-    auto [res, rep] = GetSharesBetween(
-        -static_cast<ssize_t>(sizeof(Share)) - 1, -1);
+    auto [res, rep] = GetSharesBetween(-2, -1);
 
     round_progress = res.front().progress;
 #endif
 }
 
-bool RoundManager::CloseRound(const ExtendedSubmission* submission,
+bool RoundManager::CloseRound(const BlockSubmission* submission,
                               const double fee)
 {
     std::scoped_lock round_lock(round_map_mutex, efforts_map_mutex);
@@ -44,11 +43,11 @@ bool RoundManager::CloseRound(const ExtendedSubmission* submission,
 
     ResetRoundEfforts();
 
-    return SetClosedRound(submission->chain_sv, round_type, submission,
+    return SetClosedRound(std::to_string(submission->chain), round_type, submission,
                           round_shares, submission->time_ms);
 }
 
-void RoundManager::AddRoundShare(const std::string& miner, const double effort)
+void RoundManager::AddRoundShare(const MinerIdHex& miner, const double effort)
 {
     std::scoped_lock round_lock(efforts_map_mutex);
 
@@ -63,9 +62,7 @@ void RoundManager::AddRoundShare(const std::string& miner, const double effort)
         pending_shares.reserve(pending_shares.size() + 1000);
     }
 
-    Share curshare;
-    curshare.progress = round_progress;
-    memcpy(curshare.addr, miner.data(), ADDRESS_LEN);
+    Share curshare {.miner_id = miner.id, .progress = round_progress};
 
     pending_shares.push_back(std::move(curshare));
 #endif
@@ -131,19 +128,20 @@ bool RoundManager::LoadEfforts()
 {
     bool res = GetMinerEfforts(efforts_map, key_names.coin, round_type);
 
-    std::vector<std::string> to_remove;
-    for (auto& [addr, effort] : efforts_map)
+    std::vector<MinerIdHex> to_remove;
+    for (auto& [id, effort] : efforts_map)
     {
         // remove special effort keys such as $total and $estimated
-        if (addr.length() != ADDRESS_LEN)
+        // erase_if...
+        if (effort == 0)
         {
-            to_remove.emplace_back(addr);
+            to_remove.emplace_back(id);
         }
-        else
-        {
+        // else
+        // {
             logger.Log<LogType::Info>("Loaded {} effort for address {} of {}",
-                                      round_type, addr, effort);
-        }
+                                      round_type, id.GetHex(), effort);
+        // }
     }
 
     for (const auto& remove : to_remove)
@@ -152,10 +150,4 @@ bool RoundManager::LoadEfforts()
     }
 
     return res;
-}
-
-bool RoundManager::IsMinerIn(const std::string& addr)
-{
-    std::scoped_lock lock(efforts_map_mutex);
-    return efforts_map.contains(addr);
 }

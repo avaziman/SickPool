@@ -39,8 +39,7 @@ class StatsManager
     void Start(std::stop_token st);
 
     bool LoadAvgHashrateSums(int64_t hr_time);
-    void AddShare(const std::string& worker_full, const std::string& miner_addr,
-                  const double diff);
+    void AddShare(const WorkerFullId& id, const double diff);
     bool AddWorker(const std::string& address, const std::string& worker_full, std::time_t curtime,
                    const std::string& idTag = "null");
     void PopWorker(const std::string& worker, const std::string& address);
@@ -72,4 +71,3 @@ class StatsManager
 };
 
 #endif
-// TODO: add another unordered map for stakers (non miners too!)

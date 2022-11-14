@@ -10,7 +10,7 @@ class StratumServerZec : public StratumServer
    public:
     using share_t = ShareZec;
 
-    StratumServerZec(const CoinConfig& conf) : StratumServer(conf) {}
+    explicit StratumServerZec(const CoinConfig& conf) : StratumServer(conf) {}
 
     RpcResult HandleAuthorize(StratumClient* cli,
                               simdjson::ondemand::array& params);
@@ -19,7 +19,7 @@ class StratumServerZec : public StratumServer
     RpcResult HandleSubmit(StratumClient* cli, WorkerContext* wc,
                            simdjson::ondemand::array& params);
 
-    void HandleReq(StratumClient* cli, WorkerContext* wc,
+    void HandleReq(StratumClient* cli, WorkerContextT* wc,
                    std::string_view req) override;
     void UpdateDifficulty(StratumClient* cli) override;
 };

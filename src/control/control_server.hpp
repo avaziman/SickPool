@@ -10,15 +10,15 @@ enum class ControlCommands
 {
     NONE = 0,
     BLOCK_NOTIFY = 1,
-    WALLET_NOTFIY = 2,
+    // WALLET_NOTFIY = 2,
 };
 
-struct WalletNotify
-{
-    char block_hash[HASH_SIZE];
-    char txid[HASH_SIZE];
-    char wallet_address[ADDRESS_LEN];
-};
+// struct WalletNotify
+// {
+//     char block_hash[HASH_SIZE];
+//     char txid[HASH_SIZE];
+//     char wallet_address[ADDRESS_LEN];
+// };
 
 class ControlServer
 {

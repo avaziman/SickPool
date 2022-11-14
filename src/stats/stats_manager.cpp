@@ -119,8 +119,8 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
     const int64_t remove_time =
         update_time_ms - average_hashrate_interval_seconds * 1000;
 
-    std::vector<std::pair<std::string, double>> remove_worker_hashrates;
-    bool res = redis_manager->TsMrange(remove_worker_hashrates, "worker"sv,
+    std::vector<std::pair<WorkerFullId, double>> remove_worker_hashrates;
+    bool res = redis_manager->TsMrange(remove_worker_hashrates, EnumName<Prefix::WORKER>(),
                                        redis_manager->key_names.hashrate,
                                        remove_time, remove_time);
 
@@ -134,7 +134,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             worker_stats_map[worker].average_hashrate_sum -= worker_hr;
         }
 
-        for (auto& [worker, ws] : worker_stats_map)
+        for (auto& [worker_id, ws] : worker_stats_map)
         {
             ws.interval_hashrate =
                 GetExpectedHashes<confs>(ws.current_interval_effort) /
@@ -145,10 +145,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             ws.average_hashrate =
                 ws.average_hashrate_sum / average_interval_ratio;
 
-            // std::string addr = worker.substr(0, ADDRESS_LEN);
-            std::string addr = worker.substr(0, worker.find('.'));
-
-            auto& miner_stats = miner_stats_map[addr];
+            auto& miner_stats = miner_stats_map[worker_id.miner_id];
             miner_stats.average_hashrate += ws.average_hashrate;
             miner_stats.interval_hashrate += ws.interval_hashrate;
 
@@ -167,7 +164,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
 bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
 {
-    std::vector<std::pair<std::string, double>> vec;
+    std::vector<std::pair<WorkerFullId, double>> vec;
     bool res = redis_manager->LoadAverageHashrateSum(vec, "worker", hr_time);
 
     if (!res)
@@ -176,21 +173,20 @@ bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
         return false;
     }
 
-    for (const auto& [worker, avg_hr_sum] : vec)
+    for (const auto& [id, avg_hr_sum] : vec)
     {
-        worker_stats_map[worker].average_hashrate_sum = avg_hr_sum;
+        worker_stats_map[id].average_hashrate_sum = avg_hr_sum;
         logger.Log<LogType::Info>("Loaded worker hashrate sum for {} of {}",
-                                  worker, avg_hr_sum);
+                                  id.GetHex(), avg_hr_sum);
     }
     return true;
 }
 
-void StatsManager::AddShare(const std::string& worker_full,
-                            const std::string& miner_addr, const double diff)
+void StatsManager::AddShare(const WorkerFullId& id, const double diff)
 {
     std::scoped_lock lock(stats_map_mutex);
     // both must exist, as we added in AddWorker
-    WorkerStats* worker_stats = &worker_stats_map[worker_full];
+    WorkerStats* worker_stats = &worker_stats_map[id];
 
     if (diff == static_cast<double>(BadDiff::STALE_SHARE_DIFF))
     {
@@ -210,7 +206,7 @@ void StatsManager::AddShare(const std::string& worker_full,
 
         logger.Log<LogType::Debug>(
             "Logged share with diff: {} for {} total diff: {}", diff,
-            worker_full, worker_stats->current_interval_effort);
+            id.GetHex(), worker_stats->current_interval_effort);
         // logger.Log<LogType::Debug>(
         //             "Logged share with diff: {}, hashes: {}", diff,
         //             expected_shares);
@@ -224,10 +220,12 @@ bool StatsManager::AddWorker(const std::string& address,
     using namespace std::literals;
     std::scoped_lock stats_db_lock(stats_map_mutex);
 
-    bool new_worker = !worker_stats_map.contains(worker_full);
-    bool new_miner = !round_manager->IsMinerIn(address);
-    bool returning_worker =
-        !new_worker && !worker_stats_map[worker_full].connection_count;
+    // bool new_worker = !worker_stats_map.contains(worker_full);
+    bool new_worker = true;
+    // bool new_miner = !round_manager->IsMinerIn(address);
+    bool new_miner = true;
+    // bool returning_worker =
+    //     !new_worker && !worker_stats_map[worker_full].connection_count;
 
     std::string addr_lowercase(address);
     // std::transform(addr_lowercase.begin(), addr_lowercase.end(),
@@ -239,11 +237,12 @@ bool StatsManager::AddWorker(const std::string& address,
 
     // std::ranges::transform()
     // 100% new, as we loaded all existing miners
+    MinerIdHex id(0);
     if (new_miner)
     {
         logger.Log<LogType::Info>("New miner has spawned: {}", address);
         if (redis_manager->AddNewMiner(address, addr_lowercase, worker_full,
-                                       idTag, curtime))
+                                       id, curtime))
         {
             logger.Log<LogType::Info>("Miner {} added to database.", address);
         }
@@ -255,8 +254,8 @@ bool StatsManager::AddWorker(const std::string& address,
         }
     }
 
-    if (new_worker || returning_worker)
-    {
+    // if (new_worker || returning_worker)
+    // {
         if (redis_manager->AddNewWorker(address, addr_lowercase, worker_full,
                                         idTag))
         {
@@ -269,9 +268,9 @@ bool StatsManager::AddWorker(const std::string& address,
                 "Failed to add worker {} to database.", worker_full);
             return false;
         }
-    }
+    // }
 
-    worker_stats_map[worker_full].connection_count++;
+    // worker_stats_map[worker_full].connection_count++;
 
     return true;
 }
@@ -281,7 +280,7 @@ void StatsManager::PopWorker(const std::string& worker_full,
 {
     std::scoped_lock stats_lock(stats_map_mutex);
 
-    int con_count = (--worker_stats_map[worker_full].connection_count);
+    // int con_count = (--worker_stats_map[worker_full].connection_count);
     // dont remove from the umap in case they join back, so their progress
     // is saved
     // if (con_count == 0)
@@ -292,4 +291,3 @@ void StatsManager::PopWorker(const std::string& worker_full,
 
 // TODO: idea: since writing all shares on all pbaas is expensive every 10
 // sec, just write to primary and to side chains write every 5 mins
-// TODO: check that ts indeed exists

@@ -21,71 +21,86 @@
 class ShareProcessor
 {
    public:
-    static inline bool VerifyShareParams(ShareResult& result, const job_t* job,
-                                         std::string_view given_time,
-                                         const int64_t curtime)
-    {
-        uint32_t shareTime = HexToUint(given_time.data(), given_time.size());
-// in btc the value in not reversed
-#ifdef STRATUM_ZEC
-        shareTime = bswap_32(shareTime);  // swap to little endian
-#endif
+//     template <StratumProtocol sp>
+//     static inline bool VerifyShareParams(ShareResult& result, const job_t* job,
+//                                          std::string_view given_time,
+//                                          const int64_t curtime);
 
-        // int64_t minTime = job->min_time;
-        // int64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
+//     template <>
+//     static inline bool VerifyShareParams<StratumProtocol::CN>(
+//         ShareResult& result, const job_t* job, std::string_view given_time,
+//         const int64_t curtime)
+//     {
+//         uint32_t shareTime = static_cast<uint32_t>(
+//             HexToUint(given_time.data(), given_time.size()));
+// // in btc the value in not reversed
+// #ifdef STRATUM_ZEC
+//         shareTime = bswap_32(shareTime);  // swap to little endian
+// #endif
 
-        // if (shareTime < minTime || shareTime > maxTime)
-        // {
-        //     result.code = ResCode::UNKNOWN;
-        //     result.message =
-        //         fmt::format("Invalid nTime (min: {}, max: {}, given: {})",
-        //                     minTime, maxTime, shareTime);
-        //     result.difficulty =
-        //         static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
-        //     return false;
-        // }
+//         uint64_t minTime = job->min_time;
+//         uint64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
 
-        return true;
-    }
+//         if (shareTime < minTime || shareTime > maxTime)
+//         {
+//             result.code = ResCode::UNKNOWN;
+//             result.message =
+//                 fmt::format("Invalid nTime (min: {}, max: {}, given: {})",
+//                             minTime, maxTime, shareTime);
+//             result.difficulty =
+//                 static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
+//             return false;
+//         }
+
+//         return true;
+//     }
 
     static constexpr std::string_view field_str = "ShareProcessor";
     static const Logger<field_str> logger;
 
+    // template <StratumProtocol sp, HashAlgo ha>
+    // inline static void Hash(ShareResult& result, const Job<sp>* job, const ShareT<sp> share);
+
+    // template <StratumProtocol sp, HashAlgo ha>
+    // inline static void Hash(ShareResult& result, const Job<sp>* job, const ShareT<sp> share);
+
     template <StaticConf confs>
     inline static void Process(ShareResult& result, StratumClient* cli,
-                               WorkerContext* wc, const job_t* job,
-                               const share_t& share, int64_t curTime)
+                               WorkerContext<confs.BLOCK_HEADER_SIZE>* wc,
+                               const Job<confs.STRATUM_PROTOCOL>* job,
+                               const ShareT<confs.STRATUM_PROTOCOL>& share,
+                               int64_t curTime)
     {
         // veirfy params before even hashing
 
-        // if (!VerifyShareParams(result, job, share.time, curTime))
+        // if (!VerifyShareParams<confs.STRATUM_PROTOCOL>(result, job, share.time,
+        //                                                curTime))
         // {
         //     return;
         // }
 
-        uint8_t* headerData = wc->block_header;
-
-        job->GetHeaderData(headerData, share, cli->extra_nonce_sv);
+        job->GetHeaderData(wc->block_header, share, cli->extra_nonce_sv);
 
         // std::cout << "block header: " << std::endl;
-        // PrintHex(headerData, BLOCK_HEADER_SIZE);
+        // PrintHex(wc->block_header, BLOCK_HEADER_SIZE);
 
         if constexpr (confs.HASH_ALGO == HashAlgo::PROGPOWZ)
         {
             currency::get_block_longhash_sick(
                 result.hash_bytes.data(), static_cast<uint64_t>(job->height),
-                job->block_template_hash.data(), share.nonce);
+                job->template_hash.data(), share.nonce);
             std::ranges::reverse(result.hash_bytes);
         }
         else if constexpr (confs.HASH_ALGO == HashAlgo::VERUSHASH_V2b2)
         {
             // takes about 6-8 microseconds vs 8-12 on snomp
-            // HashWrapper::VerushashV2b2(result.hash_bytes.data(), headerData,
+            // HashWrapper::VerushashV2b2(result.hash_bytes.data(),
+            // wc->block_header,
             //                            BLOCK_HEADER_SIZE, &wc->hasher);
         }
         else if constexpr (confs.HASH_ALGO == HashAlgo::X25X)
         {
-            // HashWrapper::X25X(result.hash_bytes.data(), headerData,
+            // HashWrapper::X25X(result.hash_bytes.data(), wc->block_header,
             //                   BLOCK_HEADER_SIZE);
         }
         else
@@ -93,14 +108,15 @@ class ShareProcessor
             throw std::runtime_error("Missing hash function");
         }
 
-        uint256 hash(result.hash_bytes);
+        
 
-        logger.Log<LogType::Debug>("Share hash: {} ", hash.GetHex());
+        logger.Log<LogType::Debug>("Share hash: {} ", HexlifyS(result.hash_bytes));
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
 
-        if (auto shareEnd = *reinterpret_cast<uint32_t*>(hash.begin());
+        if (auto shareEnd =
+                *reinterpret_cast<uint32_t*>(result.hash_bytes.begin());
             !cli->SetLastShare(shareEnd, curTime))
         {
             result.code = ResCode::DUPLICATE_SHARE;
@@ -110,20 +126,21 @@ class ShareProcessor
             return;
         }
 
-        result.difficulty = confs.DIFF1 / UintToArith256(hash).getdouble();
+        double raw_diff = BytesToDouble(result.hash_bytes);
+        result.difficulty = confs.DIFF1 / raw_diff;
 
         if (result.difficulty >= job->target_diff) [[unlikely]]
         {
             result.code = ResCode::VALID_BLOCK;
             return;
         }
-        else if (result.difficulty / cli->GetDifficulty() < 0.99)  // allow 5% below
+        else if (result.difficulty / cli->GetDifficulty() <
+                 0.99)  // allow 1% below
         {
             result.code = ResCode::LOW_DIFFICULTY_SHARE;
             result.message =
-                fmt::format("Low difficulty share of {}", result.difficulty);
-            char blockHeaderHex[BLOCK_HEADER_SIZE * 2];
-            Hexlify(blockHeaderHex, headerData, BLOCK_HEADER_SIZE);
+                fmt::format("Low difficulty share of {} (Expected: {})",
+                            result.difficulty, cli->GetDifficulty());
 
             // logger.Log<LogType::Debug>(
             //             "Low difficulty share diff: {}, hash: {}",

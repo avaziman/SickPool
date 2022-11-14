@@ -3,6 +3,7 @@
 #include <simdjson/simdjson.h>
 
 #include <algorithm>
+#include <vector>
 
 #include "../crypto/hash_wrapper.hpp"
 #include "../daemon/daemon_rpc.hpp"
@@ -14,29 +15,27 @@
 #include "share.hpp"
 #include "static_config.hpp"
 #include "transaction.hpp"
-using namespace std::string_view_literals;
 
+template <typename job_t>
 class JobManager
 {
    public:
-    JobManager(daemon_manager_t* daemon_manager,
-               PaymentManager* payment_manager, const std::string& pool_addr)
-        : daemon_manager(daemon_manager),
-          payment_manager(payment_manager),
-          pool_addr(pool_addr)
+    explicit JobManager(daemon_manager_t* daemon_manager,
+                        PaymentManager* payment_manager,
+                        const std::string& pool_addr)
+        : pool_addr(pool_addr),
+          daemon_manager(daemon_manager),
+          payment_manager(payment_manager)
     {
     }
 
-    // virtual const job_t* GetNewJob();
-    // virtual const job_t* GetNewJob(const std::string& json_template) = 0;
-
     // allow concurrect reading while not being modified
-    inline const job_t* GetJob(std::string_view hexId)
+    inline job_t* GetJob(std::string_view hexId)
     {
-        std::shared_lock<std::shared_mutex> lock(jobs_mutex);
+        std::shared_lock lock(jobs_mutex);
         for (const auto& job : jobs)
         {
-            if (job->GetId() == hexId)
+            if (job->id == hexId)
             {
                 return job.get();
             }
@@ -46,7 +45,7 @@ class JobManager
 
     inline job_t* SetNewJob(std::unique_ptr<job_t> job)
     {
-        last_job_id_hex = job->GetId();
+        last_job_id_hex = job->id;
         job_count++;
 
         std::unique_lock jobs_lock(jobs_mutex);
@@ -60,30 +59,28 @@ class JobManager
         return jobs.emplace_back(std::move(job)).get();
     }
 
-    inline const job_t* GetLastJob() { return GetJob(last_job_id_hex); }
+    inline job_t* GetLastJob() { return GetJob(last_job_id_hex); }
 
    protected:
     // multiple jobs can use the same block template, (append transactions only)
     static constexpr std::string_view field_str = "JobManager";
     const Logger<field_str> logger;
+    static constexpr std::string_view coinbase_extra = "SickPool.io";
+    const std::string pool_addr;
+
     daemon_manager_t* daemon_manager;
     PaymentManager* payment_manager;
 
-    std::shared_mutex jobs_mutex;
-    // unordered map is not thread safe for modifying and accessing different
-    // elements, but a vector is, so we use other optimization (save last job)
-    std::vector<std::unique_ptr<job_t>> jobs;
     uint32_t job_count = 0;
 
     simdjson::ondemand::parser jsonParser;
 
-    static constexpr std::string_view coinbase_extra = "SickPool.io"sv;
-
+   private:
+    std::shared_mutex jobs_mutex;
+    // unordered map is not thread safe for modifying and accessing different
+    // elements, but a vector is, so we use other optimization (save last job)
+    std::vector<std::unique_ptr<job_t>> jobs;
     std::string last_job_id_hex;
-    const std::string pool_addr;
-
-    virtual transaction_t GetCoinbaseTx(int64_t value, uint32_t height,
-                                        std::string_view rpc_cb);
 };
 
 #if SICK_COIN == VRSC

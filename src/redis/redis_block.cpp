@@ -6,12 +6,12 @@
 using enum Prefix;
 
 void RedisManager::AppendAddBlockSubmission(
-    const ExtendedSubmission *submission)
+    const BlockSubmission *submission)
 {
     using namespace std::string_view_literals;
 
     uint32_t block_id = submission->number;
-    auto chain = std::string(submission->chain_sv);
+    auto chain = submission->chain;
     std::string block_id_str = std::to_string(block_id);
     std::string_view block_id_sv(block_id_str);
 
@@ -47,17 +47,17 @@ void RedisManager::AppendAddBlockSubmission(
         /* non-sortable indexes */
         AppendCommand({"SADD"sv,
                        Format({key_names.block_index_chain,
-                                   submission->chain_sv}),
+                                   std::to_string(submission->chain)}),
                        block_id_sv});
 
-        // AppendCommand(
-        //     {"SADD"sv, PrefixKey<BLOCK, INDEX, TYPE, POW>(), block_id_sv});
 
         AppendCommand(
             {"SADD"sv,
-             Format({key_names.block_index_solver, submission->miner_sv}),
+             Format({key_names.block_index_solver, std::to_string(submission->miner_id)}),
              block_id_sv});
 
+        // AppendCommand(
+        //     {"SADD"sv, PrefixKey<BLOCK, INDEX, TYPE, POW>(), block_id_sv});
         /* other block statistics */
         // AppendTsAdd(PrefixKey<BLOCK, STATS, EFFORT_PERCENT>(),
         //             submission->time_ms, submission->effort_percent);
@@ -82,7 +82,7 @@ bool RedisManager::UpdateBlockConfirmations(std::string_view block_id,
 }
 
 bool RedisManager::LoadImmatureBlocks(
-    std::vector<std::unique_ptr<ExtendedSubmission>> &submissions)
+    std::vector<std::unique_ptr<BlockSubmission>> &submissions)
 
 {
     auto reply =
@@ -105,7 +105,7 @@ bool RedisManager::LoadImmatureBlocks(
 
         auto submission = (BlockSubmission *)block_reply->str;
         auto extended =
-            std::make_unique<ExtendedSubmission>(*submission);
+            std::make_unique<BlockSubmission>(*submission);
 
         submissions.emplace_back(std::move(extended));
     }

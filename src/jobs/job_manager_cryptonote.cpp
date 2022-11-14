@@ -1,18 +1,16 @@
 #include "job_manager_cryptonote.hpp"
 
-const job_t* JobManagerCryptoNote::GetNewJob(
+const JobCryptoNote* JobManagerCryptoNote::GetNewJob(
     const BlockTemplateResCn& rpctemplate)
 {
-    block_template = BlockTemplateCn(rpctemplate);
-    std::string jobIdHex = fmt::format("{:08x}", job_count);
+    block_template = std::make_unique<BlockTemplateCn>(rpctemplate);
 
-    auto job =
-        std::make_unique<job_t>(jobIdHex, std::move(block_template));
+    auto job = std::make_unique<JobCryptoNote>(rpctemplate);
 
     return SetNewJob(std::move(job));
 }
 
-const job_t* JobManagerCryptoNote::GetNewJob()
+const JobCryptoNote* JobManagerCryptoNote::GetNewJob()
 {
     BlockTemplateResCn res;
     if (!daemon_manager->GetBlockTemplate(res, pool_addr, std::string_view(hex_extra.data(), hex_extra.size()), jsonParser))

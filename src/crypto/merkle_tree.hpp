@@ -14,22 +14,22 @@
 class MerkleTree
 {
    public:
-    static void CalcRoot(
-        uint8_t* res, const std::vector<TransactionData>& txsData)
-    {
-        std::vector<uint8_t> hashes;
-        uint32_t hash_count = txsData.size();
+    // static void CalcRoot(
+    //     uint8_t* res, const std::vector<TransactionData>& txsData)
+    // {
+    //     std::vector<uint8_t> hashes;
+    //     uint32_t hash_count = txsData.size();
 
-        hashes.reserve(txsData.size() * HASH_SIZE);
+    //     hashes.reserve(txsData.size() * HASH_SIZE);
 
-        for (int i = 0; i < hash_count; i++)
-        {
-            memcpy(hashes.data() + i * HASH_SIZE, txsData[i].hash,
-            HASH_SIZE);
-        }
+    //     for (int i = 0; i < hash_count; i++)
+    //     {
+    //         memcpy(hashes.data() + i * HASH_SIZE, txsData[i].hash,
+    //         HASH_SIZE);
+    //     }
 
-        CalcRoot(res, hashes, hash_count);
-    }
+    //     CalcRoot(res, hashes, hash_count);
+    // }
 
     static void CalcRoot(uint8_t* res, std::vector<uint8_t>& hashes,
                          std::size_t hash_count)

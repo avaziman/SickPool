@@ -1,6 +1,7 @@
     #ifndef REDIS_ROUND_HPP_
 #define REDIS_ROUND_HPP_
 #include <mutex>
+#include <charconv>
 
 #include "redis_manager.hpp"
 class RedisRound : public RedisManager
@@ -91,7 +92,7 @@ class RedisRound : public RedisManager
                             std::to_string(end_index)});
 
         return std::make_pair(
-            std::span<Share>(reinterpret_cast<Share *>(res->str), res->len / sizeof(Share)), std::move(res));
+            std::span<Share>(reinterpret_cast<Share*>(res->str), res->len / sizeof(Share)), std::move(res));
     }
 
     void AddPendingShares(const std::vector<Share>& pending_shares)
@@ -107,12 +108,12 @@ class RedisRound : public RedisManager
     void AppendSetMinerEffort(std::string_view chain, std::string_view miner,
                               std::string_view type, double effort);
 
-    void AppendAddRoundShares(std::string_view chain,
+    void AppendAddRoundRewards(std::string_view chain,
                               const BlockSubmission *submission,
                               const round_shares_t &miner_shares);
 
     bool SetClosedRound(std::string_view chain, std::string_view type,
-                    const ExtendedSubmission *submission,
+                    const BlockSubmission *submission,
                     const round_shares_t &round_shares, int64_t time_ms);
     void GetCurrentRound(Round *rnd, std::string_view chain,
                            std::string_view type);

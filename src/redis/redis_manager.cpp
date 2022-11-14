@@ -134,7 +134,7 @@ bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t curtime_ms,
     return GetReplies();
 }
 
-bool RedisManager::UpdateImmatureRewards(std::string_view chain,
+bool RedisManager::UpdateImmatureRewards(uint8_t chain,
                                          uint32_t block_num,
                                          int64_t matured_time, bool matured)
 {
@@ -155,7 +155,7 @@ bool RedisManager::UpdateImmatureRewards(std::string_view chain,
             std::string_view addr(reply->element[i]->str,
                                   reply->element[i]->len);
 
-            RoundShare *miner_share = (RoundShare *)reply->element[i + 1]->str;
+            RoundReward *miner_share = (RoundReward *)reply->element[i + 1]->str;
 
             // if a block has been orphaned only remove the immature
             // if there are sub chains add chain:
@@ -297,13 +297,12 @@ void RedisManager::AppendTsCreate(std::string_view key, std::string_view prefix,
     using namespace std::string_view_literals;
     AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
                    std::to_string(retention_ms), "LABELS"sv, "type"sv, type,
-                   "prefix"sv, prefix, "address"sv, address, "identity"sv, id});
+                   "prefix"sv, prefix, "address"sv, address, "id"sv, id});
 }
 
 bool RedisManager::AddNewMiner(std::string_view address,
                                std::string_view addr_lowercase,
-                               std::string_view worker_full,
-                               std::string_view id_tag, int64_t curtime)
+                               std::string_view alias, MinerIdHex id, int64_t curtime)
 {
     using namespace std::string_view_literals;
 
@@ -312,30 +311,30 @@ bool RedisManager::AddNewMiner(std::string_view address,
     {
         RedisTransaction add_worker_tx(this);
 
-        // 100% new, as we loaded all existing
-        // miners
         auto chain = key_names.coin;
 
+        // address maps
         AppendCommand(
             {"HSET"sv, key_names.address_map, addr_lowercase, address});
+
+        AppendCommand({"HSET"sv, key_names.address_id_map, address, id.GetHex()});
 
         // create worker count ts
         std::string worker_count_key =
             Format({key_names.worker_count, address});
 
-        AppendTsCreate(worker_count_key, "miner"sv, EnumName<WORKER_COUNT>(),
-                       addr_lowercase, id_tag,
+        AppendTsCreate(worker_count_key, EnumName<MINER>(), EnumName<WORKER_COUNT>(),
+                       addr_lowercase, alias,
                        conf->redis.hashrate_ttl_seconds * 1000);
 
         // reset worker count
         AppendTsAdd(worker_count_key, curtime, 0);
 
         std::string curtime_str = std::to_string(curtime);
-        // don't override if it exists
-        AppendCommand({"ZADD"sv, key_names.solver_index_jointime, "NX",
-                       curtime_str, address});
 
         // reset all indexes of new miner
+        AppendCommand(
+            {"ZADD"sv, key_names.solver_index_jointime, curtime_str, address});
         AppendCommand(
             {"ZADD"sv, key_names.solver_index_worker_count, "0", address});
         AppendCommand({"ZADD"sv, key_names.solver_index_mature, "0", address});
@@ -351,16 +350,14 @@ bool RedisManager::AddNewMiner(std::string_view address,
                        EnumName<IMMATURE_BALANCE>(), "0"sv,
                        EnumName<WORKER_COUNT>(), "0"sv});
 
-        if (id_tag != "null")
+        if (alias != "")
         {
-            // AppendCommand(
-            //     {"HSET"sv, key_names.address_map, id_tag, address});
-            // AppendCommand(
-            //     {"HSET"sv, solver_key, PrefixKey<IDENTITY>(), id_tag});
+            AppendCommand(
+                {"HSET"sv, key_names.alias_map, alias, address});
         }
 
         // to be accessible by lowercase addr
-        AppendCreateStatsTs(address, id_tag, "miner"sv, addr_lowercase);
+        AppendCreateStatsTs(address, alias, EnumName<MINER>(), addr_lowercase);
     }
 
     return GetReplies();
@@ -369,7 +366,7 @@ bool RedisManager::AddNewMiner(std::string_view address,
 bool RedisManager::AddNewWorker(std::string_view address,
                                 std::string_view address_lowercase,
                                 std::string_view worker_full,
-                                std::string_view id_tag)
+                                std::string_view id)
 {
     using namespace std::string_view_literals;
 
@@ -378,25 +375,25 @@ bool RedisManager::AddNewWorker(std::string_view address,
     {
         RedisTransaction add_worker_tx(this);
 
-        AppendCreateStatsTs(worker_full, id_tag, "worker"sv, address_lowercase);
+        AppendCreateStatsTs(worker_full, id, EnumName<WORKER>(), address_lowercase);
     }
 
     return GetReplies();
 }
 
-void RedisManager::AppendUpdateWorkerCount(std::string_view address, int amount,
+void RedisManager::AppendUpdateWorkerCount(MinerIdHex miner_id, int amount,
                                            int64_t update_time_ms)
 {
     using namespace std::string_view_literals;
     std::string amount_str = std::to_string(amount);
 
     AppendCommand(
-        {"ZADD"sv, key_names.solver_index_worker_count, address, amount_str});
+        {"ZADD"sv, key_names.solver_index_worker_count, miner_id.GetHex(), amount_str});
 
-    AppendCommand({"HSET"sv, fmt::format("{}:{}", key_names.solver, address),
+    AppendCommand({"HSET"sv, Format({key_names.solver, miner_id.GetHex()}),
                    EnumName<WORKER_COUNT>(), amount_str});
 
-    AppendCommand({"TS.ADD"sv, Format({key_names.worker_count, address}),
+    AppendCommand({"TS.ADD"sv, Format({key_names.worker_count, miner_id.GetHex()}),
                    std::to_string(update_time_ms), amount_str});
 }
 
@@ -441,18 +438,6 @@ void RedisManager::AppendCreateStatsTs(std::string_view addrOrWorker,
                                        std::string_view addr_lowercase_sv)
 {
     using namespace std::literals;
-
-    std::string_view address = addrOrWorker.substr(0, ADDRESS_LEN);
-    std::string addr_lowercase;
-
-    if (addr_lowercase_sv.empty())
-    {
-        addr_lowercase = address;
-        std::transform(addr_lowercase.begin(), addr_lowercase.end(),
-                       addr_lowercase.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        addr_lowercase_sv = std::string_view(addr_lowercase);
-    }
 
     auto retention = conf->redis.hashrate_ttl_seconds * 1000;
 

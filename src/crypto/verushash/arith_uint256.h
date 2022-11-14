@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <stdint.h>
 #include <string>
-
+#include "uint256.h"
 class uint256;
 
 class uint_error : public std::runtime_error {
@@ -28,7 +28,7 @@ protected:
     uint32_t pn[WIDTH];
 public:
 
-    base_uint()
+    constexpr base_uint()
     {
         static_assert(BITS/32 > 0 && BITS%32 == 0, "Template parameter BITS must be a positive multiple of 32.");
 
@@ -36,7 +36,7 @@ public:
             pn[i] = 0;
     }
 
-    base_uint(const base_uint& b)
+    constexpr base_uint(const base_uint& b)
     {
         static_assert(BITS/32 > 0 && BITS%32 == 0, "Template parameter BITS must be a positive multiple of 32.");
 
@@ -249,7 +249,7 @@ public:
 /** 256-bit unsigned big integer. */
 class arith_uint256 : public base_uint<256> {
 public:
-    arith_uint256() {}
+    constexpr arith_uint256() {}
     arith_uint256(const base_uint<256>& b) : base_uint<256>(b) {}
     arith_uint256(uint64_t b) : base_uint<256>(b) {}
     explicit arith_uint256(const std::string& str) : base_uint<256>(str) {}
@@ -278,10 +278,18 @@ public:
     uint32_t GetCompact(bool fNegative = false) const;
 
     friend uint256 ArithToUint256(const arith_uint256 &);
-    friend arith_uint256 UintToArith256(const uint256 &);
+    friend constexpr arith_uint256 UintToArith256(const uint256&);
 };
 
 uint256 ArithToUint256(const arith_uint256 &);
-arith_uint256 UintToArith256(const uint256 &);
+
+constexpr arith_uint256 UintToArith256(const uint256& a)
+{
+    arith_uint256 b;
+    // for (int x = 0; x < b.WIDTH; ++x) b.pn[x] = (uint32_t)&(a.m_data + x *
+    // 4);
+    std::copy(a.m_data, a.m_data + b.WIDTH, b.pn);
+    return b;
+}
 
 #endif // BITCOIN_ARITH_UINT256_H

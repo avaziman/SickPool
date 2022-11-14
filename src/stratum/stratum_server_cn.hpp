@@ -12,14 +12,16 @@
 static constexpr std::string_view field_str_cn = "StratumServerCn";
 
 template <StaticConf confs>
-class StratumServer<confs, StratumProtocol::CN>
+class StratumServerCn : public StratumServer<confs>
 {
    public:
-    using share_t = ShareCn;
-    // explicit StratumServerCn(CoinConfig&& conf)
-    //     : StratumServer<confs>(std::move(conf))
-    // {
-    // }
+    using WorkerContextT = StratumServer<confs>::WorkerContextT;
+    using job_t = StratumServer<confs>::job_t;
+
+    explicit StratumServerCn(CoinConfig&& conf)
+        : StratumServer<confs>(std::move(conf))
+    {
+    }
 
    private:
     const Logger<field_str_cn> logger;
@@ -29,11 +31,11 @@ class StratumServer<confs, StratumProtocol::CN>
                               std::string_view worker);
     RpcResult HandleSubscribe(StratumClient* cli,
                               simdjson::ondemand::array& params) const;
-    RpcResult HandleSubmit(StratumClient* cli, WorkerContext* wc,
+    RpcResult HandleSubmit(StratumClient* cli, WorkerContextT* wc,
                            simdjson::ondemand::array& params,
                            std::string_view worker);
 
-    void HandleReq(Connection<StratumClient>* conn, WorkerContext* wc,
+    void HandleReq(Connection<StratumClient>* conn, WorkerContextT* wc,
                    std::string_view req) override;
 
     void UpdateDifficulty(Connection<StratumClient>* conn) override;

@@ -16,7 +16,7 @@
     },
     "pow_fee": 0.01,
     "pos_fee": 0.01,
-    "default_difficulty": 10.0,
+    "default_difficulty": 150.0,
     "minimum_difficulty": 0.000001,
     "target_shares_rate": 100.0,
     "pool_addr": "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp",

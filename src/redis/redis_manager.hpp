@@ -27,12 +27,12 @@
 #define STRR(s) #s
 #define xSTRR(s) STRR(s)
 
-typedef std::unique_ptr<redisReply, std::function<void(redisReply *)>>
-    redis_unique_ptr;
-typedef std::unique_ptr<redisContext, std::function<void(redisContext *)>>
-    redis_unique_ptr_context;
+using redis_unique_ptr =
+    std::unique_ptr<redisReply, std::function<void(redisReply *)>>;
+using redis_unique_ptr_context =
+    std::unique_ptr<redisContext, std::function<void(redisContext *)>>;
 
-typedef std::vector<std::pair<std::string, PayeeInfo>> payees_info_t;
+using payees_info_t = std::vector<std::pair<std::string, PayeeInfo>>;
 
 struct TsAggregation
 {
@@ -48,6 +48,7 @@ enum class Prefix
     PAYOUT_FEELESS,
     PAYOUTS,
     ADDRESS_MAP,
+    ADDRESS_ID_MAP,
     ALIAS_MAP,
     PAYOUT_THRESHOLD,
     IDENTITY,
@@ -124,22 +125,20 @@ class RedisManager
 
     // manual binary search :)
 
-    void AppendAddBlockSubmission(const ExtendedSubmission *submission);
+    void AppendAddBlockSubmission(const BlockSubmission *submission);
     bool UpdateBlockConfirmations(std::string_view block_id,
                                   int32_t confirmations);
 
-    bool UpdateImmatureRewards(std::string_view chain, uint32_t block_num,
+    bool UpdateImmatureRewards(uint8_t chain, uint32_t block_num,
                                int64_t matured_time, bool matured);
     int GetBlockNumber();
     /* stats */
 
     bool AddNewMiner(std::string_view address, std::string_view addr_lowercase,
-                     std::string_view worker_full, std::string_view idTag,
-                    int64_t curtime);
+                     std::string_view alias, MinerIdHex id, int64_t curtime);
 
     bool AddNewWorker(std::string_view address, std::string_view addr_lowercase,
                       std::string_view worker_full, std::string_view id_tag);
-    // bool PopWorker(std::string_view address);
 
     /* round */
     bool LoadUnpaidRewards(payees_info_t &rewards,
@@ -149,10 +148,10 @@ class RedisManager
     /* stats */
     bool SetNewBlockStats(std::string_view chain, int64_t curtime,
                           double net_hr, double estimated_shares);
-    bool ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
+    bool ResetMinersWorkerCounts(const efforts_map_t &miner_stats_map,
                                  int64_t time_now);
     bool LoadAverageHashrateSum(
-        std::vector<std::pair<std::string, double>> &hashrate_sums,
+        std::vector<std::pair<WorkerFullId, double>> &hashrate_sums,
         std::string_view prefix, int64_t hr_time);
 
     bool UpdateIntervalStats(worker_map &worker_stats_map,
@@ -160,7 +159,7 @@ class RedisManager
                              std::mutex *stats_mutex, double net_hr,
                              double diff, uint32_t blocks_found,
                              int64_t update_time_ms);
-    bool TsMrange(std::vector<std::pair<std::string, double>> &last_averages,
+    bool TsMrange(std::vector<std::pair<WorkerFullId, double>> &last_averages,
                   std::string_view prefix, std::string_view type, int64_t from,
                   int64_t to, const TsAggregation *aggregation = nullptr);
 
@@ -170,14 +169,14 @@ class RedisManager
                       std::string_view chain);
 
     /* payout */
-    bool AddPayout(const PaymentInfo *payment);
+    // bool AddPayout(const PaymentInfo *payment);
 
     bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
     std::string hget(std::string_view key, std::string_view field);
 
     bool LoadImmatureBlocks(
-        std::vector<std::unique_ptr<ExtendedSubmission>> &submsissions);
+        std::vector<std::unique_ptr<BlockSubmission>> &submsissions);
 
     bool UpdateBlockNumber(int64_t time, uint32_t number);
 
@@ -355,6 +354,9 @@ class RedisManager
         const std::string reward_mature = Format({reward, EnumName<MATURE>()});
 
         const std::string address_map = Format({coin, EnumName<ADDRESS_MAP>()});
+        const std::string address_id_map =
+            Format({coin, EnumName<ADDRESS_ID_MAP>()});
+        const std::string alias_map = Format({coin, EnumName<ALIAS_MAP>()});
         const std::string block_number =
             Format({coin, EnumName<BLOCK>(), EnumName<NUMBER>()});
 
@@ -433,11 +435,11 @@ class RedisManager
     void AppendHset(std::string_view key, std::string_view field,
                     std::string_view val);
 
-    void AppendUpdateWorkerCount(std::string_view address, int amount,
+    void AppendUpdateWorkerCount(MinerIdHex miner_id, int amount,
                                  int64_t update_time_ms);
     void AppendCreateStatsTs(std::string_view addrOrWorker, std::string_view id,
                              std::string_view prefix,
-                             std::string_view addr_lowercase_sv = "");
+                             std::string_view addr_lowercase_sv);
     void AppendTsAdd(std::string_view key_name, int64_t time, double value);
 
     void AppendIntervalStatsUpdate(std::string_view addr,

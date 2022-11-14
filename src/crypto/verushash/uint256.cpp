@@ -25,32 +25,7 @@ std::string base_blob<BITS>::GetHex() const
     return HexStr(m_data_rev);
 }
 
-template <unsigned int BITS>
-void base_blob<BITS>::SetHex(const char* psz)
-{
-    memset(m_data, 0, sizeof(m_data));
-
-    // skip leading spaces
-    while (IsSpace(*psz)) psz++;
-
-    // skip 0x
-    if (psz[0] == '0' && ToLower(psz[1]) == 'x') psz += 2;
-
-    // hex string to uint
-    size_t digits = 0;
-    while (::HexDigit(psz[digits]) != -1) digits++;
-    unsigned char* p1 = (unsigned char*)m_data;
-    unsigned char* pend = p1 + WIDTH;
-    while (digits > 0 && p1 < pend)
-    {
-        *p1 = ::HexDigit(psz[--digits]);
-        if (digits > 0)
-        {
-            *p1 |= ((unsigned char)::HexDigit(psz[--digits]) << 4);
-            p1++;
-        }
-    }
-}
+// template <unsigned int BITS>
 
 template <unsigned int BITS>
 void base_blob<BITS>::SetHex(const std::string& str)
@@ -80,3 +55,4 @@ template void base_blob<256>::SetHex(const std::string&);
 
 const uint256 uint256::ZERO(0);
 const uint256 uint256::ONE(1);
+// constinit uint256 TWO = uint256S("2");

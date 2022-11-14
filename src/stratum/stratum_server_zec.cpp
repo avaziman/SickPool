@@ -2,7 +2,7 @@
 #ifdef STRATUM_PROTOCOL_ZEC
 #include "stratum_server_zec.hpp"
 
-void StratumServerZec::HandleReq(StratumClient *cli, WorkerContext *wc,
+void StratumServerZec::HandleReq(StratumClient *cli, WorkerContextT *wc,
                                  std::string_view req)
 {
     int id = 0;

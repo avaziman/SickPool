@@ -17,30 +17,57 @@
 #include "share.hpp"
 #include "static_config.hpp"
 
-struct BlockTemplateBtc : public BlockTemplate
-{
-    std::span<uint8_t> coinb1;
-    std::span<uint8_t> coinb2;
+// struct BlockTemplateBtc : public BlockTemplate
+// {
+//     std::span<uint8_t> coinb1;
+//     std::span<uint8_t> coinb2;
 
-    BlockTemplateBtc() = default;
-    
-    template <typename Template>
-    BlockTemplateBtc(const Template& rpct)
-    // extra tx space for coinbase + payment
-        : BlockTemplate(rpct.version, rpct.prev_block_hash,
-                        rpct.transactions.size() + 2, rpct.coinbase_value,
-                        rpct.min_time,
-                        HexToUint(rpct.bits.data(), BITS_SIZE * 2), rpct.height)
+//     BlockTemplateBtc() = default;
+
+//     template <typename Template>
+//     explicit BlockTemplateBtc(const Template& rpct)
+//     // extra tx space for coinbase + payment
+//         : BlockTemplate(rpct.version, rpct.prev_block_hash,
+//                         rpct.transactions.size() + 2, rpct.coinbase_value,
+//                         rpct.min_time,
+//                         HexToUint(rpct.bits.data(), BITS_SIZE * 2),
+//                         rpct.height)
+//     {
+//     }
+// };
+
+struct BlockTemplateBtc
+{
+    struct StaticHeaderBtc
     {
+        int32_t version;
+        uint8_t prev_bhash[32];
+    };
+
+    explicit BlockTemplateBtc(const BlockTemplateResBtc& tRes)
+        : coinbase_value(tRes.coinbase_value),
+          min_time(tRes.min_time)
+    {
+        static_header.version = tRes.version;
+        Unhexlify(static_header.prev_bhash, tRes.prev_block_hash.data(),
+                  tRes.prev_block_hash.size());
+
+        std::ranges::reverse(prev_bhash, prev_bhash + 32);
     }
+
+    StaticHeaderBtc static_header;
+    const int64_t coinbase_value;
+    const int64_t min_time;
 };
 
-class JobBtc : public JobBaseBtc
+template<>
+class Job<StratumProtocol::BTC> : public JobBaseBtc
 {
    public:
-    JobBtc(const std::string& jobId, const BlockTemplateBtc& bTemplate,
-           bool is_payment, bool clean = true)
-        : JobBaseBtc(jobId, bTemplate, is_payment),
+    explicit JobBtc(const std::string& jobId,
+                    const BlockTemplateResBtc& bTemplate, bool is_payment,
+                    bool clean = true)
+        : JobBaseBtc(jobId),
           bits(bTemplate.bits),
           //   coinb1(bTemplate.coinb1.begin(), bTemplate.coinb1.end()),
           //   coinb2(bTemplate.coinb2.begin(), bTemplate.coinb2.end()),
@@ -86,14 +113,6 @@ class JobBtc : public JobBaseBtc
         merkle_steps.reserve(tx_count * HASH_SIZE);
         merkle_steps_count =
             MerkleTree::CalcSteps(merkle_steps, merkle_branches, tx_count);
-        std::vector<std::string> merkle_steps_str(merkle_steps_count);
-
-        for (int i = 0; i < merkle_steps_count; i++)
-        {
-            merkle_steps_str[i].resize(HASH_SIZE_HEX);
-            Hexlify(merkle_steps_str[i].data(),
-                    merkle_steps.data() + i * HASH_SIZE, HASH_SIZE);
-        }
 
         std::string coinb1_hex;
         coinb1_hex.resize(coinb1.size() * 2);
@@ -114,24 +133,37 @@ class JobBtc : public JobBaseBtc
         }
 
         size_t len =
-            fmt::format_to_n(
-                notify_buff, MAX_NOTIFY_MESSAGE_SIZE,
-                "{{\"id\":null,\"method\":\"mining.notify\",\"params\":"
-                "[\"{}\",\"{}\",\"{}\",\"{}\",{},\"{:08x}\",\"{:08x}\","
-                "\"{:08x}\","
-                "{}]}}\n",
-                GetId(),  // job id
-                std::string_view(prev_bhash_rev,
-                                 HASH_SIZE_HEX),  // prev hash
-                coinb1_hex,                       // coinb1
-                coinb2_hex,                       // coinb2
-                merkle_steps_str,                 // merkle branches
-                bTemplate.version, bTemplate.bits, bTemplate.min_time, clean)
-                .size;
-        notify_buff_sv = std::string_view(notify_buff, len);
+
+            notify_buff_sv = std::string_view(notify_buff, len);
 
         // memcpy(coinbase_tx_id,
         //        bTemplate.tx_list.transactions[0].data_hex.data(), HASH_SIZE);
+    }
+
+    std::string GenNotifyMsg() override
+    {
+        std::vector<std::string> merkle_steps_str(merkle_steps_count);
+
+        for (int i = 0; i < merkle_steps_count; i++)
+        {
+            merkle_steps_str[i].resize(HASH_SIZE_HEX);
+            Hexlify(merkle_steps_str[i].data(),
+                    merkle_steps.data() + i * HASH_SIZE, HASH_SIZE);
+        }
+
+        return fmt::format(
+                   "{{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+                   "[\"{}\",\"{}\",\"{}\",\"{}\",{},\"{:08x}\",\"{:08x}\","
+                   "\"{:08x}\","
+                   "{}]}}\n",
+                   GetId(),  // job id
+                   std::string_view(prev_bhash_rev,
+                                    HASH_SIZE_HEX),  // prev hash
+                   coinb1_hex,                       // coinb1
+                   coinb2_hex,                       // coinb2
+                   merkle_steps_str,                 // merkle branches
+                   bTemplate.version, bTemplate.bits, this->min_time, clean)
+            .size;
     }
 
     template <typename T>
@@ -140,21 +172,9 @@ class JobBtc : public JobBaseBtc
         memcpy(dest, ptr, size);
     }
     template <typename T>
-    inline void WriteStatic(size_t offset, T* ptr, size_t size)
-    {
-        Write(static_header_data + offset, ptr, size);
-    }
-
-    template <typename T>
     inline void WriteUnhex(uint8_t* dest, T* ptr, size_t size) const
     {
         Unhexlify(dest, ptr, size);
-    }
-
-    template <typename T>
-    inline void WriteUnhexStatic(size_t offset, T* ptr, size_t size)
-    {
-        WriteUnhex(static_header_data + offset, ptr, size);
     }
 
     void GetHeaderData(uint8_t* buff, const ShareBtc& share,
@@ -237,7 +257,7 @@ class JobBtc : public JobBaseBtc
     const std::size_t coinbase_size;
 
     // char vector so we don't need to copy to calculate merkle root
-    std::vector<uint8_t> merkle_steps;
+    const std::vector<uint8_t> merkle_steps;
     int merkle_steps_count;
     int written = 0;
 };

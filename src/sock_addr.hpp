@@ -12,9 +12,10 @@
 class SockAddr
 {
    public:
-    SockAddr(const std::string& sockAddrStr)
+    explicit SockAddr(std::string_view sockAddrStr)
     {
-        std::string ip_str, port_str;
+        std::string ip_str;
+        std::string port_str;
 
         ip_str = sockAddrStr.substr(0, sockAddrStr.find(':'));
         port_str =

@@ -26,7 +26,7 @@ class StratumBase : public Server<StratumClient>
 
     void ServiceSockets(std::stop_token st);
     void HandleControlCommands(std::stop_token st);
-    void HandleControlCommand(ControlCommands cmd, char* buff);
+    void HandleControlCommand(ControlCommands cmd, const char* buff);
 
     virtual void HandleConsumeable(connection_it* conn) = 0;
     virtual bool HandleConnected(connection_it* conn) = 0;
@@ -45,11 +45,13 @@ class StratumBase : public Server<StratumClient>
 
     const CoinConfig coin_config;
 
+    
     virtual void HandleBlockNotify() = 0;
 
     virtual void DisconnectClient(
         const std::shared_ptr<Connection<StratumClient>> conn_ptr) = 0;
 
+    inline std::stop_token GetStopToken() const { return control_thread.get_stop_token(); }
     inline std::size_t SendRaw(int sock, const char* data,
                                std::size_t len) const
     {

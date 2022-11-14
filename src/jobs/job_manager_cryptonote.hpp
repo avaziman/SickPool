@@ -5,11 +5,12 @@
 #include "job_manager.hpp"
 #include "transaction.hpp"
 #include "cn/serialization/serialization.h"
+#include "job_cryptonote.hpp"
 
-class JobManagerCryptoNote : public JobManager
+class JobManagerCryptoNote : public JobManager<JobCryptoNote>
 {
    public:
-    using JobManager::JobManager;
+    using JobManager<JobCryptoNote>::JobManager;
     // JobManagerCryptoNote(daemon_manager_t* daemon_manager,
     //                      PaymentManager* payment_manager,
     //                      const std::string& pool_addr)
@@ -19,10 +20,10 @@ class JobManagerCryptoNote : public JobManager
     // }
 
     // will be used when new transactions come on the same block
-    BlockTemplateCn block_template;
+    std::unique_ptr<BlockTemplateCn> block_template;
 
-    const job_t* GetNewJob() /*override*/;
-    const job_t* GetNewJob(const BlockTemplateResCn& btemplate) /*override*/;
+    const JobCryptoNote* GetNewJob() /*override*/;
+    const JobCryptoNote* GetNewJob(const BlockTemplateResCn& btemplate) /*override*/;
 
    private:
     static constexpr auto hex_extra = Hexlify<coinbase_extra>();

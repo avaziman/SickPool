@@ -43,7 +43,7 @@ class BlockSubmitter
         return added;
     }
     std::mutex blocks_lock;
-    bool AddImmatureBlock(std::unique_ptr<ExtendedSubmission> submission,
+    bool AddImmatureBlock(std::unique_ptr<BlockSubmission> submission,
                           const double pow_fee)
     {
         std::scoped_lock lock(blocks_lock);
@@ -75,14 +75,11 @@ class BlockSubmitter
             fmt::format("Height: {}", submission->height),
             fmt::format("Difficulty: {}", submission->difficulty),
             fmt::format("Effort percent: {}", submission->effort_percent),
-            fmt::format("Miner: {}", std::string_view((char*)submission->miner,
-                                                      ADDRESS_LEN)),
-            fmt::format("Worker: {}", std::string((char*)submission->worker,
-                                                  MAX_WORKER_NAME_LEN)
-                                          .c_str()),
-            fmt::format(
-                "Hash: {}",
-                std::string_view((char*)submission->hash_hex, HASH_SIZE_HEX)),
+            fmt::format("Miner: {}", submission->miner_id),
+            fmt::format("Worker: {}", submission->worker_id),
+            fmt::format("Hash: {}",
+                        std::string_view((char*)submission->hash_hex.data(),
+                                         sizeof(submission->hash_hex))),
             72);
 
         logger.Log<LogType::Info>(

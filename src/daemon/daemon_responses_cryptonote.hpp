@@ -6,17 +6,6 @@
 #include <string_view>
 #include <vector>
 
-struct OutputRes {
-    std::string_view script_hex;
-    int64_t value;
-};
-
-struct TxRes {
-    std::string_view data;
-    std::string_view hash;
-    int64_t fee;
-};
-
 // in the order they appear, in the type they appear
 struct BlockTemplateResCn
 {

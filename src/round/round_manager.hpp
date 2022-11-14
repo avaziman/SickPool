@@ -15,16 +15,14 @@
 class StatsManager;
 class RedisManager;
 
-class RoundManager : public RedisRound
+class RoundManager: public RedisRound
 {
    public:
     RoundManager(const RedisManager& rm, const std::string& round_type);
     bool LoadCurrentRound();
-    void AddRoundShare(const std::string& miner, const double effort);
-    bool CloseRound(const ExtendedSubmission* submission, const double fee);
+    void AddRoundShare(const MinerIdHex& miner, const double effort);
+    bool CloseRound(const BlockSubmission* submission, const double fee);
     void ResetRoundEfforts();
-
-    bool IsMinerIn(const std::string& addr);
 
     bool UpdateEffortStats(int64_t update_time_ms);
     inline Round GetChainRound() const { return round; };
@@ -32,7 +30,7 @@ class RoundManager : public RedisRound
     void PushPendingShares() {
         std::scoped_lock round_lock(efforts_map_mutex);
         
-        AddPendingShares(pending_shares);
+        this->AddPendingShares(pending_shares);
         pending_shares.clear();
     }
 

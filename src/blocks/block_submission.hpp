@@ -8,6 +8,7 @@
 #include "static_config.hpp"
 #include "shares/share.hpp"
 #include "stats/round.hpp"
+#include "stats.hpp"
 #include "utils/hex_utils.hpp"
 
 enum class BlockType : uint8_t
@@ -20,33 +21,6 @@ enum class BlockType : uint8_t
 #pragma pack(push, 1)
 struct BlockSubmission
 {
-   public:
-    BlockSubmission(const std::string_view chainsv,
-                    const std::string_view worker_full,
-                    const BlockType blocktype, const uint32_t height,
-                    const int64_t reward, const uint64_t dur,
-                    const int64_t time, const uint32_t number,
-                    const double diff, const double effort_percent,
-                    const uint8_t* hash)
-        : block_type(blocktype),
-          block_reward(reward),
-          duration_ms(dur),
-          time_ms(time),
-          height(height),
-          number(number),
-          difficulty(diff),
-          effort_percent(effort_percent)
-    {
-        memcpy(miner, worker_full.data(), ADDRESS_LEN);
-        memcpy(worker, worker_full.data() + ADDRESS_LEN + 1,
-               worker_full.size() - ADDRESS_LEN - 1);
-        memcpy(chain, chainsv.data(), chainsv.size());
-
-        // reverse
-        Hexlify((char*)hash_hex, hash, HASH_SIZE);
-        ReverseHex((char*)hash_hex, (char*)hash_hex, HASH_SIZE_HEX);
-    }
-
     const int32_t confirmations = 0;  // up to 100, changed in database
     const BlockType block_type;
     const int64_t block_reward;
@@ -56,42 +30,12 @@ struct BlockSubmission
     const uint32_t number;
     const double difficulty;
     const double effort_percent;
-    unsigned char chain[8] = {0};
-    unsigned char miner[ADDRESS_LEN] = {0};
-    unsigned char worker[MAX_WORKER_NAME_LEN] = {0};  // separated
-    unsigned char hash_hex[HASH_SIZE_HEX] = {0};
+    const uint8_t chain;
+    const MinerId miner_id;
+    const WorkerId worker_id;
+    const std::array<char, 64> hash_hex;
 };
 
-// block submission with additional information for internal use only (not
-// passed to db)
-struct ExtendedSubmission : public BlockSubmission
-{
-   public:
-    ExtendedSubmission(const std::string_view chainsv,
-                       const std::string_view worker_full,
-                       const BlockType blocktype, const uint32_t height,
-                       const int64_t reward, const uint64_t dur,
-                       const int64_t time, const uint32_t number,
-                       const double diff, const double effort_percent,
-                       const uint8_t* hash)
-        : chain_sv(chainsv),
-          miner_sv(worker_full.data(), ADDRESS_LEN),
-          BlockSubmission(chainsv, worker_full, blocktype, height, reward,
-                          dur, time, number, diff, effort_percent, hash)
-    {
-    }
-
-    ExtendedSubmission(BlockSubmission& submission) : BlockSubmission(submission)
-    {
-        chain_sv = std::string_view((char*)submission.chain,
-                                         strlen((char*)submission.chain));
-        miner_sv = std::string_view((char*)submission.miner,
-                                    ADDRESS_LEN);
-    }
-    // way easier to use than unsigned char pointer :)
-    std::string_view chain_sv;
-    std::string_view miner_sv;
-};
 #pragma pack(pop)
 
 // don't pack

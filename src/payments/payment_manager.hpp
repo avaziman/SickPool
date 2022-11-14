@@ -42,8 +42,8 @@ class PaymentManager
     static int64_t last_payout_ms;
     static int64_t minimum_payout_threshold;
 
-    std::unique_ptr<PaymentInfo> pending_payment;
-    std::unique_ptr<PaymentInfo> finished_payment;
+    // std::unique_ptr<PaymentInfo> pending_payment;
+    // std::unique_ptr<PaymentInfo> finished_payment;
 
     // void UpdatePayouts(RoundManager* round_manager, int64_t curtime_ms);
 

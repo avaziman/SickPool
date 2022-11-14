@@ -8,7 +8,7 @@
 
 #include <assert.h>
 #include <stdint.h>
-
+#include "util/strencodings.h"
 #include <cstring>
 #include <string>
 #include <vector>
@@ -19,9 +19,9 @@ class base_blob
 {
    protected:
     static constexpr int WIDTH = BITS / 8;
-    uint8_t m_data[WIDTH];
 
    public:
+    uint8_t m_data[WIDTH];
     /* construct 0 value by default */
     constexpr base_blob() : m_data() {}
 
@@ -58,7 +58,33 @@ class base_blob
     }
 
     std::string GetHex() const;
-    void SetHex(const char* psz);
+    constexpr void SetHex(const char* psz)
+    {
+        // memset(m_data, 0, sizeof(m_data));
+        std::fill(m_data, m_data + sizeof(m_data), 0);
+
+        // skip leading spaces
+        while (IsSpace(*psz)) psz++;
+
+        // skip 0x
+        if (psz[0] == '0' && ToLower(psz[1]) == 'x') psz += 2;
+
+        // hex string to uint
+        size_t digits = 0;
+        while (::HexDigit(psz[digits]) != -1) digits++;
+        unsigned char* p1 = (unsigned char*)m_data;
+        unsigned char* pend = p1 + WIDTH;
+        while (digits > 0 && p1 < pend)
+        {
+            *p1 = ::HexDigit(psz[--digits]);
+            if (digits > 0)
+            {
+                *p1 |= ((unsigned char)::HexDigit(psz[--digits]) << 4);
+                p1++;
+            }
+        }
+    }
+
     void SetHex(const std::string& str);
     std::string ToString() const;
 
@@ -133,7 +159,7 @@ class uint256 : public base_blob<256>
  * This is a separate function because the constructor uint256(const char*) can
  * result in dangerously catching uint256(0).
  */
-inline uint256 uint256S(const char* str)
+constexpr uint256 uint256S(const char* str)
 {
     uint256 rv;
     rv.SetHex(str);

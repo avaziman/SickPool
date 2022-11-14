@@ -38,7 +38,7 @@ bool DaemonManagerSin::GetBlockTemplate(BlockTemplateResSin& templateRes,
             std::string_view tx_hash_hex = tx["hash"].get_string();
             int64_t fee = tx["fee"].get_int64();
             templateRes.transactions.emplace_back(
-                TxRes(tx_data_hex, tx_hash_hex, fee));
+                TxResBtc{tx_data_hex, tx_hash_hex, fee});
         }
 
         templateRes.coinbase_value = res["coinbasevalue"].get_int64();

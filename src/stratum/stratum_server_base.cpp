@@ -82,21 +82,13 @@ void StratumBase::HandleControlCommands(std::stop_token st)
                               gettid());
 }
 
-void StratumBase::HandleControlCommand(ControlCommands cmd, char buff[])
+void StratumBase::HandleControlCommand(ControlCommands cmd, const char* buff)
 {
     switch (cmd)
     {
         case ControlCommands::BLOCK_NOTIFY:
             HandleBlockNotify();
             break;
-        // case ControlCommands::WALLET_NOTFIY:
-        // {
-        //     // format: %b%s%w (block hash, txid, wallet address)
-        //     WalletNotify *wallet_notify =
-        //         reinterpret_cast<WalletNotify *>(buff + 2);
-        //     // HandleWalletNotify(wallet_notify);
-        //     break;
-        // }
         default:
             logger.Log<LogType::Warn>("Unknown control command {} received.",
                                       (int)cmd);

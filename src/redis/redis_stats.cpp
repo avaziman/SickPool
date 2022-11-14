@@ -9,22 +9,22 @@ void RedisManager::AppendIntervalStatsUpdate(std::string_view addr,
                                              const WorkerStats &ws)
 {
     // miner hashrate
-    std::string prefix_addr = fmt::format("{}:{}", prefix, addr);
-    std::string key = fmt::format("{}:{}", key_names.hashrate, prefix_addr);
+    std::string prefix_addr = Format({prefix, addr});
+    std::string key = Format({key_names.hashrate, prefix_addr});
     AppendTsAdd(key, update_time_ms, ws.interval_hashrate);
 
     // average hashrate
-    key = fmt::format("{}:{}", key_names.hashrate_average, prefix_addr);
+    key = Format({key_names.hashrate_average, prefix_addr});
     AppendTsAdd(key, update_time_ms, ws.average_hashrate);
 
     // shares
-    key = fmt::format("{}:{}", key_names.shares_valid, prefix_addr);
+    key = Format({key_names.shares_valid, prefix_addr});
     AppendTsAdd(key, update_time_ms, ws.interval_valid_shares);
 
-    key = fmt::format("{}:{}", key_names.shares_invalid, prefix_addr);
+    key = Format({key_names.shares_invalid, prefix_addr});
     AppendTsAdd(key, update_time_ms, ws.interval_invalid_shares);
 
-    key = fmt::format("{}:{}", key_names.shares_stale, prefix_addr);
+    key = Format({key_names.shares_stale, prefix_addr});
     AppendTsAdd(key, update_time_ms, ws.interval_stale_shares);
 }
 
@@ -46,9 +46,9 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
         // unnecessary
         std::scoped_lock stats_lock(*stats_mutex);
 
-        for (auto &[worker_name, worker_stats] : worker_stats_map)
+        for (auto &[worker_id, worker_stats] : worker_stats_map)
         {
-            AppendIntervalStatsUpdate(worker_name, EnumName<WORKER>(),
+            AppendIntervalStatsUpdate(worker_id.GetHex(), EnumName<WORKER>(),
                                       update_time_ms, worker_stats);
             if (worker_stats.interval_hashrate > 0) pool_worker_count++;
 
@@ -60,13 +60,13 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
         {
             std::string hr_str = std::to_string(miner_stats.interval_hashrate);
 
-            AppendIntervalStatsUpdate(miner_addr, EnumName<MINER>(),
+            AppendIntervalStatsUpdate(miner_addr.GetHex(), EnumName<MINER>(),
                                       update_time_ms, miner_stats);
 
-            AppendCommand(
-                {"ZADD"sv, key_names.solver_index_hashrate, hr_str, miner_addr});
+            AppendCommand({"ZADD"sv, key_names.solver_index_hashrate, hr_str,
+                           miner_addr.GetHex()});
 
-            AppendHset(Format({key_names.solver, miner_addr}),
+            AppendHset(Format({key_names.solver, miner_addr.GetHex()}),
                        EnumName<Prefix::HASHRATE>(), hr_str);
 
             AppendUpdateWorkerCount(miner_addr, miner_stats.worker_count,
@@ -92,7 +92,7 @@ bool RedisManager::UpdateIntervalStats(worker_map &worker_stats_map,
 }
 
 bool RedisManager::LoadAverageHashrateSum(
-    std::vector<std::pair<std::string, double>> &hashrate_sums,
+    std::vector<std::pair<WorkerFullId, double>> &hashrate_sums,
     std::string_view prefix, int64_t hr_time)
 {
     int64_t from =
@@ -106,20 +106,20 @@ bool RedisManager::LoadAverageHashrateSum(
                     &aggregation);
 }
 
-bool RedisManager::ResetMinersWorkerCounts(efforts_map_t &miner_stats_map,
+bool RedisManager::ResetMinersWorkerCounts(const efforts_map_t &miner_stats_map,
                                            int64_t time_now)
 {
     using namespace std::string_view_literals;
-    for (auto &[addr, _] : miner_stats_map)
+    for (const auto &[id, _] : miner_stats_map)
     {
         // reset worker count
-        AppendUpdateWorkerCount(addr, 0, time_now);
+        AppendUpdateWorkerCount(id, 0, time_now);
     }
 
     return GetReplies();
 }
 bool RedisManager::TsMrange(
-    std::vector<std::pair<std::string, double>> &last_averages,
+    std::vector<std::pair<WorkerFullId, double>> &last_averages,
     std::string_view prefix, std::string_view type, int64_t from, int64_t to,
     const TsAggregation *aggregation)
 {
@@ -165,16 +165,27 @@ bool RedisManager::TsMrange(
         {
             continue;
         }
+
         addr_start++;  // skip ':'
 
-        std::string addr(
+        std::string id_hex(
             addr_start,
             (entry->element[0]->str + entry->element[0]->len) - addr_start);
+
+        MinerId miner_id;
+        WorkerId worker_id;
+
+        std::to_chars(id_hex.data(), id_hex.data() + sizeof(miner_id) * 2,
+                      miner_id);
+        std::to_chars(
+            id_hex.data() + sizeof(miner_id) * 2,
+            id_hex.data() + sizeof(miner_id) * 2 + sizeof(worker_id) * 2,
+            worker_id);
 
         double hashrate = std::strtod(
             entry->element[2]->element[0]->element[1]->str, nullptr);
         // last_averages[i] = std::make_pair(addr, hashrate);
-        last_averages.emplace_back(addr, hashrate);
+        last_averages.emplace_back(WorkerFullId(miner_id, worker_id), hashrate);
     }
 
     return true;

@@ -16,9 +16,9 @@ PaymentManager::PaymentManager(RedisManager* rm, daemon_manager_t* dm,
     PaymentManager::minimum_payout_threshold = min_threshold;
 }
 
-inline void AddShare(round_shares_t& miner_shares, double& score_sum,
+inline void AddSharePPLNS(round_shares_t& miner_shares, double& score_sum,
                      const double n, const double score,
-                     const int64_t block_reward, const double fee, const std::string& addr)
+                     const int64_t block_reward, const double fee, const MinerId id)
 {
     const double share_ratio = score / n;
     const auto reward =
@@ -26,9 +26,9 @@ inline void AddShare(round_shares_t& miner_shares, double& score_sum,
 
     score_sum += score;
 
-    miner_shares[addr].reward += reward;
-    miner_shares[addr].share += share_ratio;
-    miner_shares[addr].effort += 1;
+    miner_shares[id].reward += reward;
+    miner_shares[id].share += share_ratio;
+    miner_shares[id].effort += 1;
 }
 
 bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
@@ -42,8 +42,8 @@ bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
     {
         const double score = shares[i].progress - shares[i - 1].progress;
         
-        AddShare(miner_shares, score_sum, n, score, block_reward, fee,
-                 shares[i]);
+        AddSharePPLNS(miner_shares, score_sum, n, score, block_reward, fee,
+                 shares[i].miner_id);
     }
 
     if (score_sum >= n){
@@ -52,8 +52,8 @@ bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
 
     const double last_score = n - score_sum;
 
-    AddShare(miner_shares, score_sum, n, last_score, block_reward, fee,
-             shares[0]);
+    AddSharePPLNS(miner_shares, score_sum, n, last_score, block_reward, fee,
+                  shares[0].miner_id);
 
     return true;
 }
@@ -75,17 +75,17 @@ bool PaymentManager::GetRewardsPROP(round_shares_t& miner_shares,
 
     for (auto& [addr, effort] : miner_efforts)
     {
-        RoundShare round_share;
+        RoundReward round_share;
         round_share.effort = effort;
         round_share.share = round_share.effort / total_effort;
         round_share.reward = static_cast<int64_t>(
             round_share.share * static_cast<double>(substracted_reward));
-        miner_shares.try_emplace(addr, round_share);
+        miner_shares.try_emplace(addr.id, round_share);
 
         logger.Log<LogType::Info>(
             "Miner round share: {}, effort: {}, share: {}, reward: "
             "{}, total effort: {}",
-            addr, round_share.effort, round_share.share, round_share.reward,
+            addr.GetHex(), round_share.effort, round_share.share, round_share.reward,
             total_effort);
     }
 

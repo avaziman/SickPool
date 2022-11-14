@@ -4,7 +4,7 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
-#include <experimental/array>
+#include <array>
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include "job.hpp"
 #include "block_template.hpp"
 #include "cn/currency_core/currency_basic.h"
 #include "currency_format_utils_blocks.h"
@@ -25,71 +26,70 @@
 
 struct BlockTemplateCn
 {
-    std::array<uint8_t, HASH_SIZE> template_hash;
-    /*const*/ std::string_view prev_hash;
-    /*const*/ std::string_view seed;
-    /*const*/ uint32_t height;
-    /*const*/ uint64_t target_diff;
-    /*const*/ double expected_hashes;
-    /*const*/ uint32_t block_size;
-    uint64_t coinbase_value;
-    uint32_t tx_count;
-    currency::block block;
+    // /*const*/ std::string_view prev_hash;
+    const std::string seed;
+    const uint32_t height;
+    const uint64_t target_diff;
+    const double expected_hashes;
+    const uint32_t block_size;
+    const currency::block block;
+    const uint64_t coinbase_value;
+    const uint32_t tx_count;
+    const std::array<uint8_t, 32> template_hash;
 
-    explicit BlockTemplateCn()
-        : prev_hash(""),
-          seed(""),
-          height(0),
-          target_diff(0),
-          expected_hashes(0.d),
-          block_size(0)
+    explicit BlockTemplateCn() = default;
+    BlockTemplateCn& operator=(BlockTemplateCn&&) = default;
+
+    currency::block UnserializeBlock(std::string_view templateblob) const
     {
+        currency::block res;
+
+        std::string template_bin;
+        template_bin.resize(templateblob.size() / 2);
+        Unhexlify((uint8_t*)template_bin.data(), templateblob.data(),
+                  templateblob.size());
+
+        bool deres = t_unserializable_object_from_blob<currency::block>(
+            res, template_bin);
+
+        return res;
     }
 
-    explicit BlockTemplateCn(const BlockTemplateResCn& btemplate)
-        : 
-          prev_hash(btemplate.prev_hash),
-          seed(btemplate.seed),
-          height(btemplate.height),
-          target_diff(btemplate.difficulty),
-          //TODO: fix..
-          expected_hashes(/*GetExpectedHashes*/(static_cast<double>(target_diff))),
-          block_size(static_cast<uint32_t>(btemplate.blob.size() / 2))
+    auto GetTemplateHash() const
     {
-        std::string template_bin;
-        template_bin.resize(btemplate.blob.size() / 2);
-        Unhexlify((unsigned char*)template_bin.data(), btemplate.blob.data(),
-                  btemplate.blob.size());
+        std::string template_hash_blob = get_block_hashing_blob(block);
 
-        currency::block cnblock;
-        bool res = t_unserializable_object_from_blob<currency::block>(
-            cnblock, template_bin);
-
-        block = cnblock;
-
-        coinbase_value = cnblock.miner_tx.vout[0].amount;
-        // include coinbase tx
-        tx_count = static_cast<uint32_t>(cnblock.tx_hashes.size() + 1);
-
-        std::string template_hash_blob = get_block_hashing_blob(cnblock);
-
-        HashWrapper::CnFastHash(
-            template_hash.data(),
+        return HashWrapper::CnFastHash(
             reinterpret_cast<uint8_t*>(template_hash_blob.data()),
             template_hash_blob.size());
     }
+
+    explicit BlockTemplateCn(const BlockTemplateResCn& btemplate)
+        :  // prev_hash(btemplate.prev_hash),
+          seed(btemplate.seed),
+          height(btemplate.height),
+          target_diff(btemplate.difficulty),
+          expected_hashes(
+              GetExpectedHashes<ZanoStatic>(static_cast<double>(target_diff))),
+          block_size(static_cast<uint32_t>(btemplate.blob.size() / 2)),
+          block(UnserializeBlock(btemplate.blob)),
+          coinbase_value(block.miner_tx.vout[0].amount),
+          // include coinbase tx
+          tx_count(static_cast<uint32_t>(block.tx_hashes.size() + 1)),
+          template_hash(GetTemplateHash())
+    {
+    }
 };
 
-class JobCryptoNote : public JobBase
+template <>
+class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
 {
    public:
-    JobCryptoNote(const std::string& jobId, BlockTemplateCn&& bTemplate,
-                  bool clean = true)
-        : JobBase(jobId, bTemplate),
-          block_template_hash(std::move(bTemplate.template_hash)),
-          block_template_hash_hex(Hexlify(block_template_hash)),
-          seed_hash(bTemplate.seed),
-          block(bTemplate.block)
+    explicit Job<StratumProtocol::CN>(const BlockTemplateResCn& bTemplate,
+                             bool clean = true)
+        : BlockTemplateCn(bTemplate),
+            // job id is the block template hash hex
+          JobBase(HexlifyS(template_hash))
     {
     }
 
@@ -101,60 +101,53 @@ class JobCryptoNote : public JobBase
 
     inline void GetBlockHex(std::string& res, uint64_t nonce) const
     {
-        this->block.nonce = nonce;
-        auto bin = t_serializable_object_to_blob(block);
+        currency::block cp(this->block);
+        cp.nonce = nonce;
+        auto bin = t_serializable_object_to_blob(cp);
         Hexlify(res.data(), bin.data(), bin.size());
     }
 
-    uint8_t coinbase_tx_id[HASH_SIZE];
-
-    std::size_t GetWorkMessage(char* buff, const StratumClient* cli,
-                               int id) const
+    template <StaticConf confs>
+    std::string GetWorkMessage(const StratumClient* cli, int id) const
     {
-        uint32_t diffBits = DiffToBits(cli->GetDifficulty());
-        arith_uint256 arith256;
-        arith256.SetCompact(diffBits);
+        // how many hashes to find a share, lower target = more hashes
+        const double diff = confs.DIFF1 * (1 / cli->GetDifficulty());
 
-        size_t len =
-            fmt::format_to_n(buff, MAX_NOTIFY_MESSAGE_SIZE,
-                             "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":[\"0x{"
-                             "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}",
-                             id,
-                             std::string_view(block_template_hash_hex.data(),
-                                              block_template_hash_hex.size()),
-                             seed_hash, arith256.GetHex(), height)
-                .size;
+        auto bin_target = DoubleToBin256(diff);
+        auto hex_target = Hexlify(bin_target);
+        std::string_view hex_target_sv(hex_target.data(), hex_target.size());
 
-        return len;
+        return fmt::format(
+            "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":[\"0x{"
+            "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}",
+            id,
+            std::string_view(this->id.data(),
+                             this->id.size()),
+            seed, hex_target_sv, height);
     }
 
-    std::size_t GetWorkMessage(char* buff, const StratumClient* cli) const
+    template <StaticConf confs>
+    std::string GetWorkMessage(const StratumClient* cli) const
     {
-        uint32_t diffBits = DiffToBits(cli->GetDifficulty());
-        arith_uint256 arith256;
-        arith256.SetCompact(diffBits);
+        const double diff = confs.DIFF1 * cli->GetDifficulty();
 
-        size_t len =
-            fmt::format_to_n(buff, MAX_NOTIFY_MESSAGE_SIZE,
-                             "{{\"jsonrpc\":\"2.0\",\"result\":[\"0x{"
-                             "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}",
-                             std::string_view(block_template_hash_hex.data(),
-                                              block_template_hash_hex.size()),
-                             seed_hash, arith256.GetHex(), height)
-                .size;
+        auto bin_target = DoubleToBin256(diff);
+        auto hex_target = Hexlify(bin_target);
+        std::string_view hex_target_sv(hex_target.data(), hex_target.size());
 
-        return len;
+        return fmt::format(
+            "{{\"jsonrpc\":\"2.0\",\"result\":[\"0x{"
+            "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}",
+            std::string_view(this->id.data(), this->id.size()), seed,
+            hex_target_sv, height);
     }
     // std::array for const explicity
-    const std::array<uint8_t, HASH_SIZE> block_template_hash;
-    const std::array<char, HASH_SIZE_HEX> block_template_hash_hex;
-
-   private:
-    const std::string seed_hash;
-    mutable currency::block block;
+    // const std::array<char, sizeof(BlockTemplateCn::template_hash) * 2>
+    //     block_template_hash_hex;
+    // using block_template_hash_hex = 
 };
 
-using job_t = JobCryptoNote;
+using JobCryptoNote = Job<StratumProtocol::CN>;
 
 #endif
 

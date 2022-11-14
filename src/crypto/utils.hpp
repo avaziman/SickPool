@@ -221,12 +221,12 @@ inline int intPow(int x, unsigned int p)
         return x * tmp * tmp;
 }
 
-constexpr double BitsToDiff(const unsigned bits)
-{
-    const unsigned exponent_diff = 8 * (DIFF1_EXPONENT - ((bits >> 24) & 0xFF));
-    const double significand = bits & 0xFFFFFF;
-    return std::ldexp(DIFF1_COEFFICIENT / significand, exponent_diff);
-}
+// constexpr double BitsToDiff(const unsigned bits)
+// {
+//     const unsigned exponent_diff = 8 * (DIFF1_EXPONENT - ((bits >> 24) & 0xFF));
+//     const double significand = bits & 0xFFFFFF;
+//     return std::ldexp(DIFF1_COEFFICIENT / significand, exponent_diff);
+// }
 
 constexpr uint64_t pow2(int power)
 {
@@ -246,7 +246,7 @@ constexpr double pow2d(int power)
 }
 
 template <StaticConf confs>
-inline double GetExpectedHashes(const double diff)
+constexpr double GetExpectedHashes(const double diff)
 {
     constexpr double u256_max = pow2d(256);
     constexpr double hash_multiplier = u256_max / confs.DIFF1;
@@ -264,26 +264,26 @@ inline int64_t GetDailyTimestamp()
 }
 
 // https://bitcoin.stackexchange.com/questions/30467/what-are-the-equations-to-convert-between-bits-and-difficulty
-static uint32_t DiffToBits(double difficulty)
-{
-    int shiftBytes;
-    int64_t word;
-    for (shiftBytes = 1; true; shiftBytes++)
-    {
-        word = (DIFF1_COEFFICIENT * pow(0x100, shiftBytes)) / difficulty;
-        if (word >= 0xffff) break;
-    }
-    word &= 0xffffff;  // convert to int < 0xffffff
-    int size = DIFF1_EXPONENT - shiftBytes;
-    // the 0x00800000 bit denotes the sign, so if it is already set, divide the
-    // mantissa by 0x100 and increase the size by a byte
-    if (word & 0x800000)
-    {
-        word >>= 8;
-        size++;
-    }
-    uint32_t bits = (size << 24) | word;
-    return bits;
-}
+// static uint32_t DiffToBits(double difficulty)
+// {
+//     int shiftBytes;
+//     int64_t word;
+//     for (shiftBytes = 1; true; shiftBytes++)
+//     {
+//         word = (DIFF1_COEFFICIENT * pow(0x100, shiftBytes)) / difficulty;
+//         if (word >= 0xffff) break;
+//     }
+//     word &= 0xffffff;  // convert to int < 0xffffff
+//     int size = DIFF1_EXPONENT - shiftBytes;
+//     // the 0x00800000 bit denotes the sign, so if it is already set, divide the
+//     // mantissa by 0x100 and increase the size by a byte
+//     if (word & 0x800000)
+//     {
+//         word >>= 8;
+//         size++;
+//     }
+//     uint32_t bits = (size << 24) | word;
+//     return bits;
+// }
 
 #endif

@@ -8,7 +8,7 @@
 
 using enum Prefix;
 
-bool GetPayees(payees_info_t& payees, RedisManager* redis_manager)
+bool GetPendingPayees(payees_info_t& payees, RedisManager* redis_manager)
 {
     // REDIS_OK
     std::vector<std::string> addresses;
@@ -85,39 +85,7 @@ int main(int argc, char** argv)
         if (res == REDIS_ERR)
         {
             // REDIS_ERR_TIMEOUT is for windows...
-            if (redis_manager.rc->err == REDIS_ERR_IO && errno == EAGAIN)
-            {
-                logger.Log<LogType::Info>("Payment time! {}", next_payment);
-                next_payment += coinConfig.payment_interval_seconds;
-                UpdateTimeout(redis_manager.rc, next_payment, curtime);
-
-                // immediate payment time!
-                GetPayees(payees, &redis_manager);
-                logger.Log<LogType::Info>("Payees pending payment: {}",
-                                          payees.size());
-
-                reward_map_t destinations;
-                destinations.reserve(payees.size());
-
-                // min fee
-                // substract fees
-                const int64_t fee = 10000000000;
-
-                if (payees.empty()) continue;
-
-                const int64_t individual_fee = fee / payees.size();
-                for (const auto& p : payees)
-                {
-                    int64_t amount_txfeed = p.second.amount - individual_fee;
-                    destinations.emplace_back(p.first, amount_txfeed);
-                }
-
-                TransferResCn res;
-                if (!daemon_manager.Transfer(res, destinations, fee, parser))
-                {
-                }
-            }
-            else
+            if (redis_manager.rc->err != REDIS_ERR_IO || errno == EAGAIN)
             {
                 // other error;
                 logger.Log<LogType::Error>("Redis error, code: {} -> {}",
@@ -126,6 +94,37 @@ int main(int argc, char** argv)
                 return -1;
             }
 
+            // timeout reached, payment time!
+            logger.Log<LogType::Info>("Payment time! {}", next_payment);
+            next_payment += coinConfig.payment_interval_seconds;
+            UpdateTimeout(redis_manager.rc, next_payment, curtime);
+
+            // immediate payment time!
+            GetPendingPayees(payees, &redis_manager);
+            logger.Log<LogType::Info>("Payees pending payment: {}",
+                                      payees.size());
+
+            reward_map_t destinations;
+            destinations.reserve(payees.size());
+
+            // min fee
+            // substract fees
+            const int64_t fee = 10000000000; // 0.01
+
+            if (payees.empty()) continue;
+
+            const int64_t individual_fee = fee / payees.size();
+            for (const auto& p : payees)
+            {
+                int64_t amount_txfeed = p.second.amount - individual_fee;
+                destinations.emplace_back(p.first, amount_txfeed);
+            }
+
+            TransferResCn transfer_res;
+            if (!daemon_manager.Transfer(transfer_res, destinations, fee,
+                                         parser))
+            {
+            }
             continue;
         }
         // block matured
@@ -136,7 +135,7 @@ int main(int argc, char** argv)
             freeReplyObject(reply);
         }
 
-        // GetPayees(payees, &redis_manager);
+        // GetPendingPayees(payees, &redis_manager);
         // redis_manager.AddPendingPayees(payees);
         // for ( : payees)
         // {

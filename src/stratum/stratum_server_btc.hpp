@@ -20,7 +20,7 @@ class StratumServerBtc : public StratumServer
     RpcResult HandleSubmit(StratumClient* cli, WorkerContext* wc,
                            simdjson::ondemand::array& params);
 
-    void HandleReq(Connection<StratumClient>* conn, WorkerContext* wc,
+    void HandleReq(Connection<StratumClient>* conn, WorkerContextT* wc,
                    std::string_view req) override;
     void UpdateDifficulty(Connection<StratumClient>* conn) override;
 

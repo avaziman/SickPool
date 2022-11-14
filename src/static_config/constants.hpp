@@ -1,25 +1,9 @@
 #include <simdjson/simdjson.h>
 
 #include <algorithm>
-
+#include <cmath>
 #include "utils/hex_utils.hpp"
 
-template <const std::string_view& hex>
-constexpr static double GetDiff1()
-{
-    std::array<char, hex.size()> src{};
-    std::ranges::copy(hex, src.begin());
-    std::array<uint8_t, hex.size() / 2> bin = Unhexlify(src);
-
-    double res = 0.0;
-    for (int i = 0; i < sizeof(bin); i++)
-    {
-        res *= 256.0;
-        res += static_cast<double>(bin[i]);
-    }
-
-    return res;
-}
 // the default
 namespace CoinConstantsBtc
 {

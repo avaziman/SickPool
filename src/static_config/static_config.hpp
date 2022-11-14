@@ -1,6 +1,6 @@
 #ifndef STATIC_CONF_HPP_
 #define STATIC_CONF_HPP_
-
+#include "crypto/verushash/arith_uint256.h"
 #include "constants.hpp"
 using namespace StratumConstants;
 
@@ -17,7 +17,19 @@ struct StaticConf{
     const Coin COIN_SYMBOL;
     const HashAlgo HASH_ALGO;
     const StratumProtocol STRATUM_PROTOCOL;
+    const uint256 DIFF1_TARGET;
     const double DIFF1;
+
+    uint32_t MAX_BLOCK_SIZE;
+    uint32_t BLOCK_HASH_SIZE;
+    uint32_t PREVHASH_SIZE;
+    uint32_t MERKLE_ROOT_SIZE;
+    uint32_t MAX_FUTURE_BLOCK_TIME;
+    uint32_t BLOCK_TIME;
+    uint32_t ADDRESS_LEN;
+    uint32_t BLOCK_HEADER_SIZE;
+    uint32_t BLOCK_HEADER_STATIC_SIZE;
+    uint32_t COINBASE_MATURITY;
 };
 // const double HASH_MULTIPLIER;  // how many hashes is a share of difficulty 1
 
@@ -34,13 +46,11 @@ using namespace CoinConstantsVrsc;
 using namespace CoinConstantsSin;
 #elif SICK_COIN == ZANO
 #include "config_zano.hpp"
-using namespace CoinConstantsZano;
+// using namespace CoinConstantsZano;
 #else
 #error "No SICK_COIN selected"
 #endif
 // SICK_COIN derived
-static constexpr uint32_t DIFF1_COEFFICIENT = DIFF1_BITS & 0x00ffffff;
-static constexpr uint32_t DIFF1_EXPONENT = DIFF1_BITS >> 24;
-
-static constexpr uint32_t HASH_SIZE_HEX = HASH_SIZE * 2;
+// static constexpr uint32_t DIFF1_COEFFICIENT = DIFF1_BITS & 0x00ffffff;
+// static constexpr uint32_t DIFF1_EXPONENT = DIFF1_BITS >> 24;
 #endif

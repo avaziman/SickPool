@@ -15,9 +15,9 @@ bool RedisRound::SetEffortStats(const efforts_map_t &miner_stats_map,
 {
     std::scoped_lock redis_lock(rc_mutex);
 
-    for (const auto &[miner_addr, miner_effort] : miner_stats_map)
+    for (const auto &[miner_id, miner_effort] : miner_stats_map)
     {
-        AppendSetMinerEffort(key_names.coin, miner_addr, EnumName<POW>(),
+        AppendSetMinerEffort(key_names.coin, miner_id.GetHex(), EnumName<POW>(),
                              miner_effort);
     }
 
@@ -38,11 +38,16 @@ bool RedisRound::GetMinerEfforts(efforts_map_t &efforts,
 
     for (int i = 0; i < reply->elements; i += 2)
     {
-        std::string addr(reply->element[i]->str, reply->element[i]->len);
+        std::string id_str(reply->element[i]->str, reply->element[i]->len);
 
         double effort = std::strtod(reply->element[i + 1]->str, nullptr);
 
-        efforts[addr] = effort;
+        MinerId id;
+        auto [_, err] = std::from_chars(id_str.data(), id_str.data() + id_str.size(), id, 16);
+
+        assert(err == std::errc{});
+
+        efforts[MinerIdHex(id)] = effort;
     }
     return true;
 }
@@ -66,30 +71,30 @@ void RedisRound::GetCurrentRound(Round *rnd, std::string_view chain,
     rnd->total_effort = strtod(total_effort_str.c_str(), nullptr);
 }
 
-void RedisRound::AppendAddRoundShares(std::string_view chain,
-                                        const BlockSubmission *submission,
-                                        const round_shares_t &miner_shares)
+void RedisRound::AppendAddRoundRewards(std::string_view chain,
+                                       const BlockSubmission *submission,
+                                       const round_shares_t &miner_shares)
 {
     using namespace std::string_view_literals;
 
-    for (const auto &[addr, round_share] : miner_shares)
+    for (const auto &[miner_id, round_share] : miner_shares)
     {
         AppendCommand(
             {"HSET"sv,
              Format({key_names.reward_immature,
-                         std::to_string(submission->number)}),
-             addr,
+                     std::to_string(submission->number)}),
+             miner_id.GetHex(),
              std::string_view(reinterpret_cast<const char *>(&round_share),
-                              sizeof(RoundShare))});
+                              sizeof(RoundReward))});
 
-        AppendCommand({"HINCRBY"sv, Format({key_names.solver, addr}),
+        AppendCommand({"HINCRBY"sv, Format({key_names.solver, miner_id.GetHex()}),
                        EnumName<Prefix::IMMATURE_BALANCE>(),
                        std::to_string(round_share.reward)});
     }
 }
 
 bool RedisRound::SetClosedRound(std::string_view chain, std::string_view type,
-                              const ExtendedSubmission *submission,
+                              const BlockSubmission *submission,
                               const round_shares_t &round_shares,
                               int64_t time_ms)
 {
@@ -102,7 +107,7 @@ bool RedisRound::SetClosedRound(std::string_view chain, std::string_view type,
 
         AppendCommand({"INCR"sv, key_names.block_number});
         AppendAddBlockSubmission(submission);
-        AppendAddRoundShares(chain, submission, round_shares);
+        AppendAddRoundRewards(chain, submission, round_shares);
         // set round start time
         AppendSetMinerEffort(chain, EnumName<START_TIME>(), type,
                              static_cast<double>(time_ms));
@@ -110,9 +115,9 @@ bool RedisRound::SetClosedRound(std::string_view chain, std::string_view type,
         AppendSetMinerEffort(chain, EnumName<TOTAL_EFFORT>(), type, 0);
 
         // reset miners efforts
-        for (auto &[addr, _] : round_shares)
+        for (auto &[miner_id, _] : round_shares)
         {
-            AppendSetMinerEffort(chain, addr, type, 0);
+            AppendSetMinerEffort(chain, miner_id.GetHex(), type, 0);
         }
     }
 

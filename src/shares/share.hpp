@@ -7,36 +7,35 @@
 
 #include "static_config.hpp"
 
-// as in order of appearance
-#ifdef STRATUM_PROTOCOL_ZEC
-struct ShareZec
+template <StratumProtocol sp>
+struct ShareT{};
+
+template <> 
+struct ShareT<StratumProtocol::ZEC>
 {
+    // as in order of appearance
     std::string_view worker;
     std::string_view jobId;
     std::string_view time;
     std::string_view nonce2;
     std::string_view solution;
 };
-typedef ShareZec share_t;
-// as in order of appearance
-#endif
 
-// #ifdef STRATUM_PROTOCOL_BTC
-struct ShareCn
+template <>
+struct ShareT<StratumProtocol::CN>
 {
     std::string_view worker;
     
     std::string_view nonce_sv;
     // used to identify job instead of JobId.
-    std::string_view header_pow;
+    std::string_view jobId; // header_pow
     std::string_view mix_digest;
 
     uint64_t nonce;
 };
-typedef ShareCn share_t;
+using ShareCn = ShareT<StratumProtocol::CN>;
 
-// #endif
-
+template <size_t BLOCK_HEADER_SIZE>
 struct WorkerContext
 {
     uint32_t current_height;
@@ -76,8 +75,7 @@ struct ShareResult
     ResCode code;
     std::string message;
     double difficulty;
-    // uint256 takes vector as param
-    std::vector<uint8_t> hash_bytes = std::vector<uint8_t>(32);
+    std::array<uint8_t, 32> hash_bytes;
 };
 
 #endif

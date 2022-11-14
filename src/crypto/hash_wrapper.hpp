@@ -55,8 +55,14 @@ class HashWrapper
 
     inline static void CnFastHash(uint8_t* dest, const uint8_t* in, size_t size)
     {
-        // keccak(in, size, dest, HASH_SIZE);
         crypto::cn_fast_hash(in, size, (char*)dest);
+    }
+
+    inline static std::array<uint8_t, 32> CnFastHash(const uint8_t* in, size_t size)
+    {
+        std::array<uint8_t, 32> res; 
+        crypto::cn_fast_hash(in, size, (char*)res.data());
+        return res;
     }
 
    private:

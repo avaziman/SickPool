@@ -1,8 +1,50 @@
 #ifndef HEX_UTILS_HPP
 #define HEX_UTILS_HPP
-#include <iostream>
 #include <array>
 #include <iomanip>
+#include <iostream>
+#include <string>
+
+constexpr auto u64maxd = static_cast<double>(UINT64_MAX);
+
+#define BIN_TO_DOUBLE_8B(bin)                                             \
+    const uint64_t* bin8 = reinterpret_cast<const uint64_t*>(bin.data()); \
+    static_assert(sizeof(bin) % 8 == 0, "Incompatible byte length");      \
+    double res = 0.0;                                                     \
+    for (int i = 0; i < sizeof(bin) / sizeof(uint64_t); i++)              \
+    {                                                                     \
+        res *= u64maxd;                                                   \
+        res += static_cast<double>(bin8[i]);                              \
+    }                                                                     \
+    return res
+
+#define BIN_TO_DOUBLE_1B(bin)               \
+    double res = 0.0;                       \
+    for (int i = 0; i < sizeof(bin); i++)   \
+    {                                       \
+        res *= 256.0;                       \
+        res += static_cast<double>(bin[i]); \
+    }                                       \
+    return res
+
+// log 256 n complexity
+constexpr static std::array<uint8_t, 32> DoubleToBin256(double d)
+{
+    std::array<uint8_t, 32> res{};
+
+    int i = 0;
+    while (d >= 1.0)
+    {
+        double remain = fmod(d, 256.0);
+        // little endian, least significant first
+        res[sizeof(res) - i - 1] = static_cast<uint8_t>(remain);
+
+        d /= 256.0;
+        i++;
+    }
+
+    return res;
+}
 
 inline void ReverseHex(char* dest, const char* input, uint32_t size)
 {
@@ -69,13 +111,22 @@ constexpr void Hexlify(char* dest, const T* src, size_t srcSize)
 }
 
 template <size_t size>
-constexpr std::array<char, size * 2> Hexlify(const std::array<uint8_t, size>& src)
+constexpr std::array<char, size * 2> Hexlify(
+    const std::array<uint8_t, size>& src)
 {
     std::array<char, size * 2> res;
     Hexlify(res.data(), src.data(), size);
     return res;
 }
 
+template <size_t size>
+constexpr std::string HexlifyS(const std::array<uint8_t, size>& src)
+{
+    std::string res;
+    res.resize(size * 2);
+    Hexlify(res.data(), src.data(), size);
+    return res;
+}
 template <const std::string_view& src>
 constexpr auto Hexlify()
 {
@@ -97,7 +148,8 @@ inline void PrintHex(const uint8_t* b, std::size_t size,
     std::cout << std::endl;
 }
 
-constexpr void Unhexlify(unsigned char* dest, const char* src, const size_t size)
+constexpr void Unhexlify(unsigned char* dest, const char* src,
+                         const size_t size)
 {
     // each byte is 2 characters in hex
     for (int i = 0; i < size / 2; i++)
@@ -117,13 +169,21 @@ constexpr std::array<uint8_t, size / 2> Unhexlify(
     return res;
 }
 
-inline uint32_t FromHex(const char* str)
+template <size_t size>
+constexpr static double BytesToDouble(const std::array<uint8_t, size>& bin)
 {
-    uint32_t val;
-    std::stringstream ss;
-    ss << std::hex << str;
-    ss >> val;
-    return val;
+    // BIN_TO_DOUBLE_8B(bin);
+    BIN_TO_DOUBLE_1B(bin);
+}
+
+template <const std::string_view& hex>
+constexpr static double HexToDouble()
+{
+    std::array<char, hex.size()> src{};
+    std::ranges::copy(hex, src.begin());
+    std::array<uint8_t, hex.size() / 2> bin = Unhexlify(src);
+
+    BIN_TO_DOUBLE_1B(bin);
 }
 
 #endif
