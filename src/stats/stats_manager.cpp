@@ -9,13 +9,13 @@ int StatsManager::diff_adjust_seconds;
 
 double StatsManager::average_interval_ratio;
 
-StatsManager::StatsManager(RedisManager* redis_manager,
+StatsManager::StatsManager(const RedisManager& redis_manager,
                            DifficultyManager* diff_manager,
                            RoundManager* round_manager, const StatsConfig* cc)
-    : redis_manager(redis_manager),
+    : conf(cc),
+      redis_manager(redis_manager),
       diff_manager(diff_manager),
-      round_manager(round_manager),
-      conf(cc)
+      round_manager(round_manager)
 {
     StatsManager::hashrate_interval_seconds = cc->hashrate_interval_seconds;
     StatsManager::effort_interval_seconds = cc->effort_interval_seconds;
@@ -91,7 +91,7 @@ void StatsManager::Start(std::stop_token st)
         if (next_update == next_block_update)
         {
             uint32_t block_number = round_manager->blocks_found.load();
-            redis_manager->UpdateBlockNumber(update_time_ms, block_number);
+            redis_manager.UpdateBlockNumber(update_time_ms, block_number);
             round_manager->blocks_found.store(0);
 
             next_block_update += conf->mined_blocks_interval;
@@ -120,9 +120,9 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         update_time_ms - average_hashrate_interval_seconds * 1000;
 
     std::vector<std::pair<WorkerFullId, double>> remove_worker_hashrates;
-    bool res = redis_manager->TsMrange(remove_worker_hashrates, EnumName<Prefix::WORKER>(),
-                                       redis_manager->key_names.hashrate,
-                                       remove_time, remove_time);
+    bool res = redis_manager.TsMrange(
+        remove_worker_hashrates, EnumName<Prefix::WORKER>(),
+        redis_manager.key_names.hashrate, remove_time, remove_time);
 
     {
         // only lock after receiving the hashrates to remove
@@ -156,7 +156,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
             if (ws.interval_hashrate > 0.d) miner_stats.worker_count++;
         }
     }
-    return redis_manager->UpdateIntervalStats(
+    return redis_manager.UpdateIntervalStats(
         worker_stats_map, miner_stats_map, &stats_map_mutex,
         round_manager->netwrok_hr, round_manager->difficulty,
         round_manager->blocks_found, update_time_ms);
@@ -165,7 +165,8 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
 {
     std::vector<std::pair<WorkerFullId, double>> vec;
-    bool res = redis_manager->LoadAverageHashrateSum(vec, "worker", hr_time);
+    bool res = redis_manager.LoadAverageHashrateSum(
+        vec, "worker", hr_time, average_hashrate_interval_seconds * 1000);
 
     if (!res)
     {
@@ -213,36 +214,30 @@ void StatsManager::AddShare(const WorkerFullId& id, const double diff)
     }
 }
 
-bool StatsManager::AddWorker(const std::string& address,
-                             const std::string& worker_full, int64_t curtime,
-                             const std::string& idTag)
+bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
+                             std::string_view address,
+                             std::string_view worker_name, int64_t curtime,
+                             std::string_view alias, int64_t min_payout)
 {
     using namespace std::literals;
     std::scoped_lock stats_db_lock(stats_map_mutex);
 
-    // bool new_worker = !worker_stats_map.contains(worker_full);
-    bool new_worker = true;
-    // bool new_miner = !round_manager->IsMinerIn(address);
-    bool new_miner = true;
-    // bool returning_worker =
-    //     !new_worker && !worker_stats_map[worker_full].connection_count;
-
     std::string addr_lowercase(address);
-    // std::transform(addr_lowercase.begin(), addr_lowercase.end(),
-    //                addr_lowercase.begin(),
-    //                [](unsigned char c) { return std::tolower(c); });
+    std::ranges::transform(address, std::back_inserter(addr_lowercase),
+                           [](char c) { return std::tolower(c); });
 
-    std::ranges::transform(addr_lowercase, std::back_inserter(addr_lowercase),
-                           [](unsigned char c) { return std::tolower(c); });
-
-    // std::ranges::transform()
-    // 100% new, as we loaded all existing miners
-    MinerIdHex id(0);
-    if (new_miner)
+    MinerIdHex miner_id(0);
+    if (bool new_miner = redis_manager.GetMinerId(miner_id, addr_lowercase);
+        !new_miner)
     {
-        logger.Log<LogType::Info>("New miner has spawned: {}", address);
-        if (redis_manager->AddNewMiner(address, addr_lowercase, worker_full,
-                                       id, curtime))
+        // new id
+        miner_id = MinerIdHex(0);
+
+        logger.Log<LogType::Info>(
+            "New miner has spawned: {}, assigning new id {}", address,
+            miner_id.GetHex());
+        if (redis_manager.AddNewMiner(address, addr_lowercase, "", miner_id,
+                                      curtime, min_payout))
         {
             logger.Log<LogType::Info>("Miner {} added to database.", address);
         }
@@ -254,39 +249,49 @@ bool StatsManager::AddWorker(const std::string& address,
         }
     }
 
-    // if (new_worker || returning_worker)
-    // {
-        if (redis_manager->AddNewWorker(address, addr_lowercase, worker_full,
-                                        idTag))
+    // set active
+    redis_manager.SetActiveId(miner_id);
+
+    WorkerIdHex worker_id(0);
+    if (bool new_worker =
+            !redis_manager.GetWorkerId(worker_id, miner_id, worker_name);
+        new_worker)
+    {
+        // new id
+        worker_id = WorkerIdHex(0);
+
+        if (redis_manager.AddNewWorker(WorkerFullId(miner_id.id, worker_id.id),
+                                       addr_lowercase, worker_name, alias))
         {
             logger.Log<LogType::Info>("Worker {} added to database.",
-                                      worker_full);
+                                      worker_name);
         }
         else
         {
             logger.Log<LogType::Critical>(
-                "Failed to add worker {} to database.", worker_full);
+                "Failed to add worker {} to database.", worker_name);
             return false;
         }
-    // }
+    }
 
-    // worker_stats_map[worker_full].connection_count++;
+    worker_full_id = WorkerFullId(miner_id.id, worker_id.id);
+    worker_stats_map[worker_full_id].connection_count =
+        worker_stats_map[worker_full_id].connection_count + 1;
 
     return true;
 }
 
-void StatsManager::PopWorker(const std::string& worker_full,
-                             const std::string& address)
+void StatsManager::PopWorker(const WorkerFullId& fullid)
 {
     std::scoped_lock stats_lock(stats_map_mutex);
 
-    // int con_count = (--worker_stats_map[worker_full].connection_count);
+    int con_count = (--worker_stats_map[fullid].connection_count);
     // dont remove from the umap in case they join back, so their progress
     // is saved
-    // if (con_count == 0)
-    // {
-    //     // redis_manager->PopWorker(address);
-    // }
+    if (con_count == 0)
+    {
+        redis_manager.PopWorker(fullid);
+    }
 }
 
 // TODO: idea: since writing all shares on all pbaas is expensive every 10

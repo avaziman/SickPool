@@ -11,9 +11,10 @@ using enum Prefix;
 bool GetPendingPayees(payees_info_t& payees, RedisManager* redis_manager)
 {
     // REDIS_OK
-    std::vector<std::string> addresses;
-    if (!redis_manager->GetAddresses(addresses)) return false;
-    if (!redis_manager->LoadUnpaidRewards(payees, addresses)) return false;
+    std::vector<MinerIdHex> active_ids;
+
+    if (!redis_manager->GetActiveIds(active_ids)) return false;
+    if (!redis_manager->LoadUnpaidRewards(payees, active_ids)) return false;
 
     // filter only payees that reached their threshold
     std::erase_if(payees, [](const auto& p)

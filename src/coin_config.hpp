@@ -38,6 +38,6 @@ struct CoinConfig
 
     uint32_t socket_recv_timeout_seconds;
     uint32_t payment_interval_seconds;
-    uint32_t min_payout_threshold;
+    int64_t min_payout_threshold;
 };
 #endif

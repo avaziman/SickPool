@@ -47,9 +47,9 @@ enum class Prefix
     PAYOUT,
     PAYOUT_FEELESS,
     PAYOUTS,
-    ADDRESS_MAP,
+    ADDRESS,
     ADDRESS_ID_MAP,
-    ALIAS_MAP,
+    ALIAS,
     PAYOUT_THRESHOLD,
     IDENTITY,
     ROUND,
@@ -98,6 +98,7 @@ enum class Prefix
     TYPE,
     NUMBER,
     CHAIN,
+    ACTIVE_IDS,
     STATS,
     COMPACT,
 };
@@ -110,8 +111,8 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    RedisManager(const std::string &ip, const CoinConfig *cc, int db_index = 0);
-    RedisManager(const RedisManager &rm)
+    explicit RedisManager(const std::string &ip, const CoinConfig *cc, int db_index = 0);
+    explicit RedisManager(const RedisManager &rm)
         : conf(rm.conf), key_names(rm.key_names)
     {
     }
@@ -124,7 +125,8 @@ class RedisManager
     // }
 
     // manual binary search :)
-
+    bool GetActiveIds(std::vector<MinerIdHex> &addresses);
+    bool SetActiveId(const MinerIdHex& id);
     void AppendAddBlockSubmission(const BlockSubmission *submission);
     bool UpdateBlockConfirmations(std::string_view block_id,
                                   int32_t confirmations);
@@ -134,31 +136,12 @@ class RedisManager
     int GetBlockNumber();
     /* stats */
 
-    bool AddNewMiner(std::string_view address, std::string_view addr_lowercase,
-                     std::string_view alias, MinerIdHex id, int64_t curtime);
-
-    bool AddNewWorker(std::string_view address, std::string_view addr_lowercase,
-                      std::string_view worker_full, std::string_view id_tag);
-
     /* round */
     bool LoadUnpaidRewards(payees_info_t &rewards,
-                           const std::vector<std::string> &addresses);
-    bool GetAddresses(std::vector<std::string> &addresses);
+                           const std::vector<MinerIdHex> &active_ids);
 
     /* stats */
-    bool SetNewBlockStats(std::string_view chain, int64_t curtime,
-                          double net_hr, double estimated_shares);
-    bool ResetMinersWorkerCounts(const efforts_map_t &miner_stats_map,
-                                 int64_t time_now);
-    bool LoadAverageHashrateSum(
-        std::vector<std::pair<WorkerFullId, double>> &hashrate_sums,
-        std::string_view prefix, int64_t hr_time);
 
-    bool UpdateIntervalStats(worker_map &worker_stats_map,
-                             miner_map &miner_stats_map,
-                             std::mutex *stats_mutex, double net_hr,
-                             double diff, uint32_t blocks_found,
-                             int64_t update_time_ms);
     bool TsMrange(std::vector<std::pair<WorkerFullId, double>> &last_averages,
                   std::string_view prefix, std::string_view type, int64_t from,
                   int64_t to, const TsAggregation *aggregation = nullptr);
@@ -170,8 +153,6 @@ class RedisManager
 
     /* payout */
     // bool AddPayout(const PaymentInfo *payment);
-
-    bool DoesAddressExist(std::string_view addrOrId, std::string &valid_addr);
 
     std::string hget(std::string_view key, std::string_view field);
 
@@ -353,13 +334,12 @@ class RedisManager
             Format({reward, EnumName<IMMATURE>()});
         const std::string reward_mature = Format({reward, EnumName<MATURE>()});
 
-        const std::string address_map = Format({coin, EnumName<ADDRESS_MAP>()});
         const std::string address_id_map =
             Format({coin, EnumName<ADDRESS_ID_MAP>()});
-        const std::string alias_map = Format({coin, EnumName<ALIAS_MAP>()});
         const std::string block_number =
             Format({coin, EnumName<BLOCK>(), EnumName<NUMBER>()});
 
+        const std::string active_ids_map = Format({coin, EnumName<ACTIVE_IDS>()});
         const std::string payout = Format({coin, EnumName<PAYOUT>()});
         const std::string pending_payout =
             Format({payout, EnumName<PENDING>()});
@@ -434,18 +414,7 @@ class RedisManager
               std::string_view val);
     void AppendHset(std::string_view key, std::string_view field,
                     std::string_view val);
-
-    void AppendUpdateWorkerCount(MinerIdHex miner_id, int amount,
-                                 int64_t update_time_ms);
-    void AppendCreateStatsTs(std::string_view addrOrWorker, std::string_view id,
-                             std::string_view prefix,
-                             std::string_view addr_lowercase_sv);
     void AppendTsAdd(std::string_view key_name, int64_t time, double value);
-
-    void AppendIntervalStatsUpdate(std::string_view addr,
-                                   std::string_view prefix,
-                                   int64_t update_time_ms,
-                                   const WorkerStats &ws);
 
    private:
     int command_count = 0;

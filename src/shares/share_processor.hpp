@@ -89,7 +89,7 @@ class ShareProcessor
             currency::get_block_longhash_sick(
                 result.hash_bytes.data(), static_cast<uint64_t>(job->height),
                 job->template_hash.data(), share.nonce);
-            std::ranges::reverse(result.hash_bytes);
+            // std::ranges::reverse(result.hash_bytes);
         }
         else if constexpr (confs.HASH_ALGO == HashAlgo::VERUSHASH_V2b2)
         {

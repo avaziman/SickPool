@@ -1,7 +1,9 @@
 #ifndef STATS_HPP
 #define STATS_HPP
-#include <unordered_map>
 #include <fmt/core.h>
+
+#include <unordered_map>
+
 #include "round.hpp"
 
 // thought about hashing the address to produce shorter identifier for storage
@@ -46,8 +48,11 @@ struct MinerStats : public WorkerStats
 struct Id32
 {
     /*const*/ uint32_t id;
-    char hex[sizeof(id * 2)];
-    std::string_view GetHex() const { return std::string_view(hex, sizeof(hex)); }
+    char hex[sizeof(id) * 2];
+    std::string_view GetHex() const
+    {
+        return std::string_view(hex, sizeof(hex));
+    }
 
     explicit(false) Id32(uint32_t i) : id(i)
     {
@@ -63,16 +68,22 @@ using WorkerId = uint32_t;
 using WorkerIdHex = Id32;
 struct WorkerFullId
 {
-    const MinerIdHex miner_id;
-    const WorkerIdHex worker_id;
+    /*const*/ MinerIdHex miner_id;
+    /*const*/ WorkerIdHex worker_id;
 
     char hex[sizeof(miner_id.hex) + sizeof(worker_id.hex)];
-    std::string_view GetHex() const { return std::string_view(hex, sizeof(hex)); }
+    std::string_view GetHex() const
+    {
+        return std::string_view(hex, sizeof(hex));
+    }
 
     explicit WorkerFullId(uint32_t mi, uint32_t wi)
         : miner_id(mi), worker_id(wi)
     {
-        fmt::format_to_n(hex, sizeof(hex), "{}{}", miner_id.hex, worker_id.hex);
+        fmt::format_to_n(
+            hex, sizeof(hex), "{}{}",
+            std::string_view(miner_id.hex, sizeof(miner_id.hex)),
+            std::string_view(worker_id.hex, sizeof(worker_id.hex)));
     }
 
     bool operator==(const WorkerFullId& i) const
@@ -95,7 +106,8 @@ struct std::hash<WorkerFullId>
 {
     std::size_t operator()(const WorkerFullId& s) const noexcept
     {
-        return std::hash<Id32>{}(s.miner_id) << 32 | std::hash<Id32>{}(s.worker_id);
+        return std::hash<Id32>{}(s.miner_id) << 32 |
+               std::hash<Id32>{}(s.worker_id);
     }
 };
 

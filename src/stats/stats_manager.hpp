@@ -16,7 +16,7 @@
 #include "difficulty/difficulty_manager.hpp"
 #include "logger.hpp"
 #include "payments/payment_manager.hpp"
-#include "redis/redis_manager.hpp"
+#include "redis_stats.hpp"
 #include "round.hpp"
 #include "shares/share.hpp"
 #include "static_config/static_config.hpp"
@@ -28,7 +28,7 @@ class RoundManager;
 class StatsManager
 {
    public:
-    StatsManager(RedisManager* redis_manager, DifficultyManager* diff_manager,
+    StatsManager(const RedisManager& redis_manager, DifficultyManager* diff_manager,
                  RoundManager* round_manager, const StatsConfig* cc);
 
     // Every hashrate_interval_seconds we need to write:
@@ -40,9 +40,10 @@ class StatsManager
 
     bool LoadAvgHashrateSums(int64_t hr_time);
     void AddShare(const WorkerFullId& id, const double diff);
-    bool AddWorker(const std::string& address, const std::string& worker_full, std::time_t curtime,
-                   const std::string& idTag = "null");
-    void PopWorker(const std::string& worker, const std::string& address);
+    bool AddWorker(WorkerFullId& worker_full_id, const std::string_view address,
+                   std::string_view worker_full, std::time_t curtime,
+                   std::string_view alias, int64_t min_payout);
+    void PopWorker(const WorkerFullId& fullid);
 
     // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
 
@@ -61,7 +62,7 @@ class StatsManager
     static constexpr std::string_view field_str = "StatsManager";
     Logger<field_str> logger;
     const StatsConfig* conf;
-    RedisManager* redis_manager;
+    RedisStats redis_manager;
     DifficultyManager* diff_manager;
     RoundManager* round_manager;
 

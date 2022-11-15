@@ -117,7 +117,8 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
     }
 
     share.nonce = HexToUint(share.nonce_sv.data() + 2, sizeof(share.nonce) * 2);
-    share.jobId = share.jobId.substr(2); // remove the hex prefix as we don't save it.
+    share.jobId =
+        share.jobId.substr(2);  // remove the hex prefix as we don't save it.
 
     if (!parse_error.empty())
     {
@@ -136,7 +137,6 @@ RpcResult StratumServerCn<confs>::HandleAuthorize(
 {
     using namespace simdjson;
 
-    int resCode = 0;
     std::string_view given_addr;
     bool isIdentity = false;
 
@@ -171,20 +171,20 @@ RpcResult StratumServerCn<confs>::HandleAuthorize(
 
     auto addr_encoded = tools::base58::encode(addr_data);
 
-    std::string worker_full_str = fmt::format("{}.{}", given_addr, worker);
-
-    cli->SetAddress(worker_full_str, given_addr);
 
     // string-views to non-local string
+    WorkerFullId worker_full_id(0, 0);
     bool added_to_db = this->stats_manager.AddWorker(
-        cli->GetAddress(), cli->GetFullWorkerName(), std::time(nullptr));
+        worker_full_id, given_addr, worker, GetCurrentTimeMs(), "",
+        this->coin_config.min_payout_threshold);
 
     if (!added_to_db)
     {
         return RpcResult(ResCode::UNAUTHORIZED_WORKER,
                          "Failed to add worker to database!");
     }
-    cli->SetAuthorized();
+    std::string worker_full_str = fmt::format("{}.{}", given_addr, worker);
+    cli->SetAuthorized(worker_full_id, std::move(worker_full_str));
 
     logger.Log<LogType::Info>("Authorized worker: {}, address: {}", worker,
                               given_addr);

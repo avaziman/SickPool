@@ -152,11 +152,6 @@ RpcResult StratumServerBtc::HandleAuthorize(StratumClient *cli,
     worker = worker_full.substr(split + 1, worker_full.size() - 1);
     ValidateAddressRes va_res;
 
-    // bool oldAddress = redis_manager.DoesAddressExist(given_addr,
-    // va_res.valid_addr);
-
-    // if (!oldAddress)
-    // {
     if (!daemon_manager.ValidateAddress(va_res, httpParser, given_addr))
     {
         return RpcResult(ResCode::UNAUTHORIZED_WORKER,

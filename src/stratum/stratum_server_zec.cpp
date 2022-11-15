@@ -146,11 +146,6 @@ RpcResult StratumServerZec::HandleAuthorize(StratumClient *cli,
     worker = worker_full.substr(split + 1, worker_full.size() - 1);
     ValidateAddressRes va_res;
 
-    // bool oldAddress = redis_manager.DoesAddressExist(given_addr,
-    // va_res.valid_addr);
-
-    // if (!oldAddress)
-    // {
     if (!daemon_manager.ValidateAddress(va_res, httpParser, given_addr))
     {
         return RpcResult(ResCode::UNAUTHORIZED_WORKER,
@@ -198,8 +193,8 @@ RpcResult StratumServerZec::HandleAuthorize(StratumClient *cli,
 
     // string-views to non-local string
     bool added_to_db = stats_manager.AddWorker(
-        cli->GetAddress(), cli->GetFullWorkerName(),
-        va_res.script_pub_key, std::time(nullptr), id_tag);
+        cli->GetAddress(), cli->GetFullWorkerName(), va_res.script_pub_key,
+        std::time(nullptr), id_tag, coin_config.min_payout_threshold);
 
     if (!added_to_db)
     {

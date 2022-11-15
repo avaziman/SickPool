@@ -11,10 +11,6 @@ RoundManager::RoundManager(const RedisManager& rm,
         logger.Log<LogType::Critical>("Failed to load current round!");
     }
 
-    if (!ResetMinersWorkerCounts(efforts_map, GetCurrentTimeMs()))
-    {
-        logger.Log<LogType::Critical>("Failed to reset worker counts!");
-    }
 
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
     // get the last share

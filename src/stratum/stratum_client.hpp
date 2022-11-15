@@ -7,12 +7,12 @@
 #include <cstring>
 #include <list>
 #include <memory>
+#include <optional>
 #include <set>
 #include <unordered_set>
-#include <optional>
 
-#include "stats.hpp"
 #include "hash_wrapper.hpp"
+#include "stats.hpp"
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
 
@@ -29,8 +29,9 @@ class StratumClient
     int64_t GetLastAdjusted() const { return last_adjusted; }
 
     // make sting_view when unordered map supports it
-    const std::string& GetAddress() const { return address; }
-    const std::string& GetFullWorkerName() const { return worker_full; }
+    std::string_view GetAddress() const { return address; }
+    std::string_view GetWorkerName() const { return worker_name; }
+    std::string_view GetFullWorkerName() const { return worker_full; }
     WorkerFullId GetId() const { return id; }
 
     void SetPendingDifficulty(double diff)
@@ -73,16 +74,19 @@ class StratumClient
         share_count = 0;
     }
 
-    // called after auth, before added to databse
-    void SetAddress(std::string_view worker, std::string_view addr)
+    void SetAuthorized(const WorkerFullId& id, std::string&& workerfull)
     {
-        // add the hasher on authorization
-        // copy the worker name (it will be destroyed)
-        worker_full = std::string(worker);
-        address = std::string(addr);
-    }
+        is_authorized = true;
+        this->id = id;
 
-    void SetAuthorized() { is_authorized = true; }
+        this->worker_full = std::move(workerfull);
+        std::string_view worker_full_sv(worker_full);
+
+        auto dot = worker_full_sv.find('.');
+        this->address = worker_full_sv.substr(0, dot);
+        this->worker_name =
+            worker_full_sv.substr(dot + 1, worker_full_sv.size() - 1);
+    }
 
     std::list<std::unique_ptr<StratumClient>>::iterator it;
 
@@ -106,7 +110,9 @@ class StratumClient
     // std::string current_job_id;
     WorkerFullId id;
     std::string worker_full;
-    std::string address;
+    std::string_view address;
+    std::string_view worker_name;
+
     std::string ip;
 
     std::mutex shares_mutex;

@@ -10,7 +10,7 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
                       coin_config.min_payout_threshold),
       job_manager(&daemon_manager, &payment_manager, coin_config.pool_addr),
       block_submitter(&redis_manager, &daemon_manager, &round_manager),
-      stats_manager(&redis_manager, &diff_manager, &round_manager, &conf.stats)
+      stats_manager(redis_manager, &diff_manager, &round_manager, &conf.stats)
 {
     static_assert(confs.DIFF1 != 0, "DIFF1 can't be zero!");
 
@@ -118,8 +118,8 @@ void StratumServer<confs>::HandleBlockNotify()
     round_manager.netwrok_hr = net_est_hr;
     round_manager.difficulty = new_job->target_diff;
 
-    redis_manager.SetNewBlockStats(coin_config.symbol, curtime_ms, net_est_hr,
-                                   new_job->target_diff);
+    // redis_manager.SetNewBlockStats(coin_config.symbol, curtime_ms, net_est_hr,
+    //                                new_job->target_diff);
 
     logger.Log<LogType::Info>(
         "Broadcasted new job: \n"
@@ -357,8 +357,7 @@ void StratumServer<confs>::DisconnectClient(
     const std::shared_ptr<Connection<StratumClient>> conn_ptr)
 {
     auto sock = conn_ptr->sock;
-    stats_manager.PopWorker(conn_ptr->ptr->GetFullWorkerName(),
-                            conn_ptr->ptr->GetAddress());
+    stats_manager.PopWorker(conn_ptr->ptr->GetId());
     std::unique_lock lock(clients_mutex);
     clients.erase(conn_ptr);
 

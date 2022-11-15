@@ -13,7 +13,7 @@ template <typename T>
 struct Connection
 {
     public: 
-    Connection(const int s, const in_addr& addr) : sock(s), ip(ip_str, sizeof(ip_str))
+    explicit Connection(const int s, const in_addr& addr) : sock(s), ip(ip_str, sizeof(ip_str))
     {
         inet_ntop(AF_INET, &addr, ip_str, sizeof(ip_str));
     }
