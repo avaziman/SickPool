@@ -32,7 +32,7 @@ void RedisManager::AppendAddBlockSubmission(
                        std::to_string(submission->number), block_id_sv});
 
         AppendCommand({"ZADD"sv, key_names.block_index_reward,
-                       std::to_string(submission->block_reward), block_id_sv});
+                       std::to_string(submission->reward), block_id_sv});
 
         AppendCommand({"ZADD"sv, key_names.block_index_difficulty,
                        std::to_string(submission->difficulty), block_id_sv});

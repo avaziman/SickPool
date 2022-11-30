@@ -9,6 +9,7 @@ using namespace CoinConstantsBtc;
 namespace CoinConstantsSin
 {
 static constexpr uint32_t EXTRANONCE2_SIZE = 4;
+static constexpr uint32_t JOBID_SIZE = 4;
 
 // static constexpr uint32_t DIFF1_BITS = 0x1d00ffff;
 static constexpr uint32_t DIFF1_BITS = 0x1d00ffff;

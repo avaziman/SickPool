@@ -3,9 +3,9 @@
 #include <fmt/core.h>
 
 #include <unordered_map>
-
+#include <list>
+#include "redis_interop.hpp"
 #include "round.hpp"
-
 // thought about hashing the address to produce shorter identifier for storage
 // efficiency but it neglects the cryptocurrency's intent and requires another
 // hash to addr mapping...
@@ -29,7 +29,7 @@ struct WorkerStats
     double average_hashrate_sum = 0.0;
     double current_interval_effort = 0.0;
 
-    uint32_t connection_count = 0;
+    // uint32_t connection_count = 0;
 
     inline void ResetInterval()
     {
@@ -63,9 +63,11 @@ struct Id32
 };
 
 using MinerId = uint32_t;
-using MinerIdHex = Id32;
 using WorkerId = uint32_t;
+
+using MinerIdHex = Id32;
 using WorkerIdHex = Id32;
+
 struct WorkerFullId
 {
     /*const*/ MinerIdHex miner_id;
@@ -119,7 +121,7 @@ struct Share
 };
 #pragma pack(pop)
 
-using worker_map = std::unordered_map<WorkerFullId, WorkerStats>;
+using worker_map = std::list<std::pair<WorkerFullId, WorkerStats>>;
 
 using miner_map = std::unordered_map<MinerIdHex, MinerStats>;
 
@@ -127,5 +129,22 @@ using round_map_t = std::unordered_map<std::string, Round>;
 
 // miner -> effort
 using efforts_map_t = std::unordered_map<MinerIdHex, double>;
+
+/* block submission attributes are
+    sortable:
+    time/number
+    reward
+    difficulty
+    effort
+    duration
+    (no need height because it will always be grouped by chains, so you can just
+   filter by chain and sort by time/number).
+
+   non-sortable (filterable):
+
+    chain
+    type (pow/pos)
+    solver address
+*/
 
 #endif

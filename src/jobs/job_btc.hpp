@@ -65,8 +65,7 @@ class Job<StratumProtocol::BTC> : public JobBaseBtc
 {
    public:
     explicit JobBtc(const std::string& jobId,
-                    const BlockTemplateResBtc& bTemplate, bool is_payment,
-                    bool clean = true)
+                    const BlockTemplateResBtc& bTemplate, bool is_payment)
         : JobBaseBtc(jobId),
           bits(bTemplate.bits),
           //   coinb1(bTemplate.coinb1.begin(), bTemplate.coinb1.end()),

@@ -37,6 +37,7 @@ struct CoinConfig
     StatsConfig stats;
 
     uint32_t socket_recv_timeout_seconds;
+    uint32_t block_poll_interval;
     uint32_t payment_interval_seconds;
     int64_t min_payout_threshold;
 };

@@ -11,6 +11,8 @@ static constexpr uint32_t VERSION_SIZE = 4;
 static constexpr uint32_t TIME_SIZE = 4;
 static constexpr uint32_t BITS_SIZE = 4;
 static constexpr uint32_t NONCE_SIZE = 4;
+static constexpr uint32_t EXTRANONCE2_SIZE = 4;
+
 };  // namespace CoinConstants
 
 

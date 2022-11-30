@@ -1,25 +1,41 @@
 #include "job_manager_cryptonote.hpp"
 
-const JobCryptoNote* JobManagerCryptoNote::GetNewJob(
+std::shared_ptr<JobCryptoNote> JobManagerCryptoNote::GetNewJob(
     const BlockTemplateResCn& rpctemplate)
 {
-    block_template = std::make_unique<BlockTemplateCn>(rpctemplate);
+    auto new_job = std::make_shared<JobCryptoNote>(rpctemplate);
 
-    auto job = std::make_unique<JobCryptoNote>(rpctemplate);
+    // only add the job if it's any different from the last one
+    if (auto last_job = GetLastJob();
+        new_job->height != last_job->height &&
+        *dynamic_cast<BlockTemplateCn*>(new_job.get()) ==
+            *dynamic_cast<BlockTemplateCn*>(last_job.get()))
+    {
+        return std::shared_ptr<JobCryptoNote>{};
+    }
 
-    return SetNewJob(std::move(job));
+    return SetNewJob(std::move(new_job));
 }
 
-const JobCryptoNote* JobManagerCryptoNote::GetNewJob()
+std::shared_ptr<JobCryptoNote> JobManagerCryptoNote::GetNewJob()
 {
     BlockTemplateResCn res;
-    if (!daemon_manager->GetBlockTemplate(res, pool_addr, std::string_view(hex_extra.data(), hex_extra.size()), jsonParser))
+    if (!GetBlockTemplate(res))
     {
-        logger.Log<LogType::Critical>(
-                    "Failed to get block template :(");
-        // TODO: make sock err negative maybe http positive to diffrinciate
-        return nullptr;
+        return std::shared_ptr<JobCryptoNote>{};
     }
 
     return GetNewJob(res);
+}
+
+bool JobManagerCryptoNote::GetBlockTemplate(BlockTemplateResCn& res)
+{
+    if (!daemon_manager->GetBlockTemplate(
+            res, pool_addr,
+            std::string_view(hex_extra.data(), hex_extra.size()), jsonParser))
+    {
+        logger.Log<LogType::Critical>("Failed to get block template :(");
+        return false;
+    }
+    return true;
 }

@@ -16,7 +16,7 @@
 #include "static_config.hpp"
 #include "transaction.hpp"
 
-template <typename job_t>
+template <typename JobT>
 class JobManager
 {
    public:
@@ -30,22 +30,21 @@ class JobManager
     }
 
     // allow concurrect reading while not being modified
-    inline job_t* GetJob(std::string_view hexId)
+    inline std::shared_ptr<JobT> GetJob(std::string_view hexId)
     {
         std::shared_lock lock(jobs_mutex);
         for (const auto& job : jobs)
         {
             if (job->id == hexId)
             {
-                return job.get();
+                return job;
             }
         }
         return nullptr;
     }
 
-    inline job_t* SetNewJob(std::unique_ptr<job_t> job)
+    inline std::shared_ptr<JobT> SetNewJob(std::shared_ptr<JobT> job)
     {
-        last_job_id_hex = job->id;
         job_count++;
 
         std::unique_lock jobs_lock(jobs_mutex);
@@ -56,10 +55,14 @@ class JobManager
             std::unique_lock job_lock(remove_job->job_mutex);
             jobs.pop_back();
         }
-        return jobs.emplace_back(std::move(job)).get();
+        last_job = jobs.emplace_back(std::move(job));
+        return last_job;
     }
 
-    inline job_t* GetLastJob() { return GetJob(last_job_id_hex); }
+    inline std::shared_ptr<JobT> GetLastJob() {
+        std::shared_lock lock(jobs_mutex);
+        return last_job;
+    }
 
    protected:
     // multiple jobs can use the same block template, (append transactions only)
@@ -78,9 +81,9 @@ class JobManager
    private:
     std::shared_mutex jobs_mutex;
     // unordered map is not thread safe for modifying and accessing different
+    std::shared_ptr<JobT> last_job;
     // elements, but a vector is, so we use other optimization (save last job)
-    std::vector<std::unique_ptr<job_t>> jobs;
-    std::string last_job_id_hex;
+    std::vector<std::shared_ptr<JobT>> jobs;
 };
 
 #if SICK_COIN == VRSC

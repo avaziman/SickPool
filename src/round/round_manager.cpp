@@ -11,7 +11,6 @@ RoundManager::RoundManager(const RedisManager& rm,
         logger.Log<LogType::Critical>("Failed to load current round!");
     }
 
-
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
     // get the last share
     auto [res, rep] = GetSharesBetween(-2, -1);
@@ -26,12 +25,16 @@ bool RoundManager::CloseRound(const BlockSubmission* submission,
     std::scoped_lock round_lock(round_map_mutex, efforts_map_mutex);
 
     round_shares_t round_shares;
-    // PaymentManager::GetRewardsPROP(round_shares, submission->block_reward,
+    // PaymentManager::GetRewardsPROP(round_shares, submission->reward,
     //                                efforts_map, round.total_effort, fee);
     const double n = 2;
     auto [shares, resp] = GetLastNShares(round_progress, n);
-    PaymentManager::GetRewardsPPLNS(round_shares, shares,
-                                    submission->block_reward, n, fee);
+    if (!PaymentManager::GetRewardsPPLNS(round_shares, shares,
+                                         submission->reward, n, fee))
+    {
+            
+    }
+    // if(!shares.empty())
 
     round.round_start_ms = submission->time_ms;
     round.total_effort = 0;
@@ -39,8 +42,8 @@ bool RoundManager::CloseRound(const BlockSubmission* submission,
 
     ResetRoundEfforts();
 
-    return SetClosedRound(std::to_string(submission->chain), round_type, submission,
-                          round_shares, submission->time_ms);
+    return SetClosedRound(std::to_string(submission->chain), round_type,
+                          submission, round_shares, submission->time_ms);
 }
 
 void RoundManager::AddRoundShare(const MinerIdHex& miner, const double effort)
@@ -58,7 +61,7 @@ void RoundManager::AddRoundShare(const MinerIdHex& miner, const double effort)
         pending_shares.reserve(pending_shares.size() + 1000);
     }
 
-    Share curshare {.miner_id = miner.id, .progress = round_progress};
+    Share curshare{.miner_id = miner.id, .progress = round_progress};
 
     pending_shares.push_back(std::move(curshare));
 #endif
@@ -135,8 +138,8 @@ bool RoundManager::LoadEfforts()
         }
         // else
         // {
-            logger.Log<LogType::Info>("Loaded {} effort for address {} of {}",
-                                      round_type, id.GetHex(), effort);
+        logger.Log<LogType::Info>("Loaded {} effort for address {} of {}",
+                                  round_type, id.GetHex(), effort);
         // }
     }
 

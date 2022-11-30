@@ -32,6 +32,7 @@ void RedisManager::Init()
     using namespace std::string_view_literals;
 
     const int64_t hashrate_ttl_ms = conf->redis.hashrate_ttl_seconds * 1000;
+    const int64_t mined_blocks_interval = conf->stats.mined_blocks_interval * 1000;
     const int64_t hashrate_interval_ms =
         conf->stats.hashrate_interval_seconds * 1000;
 
@@ -51,19 +52,18 @@ void RedisManager::Init()
         AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
                        std::to_string(hashrate_ttl_ms)});
 
-        // we want x7 duration
+        // we want x7 duration (7 days)
         AppendCommand({"TS.CREATE"sv, key_compact_name, "RETENTION"sv,
                        std::to_string(hashrate_ttl_ms * 7)});
 
         // we want 12 times less points to fit in 7 days (1 hr instead of 5min)
         AppendCommand({"TS.CREATERULE"sv, key_name, key_compact_name,
-                       "AGGREGATION"sv, "AVG"sv,
-                       std::to_string(hashrate_interval_ms * 12)});
+                       "ROLL_AGGREGATION"sv, "roll_avg"sv, STRR(12)});
     }
 
     // mined blocks, only compact needed.
-    AppendCommand({"TS.CREATE"sv, key_names.block_number_compact, "RETENTION"sv,
-                   std::to_string(hashrate_ttl_ms * 7)});
+    AppendCommand({"TS.CREATE"sv, key_names.mined_block_number, "RETENTION"sv,
+                   std::to_string(mined_blocks_interval)});
 
     // effort percent
     auto key_name = key_names.block_effort_percent;
@@ -194,7 +194,7 @@ bool RedisManager::UpdateImmatureRewards(uint8_t chain, uint32_t block_num,
 }
 
 bool RedisManager::LoadUnpaidRewards(payees_info_t &rewards,
-                                     const std::vector<MinerIdHex>& active_ids)
+                                     const std::vector<MinerIdHex> &active_ids)
 {
     using namespace std::string_view_literals;
 
@@ -205,12 +205,12 @@ bool RedisManager::LoadUnpaidRewards(payees_info_t &rewards,
 
         rewards.reserve(active_ids.size());
 
-        for (auto& id : active_ids)
+        for (auto &id : active_ids)
         {
-            AppendCommand(
-                {"HMGET"sv, Format({key_names.solver, id.GetHex()}),
-                 EnumName<ADDRESS>(), EnumName<MATURE_BALANCE>(),
-                 EnumName<PAYOUT_THRESHOLD>(), EnumName<PAYOUT_FEELESS>()});
+            AppendCommand({"HMGET"sv, Format({key_names.solver, id.GetHex()}),
+                           EnumName<ADDRESS>(), EnumName<MATURE_BALANCE>(),
+                           EnumName<PAYOUT_THRESHOLD>(),
+                           EnumName<PAYOUT_FEELESS>()});
             // rewards.emplace_back(addr, 0);
         }
     }
@@ -259,12 +259,17 @@ void RedisManager::AppendTsAdd(std::string_view key_name, int64_t time,
 void RedisManager::AppendTsCreate(std::string_view key, std::string_view prefix,
                                   std::string_view type,
                                   std::string_view address, std::string_view id,
-                                  uint64_t retention_ms)
+                                  uint64_t retention_ms,
+                                  std::string_view duplicate_policy)
 {
+    // cant have empty labels
+    if (id == "") id = "null";
+
     using namespace std::string_view_literals;
     AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
-                   std::to_string(retention_ms), "LABELS"sv, "type"sv, type,
-                   "prefix"sv, prefix, "address"sv, address, "id"sv, id});
+                   std::to_string(retention_ms), "DUPLICATE_POLICY"sv,
+                   duplicate_policy, "LABELS"sv, "type"sv, type, "prefix"sv,
+                   prefix, "address"sv, address, "id"sv, id});
 }
 
 bool RedisManager::GetActiveIds(std::vector<MinerIdHex> &addresses)
@@ -276,23 +281,15 @@ bool RedisManager::GetActiveIds(std::vector<MinerIdHex> &addresses)
     addresses.reserve(cmd->elements);
     for (int i = 0; i < cmd->elements; i++)
     {
-        std::string key(cmd->element[i]->str, cmd->element[i]->str);
+        std::string key(cmd->element[i]->str, cmd->element[i]->len);
 
         uint32_t id;
-        std::from_chars(cmd->str, cmd->str + cmd->len, id, 16);
+        std::from_chars(key.data(), key.data() + key.size(), id, 16);
 
         addresses.push_back(MinerIdHex(id));
     }
     return cmd.get();
 }
-// bool RedisManager::PopWorker(std::string_view address)
-// {
-//     std::scoped_lock lock(rc_mutex);
-
-//     AppendUpdateWorkerCount(address, -1);
-
-//     return GetReplies();
-// }
 
 void RedisManager::AppendHset(std::string_view key, std::string_view field,
                               std::string_view val)
@@ -386,7 +383,6 @@ bool RedisManager::TsMrange(
 
         double hashrate = std::strtod(
             entry->element[2]->element[0]->element[1]->str, nullptr);
-        // last_averages[i] = std::make_pair(addr, hashrate);
         last_averages.emplace_back(WorkerFullId(miner_id, worker_id), hashrate);
     }
 
@@ -396,6 +392,6 @@ bool RedisManager::TsMrange(
 bool RedisManager::UpdateBlockNumber(int64_t time, uint32_t number)
 {
     std::scoped_lock lock(rc_mutex);
-    AppendTsAdd(key_names.block_number_compact, time, number);
+    AppendTsAdd(key_names.block_number, time, number);
     return GetReplies();
 }

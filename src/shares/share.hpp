@@ -8,32 +8,50 @@
 #include "static_config.hpp"
 
 template <StratumProtocol sp>
-struct ShareT{};
+struct StratumShare{};
 
 template <> 
-struct ShareT<StratumProtocol::ZEC>
+struct StratumShare<StratumProtocol::ZEC>
 {
     // as in order of appearance
     std::string_view worker;
-    std::string_view jobId;
-    std::string_view time;
+    std::string_view job_id;
+    std::string_view time_sv;
     std::string_view nonce2;
     std::string_view solution;
+
+    uint32_t time;
 };
+using ShareZec = StratumShare<StratumProtocol::ZEC>;
 
 template <>
-struct ShareT<StratumProtocol::CN>
+struct StratumShare<StratumProtocol::BTC>
+{
+    // as in order of appearance
+    std::string_view worker;
+    std::string_view job_id;
+    std::string_view extranonce2;
+    std::string_view time_sv;
+    std::string_view nonce_sv;
+
+    uint32_t time;
+    uint32_t nonce;
+};
+using ShareBtc = StratumShare<StratumProtocol::BTC>;
+
+template <>
+struct StratumShare<StratumProtocol::CN>
 {
     std::string_view worker;
     
     std::string_view nonce_sv;
     // used to identify job instead of JobId.
-    std::string_view jobId; // header_pow
+    std::string_view job_id; // header_pow
     std::string_view mix_digest;
 
     uint64_t nonce;
 };
-using ShareCn = ShareT<StratumProtocol::CN>;
+using ShareCn = StratumShare<StratumProtocol::CN>;
 
 template <size_t BLOCK_HEADER_SIZE>
 struct WorkerContext

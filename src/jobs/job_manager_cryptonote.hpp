@@ -10,20 +10,30 @@
 class JobManagerCryptoNote : public JobManager<JobCryptoNote>
 {
    public:
-    using JobManager<JobCryptoNote>::JobManager;
-    // JobManagerCryptoNote(daemon_manager_t* daemon_manager,
-    //                      PaymentManager* payment_manager,
-    //                      const std::string& pool_addr)
-    //     : JobManager(daemon_manager, payment_manager, pool_addr)
-    // {
+    explicit JobManagerCryptoNote(daemon_manager_t* daemon_manager,
+                         PaymentManager* payment_manager,
+                         const std::string& pool_addr)
+        : JobManager(daemon_manager, payment_manager, pool_addr)
+    {
+        BlockTemplateResCn res;
+        if (!GetBlockTemplate(res))
+        {
+            throw std::runtime_error("Failed to generate first job!");
+        }
 
-    // }
+        // insert first job at the constructor so we don't need to make sure last_job is valid
+        SetNewJob(std::make_shared<JobCryptoNote>(res));
+    }
 
     // will be used when new transactions come on the same block
     std::unique_ptr<BlockTemplateCn> block_template;
 
-    const JobCryptoNote* GetNewJob() /*override*/;
-    const JobCryptoNote* GetNewJob(const BlockTemplateResCn& btemplate) /*override*/;
+    std::shared_ptr<JobCryptoNote> GetNewJob() /*override*/;
+
+    std::shared_ptr<JobCryptoNote> GetNewJob(
+        const BlockTemplateResCn& btemplate) /*override*/;
+
+    bool GetBlockTemplate(BlockTemplateResCn& btempate);
 
    private:
     static constexpr auto hex_extra = Hexlify<coinbase_extra>();

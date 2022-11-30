@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.18)
 
+execute_process(COMMAND cxxbridge /home/sickguy/Documents/Projects/SickPool/api_rust/src/redis_interop.rs
+                OUTPUT_FILE ./redis/redis_interop.hpp
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -19,6 +23,7 @@ FetchContent_MakeAvailable(fmt)
 # optimized hash function
 add_subdirectory(crypto/cn)
 add_subdirectory(crypto/verushash)
+
 # add_subdirectory(daemon)
 # add_subdirectory(crypto/x25x)
 find_path(HIREDIS_HEADER hiredis)
@@ -40,8 +45,8 @@ file(GLOB SRC_FILES
     "daemon/*.cpp"
 )
 
-message("SRC FILES: ${SRC_FILES}")
-FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED )
+# message("SRC FILES: ${SRC_FILES}")
+FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED)
 
 add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
 
@@ -60,6 +65,7 @@ target_link_libraries(
     simdjson
     fmt::fmt
     sickverushash
+
     # sickx25x
 )
 

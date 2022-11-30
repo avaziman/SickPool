@@ -4,26 +4,34 @@
 #include "stratum_server.hpp"
 #include "stratum_client.hpp"
 #include "share.hpp"
+#include "config_vrsc.hpp"
 
-class StratumServerZec : public StratumServer
+static constexpr std::string_view field_str_zec = "StratumServerZec";
+
+template <StaticConf confs>
+class StratumServerZec : public StratumServer<confs>
 {
    public:
-    using share_t = ShareZec;
+    explicit StratumServerZec(CoinConfig&& conf)
+        : StratumServer<confs>(std::move(conf))
+    {
+    }
 
-    explicit StratumServerZec(const CoinConfig& conf) : StratumServer(conf) {}
+private:
+ using ShareT = StratumServer<confs>::ShareT;
+ using WorkerContextT = StratumServer<confs>::WorkerContextT;
+ using JobT = StratumServer<confs>::JobT;
 
-    RpcResult HandleAuthorize(StratumClient* cli,
-                              simdjson::ondemand::array& params);
-    RpcResult HandleSubscribe(StratumClient* cli,
-                              simdjson::ondemand::array& params) const;
-    RpcResult HandleSubmit(StratumClient* cli, WorkerContext* wc,
-                           simdjson::ondemand::array& params);
+ const Logger<field_str_zec> logger;
 
-    void HandleReq(StratumClient* cli, WorkerContextT* wc,
+ RpcResult HandleSubscribe(StratumClient* cli,
+                           simdjson::ondemand::array& params) const;
+ RpcResult HandleSubmit(StratumClient* cli, WorkerContextT* wc,
+                        simdjson::ondemand::array& params);
+
+ void HandleReq(Connection<StratumClient>* conn, WorkerContextT* wc,
                    std::string_view req) override;
-    void UpdateDifficulty(StratumClient* cli) override;
+ void UpdateDifficulty(Connection<StratumClient>* conn) override;
 };
-
-using stratum_server_t = StratumServerZec;
 
 #endif

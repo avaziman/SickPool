@@ -74,7 +74,8 @@ class StratumClient
         share_count = 0;
     }
 
-    void SetAuthorized(const WorkerFullId& id, std::string&& workerfull)
+    void SetAuthorized(const WorkerFullId& id, std::string&& workerfull,
+                       worker_map::iterator& it)
     {
         is_authorized = true;
         this->id = id;
@@ -86,13 +87,15 @@ class StratumClient
         this->address = worker_full_sv.substr(0, dot);
         this->worker_name =
             worker_full_sv.substr(dot + 1, worker_full_sv.size() - 1);
+        this->stats_it = it;
     }
 
-    std::list<std::unique_ptr<StratumClient>>::iterator it;
 
     const std::string_view extra_nonce_sv;
     const int64_t connect_time;
 
+    std::list<std::unique_ptr<StratumClient>>::iterator it;
+    worker_map::iterator stats_it;
    private:
     static uint32_t extra_nonce_counter;
 

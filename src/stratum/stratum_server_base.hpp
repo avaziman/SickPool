@@ -15,24 +15,8 @@ class StratumBase : public Server<StratumClient>
     void Stop();
     void Listen();
 
-   private:
-    static constexpr std::string_view field_str = "StratumBase";
-    const Logger<field_str> logger;
-
-    std::jthread control_thread;
-    std::vector<std::jthread> processing_threads;
-
-    ControlServer control_server;
-
-    void ServiceSockets(std::stop_token st);
-    void HandleControlCommands(std::stop_token st);
-    void HandleControlCommand(ControlCommands cmd, const char* buff);
-
-    virtual void HandleConsumeable(connection_it* conn) = 0;
-    virtual bool HandleConnected(connection_it* conn) = 0;
-    void HandleDisconnected(connection_it* conn) override;
-
    protected:
+    const CoinConfig coin_config;
     RedisManager redis_manager;
     DifficultyManager diff_manager;
     RoundManager round_manager;
@@ -43,7 +27,6 @@ class StratumBase : public Server<StratumClient>
     std::map<std::shared_ptr<Connection<StratumClient>>, double> clients;
     std::shared_mutex clients_mutex;
 
-    const CoinConfig coin_config;
 
     
     virtual void HandleBlockNotify() = 0;
@@ -92,6 +75,23 @@ class StratumBase : public Server<StratumClient>
 
         SendRaw(sock, buff, len);
     }
+
+   private:
+    static constexpr std::string_view field_str = "StratumBase";
+    const Logger<field_str> logger;
+
+    std::jthread control_thread;
+    std::vector<std::jthread> processing_threads;
+
+    ControlServer control_server;
+
+    void ServiceSockets(std::stop_token st);
+    void HandleControlCommands(std::stop_token st);
+    void HandleControlCommand(ControlCommands cmd, const char* buff);
+
+    virtual void HandleConsumeable(connection_it* conn) = 0;
+    virtual bool HandleConnected(connection_it* conn) = 0;
+    void HandleDisconnected(connection_it* conn) override;
 };
 
 #endif

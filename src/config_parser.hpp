@@ -103,6 +103,8 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg,
     AssignJson("target_shares_rate", cnfg.target_shares_rate, configDoc,
                logger);
     AssignJson("pool_addr", cnfg.pool_addr, configDoc, logger);
+    AssignJson("block_poll_interval", cnfg.block_poll_interval, configDoc,
+               logger);
     AssignJson("payment_interval_seconds", cnfg.payment_interval_seconds,
                configDoc, logger);
     AssignJson("min_payout_threshold", cnfg.min_payout_threshold, configDoc,

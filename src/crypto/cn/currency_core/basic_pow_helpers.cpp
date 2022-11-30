@@ -50,7 +50,6 @@ crypto::hash get_block_longhash(uint64_t height,
     return result;
 }
 
-//TODO: make context for each worker count
 void get_block_longhash_sick(uint8_t* res, const uint64_t height,
                              const uint8_t* block_header_hash,
                              const uint64_t nonce)

@@ -5,7 +5,6 @@
 #include <memory>
 
 #include "static_config.hpp"
-#include "block_submission.hpp"
 #include "daemon_manager_t.hpp"
 #include "logger.hpp"
 #include "redis/redis_manager.hpp"

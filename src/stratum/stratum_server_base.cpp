@@ -3,11 +3,11 @@
 StratumBase::StratumBase(CoinConfig &&conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(std::move(conf)),
-      redis_manager("127.0.0.1", &conf),
+      control_server(coin_config.control_port, coin_config.block_poll_interval),
+      redis_manager("127.0.0.1", &coin_config),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
       round_manager(redis_manager, "pow")
 {
-    control_server.Start(coin_config.control_port);
     control_thread = std::jthread(
         std::bind_front(&StratumBase::HandleControlCommands, this));
 }
@@ -78,11 +78,10 @@ void StratumBase::HandleControlCommands(std::stop_token st)
         logger.Log<LogType::Info>("Processed control command: {}", buff);
     }
 
-    logger.Log<LogType::Info>("Stopped control server on thread {}",
-                              gettid());
+    logger.Log<LogType::Info>("Stopped control server on thread {}", gettid());
 }
 
-void StratumBase::HandleControlCommand(ControlCommands cmd, const char* buff)
+void StratumBase::HandleControlCommand(ControlCommands cmd, const char *buff)
 {
     switch (cmd)
     {

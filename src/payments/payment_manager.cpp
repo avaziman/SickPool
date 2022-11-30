@@ -38,6 +38,9 @@ bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
 {
     double score_sum = 0;
     miner_shares.reserve(shares.size());
+
+    if (shares.empty()) return false;
+
     for (ssize_t i = shares.size() - 1; i > 0; i--)
     {
         const double score = shares[i].progress - shares[i - 1].progress;

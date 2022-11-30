@@ -13,8 +13,8 @@ class JobManagerSin : public JobManager
     // will be used when new transactions come on the same block
     BlockTemplateBtc block_template = BlockTemplateBtc();
 
-    const job_t* GetNewJob() /*override*/;
-    const job_t* GetNewJob(const BlockTemplateResSin& btemplate) /*override*/;
+    const JobT* GetNewJob() /*override*/;
+    const JobT* GetNewJob(const BlockTemplateResSin& btemplate) /*override*/;
 
     std::size_t GetCoinbaseTx(TransactionBtc& coinbase_tx,
                               const BlockTemplateResSin& rpctemplate);

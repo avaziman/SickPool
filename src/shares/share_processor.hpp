@@ -22,13 +22,13 @@ class ShareProcessor
 {
    public:
 //     template <StratumProtocol sp>
-//     static inline bool VerifyShareParams(ShareResult& result, const job_t* job,
+//     static inline bool VerifyShareParams(ShareResult& result, const JobT* job,
 //                                          std::string_view given_time,
 //                                          const int64_t curtime);
 
 //     template <>
 //     static inline bool VerifyShareParams<StratumProtocol::CN>(
-//         ShareResult& result, const job_t* job, std::string_view given_time,
+//         ShareResult& result, const JobT* job, std::string_view given_time,
 //         const int64_t curtime)
 //     {
 //         uint32_t shareTime = static_cast<uint32_t>(
@@ -65,11 +65,11 @@ class ShareProcessor
     // inline static void Hash(ShareResult& result, const Job<sp>* job, const ShareT<sp> share);
 
     template <StaticConf confs>
-    inline static void Process(ShareResult& result, StratumClient* cli,
-                               WorkerContext<confs.BLOCK_HEADER_SIZE>* wc,
-                               const Job<confs.STRATUM_PROTOCOL>* job,
-                               const ShareT<confs.STRATUM_PROTOCOL>& share,
-                               int64_t curTime)
+    inline static void Process(
+        ShareResult& result, StratumClient* cli,
+        WorkerContext<confs.BLOCK_HEADER_SIZE>* wc,
+        const Job<confs.STRATUM_PROTOCOL>* job,
+        const StratumShare<confs.STRATUM_PROTOCOL>& share, int64_t curTime)
     {
         // veirfy params before even hashing
 

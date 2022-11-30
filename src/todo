@@ -53,3 +53,10 @@ set round time if there isnt in db
 >fix on bad auth crash?
 fix request too big when its not?
 fix average
+
+
+add mysql for less frequent data such as
+old blocks
+round shares
+
+CACHE ONLY 100 last blocks rest on disk db

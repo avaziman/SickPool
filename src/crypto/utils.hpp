@@ -6,15 +6,15 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
 #include <source_location>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "static_config/static_config.hpp"
-#include "verushash/arith_uint256.h"
 #include "utils/hex_utils.hpp"
+#include "verushash/arith_uint256.h"
 
 #define DIFF_US(end, start) \
     std::chrono::duration_cast<std::chrono::microseconds>(end - start).count()
@@ -22,6 +22,17 @@
 
 #define unlikely_cond(expr) (__builtin_expect(!!(expr), 0))
 #define likely_cond(expr) (__builtin_expect(!!(expr), 1))
+
+template <StaticConf confs>
+constexpr auto GetDifficultyHex(const double diff)
+{
+    // how many hashes to find a share, lower target = more hashes
+    const double raw_diff = confs.DIFF1 * (1.0 / diff);
+
+    auto bin_target = DoubleToBin256(raw_diff);
+    auto hex_target = Hexlify(bin_target);
+    return hex_target;
+}
 
 // Helper function that converts a character to lowercase on compile time
 constexpr char charToLower(const char c)
@@ -36,8 +47,7 @@ struct join
     static constexpr auto impl() noexcept
     {
         // add space for ';'
-        constexpr std::size_t len =
-            (Strs.size() + ...) + (sizeof...(Strs)) - 1;
+        constexpr std::size_t len = (Strs.size() + ...) + (sizeof...(Strs)) - 1;
         std::array<char, len + 1> arr{};
         auto append = [i = 0, &arr](auto const& s) mutable
         {
@@ -60,7 +70,6 @@ struct join
 template <std::string_view const&... Strs>
 static constexpr auto join_v = join<Strs...>::value;
 
-
 // based on teos
 template <auto T>
 constexpr std::string_view EnumName()
@@ -82,6 +91,7 @@ constexpr std::string_view EnumName()
     // }
     return name;
 }
+
 inline uint64_t GetCurrentTimeUs()
 {
     struct timeval time_now;
@@ -223,9 +233,9 @@ inline int intPow(int x, unsigned int p)
 
 // constexpr double BitsToDiff(const unsigned bits)
 // {
-//     const unsigned exponent_diff = 8 * (DIFF1_EXPONENT - ((bits >> 24) & 0xFF));
-//     const double significand = bits & 0xFFFFFF;
-//     return std::ldexp(DIFF1_COEFFICIENT / significand, exponent_diff);
+//     const unsigned exponent_diff = 8 * (DIFF1_EXPONENT - ((bits >> 24) &
+//     0xFF)); const double significand = bits & 0xFFFFFF; return
+//     std::ldexp(DIFF1_COEFFICIENT / significand, exponent_diff);
 // }
 
 constexpr uint64_t pow2(int power)
@@ -275,7 +285,8 @@ inline int64_t GetDailyTimestamp()
 //     }
 //     word &= 0xffffff;  // convert to int < 0xffffff
 //     int size = DIFF1_EXPONENT - shiftBytes;
-//     // the 0x00800000 bit denotes the sign, so if it is already set, divide the
+//     // the 0x00800000 bit denotes the sign, so if it is already set, divide
+//     the
 //     // mantissa by 0x100 and increase the size by a byte
 //     if (word & 0x800000)
 //     {

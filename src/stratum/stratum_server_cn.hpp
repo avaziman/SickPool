@@ -1,5 +1,5 @@
-#ifndef STRATUM_SERVER_ZEC_HPP_
-#define STRATUM_SERVER_ZEC_HPP_
+#ifndef STRATUM_SERVER_CN_HPP_
+#define STRATUM_SERVER_CN_HPP_
 #include <type_traits>
 
 #include "cn/common/base58.h"
@@ -16,7 +16,7 @@ class StratumServerCn : public StratumServer<confs>
 {
    public:
     using WorkerContextT = StratumServer<confs>::WorkerContextT;
-    using job_t = StratumServer<confs>::job_t;
+    using JobT = StratumServer<confs>::JobT;
 
     explicit StratumServerCn(CoinConfig&& conf)
         : StratumServer<confs>(std::move(conf))
@@ -29,6 +29,7 @@ class StratumServerCn : public StratumServer<confs>
     RpcResult HandleAuthorize(StratumClient* cli,
                               simdjson::ondemand::array& params,
                               std::string_view worker);
+                              
     RpcResult HandleSubscribe(StratumClient* cli,
                               simdjson::ondemand::array& params) const;
     RpcResult HandleSubmit(StratumClient* cli, WorkerContextT* wc,
@@ -40,11 +41,11 @@ class StratumServerCn : public StratumServer<confs>
 
     void UpdateDifficulty(Connection<StratumClient>* conn) override;
 
-    void BroadcastJob(Connection<StratumClient>* conn, const job_t* job,
+    void BroadcastJob(Connection<StratumClient>* conn, const JobT* job,
                       int id) const;
 
     void BroadcastJob(Connection<StratumClient>* conn,
-                      const job_t* job) const override;
+                      const JobT* job) const override;
 };
 
 // using stratum_server_t = StratumServerCn;

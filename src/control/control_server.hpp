@@ -23,7 +23,8 @@ enum class ControlCommands
 class ControlServer
 {
    public:
-    void Start(unsigned short port)
+    explicit ControlServer(unsigned short port, uint32_t block_interval)
+        : block_poll_interval(block_interval)
     {
         sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -63,12 +64,13 @@ class ControlServer
         FD_ZERO(&rfds);
         FD_SET(sockfd, &rfds);
 
-        timeout.tv_sec = 1;
+        timeout.tv_sec = block_poll_interval;
 
         val = select(sockfd + 1, &rfds, nullptr, nullptr, &timeout);
 
+        // pool in case we haven't got a block notification (timeout)
         if (val <= 0){
-            return ControlCommands::NONE;
+            return ControlCommands::BLOCK_NOTIFY;
         }
 
         int connfd = accept(sockfd, nullptr, nullptr);
@@ -87,6 +89,7 @@ class ControlServer
 
    private:
     int sockfd;
+    const uint32_t block_poll_interval;
 };
 
 #endif

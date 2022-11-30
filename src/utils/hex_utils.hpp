@@ -169,6 +169,14 @@ constexpr std::array<uint8_t, size / 2> Unhexlify(
     return res;
 }
 
+inline std::string UnhexlifyS(std::string_view src)
+{
+    std::string res;
+    res.resize(src.size() / 2);
+    Unhexlify(reinterpret_cast<uint8_t*>(res.data()), src.data(), src.size());
+    return res;
+}
+
 template <size_t size>
 constexpr static double BytesToDouble(const std::array<uint8_t, size>& bin)
 {

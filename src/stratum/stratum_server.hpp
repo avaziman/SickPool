@@ -13,7 +13,6 @@
 
 #include "job.hpp"
 #include "block_submitter.hpp"
-#include "blocks/block_submission.hpp"
 #include "connection.hpp"
 #include "jobs/job_manager.hpp"
 #include "logger.hpp"
@@ -31,10 +30,10 @@ class StratumServer : public StratumBase
     explicit StratumServer(CoinConfig&& conf);
     ~StratumServer() override;
     using WorkerContextT = WorkerContext<confs.BLOCK_HEADER_SIZE>;
-    using job_t = Job<confs.STRATUM_PROTOCOL>;
+    using JobT = Job<confs.STRATUM_PROTOCOL>;
 
    private:
-    using ShareType = ShareT<confs.STRATUM_PROTOCOL>;
+    using ShareT = StratumShare<confs.STRATUM_PROTOCOL>;
 
     const Logger<field_str_stratum> logger;
 
@@ -44,24 +43,31 @@ class StratumServer : public StratumBase
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(HTTP_REQ_ALLOCATE);
 
-    job_manager_t job_manager;
     daemon_manager_t daemon_manager;
     PaymentManager payment_manager;
+    job_manager_t job_manager;
     BlockSubmitter block_submitter;
     StatsManager stats_manager;
 
     virtual void HandleReq(Connection<StratumClient>* conn,
                            WorkerContextT* wc,
                            std::string_view req) = 0;
+
+    virtual RpcResult HandleAuthorize(StratumClient* cli,
+                                      std::string_view miner,
+                                      std::string_view worker);
+    RpcResult HandleAuthorize(StratumClient* cli,
+                              simdjson::ondemand::array& params);
+
     void HandleBlockNotify() override;
 
     RpcResult HandleShare(StratumClient* cli, WorkerContextT* wc,
-                          ShareType& share);
+                          ShareT& share);
 
     virtual void UpdateDifficulty(Connection<StratumClient>* conn) = 0;
 
     virtual void BroadcastJob(Connection<StratumClient>* conn,
-                              const job_t* job) const = 0;
+                              const JobT* job) const = 0;
     void HandleConsumeable(connection_it* conn) override;
     bool HandleConnected(connection_it* conn) override;
 

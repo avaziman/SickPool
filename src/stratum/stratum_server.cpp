@@ -50,21 +50,21 @@ void StratumServer<confs>::HandleBlockNotify()
 {
     int64_t curtime_ms = GetCurrentTimeMs();
 
-    const job_t *new_job = job_manager.GetNewJob();
+    const std::shared_ptr<JobT> new_job = job_manager.GetNewJob();
 
-    while (new_job == nullptr)
+    if (!new_job)
     {
-        new_job = job_manager.GetNewJob();
+        // new_job = job_manager.GetNewJob();
 
         logger.Log<LogType::Critical>(
             "Block update error: Failed to generate new job! retrying...");
+        return;
+        // if (this->GetStopToken().stop_requested())
+        // {
+        //     return;
+        // }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(250));
-
-        if (this->GetStopToken().stop_requested())
-        {
-            return;
-        }
+        // std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
 
     // save it to process round
@@ -81,7 +81,7 @@ void StratumServer<confs>::HandleBlockNotify()
                     UpdateDifficulty(conn.get());
                 }
 
-                BroadcastJob(conn.get(), new_job);
+                BroadcastJob(conn.get(), new_job.get());
             }
         }
 
@@ -118,7 +118,8 @@ void StratumServer<confs>::HandleBlockNotify()
     round_manager.netwrok_hr = net_est_hr;
     round_manager.difficulty = new_job->target_diff;
 
-    // redis_manager.SetNewBlockStats(coin_config.symbol, curtime_ms, net_est_hr,
+    // redis_manager.SetNewBlockStats(coin_config.symbol, curtime_ms,
+    // net_est_hr,
     //                                new_job->target_diff);
 
     logger.Log<LogType::Info>(
@@ -141,21 +142,21 @@ void StratumServer<confs>::HandleBlockNotify()
         fmt::format("Est. shares: {}", new_job->expected_hashes),
         fmt::format("Block reward: {}", new_job->coinbase_value),
         fmt::format("Transaction count: {}", new_job->tx_count),
-        fmt::format("Block size: {}", new_job->block_size * 2), new_job->id.size() + 10);
+        fmt::format("Block size: {}", new_job->block_size * 2),
+        new_job->id.size() + 10);
 }
 
 template <StaticConf confs>
 RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
-                                            WorkerContextT *wc,
-                                            ShareType &share)
+                                            WorkerContextT *wc, ShareT &share)
 {
-    int64_t time = GetCurrentTimeMs();
+    uint64_t time = GetCurrentTimeMs();
     // Benchmark<std::chrono::microseconds> share_bench("Share process");
     auto start = TIME_NOW();
 
     ShareResult share_res;
     RpcResult rpc_res(ResCode::OK);
-    const job_t *job = job_manager.GetJob(share.jobId);
+    const std::shared_ptr<JobT> job = job_manager.GetJob(share.job_id);
     // to make sure the job isn't removed while we are using it,
     // and at the same time allow multiple threads to use same job
     std::shared_lock<std::shared_mutex> job_read_lock;
@@ -169,7 +170,8 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     else
     {
         job_read_lock = std::shared_lock<std::shared_mutex>(job->job_mutex);
-        ShareProcessor::Process<confs>(share_res, cli, wc, job, share, time);
+        ShareProcessor::Process<confs>(share_res, cli, wc, job.get(), share, time);
+        // share_res.code = ResCode::VALID_BLOCK;
     }
 
     if (share_res.code == ResCode::VALID_BLOCK) [[unlikely]]
@@ -184,11 +186,8 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
         job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
                          share.extranonce2);
 #elif defined(STRATUM_PROTOCOL_CN)
-        job_read_lock.unlock();
-
         // TODO: find way to upgrade to exclusive lock
         // may be straved here
-        std::unique_lock job_write(job->job_mutex);
         job->GetBlockHex(blockData, share.nonce);
 #else
 
@@ -222,31 +221,28 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
 #else
 
 #endif
-        const auto dur = time - chain_round.round_start_ms;
         const double effort_percent =
-            ((chain_round.total_effort - share_res.difficulty) /
-             job->target_diff) *
-            100.f;
+            ((chain_round.total_effort) / job->expected_hashes) * 100.f;
 
 #if HASH_ALGO == HASH_ALGO_X25X
         HashWrapper::X22I(share_res.hash_bytes.data(), wc->block_header);
         // std::reverse(share_res.hash_bytes.begin(),
         //              share_res.hash_bytes.end());
 #endif
-        std::array<char, 64> block_hash_hex;
-        auto bs = BlockSubmission{.confirmations = 0,
-                                  .block_type = BlockType::POW,
-                                  .block_reward = job->coinbase_value,
-                                  .time_ms = time,
-                                  .duration_ms = duration_ms,
-                                  .height = job->height,
-                                  .number = redis_manager.GetBlockNumber(),
-                                  .difficulty = share_res.difficulty,
-                                  .effort_percent = effort_percent,
-                                  .chain = 0,
-                                  .miner_id = cli->GetId().miner_id.id,
-                                  .worker_id = cli->GetId().worker_id.id,
-                                  .hash_hex = block_hash_hex};
+        auto bs =
+            BlockSubmission{.confirmations = 0,
+                            .block_type = static_cast<uint8_t>(BlockType::POW),
+                            .chain = 0,
+                            .reward = job->coinbase_value,
+                            .time_ms = time,
+                            .duration_ms = duration_ms,
+                            .height = job->height,
+                            .number = redis_manager.GetBlockNumber(),
+                            .difficulty = share_res.difficulty,
+                            .effort_percent = effort_percent,
+                            .miner_id = cli->GetId().miner_id.id,
+                            .worker_id = cli->GetId().worker_id.id,
+                            .hash_bin = share_res.hash_bytes};
 
         auto submission = std::make_unique<BlockSubmission>(bs);
 
@@ -255,18 +251,18 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     }
     else if (share_res.code == ResCode::VALID_SHARE) [[likely]]
     {
-        round_manager.AddRoundShare(cli->GetId().miner_id, share_res.difficulty);
+        round_manager.AddRoundShare(cli->GetId().miner_id,
+                                    share_res.difficulty);
     }
     else
     {
         // logger.Log<LogType::Warn>(
-        //             "Received bad share for job id: {}", share.jobId);
+        //             "Received bad share for job id: {}", share.job_id);
 
         rpc_res = RpcResult(share_res.code, share_res.message);
     }
 
-    stats_manager.AddShare(cli->GetId(),
-                           share_res.difficulty);
+    stats_manager.AddShare(cli->stats_it, share_res.difficulty);
 
     auto end = TIME_NOW();
 
@@ -357,9 +353,93 @@ void StratumServer<confs>::DisconnectClient(
     const std::shared_ptr<Connection<StratumClient>> conn_ptr)
 {
     auto sock = conn_ptr->sock;
-    stats_manager.PopWorker(conn_ptr->ptr->GetId());
+    stats_manager.PopWorker(conn_ptr->ptr->stats_it);
     std::unique_lock lock(clients_mutex);
     clients.erase(conn_ptr);
 
     logger.Log<LogType::Info>("Stratum client disconnected. sock: {}", sock);
+}
+
+template <StaticConf confs>
+RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
+                                                std::string_view address,
+                                                std::string_view worker)
+{
+    using namespace simdjson;
+
+    bool isIdentity = false;
+
+    if (worker.size() > MAX_WORKER_NAME_LEN)
+    {
+        return RpcResult(
+            ResCode::UNAUTHORIZED_WORKER,
+            "Worker name too long! (max " xSTRR(MAX_WORKER_NAME_LEN) " chars)");
+    }
+
+    currency::blobdata addr_blob(address.data(), address.size());
+    uint64_t prefix;
+    currency::blobdata addr_data;
+    if (!tools::base58::decode_addr(addr_blob, prefix, addr_data))
+    {
+        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
+                         fmt::format("Invalid address {}!", address));
+    }
+
+    // if the miner address is already in the database we have already
+    // validated the address, let it through
+    auto addr_encoded = tools::base58::encode(addr_data);
+
+    // string-views to non-local string
+    WorkerFullId worker_full_id(0, 0);
+    worker_map::iterator stats_it;
+    bool added_to_db = this->stats_manager.AddWorker(
+        worker_full_id, stats_it, address, worker, GetCurrentTimeMs(), "",
+        this->coin_config.min_payout_threshold);
+
+    if (!added_to_db)
+    {
+        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
+                         "Failed to add worker to database!");
+    }
+    std::string worker_full_str = fmt::format("{}.{}", address, worker);
+    cli->SetAuthorized(worker_full_id, std::move(worker_full_str), stats_it);
+
+    logger.Log<LogType::Info>("Authorized worker: {}, address: {}", worker,
+                              address);
+
+    return RpcResult(ResCode::OK);
+}
+
+template <StaticConf confs>
+RpcResult StratumServer<confs>::HandleAuthorize(
+    StratumClient *cli, simdjson::ondemand::array &params)
+{
+    using namespace simdjson;
+
+    std::string_view worker_full;
+    try
+    {
+        worker_full = params.at(0).get_string();
+    }
+    catch (const simdjson_error &err)
+    {
+        logger.Log<LogType::Error>(
+            "No worker name provided in authorization. err: {}", err.what());
+
+        return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
+    }
+
+    const size_t sep = worker_full.find('.');
+    if (sep == std::string::npos)
+    {
+        logger.Log<LogType::Error>("Bad worker name format: {}", worker_full);
+
+        return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
+    }
+
+    std::string_view miner = worker_full.substr(0, sep);
+    std::string_view worker =
+        worker_full.substr(sep + 1, worker_full.size() - 1);
+
+    return HandleAuthorize(cli, miner, worker);
 }

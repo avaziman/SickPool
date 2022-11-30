@@ -6,7 +6,6 @@
 
 #include "redis_round.hpp"
 #include "redis_manager.hpp"
-#include "block_submission.hpp"
 #include "payment_manager.hpp"
 #include "round.hpp"
 #include "stats_manager.hpp"

@@ -3,16 +3,17 @@
 
 #include <hiredis/hiredis.h>
 
+#include <vector>
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <thread>
 
 #include "round_manager.hpp"
-#include "blocks/block_submission.hpp"
 #include "difficulty/difficulty_manager.hpp"
 #include "logger.hpp"
 #include "payments/payment_manager.hpp"
@@ -21,6 +22,7 @@
 #include "shares/share.hpp"
 #include "static_config/static_config.hpp"
 #include "stats/stats.hpp"
+#include "stratum_client.hpp"
 
 class RedisManager;
 class RoundManager;
@@ -28,7 +30,7 @@ class RoundManager;
 class StatsManager
 {
    public:
-    StatsManager(const RedisManager& redis_manager, DifficultyManager* diff_manager,
+    explicit StatsManager(const RedisManager& redis_manager, DifficultyManager* diff_manager,
                  RoundManager* round_manager, const StatsConfig* cc);
 
     // Every hashrate_interval_seconds we need to write:
@@ -39,11 +41,12 @@ class StatsManager
     void Start(std::stop_token st);
 
     bool LoadAvgHashrateSums(int64_t hr_time);
-    void AddShare(const WorkerFullId& id, const double diff);
-    bool AddWorker(WorkerFullId& worker_full_id, const std::string_view address,
-                   std::string_view worker_full, std::time_t curtime,
-                   std::string_view alias, int64_t min_payout);
-    void PopWorker(const WorkerFullId& fullid);
+    void AddShare(const worker_map::iterator& it, const double diff);
+    bool AddWorker(WorkerFullId& worker_full_id, worker_map::iterator& it,
+                   const std::string_view address, std::string_view worker_full,
+                   std::time_t curtime, std::string_view alias,
+                   int64_t min_payout);
+    void PopWorker(worker_map::iterator& it);
 
     // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
 
@@ -66,7 +69,11 @@ class StatsManager
     DifficultyManager* diff_manager;
     RoundManager* round_manager;
 
-    std::mutex stats_map_mutex;
+    // workers that have disconnected from the pool, clean them after stats update
+    std::mutex to_remove_mutex;
+    std::vector<worker_map::iterator> to_remove;
+
+    std::shared_mutex stats_list_smutex;
     // worker -> stats
     worker_map worker_stats_map;
 };

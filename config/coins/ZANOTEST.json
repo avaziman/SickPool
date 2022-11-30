@@ -7,21 +7,23 @@
         "hashrate_ttl": 86400
     },
     "stats": {
-        "hashrate_interval_seconds": 1,
-        "hashrate_interval_seconds1": 10,
         "effort_interval_seconds": 10,
-        "average_hashrate_interval_seconds": 180,
-        "diff_adjust_seconds": 30000,
-        "mined_blocks_interval": 1
+        "hashrate_interval_seconds": 5,
+        "hashrate_interval_seconds1": 10,
+        "average_hashrate_interval_seconds": 5,
+        "mined_blocks_interval": 600,
+        "diff_adjust_seconds": 30000
     },
     "pow_fee": 0.01,
     "pos_fee": 0.01,
-    "default_difficulty": 150.0,
+    "gdefault_difficulty": 5000000.0,
+    "default_difficulty": 500.0,
     "minimum_difficulty": 0.000001,
     "target_shares_rate": 100.0,
     "pool_addr": "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp",
     "redis_host": "127.0.0.1:6379",
     "socket_recv_timeout_seconds": 3,
+    "block_poll_interval": 111,
     "payment_interval_seconds": 5,
     "min_payout_threshold": 10000000000000,
     "rpcs": [

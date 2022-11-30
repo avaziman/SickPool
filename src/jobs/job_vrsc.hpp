@@ -17,7 +17,7 @@ class JobVrsc : public JobBaseBtc
 {
    public:
     JobVrsc(const std::string& jobId, const BlockTemplateVrsc& bTemplate,
-            bool is_payment, bool clean = true)
+            bool is_payment)
         : JobBaseBtc(jobId, bTemplate, is_payment)
     {
         char merkle_root_hex[MERKLE_ROOT_SIZE * 2];

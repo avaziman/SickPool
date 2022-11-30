@@ -12,7 +12,7 @@ BlockWatcher<confs>::BlockWatcher(RedisManager* redis_manager,
     {
         logger.template Log<LogType::Info>(
             "Block watcher loaded immature block id: {}, hash: {}", sub->number,
-            std::string_view(sub->hash_hex.data(), confs.PREVHASH_SIZE * 2));
+            HexlifyS(sub->hash_bin));
     }
 }
 
@@ -30,8 +30,7 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
     for (int i = 0; i < immature_block_submissions.size(); i++)
     {
         const auto& submission = immature_block_submissions[i];
-        auto hashHex = std::string_view((char*)submission->hash_hex,
-                                        sizeof(submission->hash_hex));
+        auto hashHex = HexlifyS(submission->hash_bin);
         auto chain = submission->chain;
 
         int res = daemon_manager->SendRpcReq(resBody, 1, "getblockheader",

@@ -3,14 +3,12 @@
 #define STRATUM_PROTOCOL_ZEC 1
 #define HASH_ALGO HASH_ALGO_VERUSHASH
 
-using namespace CoinConstantsBtc;
-
-namespace CoinConstantsVrsc
+namespace CoinConstantsZec
 {
 
 static constexpr uint32_t DIFF1_BITS = 0x200f0f0f;
 static constexpr uint32_t MAX_BLOCK_SIZE = 2000000;
-static constexpr uint32_t HASH_SIZE = 32;
+// static constexpr uint32_t HASH_SIZE = 32;
 static constexpr uint32_t PREVHASH_SIZE = HASH_SIZE;
 static constexpr uint32_t MERKLE_ROOT_SIZE = HASH_SIZE;
 static constexpr uint32_t FINALSROOT_SIZE = HASH_SIZE;
@@ -38,8 +36,8 @@ static constexpr uint32_t EXTRANONCE2_SIZE = NONCE_SIZE - EXTRANONCE_SIZE;
 static constexpr uint32_t BLOCK_VERSION = 0x04000100;
 static constexpr uint32_t BLOCK_HEADER_SIZE = (140 + 3 + 1344);
 
-static constexpr uint32_t BLOCK_HEADER_STATIC_SIZE =
-    VERSION_SIZE + PREVHASH_SIZE + MERKLE_ROOT_SIZE + FINALSROOT_SIZE +
-    TIME_SIZE /* time, not static but we override */
-    + BITS_SIZE;
+// static constexpr uint32_t BLOCK_HEADER_STATIC_SIZE =
+//     VERSION_SIZE + PREVHASH_SIZE + MERKLE_ROOT_SIZE + FINALSROOT_SIZE +
+//     TIME_SIZE /* time, not static but we override */
+//     + BITS_SIZE;
 };  // namespace CoinConstantsVrsc

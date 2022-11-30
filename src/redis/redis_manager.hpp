@@ -13,9 +13,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include "redis_interop.hpp"
 #include "benchmark.hpp"
-#include "blocks/block_submission.hpp"
 #include "coin_config.hpp"
+#include "key_names.hpp"
 #include "logger.hpp"
 #include "payments/round_share.hpp"
 #include "redis_transaction.hpp"
@@ -40,69 +41,6 @@ struct TsAggregation
     int64_t time_bucket_ms;
 };
 
-// couldn't make nested enums...pp
-enum class Prefix
-{
-    POW,
-    PAYOUT,
-    PAYOUT_FEELESS,
-    PAYOUTS,
-    ADDRESS,
-    ADDRESS_ID_MAP,
-    ALIAS,
-    PAYOUT_THRESHOLD,
-    IDENTITY,
-    ROUND,
-    EFFORT,
-    WORKER_COUNT,
-    MINER_COUNT,
-    TOTAL_EFFORT,
-    ESTIMATED_EFFORT,
-    START_TIME,
-
-    MATURE_BALANCE,
-    IMMATURE_BALANCE,
-    MATURE,
-    IMMATURE,
-    REWARD,
-
-    HASHRATE,
-    SHARES,
-
-    BLOCK,
-
-    NETWORK,
-    POOL,
-
-    AVERAGE,
-    VALID,
-    INVALID,
-    STALE,
-
-    EFFORT_PERCENT,
-
-    SOLVER,
-    INDEX,
-    DURATION,
-    DIFFICULTY,
-    ROUND_EFFORT,
-
-    PAYEES,
-    FEE_PAYEES,
-    PENDING_AMOUNT,
-    PENDING_AMOUNT_FEE,
-    PENDING,
-    FEELESS,
-    MINER,
-    WORKER,
-    TYPE,
-    NUMBER,
-    CHAIN,
-    ACTIVE_IDS,
-    STATS,
-    COMPACT,
-};
-
 // TODO: update pending payout on payment settings change
 
 class RedisTransaction;
@@ -111,7 +49,8 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    explicit RedisManager(const std::string &ip, const CoinConfig *cc, int db_index = 0);
+    explicit RedisManager(const std::string &ip, const CoinConfig *cc,
+                          int db_index = 0);
     explicit RedisManager(const RedisManager &rm)
         : conf(rm.conf), key_names(rm.key_names)
     {
@@ -126,14 +65,14 @@ class RedisManager
 
     // manual binary search :)
     bool GetActiveIds(std::vector<MinerIdHex> &addresses);
-    bool SetActiveId(const MinerIdHex& id);
+    bool SetActiveId(const MinerIdHex &id);
     void AppendAddBlockSubmission(const BlockSubmission *submission);
     bool UpdateBlockConfirmations(std::string_view block_id,
                                   int32_t confirmations);
 
     bool UpdateImmatureRewards(uint8_t chain, uint32_t block_num,
                                int64_t matured_time, bool matured);
-    int GetBlockNumber();
+    uint32_t GetBlockNumber();
     /* stats */
 
     /* round */
@@ -172,7 +111,10 @@ class RedisManager
                 logger.Log<LogType::Critical>("Failed to get reply: {}",
                                               rc->errstr);
                 res = false;
+
             }
+
+            //TODO: handle err
 
             freeReplyObject(reply);
         }
@@ -246,104 +188,6 @@ class RedisManager
     static std::mutex rc_mutex;
     const CoinConfig *conf;
 
-    // TODO: make private...
-    struct KeyNames
-    {
-       public:
-        const std::string coin;
-        explicit KeyNames(std::string_view coin) : coin(coin) {}
-        using enum Prefix;
-
-        const std::string round = Format({coin, EnumName<ROUND>()});
-        const std::string round_shares = Format({round, EnumName<SHARES>()});
-        const std::string round_efforts = Format({round, EnumName<EFFORT>()});
-
-        const std::string block = Format({coin, EnumName<BLOCK>()});
-        const std::string block_effort_percent =
-            Format({block, EnumName<EFFORT_PERCENT>()});
-        const std::string block_effort_percent_compact =
-            Format({block_effort_percent, EnumName<COMPACT>()});
-        const std::string block_number_compact =
-            Format({block, EnumName<NUMBER>(), EnumName<COMPACT>()});
-
-        // derived
-        const std::string block_index = Format({block, EnumName<INDEX>()});
-        const std::string block_index_number =
-            Format({block_index, EnumName<NUMBER>()});
-        const std::string block_index_reward =
-            Format({block_index, EnumName<REWARD>()});
-        const std::string block_index_difficulty =
-            Format({block_index, EnumName<DIFFICULTY>()});
-        const std::string block_index_effort =
-            Format({block_index, EnumName<EFFORT>()});
-        const std::string block_index_duration =
-            Format({block_index, EnumName<DURATION>()});
-        const std::string block_index_chain =
-            Format({block_index, EnumName<CHAIN>()});
-        const std::string block_index_solver =
-            Format({block_index, EnumName<SOLVER>()});
-        const std::string block_mature_channel =
-            Format({block, EnumName<MATURE>()});
-
-        const std::string shares = Format({coin, EnumName<SHARES>()});
-        const std::string shares_valid = Format({shares, EnumName<VALID>()});
-        const std::string shares_stale = Format({shares, EnumName<STALE>()});
-        const std::string shares_invalid =
-            Format({shares, EnumName<INVALID>()});
-
-        const std::string hashrate = Format({coin, EnumName<HASHRATE>()});
-        const std::string hashrate_average =
-            Format({hashrate, EnumName<AVERAGE>()});
-        const std::string hashrate_network =
-            Format({hashrate, EnumName<NETWORK>()});
-        const std::string hashrate_network_compact =
-            Format({hashrate_network, EnumName<COMPACT>()});
-        const std::string hashrate_pool = Format({hashrate, EnumName<POOL>()});
-        const std::string hashrate_pool_compact =
-            Format({hashrate_pool, EnumName<COMPACT>()});
-
-        const std::string worker_count =
-            Format({coin, EnumName<WORKER_COUNT>()});
-        const std::string worker_count_pool =
-            Format({worker_count, EnumName<POOL>()});
-        const std::string worker_countp_compact =
-            Format({worker_count_pool, EnumName<COMPACT>()});
-
-        const std::string miner_count =
-            Format({coin, EnumName<MINER_COUNT>(), EnumName<POOL>()});
-        const std::string miner_count_compact =
-            Format({miner_count, EnumName<COMPACT>()});
-
-        const std::string difficulty = Format({coin, EnumName<DIFFICULTY>()});
-        const std::string difficulty_compact =
-            Format({difficulty, EnumName<COMPACT>()});
-
-        const std::string solver = Format({coin, EnumName<SOLVER>()});
-        const std::string solver_index = Format({solver, EnumName<INDEX>()});
-        const std::string solver_index_mature =
-            Format({solver_index, EnumName<MATURE_BALANCE>()});
-        const std::string solver_index_worker_count =
-            Format({solver_index, EnumName<WORKER_COUNT>()});
-        const std::string solver_index_hashrate =
-            Format({solver_index, EnumName<HASHRATE>()});
-        const std::string solver_index_jointime =
-            Format({solver_index, EnumName<START_TIME>()});
-
-        const std::string reward = Format({coin, EnumName<REWARD>()});
-        const std::string reward_immature =
-            Format({reward, EnumName<IMMATURE>()});
-        const std::string reward_mature = Format({reward, EnumName<MATURE>()});
-
-        const std::string address_id_map =
-            Format({coin, EnumName<ADDRESS_ID_MAP>()});
-        const std::string block_number =
-            Format({coin, EnumName<BLOCK>(), EnumName<NUMBER>()});
-
-        const std::string active_ids_map = Format({coin, EnumName<ACTIVE_IDS>()});
-        const std::string payout = Format({coin, EnumName<PAYOUT>()});
-        const std::string pending_payout =
-            Format({payout, EnumName<PENDING>()});
-    };
     const KeyNames key_names;
 
    protected:
@@ -377,38 +221,10 @@ class RedisManager
         return rptr;
     }
 
-    struct Stringable
-    {
-        const std::string_view val;
-
-        // explicit(false) Stringable(Prefix p) : val(STRR(p)) {}
-        explicit(false) Stringable(std::string_view p) : val(p) {}
-        explicit(false) Stringable(const std::string &p) : val(p) {}
-
-        explicit(false) operator std::string_view() const { return val; }
-    };
-
-    using Args = std::initializer_list<Stringable>;
-
-    static std::string Format(Args args)
-    {
-        // assert(args.size() > 0);
-
-        std::string res;
-        for (const auto &a : args)
-        {
-            res += a;
-            res += ':';
-        }
-
-        res.pop_back();
-
-        return res;
-    }
-
     void AppendTsCreate(std::string_view key, std::string_view prefix,
                         std::string_view type, std::string_view address,
-                        std::string_view id, uint64_t retention_ms);
+                        std::string_view id, uint64_t retention_ms,
+                        std::string_view duplicate_policy = "BLOCK");
 
     bool hset(std::string_view key, std::string_view field,
               std::string_view val);

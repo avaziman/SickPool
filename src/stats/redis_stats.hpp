@@ -2,13 +2,18 @@
 #define REDIS_STATS_HPP_
 
 #include <charconv>
+#include <shared_mutex>
 
 #include "redis_manager.hpp"
 
 class RedisStats : public RedisManager
 {
    public:
-    explicit RedisStats(const RedisManager &rm) : RedisManager(rm)
+    explicit RedisStats(const RedisManager &rm)
+        : RedisManager(rm),
+          average_hashrate_ratio_str(
+              std::to_string(rm.conf->stats.average_hashrate_interval_seconds /
+                             rm.conf->stats.hashrate_interval_seconds))
     {
         std::vector<MinerIdHex> active_ids;
         if (!GetActiveIds(active_ids))
@@ -22,13 +27,16 @@ class RedisStats : public RedisManager
         }
     }
 
+    const std::string average_hashrate_ratio_str;
+
     bool AddNewMiner(std::string_view address, std::string_view addr_lowercase,
                      std::string_view alias, const MinerIdHex &id,
                      int64_t curtime, int64_t min_payout);
 
     bool AddNewWorker(const WorkerFullId &full_id,
                       std::string_view address_lowercase,
-                      std::string_view worker_name, std::string_view alias);
+                      std::string_view worker_name, std::string_view alias,
+                      uint64_t curtime_ms);
 
     void AppendIntervalStatsUpdate(std::string_view addr,
                                    std::string_view prefix,
@@ -39,10 +47,10 @@ class RedisStats : public RedisManager
     bool GetWorkerId(WorkerIdHex &worker_id, const MinerIdHex &miner_id,
                      std::string_view worker_name);
 
-    bool UpdateIntervalStats(worker_map &worker_stats_map,
+    bool UpdateIntervalStats(worker_map &worker_stats_list,
                              miner_map &miner_stats_map,
-                             std::mutex *stats_mutex, double net_hr,
-                             double diff, uint32_t blocks_found,
+                             std::unique_lock<std::shared_mutex> stats_mutex,
+                             double net_hr, double diff, uint32_t blocks_found,
                              int64_t update_time_ms);
 
     // bool SetNewBlockStats(std::string_view chain, int64_t curtime,
@@ -57,9 +65,10 @@ class RedisStats : public RedisManager
                                  int64_t update_time_ms);
     void AppendCreateStatsTs(std::string_view addrOrWorker, std::string_view id,
                              std::string_view prefix,
-                             std::string_view addr_lowercase_sv);
+                             std::string_view addr_lowercase_sv,
+                             uint64_t curtime_ms);
 
-    bool PopWorker(const WorkerFullId& fullid);
+    bool PopWorker(const WorkerFullId &fullid);
 };
 
 #endif

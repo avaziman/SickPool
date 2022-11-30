@@ -1,4 +1,4 @@
-#!lua name=sickpool
+-- lua name=sickpool
 redis.register_function(
     "geteffortpow",
     function(KEYS)
@@ -31,7 +31,7 @@ redis.register_function(
         do
             table.insert(
                 result[2],
-                redis.call("GET", KEYS[2]..index)
+                redis.call("GET", KEYS[2]..":"..index)
             )
 
         end
@@ -54,7 +54,7 @@ redis.register_function(
         for _, index in ipairs(indexes) 
         do
                 
-            local solver = {index, unpack(redis.call("HMGET", KEYS[2]..index, "HASHRATE", "MATURE_BALANCE", "START_TIME", "WORKER_COUNT"))}
+            local solver = {unpack(redis.call("HMGET", KEYS[2]..index, "ADDRESS", "HASHRATE", "MATURE_BALANCE", "START_TIME", "WORKER_COUNT"))}
             table.insert(
                 result[2],
                 solver

@@ -69,7 +69,7 @@ class BlockSubmitter
             "└{0:─^{12}}┘\n",
             "", fmt::format("Block Submission #{}", submission->number),
             fmt::format("Type: {}", (int)submission->block_type),
-            fmt::format("Reward: {}", submission->block_reward),
+            fmt::format("Reward: {}", submission->reward),
             fmt::format("Found time: {}", submission->time_ms),
             fmt::format("Duration (ms): {}", submission->duration_ms),
             fmt::format("Height: {}", submission->height),
@@ -78,8 +78,7 @@ class BlockSubmitter
             fmt::format("Miner: {}", submission->miner_id),
             fmt::format("Worker: {}", submission->worker_id),
             fmt::format("Hash: {}",
-                        std::string_view((char*)submission->hash_hex.data(),
-                                         sizeof(submission->hash_hex))),
+                        HexlifyS(submission->hash_bin)),
             72);
 
         logger.Log<LogType::Info>(

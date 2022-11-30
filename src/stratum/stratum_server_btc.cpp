@@ -1,16 +1,16 @@
 #include "static_config.hpp"
-
-#ifdef STRATUM_PROTOCOL_BTC
 #include "stratum_server_btc.hpp"
 
-void StratumServerBtc::BroadcastJob(Connection<StratumClient> *conn,
-                                 const job_t *job) const
+template <StaticConf confs>
+void StratumServerBtc<confs>::BroadcastJob(Connection<StratumClient> *conn,
+                                 const JobT *job) const
 {
     auto notifyMsg = job->GetNotifyMessage();
     SendRaw(conn->sock, notifyMsg.data(), notifyMsg.size());
 }
 
-void StratumServerBtc::HandleReq(Connection<StratumClient>* conn, WorkerContext *wc,
+template <StaticConf confs>
+void StratumServerBtc<confs>::HandleReq(Connection<StratumClient>* conn, WorkerContextT *wc,
                                  std::string_view req)
 {
     int id = 0;
@@ -36,7 +36,7 @@ void StratumServerBtc::HandleReq(Connection<StratumClient>* conn, WorkerContext 
     }
     catch (const simdjson::simdjson_error &err)
     {
-        SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
+        this->SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
         logger.Log<LogType::Error>(
                     "Request JSON parse error: {}\nRequest: {}\n", err.what(),
                     req);
@@ -60,13 +60,13 @@ void StratumServerBtc::HandleReq(Connection<StratumClient>* conn, WorkerContext 
     }
     else if (method == "mining.authorize")
     {
-        res = HandleAuthorize(cli, params);
+        res = this->HandleAuthorize(cli, params);
         if (res.code == ResCode::OK)
         {
-            SendRes(sock, id, res);
+            this->SendRes(sock, id, res);
             UpdateDifficulty(conn);
 
-            const job_t *job = job_manager.GetLastJob();
+            const JobT *job = this->job_manager.GetLastJob();
 
             if (job == nullptr)
             {
@@ -86,14 +86,17 @@ void StratumServerBtc::HandleReq(Connection<StratumClient>* conn, WorkerContext 
                     "Unknown request method: {}", method);
     }
 
-    SendRes(sock, id, res);
+    this->SendRes(sock, id, res);
 }
 
 // https://en.bitcoin.it/wiki/Stratum_mining_protocol#mining.submit
-RpcResult StratumServerBtc::HandleSubscribe(
+template <StaticConf confs>
+RpcResult StratumServerBtc<confs>::HandleSubscribe(
     StratumClient *cli, simdjson::ondemand::array &params) const
 {
-    logger.Log<LogType::Info>( "client subscribed!");
+    using namespace CoinConstantsBtc;
+
+    logger.Log<LogType::Info>("client subscribed!");
 
     // [[["mining.set_difficulty", "subscription id 1"], ["mining.notify",
     // "subscription id 2"]], "extranonce1", extranonce2_size]
@@ -107,92 +110,14 @@ RpcResult StratumServerBtc::HandleSubscribe(
     return RpcResult(ResCode::OK, res);
 }
 
-// https://en.bitcoin.it/wiki/Stratum_mining_protocol#mining.authorize
-RpcResult StratumServerBtc::HandleAuthorize(StratumClient *cli,
-                                            simdjson::ondemand::array &params)
-{
-    using namespace simdjson;
-
-    std::size_t split = 0;
-    int resCode = 0;
-    std::string_view given_addr;
-    std::string_view worker;
-    bool isIdentity = false;
-
-    std::string_view worker_full;
-    try
-    {
-        worker_full = params.at(0).get_string();
-    }
-    catch (const simdjson_error &err)
-    {
-        logger.Log<LogType::Error>(
-                    "No worker name provided in authorization. err: {}",
-                    err.what());
-
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
-    }
-
-    // worker name format: address.worker_name
-    split = worker_full.find('.');
-
-    if (split == std::string_view::npos)
-    {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                         "invalid worker name format, use: address/id@.worker");
-    }
-    else if (worker_full.size() > MAX_WORKER_NAME_LEN + ADDRESS_LEN + 1)
-    {
-        return RpcResult(
-            ResCode::UNAUTHORIZED_WORKER,
-            "Worker name too long! (max " STRM(MAX_WORKER_NAME_LEN) " chars)");
-    }
-
-    given_addr = worker_full.substr(0, split);
-    worker = worker_full.substr(split + 1, worker_full.size() - 1);
-    ValidateAddressRes va_res;
-
-    if (!daemon_manager.ValidateAddress(va_res, httpParser, given_addr))
-    {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                         "Failed to validate address!");
-    }
-
-    if (!va_res.is_valid)
-    {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                         fmt::format("Invalid address {}!", given_addr));
-    }
-
-    std::string worker_full_str =
-        fmt::format("{}.{}", va_res.valid_addr, worker);
-
-    cli->SetAddress(worker_full_str, va_res.valid_addr);
-
-    // string-views to non-local string
-    bool added_to_db =
-        stats_manager.AddWorker(cli->GetAddress(), cli->GetFullWorkerName(),
-                                va_res.script_pub_key, std::time(nullptr));
-
-    if (!added_to_db)
-    {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                         "Failed to add worker to database!");
-    }
-    cli->SetAuthorized();
-
-    logger.Log<LogType::Info>(
-                "Authorized worker: {}, address: {}", worker,
-                va_res.valid_addr);
-
-    return RpcResult(ResCode::OK);
-}
-
-// https://zips.z.cash/zip-0301#mining-submit
-RpcResult StratumServerBtc::HandleSubmit(StratumClient *cli, WorkerContext *wc,
+// https://en.bitcoin.it/wiki/Stratum_mining_protocol#mining.submit
+template <StaticConf confs>
+RpcResult StratumServerBtc<confs>::HandleSubmit(StratumClient *cli, WorkerContextT *wc,
                                          simdjson::ondemand::array &params)
 {
     using namespace simdjson;
+    using namespace CoinConstantsBtc;
+
     // parsing takes 0-1 us
     ShareBtc share;
     std::string parse_error = "";
@@ -210,8 +135,8 @@ RpcResult StratumServerBtc::HandleSubmit(StratumClient *cli, WorkerContext *wc,
     {
         parse_error = "Bad worker.";
     }
-    else if (++it == end || (error = (*it).get_string().get(share.jobId)) ||
-             share.jobId.size() != JOBID_SIZE * 2)
+    else if (++it == end || (error = (*it).get_string().get(share.job_id)) ||
+             share.job_id.size() != JOBID_SIZE * 2)
     {
         parse_error = "Bad job id.";
     }
@@ -220,16 +145,18 @@ RpcResult StratumServerBtc::HandleSubmit(StratumClient *cli, WorkerContext *wc,
     {
         parse_error = "Bad nonce2.";
     }
-    else if (++it == end || (error = (*it).get_string().get(share.time)) ||
-             share.time.size() != TIME_SIZE * 2)
+    else if (++it == end || (error = (*it).get_string().get(share.time_sv)) ||
+             share.time_sv.size() != sizeof(share.time) * 2)
     {
         parse_error = "Bad time.";
     }
-    else if (++it == end || (error = (*it).get_string().get(share.nonce)) ||
-             share.nonce.size() != NONCE_SIZE * 2)
+    else if (++it == end || (error = (*it).get_string().get(share.nonce_sv)) ||
+             share.nonce_sv.size() != sizeof(share.nonce) * 2)
     {
         parse_error = "Bad nonce.";
     }
+    share.time = HexToUint(share.time_sv.data(), sizeof(share.time) * 2);
+    share.nonce = HexToUint(share.nonce_sv.data(), sizeof(share.nonce) * 2);
 
     if (!parse_error.empty())
     {
@@ -242,21 +169,19 @@ RpcResult StratumServerBtc::HandleSubmit(StratumClient *cli, WorkerContext *wc,
 }
 
 // https://en.bitcoin.it/wiki/Stratum_mining_protocol#mining.set_difficulty
-void StratumServerBtc::UpdateDifficulty(Connection<StratumClient> *conn)
+template <StaticConf confs>
+void StratumServerBtc<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
 {
     const auto cli = conn->ptr;
 
-    char request[512];
-    int len = fmt::format_to_n(request, sizeof(request),
+    std::string req = fmt::format(
                                "{{\"id\":null,\"method\":\"mining.set_"
                                "difficulty\",\"params\":[{}]}}\n",
-                               cli->GetDifficulty())
-                  .size;
+                               cli->GetDifficulty());
 
-    SendRaw(conn->sock, request, len);
+    this->SendRaw(conn->sock, req.data(), req.size());
 
     logger.Log<LogType::Debug>( 
                 "Set difficulty for {} to {}", cli->GetFullWorkerName(),
                 cli->GetDifficulty());
 }
-#endif

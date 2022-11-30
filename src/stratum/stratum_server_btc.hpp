@@ -1,33 +1,36 @@
-#ifndef STRATUM_SERVER_ZEC_HPP_
-#define STRATUM_SERVER_ZEC_HPP_
+#ifndef STRATUM_SERVER_BTC_HPP_
+#define STRATUM_SERVER_BTC_HPP_
 
 #include "static_config.hpp"
 #include "stratum_server.hpp"
 #include "share.hpp"
+static constexpr std::string_view field_str_btc = "StratumServerBtc";
 
-class StratumServerBtc : public StratumServer
+template <StaticConf confs>
+class StratumServerBtc : public StratumServer<confs>
 {
     public:
-     using share_t = ShareBtc;
-     StratumServerBtc(const CoinConfig& conf) : StratumServer(conf) {}
+     using WorkerContextT = StratumServer<confs>::WorkerContextT;
+     using JobT = StratumServer<confs>::JobT;
 
-    private: 
+     explicit StratumServerBtc(CoinConfig&& conf)
+         : StratumServer<confs>(std::move(conf))
+     {
+     }
 
-    RpcResult HandleAuthorize(StratumClient* cli,
-                              simdjson::ondemand::array& params);
-    RpcResult HandleSubscribe(StratumClient* cli,
-                              simdjson::ondemand::array& params) const;
-    RpcResult HandleSubmit(StratumClient* cli, WorkerContext* wc,
-                           simdjson::ondemand::array& params);
+    private:
+     const Logger<field_str_btc> logger;
 
-    void HandleReq(Connection<StratumClient>* conn, WorkerContextT* wc,
-                   std::string_view req) override;
-    void UpdateDifficulty(Connection<StratumClient>* conn) override;
+     RpcResult HandleSubscribe(StratumClient* cli,
+                               simdjson::ondemand::array& params) const;
+     RpcResult HandleSubmit(StratumClient* cli, WorkerContextT* wc,
+                            simdjson::ondemand::array& params);
 
-    void BroadcastJob(Connection<StratumClient>* conn,
-                                        const job_t* job) const;
+     void HandleReq(Connection<StratumClient>* conn, WorkerContextT* wc,
+                    std::string_view req) override;
+     void UpdateDifficulty(Connection<StratumClient>* conn) override;
+
+     void BroadcastJob(Connection<StratumClient>* conn, const JobT* job) const;
 };
-
-using stratum_server_t = StratumServerBtc;
 
 #endif

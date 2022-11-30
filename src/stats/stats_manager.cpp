@@ -47,11 +47,6 @@ void StatsManager::Start(std::stop_token st)
     int64_t next_block_update =
         now - (now % conf->mined_blocks_interval) + conf->mined_blocks_interval;
 
-    if (!LoadAvgHashrateSums(next_interval_update * 1000))
-    {
-        logger.Log<LogType::Critical>("Failed to load hashrate sums!");
-    }
-
     while (!st.stop_requested())
     {
         int64_t next_update =
@@ -69,6 +64,13 @@ void StatsManager::Start(std::stop_token st)
         {
             next_interval_update += hashrate_interval_seconds;
             UpdateIntervalStats<confs>(update_time_ms);
+            // no need to lock as its after the stats update and adding shares doesnt affect it
+            std::unique_lock _(to_remove_mutex);
+            for (const auto& rm_it : to_remove)
+            {
+                worker_stats_map.erase(rm_it);
+            }
+            to_remove.clear();
         }
 
         // possible that both need to be updated at the same time
@@ -116,98 +118,61 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
     //             worker_stats_map.size());
 
     miner_map miner_stats_map;
-    const int64_t remove_time =
-        update_time_ms - average_hashrate_interval_seconds * 1000;
 
-    std::vector<std::pair<WorkerFullId, double>> remove_worker_hashrates;
-    bool res = redis_manager.TsMrange(
-        remove_worker_hashrates, EnumName<Prefix::WORKER>(),
-        redis_manager.key_names.hashrate, remove_time, remove_time);
+    std::unique_lock stats_unique_lock(stats_list_smutex);
 
+    for (auto& [worker_id, ws] : worker_stats_map)
     {
-        // only lock after receiving the hashrates to remove
-        // to avoid unnecessary locking
-        std::scoped_lock lock(stats_map_mutex);
+        ws.interval_hashrate =
+            GetExpectedHashes<confs>(ws.current_interval_effort) /
+            (double)hashrate_interval_seconds;
 
-        for (const auto& [worker, worker_hr] : remove_worker_hashrates)
-        {
-            worker_stats_map[worker].average_hashrate_sum -= worker_hr;
-        }
+        // ws.average_hashrate_sum += ws.interval_hashrate;
 
-        for (auto& [worker_id, ws] : worker_stats_map)
-        {
-            ws.interval_hashrate =
-                GetExpectedHashes<confs>(ws.current_interval_effort) /
-                (double)hashrate_interval_seconds;
+        // ws.average_hashrate = ws.average_hashrate_sum / average_interval_ratio;
 
-            ws.average_hashrate_sum += ws.interval_hashrate;
+        auto& miner_stats = miner_stats_map[worker_id.miner_id];
+        // miner_stats.average_hashrate += ws.average_hashrate;
+        miner_stats.interval_hashrate += ws.interval_hashrate;
 
-            ws.average_hashrate =
-                ws.average_hashrate_sum / average_interval_ratio;
+        miner_stats.interval_valid_shares += ws.interval_valid_shares;
+        miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
+        miner_stats.interval_stale_shares += ws.interval_stale_shares;
 
-            auto& miner_stats = miner_stats_map[worker_id.miner_id];
-            miner_stats.average_hashrate += ws.average_hashrate;
-            miner_stats.interval_hashrate += ws.interval_hashrate;
-
-            miner_stats.interval_valid_shares += ws.interval_valid_shares;
-            miner_stats.interval_invalid_shares += ws.interval_invalid_shares;
-            miner_stats.interval_stale_shares += ws.interval_stale_shares;
-
-            if (ws.interval_hashrate > 0.d) miner_stats.worker_count++;
-        }
+        if (ws.interval_hashrate > 0.d) miner_stats.worker_count++;
     }
+
     return redis_manager.UpdateIntervalStats(
-        worker_stats_map, miner_stats_map, &stats_map_mutex,
+        worker_stats_map, miner_stats_map, std::move(stats_unique_lock),
         round_manager->netwrok_hr, round_manager->difficulty,
         round_manager->blocks_found, update_time_ms);
 }
 
-bool StatsManager::LoadAvgHashrateSums(int64_t hr_time)
+void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
 {
-    std::vector<std::pair<WorkerFullId, double>> vec;
-    bool res = redis_manager.LoadAverageHashrateSum(
-        vec, "worker", hr_time, average_hashrate_interval_seconds * 1000);
-
-    if (!res)
-    {
-        logger.Log<LogType::Critical>("Failed to load average hashrate sum!");
-        return false;
-    }
-
-    for (const auto& [id, avg_hr_sum] : vec)
-    {
-        worker_stats_map[id].average_hashrate_sum = avg_hr_sum;
-        logger.Log<LogType::Info>("Loaded worker hashrate sum for {} of {}",
-                                  id.GetHex(), avg_hr_sum);
-    }
-    return true;
-}
-
-void StatsManager::AddShare(const WorkerFullId& id, const double diff)
-{
-    std::scoped_lock lock(stats_map_mutex);
-    // both must exist, as we added in AddWorker
-    WorkerStats* worker_stats = &worker_stats_map[id];
+    // can be added simultaneously as each client has its own stats object
+    std::shared_lock shared_lock(stats_list_smutex);
+    auto& [id, worker_stats] = *it;
 
     if (diff == static_cast<double>(BadDiff::STALE_SHARE_DIFF))
     {
-        worker_stats->interval_stale_shares++;
+        worker_stats.interval_stale_shares++;
     }
     else if (diff == static_cast<double>(BadDiff::INVALID_SHARE_DIFF))
     {
-        worker_stats->interval_invalid_shares++;
+        worker_stats.interval_invalid_shares++;
     }
     else
     {
         // const double expected_shares = GetExpectedHashes(diff);
 
-        worker_stats->interval_valid_shares++;
+        worker_stats.interval_valid_shares++;
         // worker_stats->current_interval_effort += expected_shares;
-        worker_stats->current_interval_effort += diff;
+        worker_stats.current_interval_effort += diff;
 
         logger.Log<LogType::Debug>(
             "Logged share with diff: {} for {} total diff: {}", diff,
-            id.GetHex(), worker_stats->current_interval_effort);
+            id.GetHex(), worker_stats.current_interval_effort);
         // logger.Log<LogType::Debug>(
         //             "Logged share with diff: {}, hashes: {}", diff,
         //             expected_shares);
@@ -215,12 +180,12 @@ void StatsManager::AddShare(const WorkerFullId& id, const double diff)
 }
 
 bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
-                             std::string_view address,
+                             worker_map::iterator& it, std::string_view address,
                              std::string_view worker_name, int64_t curtime,
                              std::string_view alias, int64_t min_payout)
 {
     using namespace std::literals;
-    std::scoped_lock stats_db_lock(stats_map_mutex);
+    std::scoped_lock stats_db_lock(stats_list_smutex);
 
     std::string addr_lowercase(address);
     std::ranges::transform(address, std::back_inserter(addr_lowercase),
@@ -261,7 +226,7 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
         worker_id = WorkerIdHex(0);
 
         if (redis_manager.AddNewWorker(WorkerFullId(miner_id.id, worker_id.id),
-                                       addr_lowercase, worker_name, alias))
+                                       addr_lowercase, worker_name, alias, curtime))
         {
             logger.Log<LogType::Info>("Worker {} added to database.",
                                       worker_name);
@@ -275,23 +240,18 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
     }
 
     worker_full_id = WorkerFullId(miner_id.id, worker_id.id);
-    worker_stats_map[worker_full_id].connection_count =
-        worker_stats_map[worker_full_id].connection_count + 1;
+
+    // constant time complexity insert
+    it = worker_stats_map.emplace(worker_stats_map.cend(), worker_full_id,
+                                  WorkerStats{});
 
     return true;
 }
 
-void StatsManager::PopWorker(const WorkerFullId& fullid)
+void StatsManager::PopWorker(worker_map::iterator& it)
 {
-    std::scoped_lock stats_lock(stats_map_mutex);
-
-    int con_count = (--worker_stats_map[fullid].connection_count);
-    // dont remove from the umap in case they join back, so their progress
-    // is saved
-    if (con_count == 0)
-    {
-        redis_manager.PopWorker(fullid);
-    }
+    std::scoped_lock _(to_remove_mutex);
+    to_remove.push_back(it);
 }
 
 // TODO: idea: since writing all shares on all pbaas is expensive every 10

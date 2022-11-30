@@ -1,7 +1,6 @@
-#include "static_config.hpp"
-
-#ifdef STRATUM_PROTOCOL_CN
 #include "stratum_server_cn.hpp"
+
+#include "static_config.hpp"
 
 template class StratumServerCn<ZanoStatic>;
 
@@ -63,7 +62,9 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
     }
     else if (method == "eth_getWork")
     {
-        this->BroadcastJob(conn, this->job_manager.GetLastJob(), id);
+        std::shared_ptr<JobCryptoNote> last_job =
+            this->job_manager.GetLastJob();
+        this->BroadcastJob(conn, last_job.get(), id);
     }
     // eth_submitLogin
     else if (is_login)
@@ -104,8 +105,8 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
     {
         parse_error = "Bad nonce.";
     }
-    else if (++it == end || (error = (*it).get_string().get(share.jobId)) ||
-             share.jobId.size() != confs.BLOCK_HASH_SIZE * 2 + 2)
+    else if (++it == end || (error = (*it).get_string().get(share.job_id)) ||
+             share.job_id.size() != confs.BLOCK_HASH_SIZE * 2 + 2)
     {
         parse_error = "Bad header pow hash.";
     }
@@ -117,8 +118,8 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
     }
 
     share.nonce = HexToUint(share.nonce_sv.data() + 2, sizeof(share.nonce) * 2);
-    share.jobId =
-        share.jobId.substr(2);  // remove the hex prefix as we don't save it.
+    share.job_id =
+        share.job_id.substr(2);  // remove the hex prefix as we don't save it.
 
     if (!parse_error.empty())
     {
@@ -129,6 +130,27 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
 
     return this->HandleShare(cli, wc, share);
 }
+template <StaticConf confs>
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
+                                          const JobT *job, int id) const
+{
+    std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get(), id);
+    this->SendRaw(conn->sock, msg.data(), msg.size());
+}
+
+template <StaticConf confs>
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
+                                          const JobT *job) const
+{
+    std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get());
+    this->SendRaw(conn->sock, msg.data(), msg.size());
+}
+
+template <StaticConf confs>
+void StratumServerCn<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
+{
+    // nothing to be done; as it's sent on new job.
+}
 
 template <StaticConf confs>
 RpcResult StratumServerCn<confs>::HandleAuthorize(
@@ -137,84 +159,18 @@ RpcResult StratumServerCn<confs>::HandleAuthorize(
 {
     using namespace simdjson;
 
-    std::string_view given_addr;
-    bool isIdentity = false;
-
+    std::string_view miner;
     try
     {
-        given_addr = params.at(0).get_string();
+        miner = params.at(0).get_string();
     }
     catch (const simdjson_error &err)
     {
-        this->logger.Log<LogType::Error>(
-            "No address provided in authorization. err: {}", err.what());
+        logger.Log<LogType::Error>(
+            "No miner name provided in authorization. err: {}", err.what());
 
         return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
     }
 
-    if (worker.size() > MAX_WORKER_NAME_LEN)
-    {
-        return RpcResult(
-            ResCode::UNAUTHORIZED_WORKER,
-            "Worker name too long! (max " xSTRR(MAX_WORKER_NAME_LEN) " chars)");
-    }
-
-    currency::blobdata addr_blob =
-        std::string(given_addr.data(), given_addr.size());
-    uint64_t prefix;
-    currency::blobdata addr_data;
-    if (!tools::base58::decode_addr(addr_blob, prefix, addr_data))
-    {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                         fmt::format("Invalid address {}!", given_addr));
-    }
-
-    auto addr_encoded = tools::base58::encode(addr_data);
-
-
-    // string-views to non-local string
-    WorkerFullId worker_full_id(0, 0);
-    bool added_to_db = this->stats_manager.AddWorker(
-        worker_full_id, given_addr, worker, GetCurrentTimeMs(), "",
-        this->coin_config.min_payout_threshold);
-
-    if (!added_to_db)
-    {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                         "Failed to add worker to database!");
-    }
-    std::string worker_full_str = fmt::format("{}.{}", given_addr, worker);
-    cli->SetAuthorized(worker_full_id, std::move(worker_full_str));
-
-    logger.Log<LogType::Info>("Authorized worker: {}, address: {}", worker,
-                              given_addr);
-
-    return RpcResult(ResCode::OK);
+    return StratumServer<confs>::HandleAuthorize(cli, miner, worker);
 }
-
-template <StaticConf confs>
-void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
-                                          const job_t *job, int id) const
-{
-    std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get(), id);
-    this->SendRaw(conn->sock, msg.data(), msg.size());
-}
-
-template <StaticConf confs>
-void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
-                                          const job_t *job) const
-{
-    std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get());
-    this->SendRaw(conn->sock, msg.data(), msg.size());
-}
-
-template <StaticConf confs>
-// template <typename S = confs.STRATUM_PROTOCOL>
-// typename std::enable_if_t<confs.STRATUM_PROTOCOL == StratumProtocol::CN,
-// void>
-void StratumServerCn<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
-{
-    // nothing to be done; as it's sent on new job.
-}
-
-#endif
