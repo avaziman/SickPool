@@ -56,8 +56,8 @@ void StratumServer<confs>::HandleBlockNotify()
     {
         // new_job = job_manager.GetNewJob();
 
-        logger.Log<LogType::Critical>(
-            "Block update error: Failed to generate new job! retrying...");
+        // logger.Log<LogType::Critical>(
+        //     "Block update error: Failed to generate new job! retrying...");
         return;
         // if (this->GetStopToken().stop_requested())
         // {
@@ -157,9 +157,6 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     ShareResult share_res;
     RpcResult rpc_res(ResCode::OK);
     const std::shared_ptr<JobT> job = job_manager.GetJob(share.job_id);
-    // to make sure the job isn't removed while we are using it,
-    // and at the same time allow multiple threads to use same job
-    std::shared_lock<std::shared_mutex> job_read_lock;
 
     if (job == nullptr)
     {
@@ -169,7 +166,6 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     }
     else
     {
-        job_read_lock = std::shared_lock<std::shared_mutex>(job->job_mutex);
         ShareProcessor::Process<confs>(share_res, cli, wc, job.get(), share, time);
         // share_res.code = ResCode::VALID_BLOCK;
     }

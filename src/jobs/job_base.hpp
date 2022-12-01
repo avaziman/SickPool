@@ -29,10 +29,7 @@ class JobBase
     // const uint32_t block_size;
     // const uint32_t tx_count;
     // locked when a job is being read from, so it won't be removed.
-    mutable std::shared_mutex job_mutex;
     const std::string id;
-
-   protected:
 };
 
 #endif

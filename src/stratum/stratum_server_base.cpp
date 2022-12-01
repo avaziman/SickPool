@@ -75,7 +75,9 @@ void StratumBase::HandleControlCommands(std::stop_token st)
         if (cmd == ControlCommands::NONE) continue;
 
         HandleControlCommand(cmd, buff);
-        logger.Log<LogType::Info>("Processed control command: {}", buff);
+        if(buff[0]){
+            logger.Log<LogType::Info>("Processed control command: {}", buff);
+        }
     }
 
     logger.Log<LogType::Info>("Stopped control server on thread {}", gettid());

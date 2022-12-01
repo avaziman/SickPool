@@ -7,9 +7,9 @@ std::shared_ptr<JobCryptoNote> JobManagerCryptoNote::GetNewJob(
 
     // only add the job if it's any different from the last one
     if (auto last_job = GetLastJob();
-        new_job->height != last_job->height &&
+        new_job->height == last_job->height/* &&
         *dynamic_cast<BlockTemplateCn*>(new_job.get()) ==
-            *dynamic_cast<BlockTemplateCn*>(last_job.get()))
+            *dynamic_cast<BlockTemplateCn*>(last_job.get())*/)
     {
         return std::shared_ptr<JobCryptoNote>{};
     }

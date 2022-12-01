@@ -51,8 +51,7 @@ class JobManager
         while (jobs.size())
         {
             // incase a job is being used
-            auto remove_job = std::move(jobs.back());
-            std::unique_lock job_lock(remove_job->job_mutex);
+            std::shared_ptr<JobT> remove_job = std::move(jobs.back());
             jobs.pop_back();
         }
         last_job = jobs.emplace_back(std::move(job));
