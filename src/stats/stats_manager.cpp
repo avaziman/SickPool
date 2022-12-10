@@ -9,11 +9,11 @@ int StatsManager::diff_adjust_seconds;
 
 double StatsManager::average_interval_ratio;
 
-StatsManager::StatsManager(const RedisManager& redis_manager,
+StatsManager::StatsManager(const PersistenceLayer& pl,
                            DifficultyManager* diff_manager,
                            RoundManager* round_manager, const StatsConfig* cc)
     : conf(cc),
-      redis_manager(redis_manager),
+      persistence_stats(pl),
       diff_manager(diff_manager),
       round_manager(round_manager)
 {
@@ -96,7 +96,8 @@ void StatsManager::Start(std::stop_token st)
         if (next_update == next_block_update)
         {
             uint32_t block_number = round_manager->blocks_found.load();
-            // redis_manager.UpdateBlockNumber(update_time_ms, block_number);
+            // persistence_stats.UpdateBlockNumber(update_time_ms,
+            // block_number);
             round_manager->blocks_found.store(0);
 
             next_block_update += conf->mined_blocks_interval;
@@ -146,7 +147,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         if (ws.interval_hashrate > 0.d) miner_stats.worker_count++;
     }
 
-    return redis_manager.UpdateIntervalStats(
+    return persistence_stats.UpdateIntervalStats(
         worker_stats_map, miner_stats_map, std::move(stats_unique_lock),
         round_manager->netwrok_hr, round_manager->difficulty,
         round_manager->blocks_found, update_time_ms);
@@ -175,8 +176,8 @@ void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
         worker_stats.current_interval_effort += diff;
 
         logger.Log<LogType::Debug>(
-            "[THREAD {}] Logged share with diff: {} for {} total diff: {}", gettid(), diff,
-            id.GetHex(), worker_stats.current_interval_effort);
+            "[THREAD {}] Logged share with diff: {} for {} total diff: {}",
+            gettid(), diff, id.GetHex(), worker_stats.current_interval_effort);
         // logger.Log<LogType::Debug>(
         //             "Logged share with diff: {}, hashes: {}", diff,
         //             expected_shares);
@@ -189,27 +190,21 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
                              std::string_view alias, int64_t min_payout)
 {
     using namespace std::literals;
-    std::scoped_lock stats_db_lock(stats_list_smutex);
 
     std::string addr_lowercase;
     addr_lowercase.reserve(address.size());
     std::ranges::transform(address, std::back_inserter(addr_lowercase),
                            [](char c) { return std::tolower(c); });
 
-    MinerIdHex miner_id(0);
-    if (bool new_miner = redis_manager.GetMinerId(miner_id, addr_lowercase);
-        !new_miner)
+    int miner_id = persistence_stats.GetMinerId(address, alias);
+    if (miner_id == -1)
     {
-        // new id
-        auto id = redis_manager.GetMinerCount();
-        if (id == -1) id = 0;
-        miner_id = MinerIdHex(id);
+        logger.Log<LogType::Info>("New miner has joined the pool: {}", address);
 
-        logger.Log<LogType::Info>(
-            "New miner has spawned: {}, assigning new id {}", address,
-        miner_id.GetHex());
-        if (redis_manager.AddNewMiner(address, addr_lowercase, "", miner_id,
-                                      curtime, min_payout))
+        persistence_stats.AddMiner(address, alias, min_payout);
+
+        if (persistence_stats.AddNewMiner(address, addr_lowercase, alias,
+                                          miner_id, curtime, min_payout))
         {
             logger.Log<LogType::Info>("Miner {} added to database.", address);
         }
@@ -219,24 +214,31 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
                                           address);
             return false;
         }
+
+        return AddWorker(worker_full_id, it, address, worker_name, curtime,
+                         alias, min_payout);
+    }
+    else
+    {
+        // if he exists in sql db still try to add in redis just in case
+        persistence_stats.AddNewMiner(address, addr_lowercase, alias, miner_id,
+                                      curtime, min_payout);
     }
 
     // set active
-    redis_manager.SetActiveId(miner_id);
+    persistence_stats.SetActiveId(miner_id);
 
-    WorkerIdHex worker_id(0);
-    if (bool new_worker =
-            !redis_manager.GetWorkerId(worker_id, miner_id, worker_name);
-        new_worker)
+    int worker_id = persistence_stats.GetMinerId(address, alias);
+    if (worker_id == -1)
     {
         // new id
-        auto id = redis_manager.GetWorkerCount(miner_id);
-        if (id == -1) id = 0;
-        worker_id = WorkerIdHex(id);
+        logger.Log<LogType::Info>("New worker has joined the pool: ",
+                                  worker_name);
 
-        if (redis_manager.AddNewWorker(WorkerFullId(miner_id.id, worker_id.id),
-                                       addr_lowercase, worker_name, alias,
-                                       curtime))
+        persistence_stats.AddWorker(miner_id, worker_name);
+        if (!persistence_stats.AddNewWorker(WorkerFullId(miner_id, worker_id),
+                                            addr_lowercase, worker_name, alias,
+                                            curtime))
         {
             logger.Log<LogType::Info>("Worker {} added to database.",
                                       worker_name);
@@ -248,8 +250,17 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
             return false;
         }
     }
+    else
+    {
+        // if he exists in sql db still try to add in redis just in case
+        persistence_stats.AddNewWorker(WorkerFullId(miner_id, worker_id),
+                                       addr_lowercase, worker_name, alias,
+                                       curtime);
+    }
 
-    worker_full_id = WorkerFullId(miner_id.id, worker_id.id);
+    worker_full_id = WorkerFullId(miner_id, worker_id);
+
+    std::unique_lock stats_lock(stats_list_smutex);
 
     // constant time complexity insert
     it = worker_stats_map.emplace(worker_stats_map.cend(), worker_full_id,

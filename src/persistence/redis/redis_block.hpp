@@ -11,7 +11,6 @@ class PersistenceBlock : public PersistenceLayer
     public:
      explicit PersistenceBlock(const PersistenceLayer& pl) : PersistenceLayer(pl), block_key_names(this->key_names.coin) {}
 
-    //  void AppendAddBlockSubmission(const BlockSubmission& submission);
      bool UpdateBlockConfirmations(std::string_view block_id,
                                    int32_t confirmations);
      bool UpdateImmatureRewards(uint8_t chain, uint32_t block_num,

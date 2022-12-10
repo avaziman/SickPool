@@ -23,14 +23,13 @@
 #include "static_config/static_config.hpp"
 #include "stats/stats.hpp"
 #include "stratum_client.hpp"
+#include "persistence_stats.hpp"
 
-class RedisManager;
-class RoundManager;
 // update manager?
 class StatsManager
 {
    public:
-    explicit StatsManager(const RedisManager& redis_manager, DifficultyManager* diff_manager,
+    explicit StatsManager(const PersistenceLayer& redis_manager, DifficultyManager* diff_manager,
                  RoundManager* round_manager, const StatsConfig* cc);
 
     // Every hashrate_interval_seconds we need to write:
@@ -65,7 +64,7 @@ class StatsManager
     static constexpr std::string_view field_str = "StatsManager";
     Logger<field_str> logger;
     const StatsConfig* conf;
-    RedisStats redis_manager;
+    PersistenceStats persistence_stats;
     DifficultyManager* diff_manager;
     RoundManager* round_manager;
 

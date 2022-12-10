@@ -105,7 +105,7 @@ bool PersistenceRound::SetClosedRound(std::string_view chain, std::string_view t
         // either close everything about the round or nothing
         RedisTransaction close_round_tx(this);
 
-        AppendAddBlockSubmission(submission);
+        AddBlockSubmission(submission);
         // AppendAddRoundRewards(chain, submission, round_shares);
         // set round start time
         AppendSetMinerEffort(chain, EnumName<START_TIME>(), type,

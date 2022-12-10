@@ -4,6 +4,6 @@ PersistenceLayer::PersistenceLayer(const CoinConfig& cc) : RedisManager(cc), MyS
 
 }
 
-PersistenceLayer::PersistenceLayer(const PersistenceLayer& pl): RedisManager(pl), MySqlManager(pl) {
+// PersistenceLayer::PersistenceLayer(const PersistenceLayer& pl): RedisManager(pl), MySqlManager(pl) {
 
-}
+// }

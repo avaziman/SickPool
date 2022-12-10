@@ -8,10 +8,8 @@
 #include "redis_manager.hpp"
 #include "payment_manager.hpp"
 #include "round.hpp"
-#include "stats_manager.hpp"
 #include "round_share.hpp"
 
-class StatsManager;
 class RedisManager;
 
 class RoundManager: public PersistenceRound

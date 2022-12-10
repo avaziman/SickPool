@@ -284,40 +284,6 @@ void RedisStats::AppendCreateStatsTsWorker(std::string_view addr,
                    "roll_avg", average_hashrate_ratio_str});
 }
 
-bool RedisStats::GetMinerId(MinerIdHex &id_res, std::string_view addr_lc)
-{
-    std::scoped_lock lock(rc_mutex);
-
-    auto res = Command({"HGET", key_names.address_id_map, addr_lc});
-
-    long id = ResToInt(std::move(res));
-
-    if (id == -1) return false;
-
-    id_res = MinerIdHex(static_cast<uint32_t>(id));
-
-    return true;
-}
-
-bool RedisStats::GetWorkerId(WorkerIdHex &worker_id, const MinerIdHex &miner_id,
-                             std::string_view worker_name)
-{
-    std::scoped_lock lock(rc_mutex);
-
-    auto res = Command(
-        {"HGET",
-         Format({key_names.solver, EnumName<WORKER>(), miner_id.GetHex()}),
-         worker_name});
-
-    long id = ResToInt(std::move(res));
-
-    if (id == -1) return false;
-
-    worker_id = WorkerIdHex(static_cast<uint32_t>(id));
-
-    return true;
-}
-
 bool RedisStats::PopWorker(const WorkerFullId &fullid)
 {
     std::scoped_lock lock(rc_mutex);

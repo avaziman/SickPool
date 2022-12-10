@@ -7,7 +7,7 @@ class PersistenceLayer : public RedisManager, public MySqlManager
 {
    public:
     explicit PersistenceLayer(const CoinConfig& cc);
-    explicit PersistenceLayer(const PersistenceLayer& pl);
+    explicit PersistenceLayer(const PersistenceLayer& pl) = default;
 };
 
 #endif

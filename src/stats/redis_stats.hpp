@@ -43,10 +43,6 @@ class RedisStats : public RedisManager
                                    int64_t update_time_ms,
                                    const WorkerStats &ws);
 
-    bool GetMinerId(MinerIdHex &id, std::string_view addr_lc);
-    bool GetWorkerId(WorkerIdHex &worker_id, const MinerIdHex &miner_id,
-                     std::string_view worker_name);
-
     bool UpdateIntervalStats(worker_map &worker_stats_list,
                              miner_map &miner_stats_map,
                              std::unique_lock<std::shared_mutex> stats_mutex,
