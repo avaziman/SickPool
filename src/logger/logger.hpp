@@ -27,7 +27,7 @@ class Logger
     // }
 
     template <LogType type, typename... T>
-    /*static*/ inline void Log(fmt::format_string<T...> message, T&&... args) const
+    /*static*/ inline void Log(fmt::format_string<T...> message, T&&... args) const noexcept
     {
         using enum fmt::color;
 

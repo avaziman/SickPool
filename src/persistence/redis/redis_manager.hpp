@@ -49,8 +49,7 @@ class RedisManager
     friend class RedisTransaction;
 
    public:
-    explicit RedisManager(const std::string &ip, const CoinConfig *cc,
-                          int db_index = 0);
+    explicit RedisManager(const CoinConfig &cc);
     explicit RedisManager(const RedisManager &rm)
         : conf(rm.conf), key_names(rm.key_names)
     {
@@ -233,13 +232,18 @@ class RedisManager
                     std::string_view val);
     void AppendTsAdd(std::string_view key_name, int64_t time, double value);
 
-    int GetInt(std::string_view key)
+    long ResToInt(redis_unique_ptr r) const
+    {
+        if (!r || !r->str || r->type != REDIS_REPLY_STRING) return -1;
+
+        return std::strtol(r->str, nullptr, 10);
+    }
+
+    long GetInt(std::string_view key)
     {
         std::scoped_lock _(rc_mutex);
         auto res = Command({"GET", key});
-        if (!res || !res->str) return 0;
-
-        return std::strtol(res->str, nullptr, 10);
+        return ResToInt(std::move(res));
     }
 
    private:

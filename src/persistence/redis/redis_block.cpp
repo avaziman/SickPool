@@ -5,7 +5,7 @@
 
 using enum Prefix;
 
-// void RedisBlock::AppendAddBlockSubmission(const BlockSubmission& submission)
+// void PersistenceBlock::AppendAddBlockSubmission(const BlockSubmission& submission)
 // {
 //     using namespace std::string_view_literals;
 
@@ -70,7 +70,7 @@ using enum Prefix;
 //     }
 // }
 
-bool RedisBlock::UpdateBlockConfirmations(std::string_view block_id,
+bool PersistenceBlock::UpdateBlockConfirmations(std::string_view block_id,
                                           int32_t confirmations)
 {
     using namespace std::string_view_literals;
@@ -82,7 +82,7 @@ bool RedisBlock::UpdateBlockConfirmations(std::string_view block_id,
            }).get() == nullptr;
 }
 
-bool RedisBlock::LoadImmatureBlocks(
+bool PersistenceBlock::LoadImmatureBlocks(
     std::vector<std::unique_ptr<BlockSubmission>> &submissions)
 
 {
@@ -114,19 +114,19 @@ bool RedisBlock::LoadImmatureBlocks(
     return true;
 }
 
-uint32_t RedisBlock::GetBlockNumber()
+uint32_t PersistenceBlock::GetBlockNumber()
 {
     return GetInt(block_key_names.block_number);
 };
 
-bool RedisBlock::UpdateBlockNumber(int64_t time, uint32_t number)
+bool PersistenceBlock::UpdateBlockNumber(int64_t time, uint32_t number)
 {
     std::scoped_lock lock(rc_mutex);
     AppendTsAdd(block_key_names.block_number, time, number);
     return GetReplies();
 }
 
-bool RedisBlock::UpdateImmatureRewards(uint8_t chain, uint32_t block_num,
+bool PersistenceBlock::UpdateImmatureRewards(uint8_t chain, uint32_t block_num,
                                          int64_t matured_time, bool matured)
 {
     using namespace std::string_view_literals;
@@ -206,7 +206,7 @@ bool RedisBlock::UpdateImmatureRewards(uint8_t chain, uint32_t block_num,
     return GetReplies();
 }
 
-bool RedisBlock::SubscribeToMaturityChannel()
+bool PersistenceBlock::SubscribeToMaturityChannel()
 {
     Command({"SUBSCRIBE", block_key_names.block_mature_channel});
     return true;

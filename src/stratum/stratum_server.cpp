@@ -5,15 +5,13 @@ template <StaticConf confs>
 StratumServer<confs>::StratumServer(CoinConfig &&conf)
     : StratumBase(std::move(conf)),
       daemon_manager(coin_config.rpcs),
-      payment_manager(&redis_manager, &daemon_manager, coin_config.pool_addr,
-                      coin_config.payment_interval_seconds,
-                      coin_config.min_payout_threshold),
+      payment_manager(&persistence_layer, &daemon_manager, coin_config.pool_addr),
       job_manager(&daemon_manager, &payment_manager, coin_config.pool_addr),
-      block_submitter(&redis_manager, &daemon_manager, &round_manager),
-      stats_manager(redis_manager, &diff_manager, &round_manager, &conf.stats)
+      block_submitter(&daemon_manager, &round_manager),
+      stats_manager(persistence_layer, &diff_manager, &round_manager, &conf.stats)
 {
     static_assert(confs.DIFF1 != 0, "DIFF1 can't be zero!");
-    redis_manager.Init();
+    persistence_layer.Init();
 
     if (auto error =
             httpParser.allocate(HTTP_REQ_ALLOCATE, MAX_HTTP_JSON_DEPTH);

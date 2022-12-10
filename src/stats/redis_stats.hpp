@@ -71,11 +71,11 @@ class RedisStats : public RedisManager
                              uint64_t curtime_ms);
 
     bool PopWorker(const WorkerFullId &fullid);
-    int GetMinerCount()
+    long GetMinerCount()
     {
         return GetInt(key_names.solver_count);
     }
-    int GetWorkerCount(const MinerIdHex& id)
+    long GetWorkerCount(const MinerIdHex& id)
     {
         return GetInt(Format({key_names.miner_worker_count, id.GetHex()}));
     }

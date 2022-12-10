@@ -12,12 +12,12 @@ class StratumBase : public Server<StratumClient>
    public:
     explicit StratumBase(CoinConfig&& conf);
     virtual ~StratumBase();
-    void Stop();
+    void Stop() noexcept;
     void Listen();
 
    protected:
     const CoinConfig coin_config;
-    RedisManager redis_manager;
+    PersistenceLayer persistence_layer;
     DifficultyManager diff_manager;
     RoundManager round_manager;
 

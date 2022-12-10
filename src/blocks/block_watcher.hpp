@@ -15,7 +15,7 @@ template <StaticConf confs>
 class BlockWatcher
 {
    public:
-    explicit BlockWatcher(const RedisManager* redis_manager,
+    explicit BlockWatcher(const PersistenceLayer* pl,
                           daemon_manager_t* daemon_manager);
 
     void CheckImmatureSubmissions();
@@ -25,7 +25,7 @@ class BlockWatcher
     static constexpr std::string_view logger_field = "BlockWatcher";
     const Logger<logger_field> logger;
     std::mutex blocks_lock;
-    RedisBlock redis_manager;
+    PersistenceBlock persistence_block;
     daemon_manager_t* daemon_manager;
 
     simdjson::ondemand::parser httpParser;

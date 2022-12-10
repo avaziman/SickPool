@@ -1,0 +1,1 @@
+/usr/bin/g++-12  -O0 -g3 -Wsubobject-linkage -Wmissing-template-keyword -g CMakeFiles/SickPool.dir/src/main.cpp.o -o SickPool  src/libSickPool_core.a /usr/local/lib/libboost_program_options.a -lhiredis -lmysqlcppconn -lpthread src/crypto/cn/libcryptonote_utils.a _deps/simdjson-build/libsimdjson.a _deps/fmt-build/libfmtd.a src/crypto/verushash/libsickverushash.a 

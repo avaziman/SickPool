@@ -1,7 +1,7 @@
 #include "redis_round.hpp"
 using enum Prefix;
 
-void RedisRound::AppendSetMinerEffort(std::string_view chain,
+void PersistenceRound::AppendSetMinerEffort(std::string_view chain,
                                       std::string_view miner,
                                       std::string_view type, double effort)
 {
@@ -9,7 +9,7 @@ void RedisRound::AppendSetMinerEffort(std::string_view chain,
                miner, std::to_string(effort));
 }
 
-bool RedisRound::SetEffortStats(const efforts_map_t &miner_stats_map,
+bool PersistenceRound::SetEffortStats(const efforts_map_t &miner_stats_map,
                                      const double total_effort,
                                      std::unique_lock<std::mutex> stats_mutex)
 {
@@ -28,7 +28,7 @@ bool RedisRound::SetEffortStats(const efforts_map_t &miner_stats_map,
     return GetReplies();
 }
 
-bool RedisRound::GetMinerEfforts(efforts_map_t &efforts,
+bool PersistenceRound::GetMinerEfforts(efforts_map_t &efforts,
                                   std::string_view chain, std::string_view type)
 {
     using namespace std::string_view_literals;
@@ -52,7 +52,7 @@ bool RedisRound::GetMinerEfforts(efforts_map_t &efforts,
     return true;
 }
 
-void RedisRound::GetCurrentRound(Round *rnd, std::string_view chain,
+void PersistenceRound::GetCurrentRound(Round *rnd, std::string_view chain,
                                    std::string_view type)
 {
     std::string round_effort_key =
@@ -71,7 +71,7 @@ void RedisRound::GetCurrentRound(Round *rnd, std::string_view chain,
     rnd->total_effort = strtod(total_effort_str.c_str(), nullptr);
 }
 
-void RedisRound::AppendAddRoundRewards(std::string_view chain,
+void PersistenceRound::AppendAddRoundRewards(std::string_view chain,
                                        const BlockSubmission& submission,
                                        const round_shares_t &miner_shares)
 {
@@ -93,7 +93,7 @@ void RedisRound::AppendAddRoundRewards(std::string_view chain,
     }
 }
 
-bool RedisRound::SetClosedRound(std::string_view chain, std::string_view type,
+bool PersistenceRound::SetClosedRound(std::string_view chain, std::string_view type,
                               const BlockSubmission& submission,
                               const round_shares_t &round_shares,
                               int64_t time_ms)
@@ -123,7 +123,7 @@ bool RedisRound::SetClosedRound(std::string_view chain, std::string_view type,
     return GetReplies();
 }
 
-bool RedisRound::SetNewBlockStats(std::string_view chain, double target_diff)
+bool PersistenceRound::SetNewBlockStats(std::string_view chain, double target_diff)
 {
     std::scoped_lock lock(rc_mutex);
 
@@ -135,7 +135,7 @@ bool RedisRound::SetNewBlockStats(std::string_view chain, double target_diff)
 }
 
 // manual binary search :)
-std::pair<std::span<Share>, redis_unique_ptr> RedisRound::GetLastNShares(double progress,
+std::pair<std::span<Share>, redis_unique_ptr> PersistenceRound::GetLastNShares(double progress,
                                                              double n)
 {
     std::unique_lock lock(rc_mutex);
@@ -201,7 +201,7 @@ std::pair<std::span<Share>, redis_unique_ptr> RedisRound::GetLastNShares(double 
         std::move(res));
 }
 
-std::pair<std::span<Share>, redis_unique_ptr> RedisRound::GetSharesBetween(ssize_t start,
+std::pair<std::span<Share>, redis_unique_ptr> PersistenceRound::GetSharesBetween(ssize_t start,
                                                                ssize_t end)
 {
     std::scoped_lock _(rc_mutex);
@@ -214,12 +214,17 @@ std::pair<std::span<Share>, redis_unique_ptr> RedisRound::GetSharesBetween(ssize
         Command({"GETRANGE", key_names.round_shares,
                  std::to_string(start_index), std::to_string(end_index)});
 
+    if(!res || !res->str)
+    {
+        return std::make_pair(std::span<Share>(), std::move(res));
+    }
+
     return std::make_pair(std::span<Share>(reinterpret_cast<Share *>(res->str),
                                            res->len / sizeof(Share)),
                           std::move(res));
 }
 
-void RedisRound::AddPendingShares(const std::vector<Share> &pending_shares)
+void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares)
 {
     std::scoped_lock _(rc_mutex);
 

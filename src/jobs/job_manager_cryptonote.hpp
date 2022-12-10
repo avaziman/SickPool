@@ -18,7 +18,7 @@ class JobManagerCryptoNote : public JobManager<JobCryptoNote>
         BlockTemplateResCn res;
         if (!GetBlockTemplate(res))
         {
-            throw std::runtime_error("Failed to generate first job!");
+            throw std::invalid_argument("Failed to generate first job!");
         }
 
         // insert first job at the constructor so we don't need to make sure last_job is valid

@@ -73,7 +73,7 @@ int main(int argc, char** argv)
                                        coinConfig.symbol);
         }
     }
-    catch (const std::runtime_error& e)
+    catch (const std::invalid_argument& e)
     {
         logger.Log<LogType::Critical>("START-UP ERROR: {}.", e.what());
         return EXIT_FAILURE;

@@ -1,22 +1,27 @@
 #ifndef MYSQL_MANAGER_HPP_
-#include <cppconn/statement.h>
-#include <cppconn/driver.h>
+#define MYSQL_MANAGER_HPP_
 #include <cppconn/connection.h>
+#include <cppconn/driver.h>
 #include <cppconn/prepared_statement.h>
-
+#include <cppconn/statement.h>
+#include <fmt/core.h>
 #include <memory>
-#include "utils/hex_utils.hpp"
+
 #include "coin_config.hpp"
 #include "redis_interop.hpp"
+#include "utils/hex_utils.hpp"
 class MySqlManager
 {
-    sql::Driver *driver =
-        get_driver_instance();
-    std::unique_ptr<sql::Connection> con;
+   private:
+    static sql::Driver *driver;
+    static std::unique_ptr<sql::Connection> con;
 
-    std::unique_ptr<sql::PreparedStatement> add_block;
+    static std::unique_ptr<sql::PreparedStatement> add_block;
+    static constexpr std::string_view logger_field = "MySQL";
+    static const Logger<logger_field> logger;
 
-    explicit MySqlManager(const std::string &ip, const CoinConfig *cc);
+   public:
+    explicit MySqlManager(const CoinConfig& cc);
     void AppendAddBlockSubmission(const BlockSubmission &submission) const;
 };
 

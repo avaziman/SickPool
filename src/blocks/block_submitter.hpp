@@ -10,18 +10,15 @@
 class BlockSubmitter
 {
    private:
-    RedisBlock redis_manager;
     RoundManager* round_manager;
     daemon_manager_t* daemon_manager;
     static constexpr std::string_view field_str = "BlockSubmitter";
     Logger<field_str> logger;
 
    public:
-    explicit BlockSubmitter(const RedisManager* redis_manager,
-                   daemon_manager_t* daemon_manager,
+    explicit BlockSubmitter(daemon_manager_t* daemon_manager,
                    RoundManager* round_manager)
-        : redis_manager(*redis_manager),
-          daemon_manager(daemon_manager),
+        : daemon_manager(daemon_manager),
           round_manager(round_manager)
     {
     }
@@ -49,7 +46,7 @@ class BlockSubmitter
     {
         std::scoped_lock lock(blocks_lock);
 
-        submission->number = redis_manager.GetBlockNumber();
+        submission->number = round_manager->GetBlockNumber();
         // block number increased here.
         // round_manager->CloseRound(submission.get(), pow_fee);
         round_manager->CloseRound(*submission.get(), pow_fee);

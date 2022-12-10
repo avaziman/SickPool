@@ -201,7 +201,9 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
         !new_miner)
     {
         // new id
-        miner_id = MinerIdHex(redis_manager.GetMinerCount());
+        auto id = redis_manager.GetMinerCount();
+        if (id == -1) id = 0;
+        miner_id = MinerIdHex(id);
 
         logger.Log<LogType::Info>(
             "New miner has spawned: {}, assigning new id {}", address,
@@ -228,7 +230,9 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
         new_worker)
     {
         // new id
-        worker_id = WorkerIdHex(redis_manager.GetWorkerCount(miner_id));
+        auto id = redis_manager.GetWorkerCount(miner_id);
+        if (id == -1) id = 0;
+        worker_id = WorkerIdHex(id);
 
         if (redis_manager.AddNewWorker(WorkerFullId(miner_id.id, worker_id.id),
                                        addr_lowercase, worker_name, alias,

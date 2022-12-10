@@ -8,12 +8,13 @@ const Logger<RedisManager::logger_field> RedisManager::logger;
 redis_unique_ptr_context RedisManager::rc_unique;
 std::mutex RedisManager::rc_mutex;
 
-RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf,
-                           int db_index)
-    : conf(conf), key_names(conf->symbol)
+RedisManager::RedisManager(const CoinConfig& conf)
+    : conf(&conf), key_names(conf.symbol)
 {
+    SockAddr addr(conf.redis.host);
+
     RedisManager::rc_unique = redis_unique_ptr_context(
-        redisConnect(ip.c_str(), conf->redis.redis_port), redisFree);
+        redisConnect(addr.ip_str.c_str(), addr.port_original), redisFree);
 
     if (rc_unique->err)
     {
@@ -22,7 +23,7 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf,
         throw std::invalid_argument("Failed to connect to redis");
     }
 
-    Command({"SELECT", std::to_string(db_index)});
+    Command({"SELECT", std::to_string(conf.redis.db_index)});
 }
 void RedisManager::Init()
 {

@@ -51,12 +51,11 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    const std::string ip = "127.0.0.1";
-    const RedisManager rm(ip, &coinConfig);
-    RedisPayment redis_manager(rm);
+    const PersistenceLayer rm(coinConfig);
+    PersistenceBlock persistence_block(rm);
     daemon_manager_t daemon_manager(coinConfig.payment_rpcs);
 
-    redis_manager.SubscribeToMaturityChannel();
+    persistence_block.SubscribeToMaturityChannel();
 
     while (true)
     {
@@ -64,7 +63,7 @@ int main(int argc, char** argv)
         time_t next_payment = curtime + coinConfig.payment_interval_seconds -
                               curtime % coinConfig.payment_interval_seconds;
 
-        auto [res, rep] = redis_manager.GetOneReply(next_payment - curtime);
+        auto [res, rep] = persistence_block.GetOneReply(next_payment - curtime);
 
         payees_info_t payees;
 
@@ -84,7 +83,7 @@ int main(int argc, char** argv)
             next_payment += coinConfig.payment_interval_seconds;
 
             // immediate payment time!
-            GetPendingPayees(payees, &redis_manager);
+            GetPendingPayees(payees, &persistence_block);
             logger.Log<LogType::Info>("Payees pending payment: {}",
                                       payees.size());
 

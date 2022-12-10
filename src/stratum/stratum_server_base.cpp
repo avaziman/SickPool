@@ -3,9 +3,9 @@
 StratumBase::StratumBase(CoinConfig &&conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(std::move(conf)),
-      redis_manager("127.0.0.1", &coin_config),
+      persistence_layer(coin_config),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
-      round_manager(redis_manager, "pow"),
+      round_manager(persistence_layer, "pow"),
       control_server(coin_config.control_port, coin_config.block_poll_interval)
 {
     control_thread = std::jthread(
@@ -25,7 +25,7 @@ StratumBase::~StratumBase()
     logger.Log<LogType::Info>("Stratum base destroyed.");
 }
 
-void StratumBase::Stop()
+void StratumBase::Stop() noexcept
 {
     logger.Log<LogType::Info>("Stopping socket servicing...");
 

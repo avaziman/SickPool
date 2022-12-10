@@ -3,10 +3,11 @@
 #include "mysql_manager.hpp"
 #include "redis_manager.hpp"
 
-class PersistanceLayer 
+class PersistenceLayer : public RedisManager, public MySqlManager
 {
-    RedisManager rm;
-    MySqlManager mm;
+   public:
+    explicit PersistenceLayer(const CoinConfig& cc);
+    explicit PersistenceLayer(const PersistenceLayer& pl);
 };
 
 #endif

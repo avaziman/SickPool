@@ -2,9 +2,9 @@
 template class BlockWatcher<ZanoStatic>;
 
 template <StaticConf confs>
-BlockWatcher<confs>::BlockWatcher(const RedisManager* redis_manager,
+BlockWatcher<confs>::BlockWatcher(const PersistenceLayer* pl,
                                   daemon_manager_t* daemon_manager)
-    : redis_manager(*redis_manager), daemon_manager(daemon_manager)
+    : persistence_block(*pl), daemon_manager(daemon_manager)
 {
 
 }
@@ -17,7 +17,7 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
     uint32_t current_height;
     std::string resBody;
 
-    redis_manager.LoadImmatureBlocks(immature_block_submissions);
+    persistence_block.LoadImmatureBlocks(immature_block_submissions);
 
     for (const std::unique_ptr<BlockSubmission>& sub :
          immature_block_submissions)
@@ -49,7 +49,7 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
 
         int confirmations = header_res.depth;
 
-        redis_manager.UpdateBlockConfirmations(
+        persistence_block.UpdateBlockConfirmations(
             std::string_view(std::to_string(submission->number)),
             confirmations);
 
@@ -67,7 +67,7 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
             logger.template Log<LogType::Info>("Block {} has {}!", hashHex,
                                                desc);
 
-            redis_manager.UpdateImmatureRewards(chain, submission->number,
+            persistence_block.UpdateImmatureRewards(chain, submission->number,
                                                  confirmation_time, matured);
             immature_block_submissions.erase(
                 immature_block_submissions.begin() + i);
@@ -81,7 +81,7 @@ void BlockWatcher<confs>::WatchBlocks()
 {
     while (true)
     {
-        auto [res, rep] = redis_manager.GetOneReply(0);
+        auto [res, rep] = persistence_block.GetOneReply(0);
 
         CheckImmatureSubmissions();
     }

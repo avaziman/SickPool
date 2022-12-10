@@ -2,9 +2,9 @@
 
 using enum Prefix;
 
-RoundManager::RoundManager(const RedisManager& rm,
+RoundManager::RoundManager(const PersistenceLayer& pl,
                            const std::string& round_type)
-    : RedisRound(rm), round_type(round_type)
+    : PersistenceRound(pl), round_type(round_type)
 {
     if (!LoadCurrentRound())
     {
@@ -15,7 +15,14 @@ RoundManager::RoundManager(const RedisManager& rm,
     // get the last share
     auto [res, rep] = GetSharesBetween(-2, -1);
 
-    round_progress = res.front().progress;
+    if (!res.empty())
+    {
+        round_progress = res.front().progress;
+    }
+    else
+    {
+        round_progress = 0;
+    }
 #endif
 }
 
@@ -32,7 +39,6 @@ bool RoundManager::CloseRound(const BlockSubmission& submission,
     if (!PaymentManager::GetRewardsPPLNS(round_shares, shares,
                                          submission.reward, n, fee))
     {
-            
     }
     // if(!shares.empty())
 

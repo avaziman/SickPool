@@ -14,10 +14,10 @@
 class StatsManager;
 class RedisManager;
 
-class RoundManager: public RedisRound
+class RoundManager: public PersistenceRound
 {
    public:
-    RoundManager(const RedisManager& rm, const std::string& round_type);
+    explicit RoundManager(const PersistenceLayer& pl, const std::string& round_type);
     bool LoadCurrentRound();
     void AddRoundShare(const MinerIdHex& miner, const double effort);
     bool CloseRound(const BlockSubmission& submission, const double fee);

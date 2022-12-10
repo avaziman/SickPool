@@ -4,17 +4,16 @@ CREATE TABLE addresses (
 );
 
 CREATE TABLE workers (
-    id INT UNIQUE AUTO_INCREMENT;
+    id INT UNIQUE AUTO_INCREMENT,
+    miner_id INT,
 
-miner_id INT;
-
-FOREIGN KEY (miner_id) REFERENCES addresses(id)
+    FOREIGN KEY (miner_id) REFERENCES addresses(id)
 );
 
--- CREATE PROCEDURE 
 CREATE TABLE blocks (
     id INT UNIQUE AUTO_INCREMENT,
     status TINYINT,
+    miner_id INT,
     worker_id INT,
     hash char(64),
     reward BIGINT UNSIGNED,
@@ -33,6 +32,7 @@ CREATE TABLE blocks (
         effort_percent
     ),
     FOREIGN KEY (worker_id) REFERENCES workers(id)
+    FOREIGN KEY (miner_id) REFERENCES miners(id)
 );
 
 

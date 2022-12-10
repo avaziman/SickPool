@@ -75,8 +75,15 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg,
 
     ondemand::object ob = configDoc["redis"].get_object();
 
-    AssignJson("redis_port", cnfg.redis.redis_port, ob, logger);
+    AssignJson("host", cnfg.redis.host, ob, logger);
+    AssignJson("db_index", cnfg.redis.db_index, ob, logger);
     AssignJson("hashrate_ttl", cnfg.redis.hashrate_ttl_seconds, ob, logger);
+
+    ob = configDoc["mysql"].get_object();
+    AssignJson("host", cnfg.mysql.host, ob, logger);
+    AssignJson("db_name", cnfg.mysql.db_name, ob, logger);
+    AssignJson("user", cnfg.mysql.user, ob, logger);
+    AssignJson("pass", cnfg.mysql.pass, ob, logger);
 
     ob = configDoc["stats"].get_object();
 

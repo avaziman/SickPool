@@ -2,18 +2,12 @@
 
 Logger<PaymentManager::field_str> PaymentManager::logger;
 
-int PaymentManager::payout_age_seconds;
-int64_t PaymentManager::minimum_payout_threshold;
-int64_t PaymentManager::last_payout_ms;
 uint32_t PaymentManager::payment_counter = 0;
 
 PaymentManager::PaymentManager(RedisManager* rm, daemon_manager_t* dm,
-                               const std::string& pool_addr, int payout_age_s,
-                               int64_t min_threshold)
+                               const std::string& pool_addr)
     : redis_manager(rm), daemon_manager(dm), pool_addr(pool_addr)
 {
-    PaymentManager::payout_age_seconds = payout_age_s;
-    PaymentManager::minimum_payout_threshold = min_threshold;
 }
 
 inline void AddSharePPLNS(round_shares_t& miner_shares, double& score_sum,

@@ -1,14 +1,15 @@
 #ifndef REDIS_BLOCK_HPP_
 #define REDIS_BLOCK_HPP_
 #include "redis_manager.hpp"
-
-class RedisBlock : public RedisManager
+#include "mysql_manager.hpp"
+#include "persistence_layer.hpp"
+class PersistenceBlock : public PersistenceLayer
 {
     private:
      BlockKeyNames block_key_names;
 
     public:
-     explicit RedisBlock(const RedisManager& rm) : RedisManager(rm), block_key_names(this->key_names.coin) {}
+     explicit PersistenceBlock(const PersistenceLayer& pl) : PersistenceLayer(pl), block_key_names(this->key_names.coin) {}
 
     //  void AppendAddBlockSubmission(const BlockSubmission& submission);
      bool UpdateBlockConfirmations(std::string_view block_id,

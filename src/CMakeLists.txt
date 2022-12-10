@@ -40,6 +40,7 @@ file(GLOB SRC_FILES
     "jobs/*.cpp"
     "persistence/redis/*.cpp"
     "persistence/mysql/*.cpp"
+    "persistence/*.cpp"
     "round/*.cpp"
     "payments/*.cpp"
     "logger/*.cpp"
@@ -54,7 +55,10 @@ include(FindPkgConfig)
 
 add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
 
-set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC persistence/redis PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
+set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum
+ PUBLIC static_config PUBLIC blocks PUBLIC round
+ PUBLIC persistence/redis PUBLIC persistence/mysql PUBLIC persistence
+ PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER})
@@ -63,8 +67,7 @@ target_link_libraries(
     ${PROJECT_NAME_CORE}
     ${Boost_LIBRARIES}
     hiredis
-    # /usr/lib/x86_64-linux-gnu/libmysqlcppconn-static.a
-    # /usr/lib/x86_64-linux-gnu/libmysqlcppconn.a
+    mysqlcppconn
     pthread
     cryptonote_utils
     simdjson

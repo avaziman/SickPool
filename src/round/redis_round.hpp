@@ -5,10 +5,10 @@
 
 #include "redis_block.hpp"
 #include "redis_manager.hpp"
-class RedisRound :  public RedisBlock
+class PersistenceRound :  public PersistenceBlock
 {
    public:
-    explicit RedisRound(const RedisManager &rm) : RedisBlock(rm) {}
+    explicit PersistenceRound(const PersistenceLayer &pl) : PersistenceBlock(pl) {}
 
     std::pair<std::span<Share>, redis_unique_ptr> GetLastNShares(
         double progress, double n);

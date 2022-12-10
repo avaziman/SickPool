@@ -6,11 +6,19 @@
 
 struct RedisConfig
 {
-    uint16_t redis_port;
+    std::string host;
+    uint8_t db_index;
     uint32_t hashrate_ttl_seconds;
 };
 
-struct StatsConfig
+struct MySqlConfig {
+    std::string host;
+    std::string db_name;
+    std::string user;
+    std::string pass;
+};
+
+    struct StatsConfig
 {
     uint32_t hashrate_interval_seconds;
     uint32_t effort_interval_seconds;
@@ -34,6 +42,7 @@ struct CoinConfig
     std::vector<RpcConfig> payment_rpcs;
 
     RedisConfig redis;
+    MySqlConfig mysql;
     StatsConfig stats;
 
     uint32_t socket_recv_timeout_seconds;

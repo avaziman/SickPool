@@ -290,15 +290,11 @@ bool RedisStats::GetMinerId(MinerIdHex &id_res, std::string_view addr_lc)
 
     auto res = Command({"HGET", key_names.address_id_map, addr_lc});
 
-    if (res->type != REDIS_REPLY_STRING)
-    {
-        return false;
-    }
+    long id = ResToInt(std::move(res));
 
-    uint32_t id;
-    std::from_chars(res->str, res->str + res->len, id, 16);
+    if (id == -1) return false;
 
-    id_res = MinerIdHex(id);
+    id_res = MinerIdHex(static_cast<uint32_t>(id));
 
     return true;
 }
@@ -313,15 +309,11 @@ bool RedisStats::GetWorkerId(WorkerIdHex &worker_id, const MinerIdHex &miner_id,
          Format({key_names.solver, EnumName<WORKER>(), miner_id.GetHex()}),
          worker_name});
 
-    if (res->type != REDIS_REPLY_STRING)
-    {
-        return false;
-    }
+    long id = ResToInt(std::move(res));
 
-    uint32_t id;
-    std::from_chars(res->str, res->str + res->len, id, 16);
+    if (id == -1) return false;
 
-    worker_id = WorkerIdHex(id);
+    worker_id = WorkerIdHex(static_cast<uint32_t>(id));
 
     return true;
 }

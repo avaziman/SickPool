@@ -17,8 +17,7 @@ int main(int argc, char** argv)
     ParseCoinConfig(json, coinConfig, conf_logger);
 
     std::vector<std::unique_ptr<BlockSubmission>> immature_block_submissions;
-    const std::string ip = "127.0.0.1";
-    RedisManager redis_manager(ip, &coinConfig);
+    PersistenceLayer redis_manager(coinConfig);
     daemon_manager_t daemon_manager(coinConfig.rpcs);
 
     if (coinConfig.symbol == "ZANO")

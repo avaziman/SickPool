@@ -3,8 +3,8 @@
 #include "redis_manager.hpp"
 #include "redis_block.hpp"
 
-class RedisPayment : public RedisBlock {
-    using RedisBlock::RedisBlock;
-};
+// class RedisPayment : public RedisBlock {
+//     using RedisBlock::RedisBlock;
+// };
 
 #endif
