@@ -11,9 +11,9 @@
 #include <thread>
 #include <vector>
 
-#include "job.hpp"
 #include "block_submitter.hpp"
 #include "connection.hpp"
+#include "job.hpp"
 #include "jobs/job_manager.hpp"
 #include "logger.hpp"
 #include "server.hpp"
@@ -49,8 +49,7 @@ class StratumServer : public StratumBase
     BlockSubmitter block_submitter;
     StatsManager stats_manager;
 
-    virtual void HandleReq(Connection<StratumClient>* conn,
-                           WorkerContextT* wc,
+    virtual void HandleReq(Connection<StratumClient>* conn, WorkerContextT* wc,
                            std::string_view req) = 0;
 
     virtual RpcResult HandleAuthorize(StratumClient* cli,
@@ -60,6 +59,8 @@ class StratumServer : public StratumBase
                               simdjson::ondemand::array& params);
 
     void HandleBlockNotify() override;
+    void HandleNewJob() override;
+    void HandleNewJob(const std::shared_ptr<JobT> new_job);
 
     RpcResult HandleShare(StratumClient* cli, WorkerContextT* wc,
                           ShareT& share);

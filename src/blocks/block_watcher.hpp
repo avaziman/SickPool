@@ -4,24 +4,28 @@
 #include <simdjson/simdjson.h>
 #include <memory>
 
+#include "redis_manager.hpp"
 #include "static_config.hpp"
+
 #include "daemon_manager_t.hpp"
 #include "logger.hpp"
-#include "redis/redis_manager.hpp"
+#include "redis_block.hpp"
 
 template <StaticConf confs>
 class BlockWatcher
 {
    public:
-    explicit BlockWatcher(RedisManager* redis_manager,
+    explicit BlockWatcher(const RedisManager* redis_manager,
                           daemon_manager_t* daemon_manager);
 
     void CheckImmatureSubmissions();
+    void WatchBlocks();
+
    private:
     static constexpr std::string_view logger_field = "BlockWatcher";
     const Logger<logger_field> logger;
     std::mutex blocks_lock;
-    RedisManager* redis_manager;
+    RedisBlock redis_manager;
     daemon_manager_t* daemon_manager;
 
     simdjson::ondemand::parser httpParser;

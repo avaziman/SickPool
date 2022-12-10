@@ -6,12 +6,13 @@
 #include <typeinfo>
 
 #include "logger.hpp"
+static constexpr std::string_view logger_name = "BENCHMARK";
 
 template <typename T>
 class Benchmark
 {
    public:
-    Benchmark(std::string name)
+    explicit Benchmark(std::string_view name)
         : start(std::chrono::steady_clock::now()), name(name)
     {
     }
@@ -19,11 +20,11 @@ class Benchmark
     {
         auto end = std::chrono::steady_clock::now();
         T duration = std::chrono::duration_cast<T>(end - start);
-        // logger.Log<LogType::Debug>( "Benchmark,
-        //             "Bench \"{}\" took: {} units", name, duration.count());
+        logger.Log<LogType::Debug>("Bench \"{}\" took: {} units", name, duration.count());
     }
 
    private:
+    static inline Logger<logger_name> logger;
     std::string name;
     std::chrono::time_point<std::chrono::steady_clock> start;
 };

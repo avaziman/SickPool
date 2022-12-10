@@ -6,7 +6,6 @@ using enum Prefix;
 
 const Logger<RedisManager::logger_field> RedisManager::logger;
 redis_unique_ptr_context RedisManager::rc_unique;
-redisContext *RedisManager::rc;
 std::mutex RedisManager::rc_mutex;
 
 RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf,
@@ -15,14 +14,12 @@ RedisManager::RedisManager(const std::string &ip, const CoinConfig *conf,
 {
     RedisManager::rc_unique = redis_unique_ptr_context(
         redisConnect(ip.c_str(), conf->redis.redis_port), redisFree);
-    RedisManager::rc = rc_unique.get();
 
-    if (rc->err)
+    if (rc_unique->err)
     {
         logger.Log<LogType::Critical>("Failed to connect to redis: {}",
-                                      rc->errstr);
-        // redisFree(rc);
-        throw std::runtime_error("Failed to connect to redis");
+                                      rc_unique->errstr);
+        throw std::invalid_argument("Failed to connect to redis");
     }
 
     Command({"SELECT", std::to_string(db_index)});
@@ -32,7 +29,8 @@ void RedisManager::Init()
     using namespace std::string_view_literals;
 
     const int64_t hashrate_ttl_ms = conf->redis.hashrate_ttl_seconds * 1000;
-    const int64_t mined_blocks_interval = conf->stats.mined_blocks_interval * 1000;
+    const int64_t mined_blocks_interval =
+        conf->stats.mined_blocks_interval * 1000;
     const int64_t hashrate_interval_ms =
         conf->stats.hashrate_interval_seconds * 1000;
 
@@ -62,31 +60,30 @@ void RedisManager::Init()
     }
 
     // mined blocks, only compact needed.
-    AppendCommand({"TS.CREATE"sv, key_names.mined_block_number, "RETENTION"sv,
-                   std::to_string(mined_blocks_interval)});
+    // AppendCommand({"TS.CREATE"sv, key_names.mined_block_number, "RETENTION"sv,
+    //                std::to_string(mined_blocks_interval)});
 
     // effort percent
-    auto key_name = key_names.block_effort_percent;
-    auto key_compact_name = key_names.block_effort_percent_compact;
-    AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
-                   std::to_string(hashrate_ttl_ms * 7)});
+    // auto key_name = key_names.block_effort_percent;
+    // auto key_compact_name = key_names.block_effort_percent_compact;
+    // AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
+    //                std::to_string(hashrate_ttl_ms * 7)});
 
-    AppendCommand({"TS.CREATE"sv, key_compact_name, "RETENTION"sv,
-                   std::to_string(hashrate_ttl_ms * 7)});
+    // AppendCommand({"TS.CREATE"sv, key_compact_name, "RETENTION"sv,
+    //                std::to_string(hashrate_ttl_ms * 7)});
 
-    AppendCommand({"TS.CREATERULE"sv, key_name, key_compact_name,
-                   "AGGREGATION"sv, "AVG"sv,
-                   std::to_string(hashrate_interval_ms * 12)});
+    // AppendCommand({"TS.CREATERULE"sv, key_name, key_compact_name,
+    //                "AGGREGATION"sv, "AVG"sv,
+    //                std::to_string(hashrate_interval_ms * 12)});
 
     if (!GetReplies())
     {
         logger.Log<LogType::Critical>(
-            "Failed to connect to add pool timeserieses", rc->errstr);
-        throw std::runtime_error("Failed to connect to add pool timeserieses");
+            "Failed to connect to add pool timeserieses", rc_unique->errstr);
+        throw std::invalid_argument(
+            "Failed to connect to add pool timeserieses");
     }
 }
-
-RedisManager::~RedisManager() {}
 
 bool RedisManager::SetActiveId(const MinerIdHex &id)
 {
@@ -97,99 +94,6 @@ bool RedisManager::SetActiveId(const MinerIdHex &id)
 
     AppendCommand({"SADD", key_names.active_ids_map, id.GetHex()});
 
-    return GetReplies();
-}
-// bool RedisManager::SetNewBlockStats(std::string_view chain, int64_t
-// curtime_ms,
-//                                     double net_est_hr, double target_diff)
-// {
-//     std::scoped_lock lock(rc_mutex);
-
-//     // AppendTsAdd(key_name.hashrate_network, curtime_ms, net_est_hr);
-
-//     // AppendSetMinerEffort(chain, EnumName<ESTIMATED_EFFORT>(), "pow",
-//     //                      target_diff);
-//     return GetReplies();
-// }
-
-bool RedisManager::UpdateImmatureRewards(uint8_t chain, uint32_t block_num,
-                                         int64_t matured_time, bool matured)
-{
-    using namespace std::string_view_literals;
-    using namespace std::string_literals;
-    std::scoped_lock lock(rc_mutex);
-
-    auto reply = Command({"HGETALL"sv, Format({key_names.reward_immature,
-                                               std::to_string(block_num)})});
-
-    int64_t matured_funds = 0;
-    // either mature everything or nothing
-    {
-        RedisTransaction update_rewards_tx(this);
-
-        for (int i = 0; i < reply->elements; i += 2)
-        {
-            std::string_view addr(reply->element[i]->str,
-                                  reply->element[i]->len);
-
-            RoundReward *miner_share =
-                (RoundReward *)reply->element[i + 1]->str;
-
-            // if a block has been orphaned only remove the immature
-            // if there are sub chains add chain:
-
-            if (!matured)
-            {
-                miner_share->reward = 0;
-            }
-
-            // used to show round share statistics
-            uint8_t
-                round_share_block_num[sizeof(miner_share) + sizeof(block_num)];
-            memcpy(round_share_block_num, miner_share, sizeof(miner_share));
-            memcpy(round_share_block_num + sizeof(miner_share), &block_num,
-                   sizeof(block_num));
-
-            std::string mature_rewards_key =
-                Format({key_names.reward_mature, addr});
-            AppendCommand({"LPUSH"sv, mature_rewards_key,
-                           std::string_view((char *)round_share_block_num,
-                                            sizeof(round_share_block_num))});
-
-            AppendCommand({"LTRIM"sv, mature_rewards_key, "0"sv,
-                           std::to_string(ROUND_SHARES_LIMIT)});
-
-            std::string reward_str = std::to_string(miner_share->reward);
-            std::string_view reward_sv(reward_str);
-
-            // // used for payments
-            // AppendCommand({"HSET"sv, fmt::format("mature-rewards:{}", addr),
-            //                std::to_string(block_num), reward_sv});
-
-            AppendCommand(
-                {"ZINCRBY"sv, key_names.solver_index_mature, reward_sv, addr});
-
-            std::string_view solver_key =
-                fmt::format("{}:{}", key_names.solver, addr);
-
-            AppendCommand({"HINCRBY"sv, solver_key, EnumName<MATURE_BALANCE>(),
-                           reward_sv});
-            AppendCommand({"HINCRBY"sv, solver_key,
-                           EnumName<IMMATURE_BALANCE>(),
-                           fmt::format("-{}", reward_sv)});
-
-            // for payment manager...
-            AppendCommand({"PUBLISH", key_names.block_mature_channel, "OK"});
-
-            matured_funds += miner_share->reward;
-        }
-
-        // we pushed it to mature round shares list
-        AppendCommand({"UNLINK"sv, Format({key_names.reward_immature,
-                                           std::to_string(block_num)})});
-    }
-
-    logger.Log<LogType::Info>("{} funds have matured!", matured_funds);
     return GetReplies();
 }
 
@@ -256,11 +160,12 @@ void RedisManager::AppendTsAdd(std::string_view key_name, int64_t time,
         {"TS.ADD"sv, key_name, std::to_string(time), fmt::format("{}", value)});
 }
 
-void RedisManager::AppendTsCreate(std::string_view key, std::string_view prefix,
-                                  std::string_view type,
-                                  std::string_view address, std::string_view id,
-                                  uint64_t retention_ms,
-                                  std::string_view duplicate_policy)
+void RedisManager::AppendTsCreateMiner(std::string_view key,
+                                       std::string_view type,
+                                       std::string_view address,
+                                       std::string_view id,
+                                       uint64_t retention_ms,
+                                       std::string_view duplicate_policy)
 {
     // cant have empty labels
     if (id == "") id = "null";
@@ -269,7 +174,24 @@ void RedisManager::AppendTsCreate(std::string_view key, std::string_view prefix,
     AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
                    std::to_string(retention_ms), "DUPLICATE_POLICY"sv,
                    duplicate_policy, "LABELS"sv, "type"sv, type, "prefix"sv,
-                   prefix, "address"sv, address, "id"sv, id});
+                   EnumName<Prefix::MINER>(), "address"sv, address, "id"sv,
+                   id});
+}
+
+void RedisManager::AppendTsCreateWorker(
+    std::string_view key, std::string_view type, std::string_view address,
+    std::string_view id, uint64_t retention_ms, std::string_view worker_name,
+    std::string_view duplicate_policy)
+{
+    // cant have empty labels
+    if (id == "") id = "null";
+
+    using namespace std::string_view_literals;
+    AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
+                   std::to_string(retention_ms), "DUPLICATE_POLICY"sv,
+                   duplicate_policy, "LABELS"sv, "type"sv, type, "prefix"sv,
+                   EnumName<Prefix::WORKER>(), "address"sv, address, "id"sv, id,
+                   "worker_name", worker_name});
 }
 
 bool RedisManager::GetActiveIds(std::vector<MinerIdHex> &addresses)
@@ -307,9 +229,9 @@ bool RedisManager::hset(std::string_view key, std::string_view field,
 std::string RedisManager::hget(std::string_view key, std::string_view field)
 {
     using namespace std::string_view_literals;
-    auto reply = Command({"HGET"sv, key, field});
 
-    if (reply && reply->type == REDIS_REPLY_STRING)
+    if (auto reply = Command({"HGET"sv, key, field});
+        reply && reply->type == REDIS_REPLY_STRING)
     {
         // returns 0 if failed
         return std::string(reply->str, reply->len);
@@ -387,11 +309,4 @@ bool RedisManager::TsMrange(
     }
 
     return true;
-}
-
-bool RedisManager::UpdateBlockNumber(int64_t time, uint32_t number)
-{
-    std::scoped_lock lock(rc_mutex);
-    AppendTsAdd(key_names.block_number, time, number);
-    return GetReplies();
 }

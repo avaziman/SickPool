@@ -64,13 +64,16 @@ void StatsManager::Start(std::stop_token st)
         {
             next_interval_update += hashrate_interval_seconds;
             UpdateIntervalStats<confs>(update_time_ms);
-            // no need to lock as its after the stats update and adding shares doesnt affect it
-            std::unique_lock _(to_remove_mutex);
-            for (const auto& rm_it : to_remove)
-            {
-                worker_stats_map.erase(rm_it);
-            }
-            to_remove.clear();
+            // no need to lock as its after the stats update and adding shares
+            // doesnt affect it
+            // TODO think how to stop updating stats while reserving right
+            // statistics on disconnect
+            // std::unique_lock _(to_remove_mutex);
+            // for (const auto& rm_it : to_remove)
+            // {
+            //     worker_stats_map.erase(rm_it);
+            // }
+            // to_remove.clear();
         }
 
         // possible that both need to be updated at the same time
@@ -93,7 +96,7 @@ void StatsManager::Start(std::stop_token st)
         if (next_update == next_block_update)
         {
             uint32_t block_number = round_manager->blocks_found.load();
-            redis_manager.UpdateBlockNumber(update_time_ms, block_number);
+            // redis_manager.UpdateBlockNumber(update_time_ms, block_number);
             round_manager->blocks_found.store(0);
 
             next_block_update += conf->mined_blocks_interval;
@@ -129,7 +132,8 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
         // ws.average_hashrate_sum += ws.interval_hashrate;
 
-        // ws.average_hashrate = ws.average_hashrate_sum / average_interval_ratio;
+        // ws.average_hashrate = ws.average_hashrate_sum /
+        // average_interval_ratio;
 
         auto& miner_stats = miner_stats_map[worker_id.miner_id];
         // miner_stats.average_hashrate += ws.average_hashrate;
@@ -171,7 +175,7 @@ void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
         worker_stats.current_interval_effort += diff;
 
         logger.Log<LogType::Debug>(
-            "Logged share with diff: {} for {} total diff: {}", diff,
+            "[THREAD {}] Logged share with diff: {} for {} total diff: {}", gettid(), diff,
             id.GetHex(), worker_stats.current_interval_effort);
         // logger.Log<LogType::Debug>(
         //             "Logged share with diff: {}, hashes: {}", diff,
@@ -187,7 +191,8 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
     using namespace std::literals;
     std::scoped_lock stats_db_lock(stats_list_smutex);
 
-    std::string addr_lowercase(address);
+    std::string addr_lowercase;
+    addr_lowercase.reserve(address.size());
     std::ranges::transform(address, std::back_inserter(addr_lowercase),
                            [](char c) { return std::tolower(c); });
 
@@ -196,11 +201,11 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
         !new_miner)
     {
         // new id
-        miner_id = MinerIdHex(0);
+        miner_id = MinerIdHex(redis_manager.GetMinerCount());
 
         logger.Log<LogType::Info>(
             "New miner has spawned: {}, assigning new id {}", address,
-            miner_id.GetHex());
+        miner_id.GetHex());
         if (redis_manager.AddNewMiner(address, addr_lowercase, "", miner_id,
                                       curtime, min_payout))
         {
@@ -223,10 +228,11 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
         new_worker)
     {
         // new id
-        worker_id = WorkerIdHex(0);
+        worker_id = WorkerIdHex(redis_manager.GetWorkerCount(miner_id));
 
         if (redis_manager.AddNewWorker(WorkerFullId(miner_id.id, worker_id.id),
-                                       addr_lowercase, worker_name, alias, curtime))
+                                       addr_lowercase, worker_name, alias,
+                                       curtime))
         {
             logger.Log<LogType::Info>("Worker {} added to database.",
                                       worker_name);
@@ -253,6 +259,5 @@ void StatsManager::PopWorker(worker_map::iterator& it)
     std::scoped_lock _(to_remove_mutex);
     to_remove.push_back(it);
 }
-
 // TODO: idea: since writing all shares on all pbaas is expensive every 10
 // sec, just write to primary and to side chains write every 5 mins

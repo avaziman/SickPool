@@ -17,8 +17,8 @@
 class JobBase
 {
    public:
-    explicit JobBase(std::string&& jobId)
-        : id(std::move(jobId))
+    explicit JobBase(std::string&& jobId, bool clean)
+        : id(std::move(jobId)), clean(clean)
     {
     }
 
@@ -29,6 +29,7 @@ class JobBase
     // const uint32_t block_size;
     // const uint32_t tx_count;
     // locked when a job is being read from, so it won't be removed.
+    const bool clean;
     const std::string id;
 };
 

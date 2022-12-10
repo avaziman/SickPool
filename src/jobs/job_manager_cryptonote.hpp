@@ -22,7 +22,7 @@ class JobManagerCryptoNote : public JobManager<JobCryptoNote>
         }
 
         // insert first job at the constructor so we don't need to make sure last_job is valid
-        SetNewJob(std::make_shared<JobCryptoNote>(res));
+        SetNewJob(std::make_shared<JobCryptoNote>(res, true));
     }
 
     // will be used when new transactions come on the same block

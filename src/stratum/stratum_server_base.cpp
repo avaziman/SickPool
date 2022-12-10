@@ -3,10 +3,10 @@
 StratumBase::StratumBase(CoinConfig &&conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(std::move(conf)),
-      control_server(coin_config.control_port, coin_config.block_poll_interval),
       redis_manager("127.0.0.1", &coin_config),
       diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
-      round_manager(redis_manager, "pow")
+      round_manager(redis_manager, "pow"),
+      control_server(coin_config.control_port, coin_config.block_poll_interval)
 {
     control_thread = std::jthread(
         std::bind_front(&StratumBase::HandleControlCommands, this));
@@ -14,8 +14,14 @@ StratumBase::StratumBase(CoinConfig &&conf)
 
 StratumBase::~StratumBase()
 {
-    // no need to stop, as stopping has caused this destruction...
-    // Stop();
+    // make sure threads are pending stop as there might have been an exception (Stop wasn't called)
+    Stop();
+    for (auto &t : processing_threads)
+    {
+        t.join();
+    }
+    control_thread.join();
+
     logger.Log<LogType::Info>("Stratum base destroyed.");
 }
 
@@ -46,8 +52,8 @@ void StratumBase::ServiceSockets(std::stop_token st)
 
 void StratumBase::Listen()
 {
-    // const auto worker_amount = 2;
-    const auto worker_amount = std::thread::hardware_concurrency();
+    const auto worker_amount = 2;
+    // const auto worker_amount = std::thread::hardware_concurrency();
     processing_threads.reserve(worker_amount);
 
     for (auto i = 0; i < worker_amount; i++)
@@ -56,7 +62,8 @@ void StratumBase::Listen()
             std::bind_front(&StratumBase::ServiceSockets, this));
     }
 
-    HandleBlockNotify();
+    
+    HandleNewJob();
 
     for (auto &t : processing_threads)
     {
@@ -68,11 +75,11 @@ void StratumBase::Listen()
 void StratumBase::HandleControlCommands(std::stop_token st)
 {
     char buff[256] = {0};
-    while (!st.stop_requested())
+    while (true)
     {
         ControlCommands cmd = control_server.GetNextCommand(buff, sizeof(buff));
 
-        if (cmd == ControlCommands::NONE) continue;
+        if (st.stop_requested()) break;
 
         HandleControlCommand(cmd, buff);
         if(buff[0]){
@@ -90,6 +97,9 @@ void StratumBase::HandleControlCommand(ControlCommands cmd, const char *buff)
         case ControlCommands::BLOCK_NOTIFY:
             HandleBlockNotify();
             break;
+        case ControlCommands::NONE:
+            break;
+
         default:
             logger.Log<LogType::Warn>("Unknown control command {} received.",
                                       (int)cmd);

@@ -3,16 +3,19 @@
 std::shared_ptr<JobCryptoNote> JobManagerCryptoNote::GetNewJob(
     const BlockTemplateResCn& rpctemplate)
 {
-    auto new_job = std::make_shared<JobCryptoNote>(rpctemplate);
-
     // only add the job if it's any different from the last one
-    if (auto last_job = GetLastJob();
-        new_job->height == last_job->height/* &&
-        *dynamic_cast<BlockTemplateCn*>(new_job.get()) ==
-            *dynamic_cast<BlockTemplateCn*>(last_job.get())*/)
-    {
-        return std::shared_ptr<JobCryptoNote>{};
-    }
+    auto last_job = GetLastJob();
+    bool clean = rpctemplate.height > last_job->height;
+
+    // if (!clean
+    //     /* &&
+    //     *dynamic_cast<BlockTemplateCn*>(new_job.get()) ==
+    //         *dynamic_cast<BlockTemplateCn*>(last_job.get())*/)
+    // {
+    //     return std::shared_ptr<JobCryptoNote>{};
+    // }
+
+    auto new_job = std::make_shared<JobCryptoNote>(rpctemplate, clean);
 
     return SetNewJob(std::move(new_job));
 }

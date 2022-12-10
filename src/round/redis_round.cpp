@@ -72,7 +72,7 @@ void RedisRound::GetCurrentRound(Round *rnd, std::string_view chain,
 }
 
 void RedisRound::AppendAddRoundRewards(std::string_view chain,
-                                       const BlockSubmission *submission,
+                                       const BlockSubmission& submission,
                                        const round_shares_t &miner_shares)
 {
     using namespace std::string_view_literals;
@@ -82,7 +82,7 @@ void RedisRound::AppendAddRoundRewards(std::string_view chain,
         AppendCommand(
             {"HSET"sv,
              Format({key_names.reward_immature,
-                     std::to_string(submission->number)}),
+                     std::to_string(submission.number)}),
              miner_id.GetHex(),
              std::string_view(reinterpret_cast<const char *>(&round_share),
                               sizeof(RoundReward))});
@@ -94,7 +94,7 @@ void RedisRound::AppendAddRoundRewards(std::string_view chain,
 }
 
 bool RedisRound::SetClosedRound(std::string_view chain, std::string_view type,
-                              const BlockSubmission *submission,
+                              const BlockSubmission& submission,
                               const round_shares_t &round_shares,
                               int64_t time_ms)
 {
@@ -105,9 +105,8 @@ bool RedisRound::SetClosedRound(std::string_view chain, std::string_view type,
         // either close everything about the round or nothing
         RedisTransaction close_round_tx(this);
 
-        AppendCommand({"INCR"sv, key_names.block_number});
         AppendAddBlockSubmission(submission);
-        AppendAddRoundRewards(chain, submission, round_shares);
+        // AppendAddRoundRewards(chain, submission, round_shares);
         // set round start time
         AppendSetMinerEffort(chain, EnumName<START_TIME>(), type,
                              static_cast<double>(time_ms));
@@ -122,4 +121,109 @@ bool RedisRound::SetClosedRound(std::string_view chain, std::string_view type,
     }
 
     return GetReplies();
+}
+
+bool RedisRound::SetNewBlockStats(std::string_view chain, double target_diff)
+{
+    std::scoped_lock lock(rc_mutex);
+
+    // AppendTsAdd(key_name.hashrate_network, curtime_ms, net_est_hr);
+
+    AppendSetMinerEffort(chain, EnumName<ESTIMATED_EFFORT>(), "pow",
+                         target_diff);
+    return GetReplies();
+}
+
+// manual binary search :)
+std::pair<std::span<Share>, redis_unique_ptr> RedisRound::GetLastNShares(double progress,
+                                                             double n)
+{
+    std::unique_lock lock(rc_mutex);
+
+    redis_unique_ptr res = Command({"STRLEN", key_names.round_shares});
+    lock.unlock();
+
+    const size_t len = res->integer / sizeof(Share);
+    size_t low = 0;
+    size_t high = len;
+    ssize_t mid;
+
+    // we need the shares from the latest to the last one which sums is
+    // bigger or equal to progress - n
+    double target = progress - n;
+    double share_progress;
+
+    do
+    {
+        mid = std::midpoint(low, high);
+        auto [share, resp] = GetSharesBetween(mid, mid + 1);
+
+        if (share.empty())
+        {
+            return std::make_pair(std::span<Share>(), redis_unique_ptr());
+        }
+
+        share_progress = share.front().progress;
+        if (share_progress > target)
+        {
+            high = mid - 1;
+        }
+        else if (share_progress < target)
+        {
+            low = mid + 1;
+        }
+        else
+        {
+            mid++;
+            break;
+        }
+
+    } while (low < high);
+
+    size_t share_count = len - mid;
+    lock.lock();
+    res = Command({"GETRANGE", key_names.round_shares,
+                   std::to_string(-static_cast<ssize_t>(share_count) *
+                                  static_cast<ssize_t>(sizeof(Share))),
+                   std::to_string(-1)});
+
+    std::string_view shares_sv(res->str, res->len);
+    if (shares_sv.size() != share_count * sizeof(Share))
+    {
+        return std::make_pair(std::span<Share>(), redis_unique_ptr());
+    }
+
+    // remove the unneccessary shares
+    auto res2 = Command({"SET", key_names.round_shares, shares_sv});
+
+    return std::make_pair(
+        std::span<Share>(reinterpret_cast<Share *>(res->str), share_count),
+        std::move(res));
+}
+
+std::pair<std::span<Share>, redis_unique_ptr> RedisRound::GetSharesBetween(ssize_t start,
+                                                               ssize_t end)
+{
+    std::scoped_lock _(rc_mutex);
+
+    ssize_t start_index = start * sizeof(Share);
+    ssize_t end_index = end * sizeof(Share) - 1;
+    if (end < 0) end_index = end;  // we want till the end
+
+    auto res =
+        Command({"GETRANGE", key_names.round_shares,
+                 std::to_string(start_index), std::to_string(end_index)});
+
+    return std::make_pair(std::span<Share>(reinterpret_cast<Share *>(res->str),
+                                           res->len / sizeof(Share)),
+                          std::move(res));
+}
+
+void RedisRound::AddPendingShares(const std::vector<Share> &pending_shares)
+{
+    std::scoped_lock _(rc_mutex);
+
+    std::string_view sv(reinterpret_cast<const char *>(pending_shares.data()),
+                        pending_shares.size() * sizeof(Share));
+    Command({"APPEND", key_names.round_shares, sv});
 }

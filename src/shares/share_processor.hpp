@@ -134,7 +134,8 @@ class ShareProcessor
             result.code = ResCode::VALID_BLOCK;
             return;
         }
-        else if (result.difficulty / cli->GetDifficulty() <
+        else 
+        if (result.difficulty / cli->GetDifficulty() <
                  0.99)  // allow 1% below
         {
             result.code = ResCode::LOW_DIFFICULTY_SHARE;

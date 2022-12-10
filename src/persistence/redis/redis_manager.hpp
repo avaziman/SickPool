@@ -13,12 +13,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include "redis_interop.hpp"
 #include "benchmark.hpp"
 #include "coin_config.hpp"
 #include "key_names.hpp"
 #include "logger.hpp"
 #include "payments/round_share.hpp"
+#include "redis_interop.hpp"
 #include "redis_transaction.hpp"
 #include "shares/share.hpp"
 #include "static_config/static_config.hpp"
@@ -55,50 +55,19 @@ class RedisManager
         : conf(rm.conf), key_names(rm.key_names)
     {
     }
-    ~RedisManager();
     void Init();
-    /* block */
 
-    // bool GetPendingPayouts(reward_map_t &payouts) {
-    //     AppendCommand()
-    // }
-
-    // manual binary search :)
     bool GetActiveIds(std::vector<MinerIdHex> &addresses);
     bool SetActiveId(const MinerIdHex &id);
-    void AppendAddBlockSubmission(const BlockSubmission *submission);
-    bool UpdateBlockConfirmations(std::string_view block_id,
-                                  int32_t confirmations);
 
-    bool UpdateImmatureRewards(uint8_t chain, uint32_t block_num,
-                               int64_t matured_time, bool matured);
-    uint32_t GetBlockNumber();
-    /* stats */
-
-    /* round */
     bool LoadUnpaidRewards(payees_info_t &rewards,
                            const std::vector<MinerIdHex> &active_ids);
-
-    /* stats */
 
     bool TsMrange(std::vector<std::pair<WorkerFullId, double>> &last_averages,
                   std::string_view prefix, std::string_view type, int64_t from,
                   int64_t to, const TsAggregation *aggregation = nullptr);
 
-    /* pos */
-    bool AddStakingPoints(std::string_view chain, int64_t duration_ms);
-    bool GetPosPoints(std::vector<std::pair<std::string, double>> &stakers,
-                      std::string_view chain);
-
-    /* payout */
-    // bool AddPayout(const PaymentInfo *payment);
-
     std::string hget(std::string_view key, std::string_view field);
-
-    bool LoadImmatureBlocks(
-        std::vector<std::unique_ptr<BlockSubmission>> &submsissions);
-
-    bool UpdateBlockNumber(int64_t time, uint32_t number);
 
     inline bool GetReplies(redis_unique_ptr *last_reply = nullptr)
     {
@@ -106,23 +75,23 @@ class RedisManager
         bool res = true;
         for (int i = 0; i < command_count - 1; i++)
         {
-            if (redisGetReply(rc, (void **)&reply) != REDIS_OK)
+            if (redisGetReply(rc_unique.get(), (void **)&reply) != REDIS_OK)
             {
                 logger.Log<LogType::Critical>("Failed to get reply: {}",
-                                              rc->errstr);
+                                              rc_unique->errstr);
                 res = false;
-
             }
 
-            //TODO: handle err
+            // TODO: handle err
 
             freeReplyObject(reply);
         }
 
-        if (command_count > 0 && redisGetReply(rc, (void **)&reply) != REDIS_OK)
+        if (command_count > 0 &&
+            redisGetReply(rc_unique.get(), (void **)&reply) != REDIS_OK)
         {
             logger.Log<LogType::Critical>("Failed to get reply: {}",
-                                          rc->errstr);
+                                          rc_unique->errstr);
             res = false;
         }
 
@@ -137,6 +106,33 @@ class RedisManager
 
         command_count = 0;
         return res;
+    }
+
+    // for pub sub when we only want to get reply not send
+    std::pair<int, redis_unique_ptr> GetOneReply(time_t timeout_sec = 0) const
+    {
+        redisReply *reply;
+
+        // remove the error so we can continue using the reader.
+        rc_unique->err = 0;
+
+        if (timeout_sec)
+        {
+            if (timeval timeout{.tv_sec = timeout_sec, .tv_usec = 0};
+                redisSetTimeout(rc_unique.get(), timeout) == REDIS_ERR)
+            {
+                logger.Log<LogType::Error>("Failed to set redis timeout");
+                // return -1;
+            }
+        }
+
+        int res = redisGetReply(rc_unique.get(), (void **)&reply) != REDIS_OK;
+        if (!res)
+        {
+            logger.Log<LogType::Critical>("Failed to get reply: {}",
+                                          rc_unique->errstr);
+        }
+        return std::make_pair(res, redis_unique_ptr(reply, freeReplyObject));
     }
 
     bool AddPendingPayees(payees_info_t &payees)
@@ -181,16 +177,14 @@ class RedisManager
         return GetReplies();
     }
 
-    static constexpr int ROUND_SHARES_LIMIT = 100;
-
-    static redis_unique_ptr_context rc_unique;
-    static redisContext *rc;
-    static std::mutex rc_mutex;
-    const CoinConfig *conf;
-
-    const KeyNames key_names;
+    static int GetError() { return RedisManager::rc_unique->err; }
 
    protected:
+    static constexpr int ROUND_SHARES_LIMIT = 100;
+    const CoinConfig *conf;
+    const KeyNames key_names;
+
+    static std::mutex rc_mutex;
     static constexpr std::string_view logger_field = "Redis";
     static const Logger<logger_field> logger;
 
@@ -209,7 +203,8 @@ class RedisManager
             i++;
         }
 
-        redisAppendCommandArgv(rc, static_cast<int>(argc), argv, args_len);
+        redisAppendCommandArgv(rc_unique.get(), static_cast<int>(argc), argv,
+                               args_len);
         command_count++;
     }
 
@@ -221,10 +216,16 @@ class RedisManager
         return rptr;
     }
 
-    void AppendTsCreate(std::string_view key, std::string_view prefix,
-                        std::string_view type, std::string_view address,
-                        std::string_view id, uint64_t retention_ms,
-                        std::string_view duplicate_policy = "BLOCK");
+    void AppendTsCreateMiner(std::string_view key, std::string_view type,
+                             std::string_view address, std::string_view id,
+                             uint64_t retention_ms,
+                             std::string_view duplicate_policy = "BLOCK");
+
+    void AppendTsCreateWorker(std::string_view key, std::string_view type,
+                              std::string_view address, std::string_view id,
+                              uint64_t retention_ms,
+                              std::string_view worker_name,
+                              std::string_view duplicate_policy = "BLOCK");
 
     bool hset(std::string_view key, std::string_view field,
               std::string_view val);
@@ -232,8 +233,18 @@ class RedisManager
                     std::string_view val);
     void AppendTsAdd(std::string_view key_name, int64_t time, double value);
 
+    int GetInt(std::string_view key)
+    {
+        std::scoped_lock _(rc_mutex);
+        auto res = Command({"GET", key});
+        if (!res || !res->str) return 0;
+
+        return std::strtol(res->str, nullptr, 10);
+    }
+
    private:
     int command_count = 0;
+    static redis_unique_ptr_context rc_unique;
 };
 
 #endif

@@ -48,17 +48,21 @@ class JobManager
         job_count++;
 
         std::unique_lock jobs_lock(jobs_mutex);
-        while (jobs.size())
+        if (job->clean)
         {
-            // incase a job is being used
-            std::shared_ptr<JobT> remove_job = std::move(jobs.back());
-            jobs.pop_back();
+            while (jobs.size())
+            {
+                // incase a job is being used
+                std::shared_ptr<JobT> remove_job = std::move(jobs.back());
+                jobs.pop_back();
+            }
         }
         last_job = jobs.emplace_back(std::move(job));
         return last_job;
     }
 
-    inline std::shared_ptr<JobT> GetLastJob() {
+    inline std::shared_ptr<JobT> GetLastJob()
+    {
         std::shared_lock lock(jobs_mutex);
         return last_job;
     }

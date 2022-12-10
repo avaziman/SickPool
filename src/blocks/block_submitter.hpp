@@ -5,21 +5,22 @@
 
 #include "logger.hpp"
 #include "round_manager.hpp"
+#include "redis_block.hpp"
 
 class BlockSubmitter
 {
    private:
+    RedisBlock redis_manager;
     RoundManager* round_manager;
     daemon_manager_t* daemon_manager;
-    RedisManager* redis_manager;
     static constexpr std::string_view field_str = "BlockSubmitter";
     Logger<field_str> logger;
 
    public:
-    BlockSubmitter(RedisManager* redis_manager,
+    explicit BlockSubmitter(const RedisManager* redis_manager,
                    daemon_manager_t* daemon_manager,
                    RoundManager* round_manager)
-        : redis_manager(redis_manager),
+        : redis_manager(*redis_manager),
           daemon_manager(daemon_manager),
           round_manager(round_manager)
     {
@@ -48,9 +49,10 @@ class BlockSubmitter
     {
         std::scoped_lock lock(blocks_lock);
 
+        submission->number = redis_manager.GetBlockNumber();
         // block number increased here.
         // round_manager->CloseRound(submission.get(), pow_fee);
-        round_manager->CloseRound(submission.get(), pow_fee);
+        round_manager->CloseRound(*submission.get(), pow_fee);
 
         logger.Log<LogType::Info>(
             "Added new block submission: \n"

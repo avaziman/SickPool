@@ -20,7 +20,7 @@ class RoundManager: public RedisRound
     RoundManager(const RedisManager& rm, const std::string& round_type);
     bool LoadCurrentRound();
     void AddRoundShare(const MinerIdHex& miner, const double effort);
-    bool CloseRound(const BlockSubmission* submission, const double fee);
+    bool CloseRound(const BlockSubmission& submission, const double fee);
     void ResetRoundEfforts();
 
     bool UpdateEffortStats(int64_t update_time_ms);

@@ -1,19 +1,12 @@
 #include "block_watcher.hpp"
+template class BlockWatcher<ZanoStatic>;
 
 template <StaticConf confs>
-BlockWatcher<confs>::BlockWatcher(RedisManager* redis_manager,
+BlockWatcher<confs>::BlockWatcher(const RedisManager* redis_manager,
                                   daemon_manager_t* daemon_manager)
-    : redis_manager(redis_manager), daemon_manager(daemon_manager)
+    : redis_manager(*redis_manager), daemon_manager(daemon_manager)
 {
-    redis_manager->LoadImmatureBlocks(immature_block_submissions);
 
-    for (const std::unique_ptr<BlockSubmission>& sub :
-         immature_block_submissions)
-    {
-        logger.template Log<LogType::Info>(
-            "Block watcher loaded immature block id: {}, hash: {}", sub->number,
-            HexlifyS(sub->hash_bin));
-    }
 }
 
 template <StaticConf confs>
@@ -24,6 +17,16 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
     uint32_t current_height;
     std::string resBody;
 
+    redis_manager.LoadImmatureBlocks(immature_block_submissions);
+
+    for (const std::unique_ptr<BlockSubmission>& sub :
+         immature_block_submissions)
+    {
+        logger.template Log<LogType::Info>(
+            "Block watcher loaded immature block id: {}, hash: {}", sub->number,
+            HexlifyS(sub->hash_bin));
+    }
+
     logger.template Log<LogType::Info>("Checking confirmations for {} blocks",
                                        immature_block_submissions.size());
 
@@ -33,37 +36,20 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
         auto hashHex = HexlifyS(submission->hash_bin);
         auto chain = submission->chain;
 
-        int res = daemon_manager->SendRpcReq(resBody, 1, "getblockheader",
-                                             DaemonRpc::GetParamsStr(hashHex));
+        BlockHeaderResCn header_res;
+        bool res =
+            daemon_manager->GetBlockHeader(header_res, hashHex, httpParser);
 
-        if (res != 200)
+        if (!res)
         {
             logger.template Log<LogType::Info>(
-                "Failed to get confirmations for block {}, parse "
-                "error: {}, http code: {}",
-                hashHex, resBody, res);
+                "Failed to get confirmations for block {}", hashHex);
             continue;
         }
 
-        int32_t confirmations = -1;
-        try
-        {
-            ondemand::document doc = httpParser.iterate(
-                resBody.data(), resBody.size(), resBody.capacity());
+        int confirmations = header_res.depth;
 
-            confirmations = (int32_t)doc["result"]["confirmations"].get_int64();
-        }
-        catch (const simdjson_error& err)
-        {
-            confirmations = 0;
-            logger.template Log<LogType::Info>(
-                "Failed to get confirmations for block {}, parse "
-                "error: {}",
-                hashHex, err.what());
-            continue;
-        }
-
-        redis_manager->UpdateBlockConfirmations(
+        redis_manager.UpdateBlockConfirmations(
             std::string_view(std::to_string(submission->number)),
             confirmations);
 
@@ -72,37 +58,31 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
 
         int64_t confirmation_time = GetCurrentTimeMs();
 
-        // 100% orphaned
-        if (confirmations == -1 &&
-            current_height > submission->height + confs.COINBASE_MATURITY)
+        // 100% orphaned or matured
+        if (current_height > submission->height + confs.COINBASE_MATURITY)
         {
-            logger.template Log<LogType::Info>("Block {} has been orphaned! :(",
-                                               hashHex);
+            bool matured = confirmations > confs.COINBASE_MATURITY;
 
-            redis_manager->UpdateImmatureRewards(chain, submission->number,
-                                                 confirmation_time, false);
+            std::string desc = matured ? "matured" : "been orphaned";
+            logger.template Log<LogType::Info>("Block {} has {}!", hashHex,
+                                               desc);
+
+            redis_manager.UpdateImmatureRewards(chain, submission->number,
+                                                 confirmation_time, matured);
             immature_block_submissions.erase(
                 immature_block_submissions.begin() + i);
-            i--;
-        }
-        else if (confirmations > confs.COINBASE_MATURITY)
-        {
-            logger.template Log<LogType::Info>("Block {} has matured!",
-                                               hashHex);
-
-            //     int64_t duration_ms = confirmation_time - last_matured_time;
-            //     redis_manager->AddStakingPoints(chain, duration_ms);
-            // }
-
-            redis_manager->UpdateImmatureRewards(chain, submission->number,
-                                                 confirmation_time, true);
-
-            immature_block_submissions.erase(
-                immature_block_submissions.begin() + i);
-
             i--;
         }
     }
 }
 
-// think of what happens if they deposit at the same time as the block was found
+template <StaticConf confs>
+void BlockWatcher<confs>::WatchBlocks()
+{
+    while (true)
+    {
+        auto [res, rep] = redis_manager.GetOneReply(0);
+
+        CheckImmatureSubmissions();
+    }
+}

@@ -101,10 +101,10 @@ template <>
 class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
 {
    public:
-    explicit Job<StratumProtocol::CN>(const BlockTemplateResCn& bTemplate)
+    explicit Job<StratumProtocol::CN>(const BlockTemplateResCn& bTemplate, bool clean)
         : BlockTemplateCn(bTemplate),
           // job id is the block template hash hex
-          JobBase(HexlifyS(template_hash))
+          JobBase(HexlifyS(template_hash), clean)
     {
     }
 

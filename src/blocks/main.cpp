@@ -25,7 +25,7 @@ int main(int argc, char** argv)
     {
         static constexpr StaticConf confs = ZanoStatic;
         BlockWatcher<confs> block_watcher(&redis_manager, &daemon_manager);
-        block_watcher.CheckImmatureSubmissions();
+        block_watcher.WatchBlocks();
     }
 
     return 0;

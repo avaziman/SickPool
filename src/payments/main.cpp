@@ -26,20 +26,10 @@ bool GetPendingPayees(payees_info_t& payees, RedisManager* redis_manager)
 static constexpr std::string_view logger_field = "PaymentManager";
 const Logger<logger_field> logger;
 
-int UpdateTimeout(redisContext* redisCo, time_t payment_time, time_t curtime)
-{
-    // remove the error so we can continue using the reader.
-    redisCo->err = 0;
-
-    if (timeval timeout{.tv_sec = payment_time - curtime};
-        redisSetTimeout(redisCo, timeout) == REDIS_ERR)
-    {
-        logger.Log<LogType::Error>("Failed to set redis timeout");
-        return -1;
-    }
-
-    return 0;
-}
+// on each matured pool block: check if the updated
+// balances meets the payout threshold if yes
+// put miner on pending, stop waiting for replies if its time for
+// payout
 
 int main(int argc, char** argv)
 {
@@ -62,43 +52,36 @@ int main(int argc, char** argv)
     }
 
     const std::string ip = "127.0.0.1";
-    RedisPayment redis_manager(ip, &coinConfig);
+    const RedisManager rm(ip, &coinConfig);
+    RedisPayment redis_manager(rm);
     daemon_manager_t daemon_manager(coinConfig.payment_rpcs);
-    time_t curtime = time(nullptr);
-
-    time_t next_payment = curtime + coinConfig.payment_interval_seconds -
-                          curtime % coinConfig.payment_interval_seconds;
-    UpdateTimeout(redis_manager.rc, next_payment, curtime);
 
     redis_manager.SubscribeToMaturityChannel();
-    // on each matured block: check if the updated
-    // balances meets the payout threshold if yes
-    // put miner on pending pending, stop waiting for replies if its time for
-    // payout
-    redisReply* reply;
 
-    int res;
-    while (res = redisGetReply(redis_manager.rc, (void**)&reply))
+    while (true)
     {
+        time_t curtime = time(nullptr);
+        time_t next_payment = curtime + coinConfig.payment_interval_seconds -
+                              curtime % coinConfig.payment_interval_seconds;
+
+        auto [res, rep] = redis_manager.GetOneReply(next_payment - curtime);
+
         payees_info_t payees;
 
-        // mature block update
+        // payout time!
         if (res == REDIS_ERR)
         {
             // REDIS_ERR_TIMEOUT is for windows...
-            if (redis_manager.rc->err != REDIS_ERR_IO || errno == EAGAIN)
+            if (RedisManager::GetError() != REDIS_ERR_IO || errno == EAGAIN)
             {
-                // other error;
-                logger.Log<LogType::Error>("Redis error, code: {} -> {}",
-                                           redis_manager.rc->err,
-                                           redis_manager.rc->errstr);
+                logger.Log<LogType::Error>("Redis error, code: {}",
+                                           RedisManager::GetError());
                 return -1;
             }
 
             // timeout reached, payment time!
             logger.Log<LogType::Info>("Payment time! {}", next_payment);
             next_payment += coinConfig.payment_interval_seconds;
-            UpdateTimeout(redis_manager.rc, next_payment, curtime);
 
             // immediate payment time!
             GetPendingPayees(payees, &redis_manager);
@@ -110,32 +93,28 @@ int main(int argc, char** argv)
 
             // min fee
             // substract fees
-            const int64_t fee = 10000000000; // 0.01
+            const int64_t fee = 10000000000;  // 0.01
 
             if (payees.empty()) continue;
 
             const int64_t individual_fee = fee / payees.size();
-            for (const auto& p : payees)
+            for (const auto& [addr, info] : payees)
             {
-                int64_t amount_txfeed = p.second.amount - individual_fee;
-                destinations.emplace_back(p.first, amount_txfeed);
+                int64_t amount_txfeed = info.amount - individual_fee;
+                destinations.emplace_back(addr, amount_txfeed);
             }
 
             TransferResCn transfer_res;
             if (!daemon_manager.Transfer(transfer_res, destinations, fee,
                                          parser))
             {
+                logger.Log<LogType::Info>("Failed to transfer funds!");
             }
-            continue;
         }
-        // block matured
-        else
-        {
-            UpdateTimeout(redis_manager.rc, next_payment, curtime);
+        else {
+        // pool block matured
 
-            freeReplyObject(reply);
         }
-
         // GetPendingPayees(payees, &redis_manager);
         // redis_manager.AddPendingPayees(payees);
         // for ( : payees)

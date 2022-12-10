@@ -38,28 +38,33 @@ file(GLOB SRC_FILES
     "stats/*.cpp"
     "blocks/*.cpp"
     "jobs/*.cpp"
-    "redis/*.cpp"
+    "persistence/redis/*.cpp"
+    "persistence/mysql/*.cpp"
     "round/*.cpp"
     "payments/*.cpp"
     "logger/*.cpp"
     "daemon/*.cpp"
 )
 
-# message("SRC FILES: ${SRC_FILES}")
+# dependencies
+# BOOST
 FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED)
+
+include(FindPkgConfig)
 
 add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
 
-set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC redis PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
+set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum PUBLIC static_config PUBLIC blocks PUBLIC round PUBLIC persistence/redis PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
-find_library(HIREDIS_LIB hiredis)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER})
 
 target_link_libraries(
     ${PROJECT_NAME_CORE}
-    ${HIREDIS_LIB}
     ${Boost_LIBRARIES}
+    hiredis
+    # /usr/lib/x86_64-linux-gnu/libmysqlcppconn-static.a
+    # /usr/lib/x86_64-linux-gnu/libmysqlcppconn.a
     pthread
     cryptonote_utils
     simdjson

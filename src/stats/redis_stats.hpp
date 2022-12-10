@@ -12,8 +12,8 @@ class RedisStats : public RedisManager
     explicit RedisStats(const RedisManager &rm)
         : RedisManager(rm),
           average_hashrate_ratio_str(
-              std::to_string(rm.conf->stats.average_hashrate_interval_seconds /
-                             rm.conf->stats.hashrate_interval_seconds))
+              std::to_string(this->conf->stats.average_hashrate_interval_seconds /
+                             this->conf->stats.hashrate_interval_seconds))
     {
         std::vector<MinerIdHex> active_ids;
         if (!GetActiveIds(active_ids))
@@ -63,12 +63,22 @@ class RedisStats : public RedisManager
 
     void AppendUpdateWorkerCount(MinerIdHex miner_id, int amount,
                                  int64_t update_time_ms);
-    void AppendCreateStatsTs(std::string_view addrOrWorker, std::string_view id,
-                             std::string_view prefix,
+    void AppendCreateStatsTsMiner(std::string_view addr, std::string_view id,
                              std::string_view addr_lowercase_sv,
+                             uint64_t curtime_ms);
+    void AppendCreateStatsTsWorker(std::string_view addr, std::string_view id,
+                             std::string_view addr_lowercase_sv, std::string_view worker_name,
                              uint64_t curtime_ms);
 
     bool PopWorker(const WorkerFullId &fullid);
+    int GetMinerCount()
+    {
+        return GetInt(key_names.solver_count);
+    }
+    int GetWorkerCount(const MinerIdHex& id)
+    {
+        return GetInt(Format({key_names.miner_worker_count, id.GetHex()}));
+    }
 };
 
 #endif

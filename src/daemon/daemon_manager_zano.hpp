@@ -20,5 +20,8 @@ class DaemonManagerZano : public DaemonManager
     bool Transfer(TransferResCn& transfer_res,
                   const std::vector<std::pair<std::string, int64_t>>& dests, int64_t fee,
                       simdjson::ondemand::parser& parser);
+
+    bool GetBlockHeader(BlockHeaderResCn& res, std::string_view block_hash,
+                        simdjson::ondemand::parser& parser);
 };
 #endif

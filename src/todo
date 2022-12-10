@@ -60,3 +60,6 @@ old blocks
 round shares
 
 CACHE ONLY 100 last blocks rest on disk db
+
+
+add connection count

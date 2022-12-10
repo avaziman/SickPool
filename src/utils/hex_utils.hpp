@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <cmath>
 
 constexpr auto u64maxd = static_cast<double>(UINT64_MAX);
 

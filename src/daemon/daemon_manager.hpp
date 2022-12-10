@@ -10,6 +10,9 @@
 #include "daemon_rpc.hpp"
 #include "logger.hpp"
 
+#define LOG_CODE_ERR(method, code, res) logger.Log<LogType::Error>("Failed to {}, rescode: {}, response: {}", method, code, res)
+#define LOG_PARSE_ERR(method, err) logger.Log<LogType::Error>("Failed to parse {} response: {}", method, err.what())
+
 enum class ValidationType
 {
     WORK,
@@ -70,7 +73,6 @@ struct RpcConfig
     std::string auth;
 };
 
-#define LOG_PARSE_ERR(method, err) logger.Log<LogType::Error>("Failed to parse {} response: {}", method, err.what())
 class DaemonManager
 {
    public:

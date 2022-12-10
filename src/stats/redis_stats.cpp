@@ -125,16 +125,6 @@ bool RedisStats::AddNewMiner(std::string_view address,
             AppendCommand({"HSET"sv, key_names.address_id_map, alias, id_hex});
         }
 
-        // create worker count ts
-        std::string worker_count_key = Format({key_names.worker_count, id_hex});
-
-        AppendTsCreate(worker_count_key, EnumName<MINER>(),
-                       EnumName<WORKER_COUNT>(), addr_lowercase, alias,
-                       conf->redis.hashrate_ttl_seconds * 1000);
-
-        // reset worker count
-        AppendTsAdd(worker_count_key, curime_ms, 0);
-
         std::string curime_ms_str = std::to_string(curime_ms / 1000);
 
         // reset all indexes of new miner
@@ -169,7 +159,9 @@ bool RedisStats::AddNewMiner(std::string_view address,
                        "0"sv});
 
         // to be accessible by lowercase addr
-        AppendCreateStatsTs(id_hex, alias, EnumName<MINER>(), addr_lowercase, curime_ms);
+        AppendCreateStatsTsMiner(id_hex, alias, addr_lowercase, curime_ms);
+
+        AppendCommand({"INCR", key_names.solver_count});
     }
 
     return GetReplies();
@@ -192,15 +184,16 @@ bool RedisStats::AddNewWorker(const WorkerFullId &full_id,
     {
         RedisTransaction add_worker_tx(this);
 
-        AppendCreateStatsTs(full_id.GetHex(), alias, EnumName<WORKER>(),
-                            address_lowercase, curtime_ms);
+        AppendCreateStatsTsWorker(full_id.GetHex(), alias, address_lowercase,
+                                  worker_name, curtime_ms);
     }
+    AppendCommand({"INCR", Format({key_names.miner_worker_count, full_id.miner_id.GetHex()})});
 
     return GetReplies();
 }
 
 void RedisStats::AppendUpdateWorkerCount(MinerIdHex miner_id, int amount,
-                                         int64_t update_time_ms)
+                                         int64_t update_time_ms) 
 {
     using namespace std::string_view_literals;
     std::string amount_str = std::to_string(amount);
@@ -216,42 +209,79 @@ void RedisStats::AppendUpdateWorkerCount(MinerIdHex miner_id, int amount,
                    std::to_string(update_time_ms), amount_str});
 }
 
-void RedisStats::AppendCreateStatsTs(std::string_view addrOrWorker,
+void RedisStats::AppendCreateStatsTsMiner(std::string_view addr,
                                      std::string_view id,
-                                     std::string_view prefix,
                                      std::string_view addr_lowercase_sv,
                                      uint64_t curtime_ms)
 {
     using namespace std::literals;
 
     auto retention = conf->redis.hashrate_ttl_seconds * 1000;
+    const size_t coin_sep = key_names.coin.size() + 1;
+    constexpr auto prefix = EnumName<Prefix::MINER>();
 
     for (std::string_view key_type :
          {key_names.hashrate, key_names.hashrate_average,
           key_names.shares_valid, key_names.shares_stale,
-          key_names.shares_invalid})
+          key_names.shares_invalid, key_names.worker_count})
     {
-        auto key = Format({key_type, prefix, addrOrWorker});
-        AppendTsCreate(key, prefix, key_type, addr_lowercase_sv, id, retention,
+        auto key = Format({key_type, prefix, addr});
+        key_type = key_type.substr(coin_sep);
+        AppendTsCreateMiner(key, key_type, addr_lowercase_sv, id, retention,
                        "SUM"sv);
     }
 
-    auto hr_key = Format({key_names.hashrate, prefix, addrOrWorker});
+    // reset worker count
+    // AppendTsAdd(worker_count_key, curime_ms, 0);
+
+    auto hr_key = Format({key_names.hashrate, prefix, addr});
     auto hr_avg_key =
-        Format({key_names.hashrate_average, prefix, addrOrWorker});
+        Format({key_names.hashrate_average, prefix, addr});
     AppendCommand({"TS.CREATERULE", hr_key, hr_avg_key, "ROLL_AGGREGATION",
                    "roll_avg", average_hashrate_ratio_str});
 
-    uint64_t hr_interval_ms = conf->stats.hashrate_interval_seconds * 1000;
-    uint64_t prev_update = curtime_ms - (curtime_ms % hr_interval_ms);
+    // uint64_t hr_interval_ms = conf->stats.hashrate_interval_seconds * 1000;
+    // uint64_t prev_update = curtime_ms - (curtime_ms % hr_interval_ms);
 
     // to have accurate rolling statistics
-    const auto ratio = conf->stats.average_hashrate_interval_seconds /
-                       conf->stats.hashrate_interval_seconds;
+    // const auto ratio = conf->stats.average_hashrate_interval_seconds /
+    //                    conf->stats.hashrate_interval_seconds;
     // for (int i = 0; i < ratio; i++)
     // {
     //     AppendTsAdd(hr_key, prev_update - (ratio - i - 1) * hr_interval_ms, 0);
     // }
+}
+
+void RedisStats::AppendCreateStatsTsWorker(std::string_view addr,
+                                           std::string_view id,
+                                           std::string_view addr_lowercase_sv,
+                                           std::string_view worker_name,
+                                           uint64_t curtime_ms)
+{
+    using namespace std::literals;
+
+    auto retention = conf->redis.hashrate_ttl_seconds * 1000;
+    const size_t coin_sep = key_names.coin.size() + 1;
+    constexpr auto prefix = EnumName<Prefix::WORKER>();
+
+    for (std::string_view key_type :
+         {key_names.hashrate, key_names.hashrate_average,
+          key_names.shares_valid, key_names.shares_stale,
+          key_names.shares_invalid, key_names.worker_count})
+    {
+        auto key = Format({key_type, prefix, addr});
+        key_type = key_type.substr(coin_sep);
+        AppendTsCreateWorker(key, key_type, addr_lowercase_sv, id, retention, worker_name,
+                            "SUM"sv);
+    }
+
+    // reset worker count
+    // AppendTsAdd(worker_count_key, curime_ms, 0);
+
+    auto hr_key = Format({key_names.hashrate, prefix, addr});
+    auto hr_avg_key = Format({key_names.hashrate_average, prefix, addr});
+    AppendCommand({"TS.CREATERULE", hr_key, hr_avg_key, "ROLL_AGGREGATION",
+                   "roll_avg", average_hashrate_ratio_str});
 }
 
 bool RedisStats::GetMinerId(MinerIdHex &id_res, std::string_view addr_lc)

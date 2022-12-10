@@ -27,9 +27,8 @@ class StratumBase : public Server<StratumClient>
     std::map<std::shared_ptr<Connection<StratumClient>>, double> clients;
     std::shared_mutex clients_mutex;
 
-
-    
     virtual void HandleBlockNotify() = 0;
+    virtual void HandleNewJob() = 0;
 
     virtual void DisconnectClient(
         const std::shared_ptr<Connection<StratumClient>> conn_ptr) = 0;
@@ -79,11 +78,11 @@ class StratumBase : public Server<StratumClient>
    private:
     static constexpr std::string_view field_str = "StratumBase";
     const Logger<field_str> logger;
-
-    std::jthread control_thread;
+    
     std::vector<std::jthread> processing_threads;
 
     ControlServer control_server;
+    std::jthread control_thread;
 
     void ServiceSockets(std::stop_token st);
     void HandleControlCommands(std::stop_token st);

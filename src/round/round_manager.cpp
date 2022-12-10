@@ -19,31 +19,31 @@ RoundManager::RoundManager(const RedisManager& rm,
 #endif
 }
 
-bool RoundManager::CloseRound(const BlockSubmission* submission,
+bool RoundManager::CloseRound(const BlockSubmission& submission,
                               const double fee)
 {
     std::scoped_lock round_lock(round_map_mutex, efforts_map_mutex);
 
     round_shares_t round_shares;
-    // PaymentManager::GetRewardsPROP(round_shares, submission->reward,
+    // PaymentManager::GetRewardsPROP(round_shares, submission.reward,
     //                                efforts_map, round.total_effort, fee);
     const double n = 2;
     auto [shares, resp] = GetLastNShares(round_progress, n);
     if (!PaymentManager::GetRewardsPPLNS(round_shares, shares,
-                                         submission->reward, n, fee))
+                                         submission.reward, n, fee))
     {
             
     }
     // if(!shares.empty())
 
-    round.round_start_ms = submission->time_ms;
+    round.round_start_ms = submission.time_ms;
     round.total_effort = 0;
     blocks_found++;
 
     ResetRoundEfforts();
 
-    return SetClosedRound(std::to_string(submission->chain), round_type,
-                          submission, round_shares, submission->time_ms);
+    return SetClosedRound(std::to_string(submission.chain), round_type,
+                          submission, round_shares, submission.time_ms);
 }
 
 void RoundManager::AddRoundShare(const MinerIdHex& miner, const double effort)

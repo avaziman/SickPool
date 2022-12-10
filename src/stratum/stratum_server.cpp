@@ -13,6 +13,7 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
       stats_manager(redis_manager, &diff_manager, &round_manager, &conf.stats)
 {
     static_assert(confs.DIFF1 != 0, "DIFF1 can't be zero!");
+    redis_manager.Init();
 
     if (auto error =
             httpParser.allocate(HTTP_REQ_ALLOCATE, MAX_HTTP_JSON_DEPTH);
@@ -48,8 +49,6 @@ StratumServer<confs>::~StratumServer()
 template <StaticConf confs>
 void StratumServer<confs>::HandleBlockNotify()
 {
-    int64_t curtime_ms = GetCurrentTimeMs();
-
     const std::shared_ptr<JobT> new_job = job_manager.GetNewJob();
 
     if (!new_job)
@@ -59,15 +58,22 @@ void StratumServer<confs>::HandleBlockNotify()
         // logger.Log<LogType::Critical>(
         //     "Block update error: Failed to generate new job! retrying...");
         return;
-        // if (this->GetStopToken().stop_requested())
-        // {
-        //     return;
-        // }
-
-        // std::this_thread::sleep_for(std::chrono::milliseconds(250));
     }
 
-    // save it to process round
+    HandleNewJob(std::move(new_job));
+}
+
+template <StaticConf confs>
+void StratumServer<confs>::HandleNewJob()
+{
+    HandleNewJob(job_manager.GetLastJob());
+}
+
+template <StaticConf confs>
+void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
+{
+    int64_t curtime_ms = GetCurrentTimeMs();
+
     {
         std::shared_lock clients_read_lock(clients_mutex);
         for (const auto &[conn, _] : clients)
@@ -87,8 +93,8 @@ void StratumServer<confs>::HandleBlockNotify()
 
         // after we broadcasted new job:
         // > kick clients with below min difficulty
-        // > update the map according to difficulties (notify best miners first)
-        // > reset duplicate shares map
+        // > update the map according to difficulties (notify best miners
+        // first) > reset duplicate shares map
 
         for (auto it = clients.begin(); it != clients.end();)
         {
@@ -104,11 +110,18 @@ void StratumServer<confs>::HandleBlockNotify()
                 ++it;
             }
 
-            cli->ResetShareSet();
             // update the difficulty in the map
             it->second = cli_diff;
         }
-        // TODO: reset shares
+
+        // only reset share set if we invalidated the old jobs!
+        if (new_job->clean)
+        {
+            for (const auto &[cli, _] : clients)
+            {
+                cli->ptr->ResetShareSet();
+            }
+        }
     }
 
     // payment_manager.UpdatePayouts(&round_manager, curtime_ms);
@@ -118,9 +131,8 @@ void StratumServer<confs>::HandleBlockNotify()
     round_manager.netwrok_hr = net_est_hr;
     round_manager.difficulty = new_job->target_diff;
 
-    // redis_manager.SetNewBlockStats(coin_config.symbol, curtime_ms,
-    // net_est_hr,
-    //                                new_job->target_diff);
+    round_manager.SetNewBlockStats(coin_config.symbol,
+                                   new_job->target_diff);
 
     logger.Log<LogType::Info>(
         "Broadcasted new job: \n"
@@ -166,7 +178,8 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     }
     else
     {
-        ShareProcessor::Process<confs>(share_res, cli, wc, job.get(), share, time);
+        ShareProcessor::Process<confs>(share_res, cli, wc, job.get(), share,
+                                       time);
         // share_res.code = ResCode::VALID_BLOCK;
     }
 
@@ -233,7 +246,7 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
                             .time_ms = time,
                             .duration_ms = duration_ms,
                             .height = job->height,
-                            .number = redis_manager.GetBlockNumber(),
+                            .number = 0, // submitter gets number
                             .difficulty = share_res.difficulty,
                             .effort_percent = effort_percent,
                             .miner_id = cli->GetId().miner_id.id,

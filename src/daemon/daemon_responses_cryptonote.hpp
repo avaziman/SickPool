@@ -19,9 +19,18 @@ struct BlockTemplateResCn
 };
 
 struct TransferResCn {
+    simdjson::ondemand::document doc;
+
     std::string_view txid;
     std::size_t tx_size;
     // std::string_view txhex;
 };
 
+struct BlockHeaderResCn
+{
+    simdjson::ondemand::document doc;
+
+    uint32_t depth;
+    // std::string_view txhex;
+};
 #endif

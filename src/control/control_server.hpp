@@ -65,6 +65,7 @@ class ControlServer
         FD_SET(sockfd, &rfds);
 
         timeout.tv_sec = block_poll_interval;
+        timeout.tv_usec = 0;
 
         val = select(sockfd + 1, &rfds, nullptr, nullptr, &timeout);
 
