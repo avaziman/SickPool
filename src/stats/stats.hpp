@@ -16,6 +16,12 @@ enum class BadDiff
     INVALID_SHARE_DIFF = -2
 };
 
+struct NetworkStats
+{
+    double network_hr;
+    double difficulty;
+};
+
 struct WorkerStats
 {
     // derived from the below

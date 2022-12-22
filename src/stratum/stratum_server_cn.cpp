@@ -43,7 +43,7 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
     catch (const simdjson::simdjson_error &err)
     {
         this->SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
-        logger.Log<LogType::Error>(
+        logger.template Log<LogType::Error>(
             "Request JSON parse error: {}\nRequest: {}\n", err.what(), req);
         return;
     }
@@ -74,7 +74,7 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
     else
     {
         res = RpcResult(ResCode::UNKNOWN, "Unknown method");
-        logger.Log<LogType::Warn>("Unknown request method: {}", method);
+        logger.template Log<LogType::Warn>("Unknown request method: {}", method);
     }
 
     this->SendRes(sock, id, res);
@@ -123,7 +123,7 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
 
     if (!parse_error.empty())
     {
-        logger.Log<LogType::Critical>("Failed to parse submit: {}",
+        logger.template Log<LogType::Critical>("Failed to parse submit: {}",
                                       parse_error);
         return RpcResult(ResCode::UNKNOWN, parse_error);
     }
@@ -166,7 +166,7 @@ RpcResult StratumServerCn<confs>::HandleAuthorize(
     }
     catch (const simdjson_error &err)
     {
-        logger.Log<LogType::Error>(
+        logger.template Log<LogType::Error>(
             "No miner name provided in authorization. err: {}", err.what());
 
         return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");

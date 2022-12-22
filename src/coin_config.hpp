@@ -18,7 +18,7 @@ struct MySqlConfig {
     std::string pass;
 };
 
-    struct StatsConfig
+struct StatsConfig
 {
     uint32_t hashrate_interval_seconds;
     uint32_t effort_interval_seconds;

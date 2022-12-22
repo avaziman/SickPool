@@ -2,12 +2,7 @@
 
 template void StatsManager::Start<ZanoStatic>(std::stop_token st);
 
-int StatsManager::hashrate_interval_seconds;
-int StatsManager::effort_interval_seconds;
-int StatsManager::average_hashrate_interval_seconds;
-int StatsManager::diff_adjust_seconds;
-
-double StatsManager::average_interval_ratio;
+uint32_t StatsManager::average_interval_ratio;
 
 StatsManager::StatsManager(const PersistenceLayer& pl,
                            DifficultyManager* diff_manager,
@@ -17,13 +12,8 @@ StatsManager::StatsManager(const PersistenceLayer& pl,
       diff_manager(diff_manager),
       round_manager(round_manager)
 {
-    StatsManager::hashrate_interval_seconds = cc->hashrate_interval_seconds;
-    StatsManager::effort_interval_seconds = cc->effort_interval_seconds;
-    StatsManager::average_hashrate_interval_seconds =
-        cc->average_hashrate_interval_seconds;
-    StatsManager::diff_adjust_seconds = cc->diff_adjust_seconds;
     StatsManager::average_interval_ratio =
-        (double)average_hashrate_interval_seconds / hashrate_interval_seconds;
+        cc->average_hashrate_interval_seconds / cc->hashrate_interval_seconds;
 }
 
 template <StaticConf confs>
@@ -35,23 +25,20 @@ void StatsManager::Start(std::stop_token st)
     int64_t now = std::time(nullptr);
 
     // rounded to the nearest divisible effort_internval_seconds
-    int64_t next_effort_update =
-        now - (now % effort_interval_seconds) + effort_interval_seconds;
+    int64_t next_effort_update = now - (now % conf->effort_interval_seconds) +
+                                 conf->effort_interval_seconds;
 
-    int64_t next_interval_update =
-        now - (now % hashrate_interval_seconds) + hashrate_interval_seconds;
+    int64_t next_interval_update = now -
+                                   (now % conf->hashrate_interval_seconds) +
+                                   conf->hashrate_interval_seconds;
 
     int64_t next_diff_update =
-        now - (now % diff_adjust_seconds) + diff_adjust_seconds;
-
-    int64_t next_block_update =
-        now - (now % conf->mined_blocks_interval) + conf->mined_blocks_interval;
+        now - (now % conf->diff_adjust_seconds) + conf->diff_adjust_seconds;
 
     while (!st.stop_requested())
     {
-        int64_t next_update =
-            std::min({next_interval_update, next_effort_update,
-                      next_diff_update, next_block_update});
+        int64_t next_update = std::min(
+            {next_interval_update, next_effort_update, next_diff_update});
 
         // logger.Log<LogType::Info>(
         //             "Next stats update in: {}", next_update);
@@ -62,24 +49,30 @@ void StatsManager::Start(std::stop_token st)
 
         if (next_update == next_interval_update)
         {
-            next_interval_update += hashrate_interval_seconds;
+            next_interval_update += conf->hashrate_interval_seconds;
             UpdateIntervalStats<confs>(update_time_ms);
             // no need to lock as its after the stats update and adding shares
             // doesnt affect it
-            // TODO think how to stop updating stats while reserving right
-            // statistics on disconnect
-            // std::unique_lock _(to_remove_mutex);
-            // for (const auto& rm_it : to_remove)
-            // {
-            //     worker_stats_map.erase(rm_it);
-            // }
-            // to_remove.clear();
+            std::unique_lock _(to_remove_mutex);
+            for (auto it = to_remove.begin(); it != to_remove.end();)
+            {
+                if (it->second >= average_interval_ratio)
+                {
+                    worker_stats_map.erase(it->first);
+                    it = to_remove.erase(it);
+                }
+                else
+                {
+                    it->second++;
+                    ++it;
+                }
+            }
         }
 
         // possible that both need to be updated at the same time
         if (next_update == next_effort_update)
         {
-            next_effort_update += effort_interval_seconds;
+            next_effort_update += conf->effort_interval_seconds;
             round_manager->UpdateEffortStats(update_time_ms);
 
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
@@ -89,18 +82,8 @@ void StatsManager::Start(std::stop_token st)
 
         if (next_update == next_diff_update)
         {
-            diff_manager->Adjust(diff_adjust_seconds, next_diff_update);
-            next_diff_update += diff_adjust_seconds;
-        }
-
-        if (next_update == next_block_update)
-        {
-            uint32_t block_number = round_manager->blocks_found.load();
-            // persistence_stats.UpdateBlockNumber(update_time_ms,
-            // block_number);
-            round_manager->blocks_found.store(0);
-
-            next_block_update += conf->mined_blocks_interval;
+            diff_manager->Adjust(conf->diff_adjust_seconds, next_diff_update);
+            next_diff_update += conf->diff_adjust_seconds;
         }
 
         auto startChrono = system_clock::now();
@@ -129,15 +112,9 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
     {
         ws.interval_hashrate =
             GetExpectedHashes<confs>(ws.current_interval_effort) /
-            (double)hashrate_interval_seconds;
-
-        // ws.average_hashrate_sum += ws.interval_hashrate;
-
-        // ws.average_hashrate = ws.average_hashrate_sum /
-        // average_interval_ratio;
+            (double)conf->hashrate_interval_seconds;
 
         auto& miner_stats = miner_stats_map[worker_id.miner_id];
-        // miner_stats.average_hashrate += ws.average_hashrate;
         miner_stats.interval_hashrate += ws.interval_hashrate;
 
         miner_stats.interval_valid_shares += ws.interval_valid_shares;
@@ -149,8 +126,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
     return persistence_stats.UpdateIntervalStats(
         worker_stats_map, miner_stats_map, std::move(stats_unique_lock),
-        round_manager->netwrok_hr, round_manager->difficulty,
-        round_manager->blocks_found, update_time_ms);
+        network_stats, update_time_ms);
 }
 
 void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
@@ -169,18 +145,12 @@ void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
     }
     else
     {
-        // const double expected_shares = GetExpectedHashes(diff);
-
         worker_stats.interval_valid_shares++;
-        // worker_stats->current_interval_effort += expected_shares;
         worker_stats.current_interval_effort += diff;
 
         logger.Log<LogType::Debug>(
             "[THREAD {}] Logged share with diff: {} for {} total diff: {}",
             gettid(), diff, id.GetHex(), worker_stats.current_interval_effort);
-        // logger.Log<LogType::Debug>(
-        //             "Logged share with diff: {}, hashes: {}", diff,
-        //             expected_shares);
     }
 }
 
@@ -201,20 +171,9 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
     {
         logger.Log<LogType::Info>("New miner has joined the pool: {}", address);
 
-        persistence_stats.AddMiner(address, alias, min_payout);
+        persistence_stats.AddMiner(address, alias, curtime, min_payout);
 
-        if (persistence_stats.AddNewMiner(address, addr_lowercase, alias,
-                                          miner_id, curtime, min_payout))
-        {
-            logger.Log<LogType::Info>("Miner {} added to database.", address);
-        }
-        else
-        {
-            logger.Log<LogType::Critical>("Failed to add Miner {} to database.",
-                                          address);
-            return false;
-        }
-
+        logger.Log<LogType::Info>("Miner {} added to database.", address);
         return AddWorker(worker_full_id, it, address, worker_name, curtime,
                          alias, min_payout);
     }
@@ -228,27 +187,19 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
     // set active
     persistence_stats.SetActiveId(miner_id);
 
-    int worker_id = persistence_stats.GetMinerId(address, alias);
+    int worker_id = persistence_stats.GetWorkerId(miner_id, worker_name);
     if (worker_id == -1)
     {
         // new id
         logger.Log<LogType::Info>("New worker has joined the pool: ",
                                   worker_name);
 
-        persistence_stats.AddWorker(miner_id, worker_name);
-        if (!persistence_stats.AddNewWorker(WorkerFullId(miner_id, worker_id),
-                                            addr_lowercase, worker_name, alias,
-                                            curtime))
-        {
-            logger.Log<LogType::Info>("Worker {} added to database.",
-                                      worker_name);
-        }
-        else
-        {
-            logger.Log<LogType::Critical>(
-                "Failed to add worker {} to database.", worker_name);
-            return false;
-        }
+        persistence_stats.AddWorker(miner_id, worker_name, curtime);
+
+        logger.Log<LogType::Info>("Worker {} added to database.", worker_name);
+
+        return AddWorker(worker_full_id, it, address, worker_name, curtime,
+                         alias, min_payout);
     }
     else
     {
@@ -269,10 +220,10 @@ bool StatsManager::AddWorker(WorkerFullId& worker_full_id,
     return true;
 }
 
-void StatsManager::PopWorker(worker_map::iterator& it)
+void StatsManager::PopWorker(const worker_map::iterator& it)
 {
     std::scoped_lock _(to_remove_mutex);
-    to_remove.push_back(it);
+    to_remove.emplace_back(it, 0);
 }
 // TODO: idea: since writing all shares on all pbaas is expensive every 10
 // sec, just write to primary and to side chains write every 5 mins

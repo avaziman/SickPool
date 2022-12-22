@@ -45,20 +45,14 @@ class StatsManager
                    const std::string_view address, std::string_view worker_full,
                    std::time_t curtime, std::string_view alias,
                    int64_t min_payout);
-    void PopWorker(worker_map::iterator& it);
-
-    // bool AppendPoSBalances(std::string_view chain, int64_t from_ms);
+    void PopWorker(const worker_map::iterator& it);
 
     template <StaticConf confs>
     bool UpdateIntervalStats(int64_t update_time_ms);
 
     bool UpdateEffortStats(int64_t update_time_ms);
-
-    static int hashrate_interval_seconds;
-    static int effort_interval_seconds;
-    static int average_hashrate_interval_seconds;
-    static int diff_adjust_seconds;
-    static double average_interval_ratio;
+    void SetNetworkStats(const NetworkStats& ns) { network_stats = ns; }
+    static uint32_t average_interval_ratio;
 
    private:
     static constexpr std::string_view field_str = "StatsManager";
@@ -68,9 +62,12 @@ class StatsManager
     DifficultyManager* diff_manager;
     RoundManager* round_manager;
 
-    // workers that have disconnected from the pool, clean them after stats update
+    NetworkStats network_stats;
+    // workers that have disconnected from the pool, clean them after stats
+    // update
     std::mutex to_remove_mutex;
-    std::vector<worker_map::iterator> to_remove;
+    // it + amount of iterations, remove only when average is zero
+    std::vector<std::pair<worker_map::iterator, uint32_t>> to_remove;
 
     std::shared_mutex stats_list_smutex;
     // worker -> stats

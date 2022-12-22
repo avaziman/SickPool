@@ -1,39 +1,42 @@
 #ifndef ROUND_MANAGER_HPP
 #define ROUND_MANAGER_HPP
 
-#include <mutex>
 #include <atomic>
+#include <mutex>
 
-#include "redis_round.hpp"
-#include "redis_manager.hpp"
 #include "payment_manager.hpp"
+#include "redis_manager.hpp"
+#include "redis_round.hpp"
 #include "round.hpp"
 #include "round_share.hpp"
 
 class RedisManager;
 
-class RoundManager: public PersistenceRound
+struct RoundStats
+{
+    uint32_t blocks_found;
+};
+
+class RoundManager : public PersistenceRound
 {
    public:
-    explicit RoundManager(const PersistenceLayer& pl, const std::string& round_type);
+    explicit RoundManager(const PersistenceLayer& pl,
+                          const std::string& round_type);
     bool LoadCurrentRound();
     void AddRoundShare(const MinerIdHex& miner, const double effort);
-    bool CloseRound(const BlockSubmission& submission, const double fee);
+    RoundCloseRes CloseRound(uint32_t& block_id, const BlockSubmission& submission, const double fee);
     void ResetRoundEfforts();
 
     bool UpdateEffortStats(int64_t update_time_ms);
     inline Round GetChainRound() const { return round; };
 
-    void PushPendingShares() {
+    void PushPendingShares()
+    {
         std::scoped_lock round_lock(efforts_map_mutex);
-        
+
         this->AddPendingShares(pending_shares);
         pending_shares.clear();
     }
-
-    std::atomic<uint32_t> blocks_found;
-    std::atomic<double> netwrok_hr;
-    std::atomic<double> difficulty;
 
    private:
     bool LoadEfforts();

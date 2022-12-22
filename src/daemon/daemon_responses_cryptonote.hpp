@@ -31,6 +31,6 @@ struct BlockHeaderResCn
     simdjson::ondemand::document doc;
 
     uint32_t depth;
-    // std::string_view txhex;
+    std::string_view hash;
 };
 #endif

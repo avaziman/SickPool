@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 execute_process(COMMAND cxxbridge /home/sickguy/Documents/Projects/SickPool/api_rust/src/redis_interop.rs
-                OUTPUT_FILE ./redis/redis_interop.hpp
+                OUTPUT_FILE ./persistence/redis/redis_interop.hpp
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(FetchContent)
@@ -26,7 +26,6 @@ add_subdirectory(crypto/verushash)
 
 # add_subdirectory(daemon)
 # add_subdirectory(crypto/x25x)
-find_path(HIREDIS_HEADER hiredis)
 
 file(GLOB SRC_FILES
     "shares/*.cpp"
@@ -61,12 +60,15 @@ set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC st
  PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
+find_path(HIREDIS_HEADER hiredis)
+find_library(HIREDIS_LIB hiredis)
+
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER})
 
 target_link_libraries(
     ${PROJECT_NAME_CORE}
     ${Boost_LIBRARIES}
-    hiredis
+    ${HIREDIS_LIB}
     mysqlcppconn
     pthread
     cryptonote_utils

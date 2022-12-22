@@ -15,6 +15,8 @@
 class RoundManager;
 class RedisManager;
 
+
+
 enum class PaymentStatus
 {
     PENDING_INDEPENDENT,
@@ -24,7 +26,7 @@ enum class PaymentStatus
 class PaymentManager
 {
    public:
-    PaymentManager(RedisManager* rm, daemon_manager_t* dm,
+    explicit PaymentManager(RedisManager* rm, daemon_manager_t* dm,
                    const std::string& pool_addr);
 
     static bool GetRewardsPPLNS(round_shares_t& miner_shares,
@@ -37,22 +39,13 @@ class PaymentManager
                                const efforts_map_t& miner_efforts,
                                double total_effort, double fee);
 
-    static uint32_t payment_counter;
-
-    // std::unique_ptr<PaymentInfo> pending_payment;
-    // std::unique_ptr<PaymentInfo> finished_payment;
-
-    // void UpdatePayouts(RoundManager* round_manager, int64_t curtime_ms);
 
    private:
-    bool GeneratePayoutTx(std::vector<uint8_t>& bytes,
-                          const payees_info_t& rewards);
-    // void ResetPayment();
     static constexpr std::string_view field_str = "PaymentManager";
     static Logger<field_str> logger;
     RedisManager* redis_manager;
     daemon_manager_t* daemon_manager;
-    std::string pool_addr;
+    const std::string pool_addr;
     // block id -> block height, maturity time, pending to be paid
     simdjson::ondemand::parser parser;
 };

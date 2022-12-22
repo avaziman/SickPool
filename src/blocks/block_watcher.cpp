@@ -6,7 +6,6 @@ BlockWatcher<confs>::BlockWatcher(const PersistenceLayer* pl,
                                   daemon_manager_t* daemon_manager)
     : persistence_block(*pl), daemon_manager(daemon_manager)
 {
-
 }
 
 template <StaticConf confs>
@@ -14,64 +13,76 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
 {
     using namespace simdjson;
     std::scoped_lock lock(blocks_lock);
-    uint32_t current_height;
+    uint32_t current_height = persistence_block.GetBlockHeight();
     std::string resBody;
 
     persistence_block.LoadImmatureBlocks(immature_block_submissions);
 
-    for (const std::unique_ptr<BlockSubmission>& sub :
-         immature_block_submissions)
-    {
-        logger.template Log<LogType::Info>(
-            "Block watcher loaded immature block id: {}, hash: {}", sub->number,
-            HexlifyS(sub->hash_bin));
-    }
-
-    logger.template Log<LogType::Info>("Checking confirmations for {} blocks",
+    logger.template Log<LogType::Info>("Current height: {}, checking {} blocks",
+                                       current_height,
                                        immature_block_submissions.size());
 
-    for (int i = 0; i < immature_block_submissions.size(); i++)
+    for (auto it = immature_block_submissions.begin();
+         it != immature_block_submissions.end();)
     {
-        const auto& submission = immature_block_submissions[i];
-        auto hashHex = HexlifyS(submission->hash_bin);
-        auto chain = submission->chain;
+        const auto& submission = *it;
+        uint8_t chain = 0;
+
+        logger.template Log<LogType::Info>(
+            "checking block submission id: {}, hash: {}", submission.id,
+            submission.hash);
 
         BlockHeaderResCn header_res;
-        bool res =
-            daemon_manager->GetBlockHeader(header_res, hashHex, httpParser);
+        int confirmations = 0;
 
-        if (!res)
+        if (bool res = daemon_manager->GetBlockHeaderByHeight(
+                header_res, submission.height, httpParser);
+            !res)
         {
             logger.template Log<LogType::Info>(
-                "Failed to get confirmations for block {}", hashHex);
-            continue;
+                "Failed to get confirmations for block {}", submission.hash);
+        }
+        else if (submission.hash == header_res.hash)
+        {
+            confirmations = header_res.depth;
+        }
+        else
+        {
+            confirmations = -1;
         }
 
-        int confirmations = header_res.depth;
-
-        persistence_block.UpdateBlockConfirmations(
-            std::string_view(std::to_string(submission->number)),
-            confirmations);
-
         logger.template Log<LogType::Info>("Block {} has {} confirmations",
-                                           hashHex, confirmations);
-
-        int64_t confirmation_time = GetCurrentTimeMs();
+                                           submission.hash, confirmations);
 
         // 100% orphaned or matured
-        if (current_height > submission->height + confs.COINBASE_MATURITY)
+        if (current_height > submission.height + confs.COINBASE_MATURITY)
         {
-            bool matured = confirmations > confs.COINBASE_MATURITY;
+            int64_t confirmation_time = GetCurrentTimeMs();
+            BlockStatus status = confirmations > static_cast<int>(confs.COINBASE_MATURITY)
+                                     ? BlockStatus::CONFIRMED
+                                     : BlockStatus::ORPHANED;
 
-            std::string desc = matured ? "matured" : "been orphaned";
-            logger.template Log<LogType::Info>("Block {} has {}!", hashHex,
-                                               desc);
+            persistence_block.UpdateImmatureRewards(submission.id, status,
+                                                    confirmation_time);
+            persistence_block.UpdateBlockStatus(submission.id, status);
 
-            persistence_block.UpdateImmatureRewards(chain, submission->number,
-                                                 confirmation_time, matured);
-            immature_block_submissions.erase(
-                immature_block_submissions.begin() + i);
-            i--;
+            logger.template Log<LogType::Info>(
+                "Block {} has been {}!", submission.hash,
+                status == BlockStatus::CONFIRMED
+                    ? EnumName<BlockStatus::CONFIRMED>()
+                    : EnumName<BlockStatus::ORPHANED>());
+
+            it = immature_block_submissions.erase(it);
+        }
+        else
+        {
+            if (confirmations == -1 &&
+                submission.last_status != BlockStatus::PENDING_ORPHANED)
+            {
+                persistence_block.UpdateBlockStatus(
+                    submission.id, BlockStatus::PENDING_ORPHANED);
+            }
+            ++it;
         }
     }
 }
@@ -79,10 +90,11 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
 template <StaticConf confs>
 void BlockWatcher<confs>::WatchBlocks()
 {
+    persistence_block.SubscribeToBlockNotify();
     while (true)
     {
-        auto [res, rep] = persistence_block.GetOneReply(0);
-
         CheckImmatureSubmissions();
+
+        auto [res, rep] = persistence_block.GetOneReply(0);
     }
 }

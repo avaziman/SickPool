@@ -23,7 +23,7 @@ using Args = std::initializer_list<Stringable>;
 
 static std::string Format(Args args)
 {
-    // assert(args.size() > 0);
+    // assert (args.size() > 0)
 
     std::string res;
     for (const auto &a : args)
@@ -40,13 +40,14 @@ static std::string Format(Args args)
 struct KeyNames
 {
     using enum Prefix;
-   public:
+
     const std::string coin;
     explicit KeyNames(std::string_view coin) : coin(coin) {}
 
     const std::string round = Format({coin, EnumName<ROUND>()});
     const std::string round_shares = Format({round, EnumName<SHARES>()});
     const std::string round_efforts = Format({round, EnumName<EFFORT>()});
+    const std::string round_stats = Format({round, EnumName<STATS>()});
 
     const std::string shares = Format({coin, EnumName<SHARES>()});
     const std::string shares_valid = Format({shares, EnumName<VALID>()});
@@ -71,9 +72,6 @@ struct KeyNames
     const std::string worker_countp_compact =
         Format({worker_count_pool, EnumName<COMPACT>()});
 
-    const std::string solver_count =
-        Format({coin, EnumName<SOLVER>(), EnumName<COUNT>()});
-
     const std::string miner_count =
         Format({coin, EnumName<MINER_COUNT>(), EnumName<POOL>()});
     const std::string miner_count_compact =
@@ -83,27 +81,19 @@ struct KeyNames
     const std::string difficulty_compact =
         Format({difficulty, EnumName<COMPACT>()});
 
-    const std::string solver = Format({coin, EnumName<SOLVER>()});
-    const std::string solver_index = Format({solver, EnumName<INDEX>()});
-    const std::string solver_index_mature =
-        Format({solver_index, EnumName<MATURE_BALANCE>()});
-    const std::string solver_index_worker_count =
-        Format({solver_index, EnumName<WORKER_COUNT>()});
-    const std::string solver_index_hashrate =
-        Format({solver_index, EnumName<HASHRATE>()});
-    const std::string solver_index_jointime =
-        Format({solver_index, EnumName<START_TIME>()});
+    const std::string miner = Format({coin, EnumName<SOLVER>()});
+    const std::string miner_index = Format({miner, EnumName<INDEX>()});
+
+    const std::string miner_index_round_effort =
+        Format({miner_index, EnumName<ROUND_EFFORT>()});
+    const std::string miner_index_hashrate =
+        Format({miner_index, EnumName<HASHRATE>()});
 
     const std::string reward = Format({coin, EnumName<REWARD>()});
     const std::string reward_immature = Format({reward, EnumName<IMMATURE>()});
     const std::string reward_mature = Format({reward, EnumName<MATURE>()});
 
-    const std::string address_id_map =
-        Format({coin, EnumName<ADDRESS_ID_MAP>()});
-
     const std::string active_ids_map = Format({coin, EnumName<ACTIVE_IDS>()});
-    const std::string payout = Format({coin, EnumName<PAYOUT>()});
-    const std::string pending_payout = Format({payout, EnumName<PENDING>()});
 };
 
 struct BlockKeyNames{
@@ -120,12 +110,14 @@ struct BlockKeyNames{
         Format({block, EnumName<EFFORT_PERCENT>()});
     const std::string block_effort_percent_compact =
         Format({block_effort_percent, EnumName<COMPACT>()});
+
     const std::string mined_block_number =
         Format({coin, EnumName<MINED_BLOCK>(), EnumName<NUMBER>()});
     const std::string mined_block_number_compact =
-        Format({coin, EnumName<COMPACT>()});
+        Format({mined_block_number, EnumName<COMPACT>()});
 
     // derived
+    const std::string block_stats = Format({block, EnumName<STATS>()});
     const std::string block_index = Format({block, EnumName<INDEX>()});
     const std::string block_index_number =
         Format({block_index, EnumName<NUMBER>()});

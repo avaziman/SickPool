@@ -8,21 +8,6 @@
 
 using enum Prefix;
 
-bool GetPendingPayees(payees_info_t& payees, RedisManager* redis_manager)
-{
-    // REDIS_OK
-    std::vector<MinerIdHex> active_ids;
-
-    if (!redis_manager->GetActiveIds(active_ids)) return false;
-    if (!redis_manager->LoadUnpaidRewards(payees, active_ids)) return false;
-
-    // filter only payees that reached their threshold
-    std::erase_if(payees, [](const auto& p)
-                  { return p.second.amount >= p.second.settings.threshold; });
-
-    return true;
-}
-
 static constexpr std::string_view logger_field = "PaymentManager";
 const Logger<logger_field> logger;
 
@@ -56,72 +41,71 @@ int main(int argc, char** argv)
     daemon_manager_t daemon_manager(coinConfig.payment_rpcs);
 
     persistence_block.SubscribeToMaturityChannel();
+    time_t curtime = time(nullptr);
+    time_t next_payment = curtime + coinConfig.payment_interval_seconds -
+                          curtime % coinConfig.payment_interval_seconds;
 
     while (true)
     {
-        time_t curtime = time(nullptr);
-        time_t next_payment = curtime + coinConfig.payment_interval_seconds -
-                              curtime % coinConfig.payment_interval_seconds;
-
         auto [res, rep] = persistence_block.GetOneReply(next_payment - curtime);
-
-        payees_info_t payees;
 
         // payout time!
         if (res == REDIS_ERR)
         {
             // REDIS_ERR_TIMEOUT is for windows...
-            if (RedisManager::GetError() != REDIS_ERR_IO || errno == EAGAIN)
+            if (RedisManager::GetError() != REDIS_ERR_IO || errno != EAGAIN)
             {
-                logger.Log<LogType::Error>("Redis error, code: {}",
+                logger.Log<LogType::Error>("Unexpected redis error, code: {}",
                                            RedisManager::GetError());
                 return -1;
             }
 
             // timeout reached, payment time!
             logger.Log<LogType::Info>("Payment time! {}", next_payment);
-            next_payment += coinConfig.payment_interval_seconds;
 
             // immediate payment time!
-            GetPendingPayees(payees, &persistence_block);
-            logger.Log<LogType::Info>("Payees pending payment: {}",
+            std::vector<Payee> payees;
+            if (!persistence_block.LoadUnpaidRewards(payees))
+            {
+                logger.Log<LogType::Error>("Failed to get unpaid rewards");
+                return -2;
+            }
+            logger.Log<LogType::Info>("Payees peding payment: {}",
                                       payees.size());
-
-            reward_map_t destinations;
-            destinations.reserve(payees.size());
 
             // min fee
             // substract fees
-            const int64_t fee = 10000000000;  // 0.01
+            PayoutInfo payout_info;
+            payout_info.tx_fee = 10000000000;
+            payout_info.time = next_payment;
 
             if (payees.empty()) continue;
 
-            const int64_t individual_fee = fee / payees.size();
-            for (const auto& [addr, info] : payees)
+            const uint64_t individual_fee = payout_info.tx_fee / payees.size();
+            uint64_t total = 0;
+            for (auto& [_id, amount, addr] : payees)
             {
-                int64_t amount_txfeed = info.amount - individual_fee;
-                destinations.emplace_back(addr, amount_txfeed);
+                int64_t amount_txfeed = amount - individual_fee;
+                total += amount_txfeed;
+                amount = amount_txfeed;
             }
 
+
             TransferResCn transfer_res;
-            if (!daemon_manager.Transfer(transfer_res, destinations, fee,
+            if (!daemon_manager.Transfer(transfer_res, payees, payout_info.tx_fee,
                                          parser))
             {
                 logger.Log<LogType::Info>("Failed to transfer funds!");
             }
-        }
-        else {
-        // pool block matured
+            payout_info.txid = transfer_res.txid;
+            persistence_block.AddPayout(payout_info, payees, total);
 
+            next_payment += coinConfig.payment_interval_seconds;
         }
-        // GetPendingPayees(payees, &redis_manager);
-        // redis_manager.AddPendingPayees(payees);
-        // for ( : payees)
-        // {
-        //     if (payee_info.amount < payee_info.settings.threshold)
-        //     continue;
-
-        // }
+        else
+        {
+            // pool block matured
+        }
 
         // free consumed message
     }

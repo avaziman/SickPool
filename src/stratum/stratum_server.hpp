@@ -11,6 +11,7 @@
 #include <thread>
 #include <vector>
 
+#include "cn/common/base58.h"
 #include "block_submitter.hpp"
 #include "connection.hpp"
 #include "job.hpp"
@@ -21,7 +22,6 @@
 #include "static_config/static_config.hpp"
 #include "stratum_client.hpp"
 #include "stratum_server_base.hpp"
-static constexpr std::string_view field_str_stratum = "StratumServer";
 
 template <StaticConf confs>
 class StratumServer : public StratumBase
@@ -35,13 +35,14 @@ class StratumServer : public StratumBase
    private:
     using ShareT = StratumShare<confs.STRATUM_PROTOCOL>;
 
+    static constexpr std::string_view field_str_stratum = "StratumServer";
     const Logger<field_str_stratum> logger;
 
     std::jthread stats_thread;
-
-   protected:
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(HTTP_REQ_ALLOCATE);
+
+   protected:
 
     daemon_manager_t daemon_manager;
     PaymentManager payment_manager;
@@ -75,13 +76,5 @@ class StratumServer : public StratumBase
     void DisconnectClient(
         const std::shared_ptr<Connection<StratumClient>> conn_ptr) override;
 };
-
-#ifdef STRATUM_PROTOCOL_ZEC
-#include "stratum_server_zec.hpp"
-#elif STRATUM_PROTOCOL_BTC
-#include "stratum_server_btc.hpp"
-#elif STRATUM_PROTOCOL_CN
-#include "stratum_server_cn.hpp"
-#endif
 
 #endif

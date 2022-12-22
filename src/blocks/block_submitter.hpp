@@ -2,29 +2,31 @@
 #define BLOCK_SUBMITTER_HPP_
 
 #include <mutex>
-
 #include "logger.hpp"
 #include "round_manager.hpp"
 #include "redis_block.hpp"
+#include "block_submission.hpp"
+
 
 class BlockSubmitter
 {
    private:
-    RoundManager* round_manager;
     daemon_manager_t* daemon_manager;
+    RoundManager* round_manager;
     static constexpr std::string_view field_str = "BlockSubmitter";
+    std::mutex blocks_lock;
     Logger<field_str> logger;
 
    public:
     explicit BlockSubmitter(daemon_manager_t* daemon_manager,
                    RoundManager* round_manager)
-        : daemon_manager(daemon_manager),
+        : 
+        daemon_manager(daemon_manager),
           round_manager(round_manager)
     {
     }
 
-    inline bool TrySubmit(const std::string_view chain,
-                          const std::string_view block_hex,
+    inline bool TrySubmit(const std::string_view block_hex,
                           simdjson::ondemand::parser& parser)
     {
         const int submit_retries = 5;
@@ -40,16 +42,19 @@ class BlockSubmitter
         }
         return added;
     }
-    std::mutex blocks_lock;
     bool AddImmatureBlock(std::unique_ptr<BlockSubmission> submission,
                           const double pow_fee)
     {
         std::scoped_lock lock(blocks_lock);
 
-        submission->number = round_manager->GetBlockNumber();
         // block number increased here.
-        // round_manager->CloseRound(submission.get(), pow_fee);
-        round_manager->CloseRound(*submission.get(), pow_fee);
+
+        if (auto res = round_manager->CloseRound(submission->id,
+                                                 *submission.get(), pow_fee);
+            res != RoundCloseRes::OK)
+        {
+            logger.Log<LogType::Critical>("Failed to close round! {}", static_cast<int>(res));
+        }
 
         logger.Log<LogType::Info>(
             "Added new block submission: \n"
@@ -66,7 +71,7 @@ class BlockSubmitter
             "│{10: <{12}}│\n"
             "│{11: <{12}}│\n"
             "└{0:─^{12}}┘\n",
-            "", fmt::format("Block Submission #{}", submission->number),
+            "", fmt::format("Block Submission #{}", submission->id),
             fmt::format("Type: {}", (int)submission->block_type),
             fmt::format("Reward: {}", submission->reward),
             fmt::format("Found time: {}", submission->time_ms),
@@ -82,8 +87,7 @@ class BlockSubmitter
 
         logger.Log<LogType::Info>(
             "Closed round for block submission no {} (immature).",
-            submission->number);
-        // immature_block_submissions.push_back(std::move(submission));
+            submission->id);
 
         return true;
     }

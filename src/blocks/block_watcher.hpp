@@ -31,7 +31,7 @@ class BlockWatcher
     simdjson::ondemand::parser httpParser;
 
     // pointer as it is not assignable for erase
-    std::vector<std::unique_ptr<BlockSubmission>> immature_block_submissions;
+    std::vector<BlockOverview> immature_block_submissions;
 };
 
 #endif

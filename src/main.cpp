@@ -12,19 +12,29 @@
 #include "sock_addr.hpp"
 #include "static_config.hpp"
 #include "stratum/stratum_server.hpp"
+#include "stratum_server_cn.hpp"
 
 StratumBase* stratum_bserver_ptr;
 
 const Logger<config_field_str> logger;
+using enum LogType;
 
 void SigintHandler(int sig)
 {
-    logger.Log<LogType::Info>("Enter password:");
-    // std::string pass;
-    // std::cin >> pass;
+    logger.Log<Info>("Received signal {}.", sig);
 
-    // if(pass == "1234"){
-    logger.Log<LogType::Info>("Stopping stratum server...");
+#ifdef DEBUG
+    std::string pass;
+    std::cin >> pass;
+
+    if (pass != "1234"){
+        logger.Log<Info>("Bad password, NOT shutting down...");
+
+        return;
+    } 
+#endif
+
+    logger.Log<Info>("Stopping stratum server...");
 
     stratum_bserver_ptr->Stop();
     // }
@@ -32,14 +42,14 @@ void SigintHandler(int sig)
 
 int main(int argc, char** argv)
 {
-    logger.Log<LogType::Info>("Starting SickPool!");
-    logger.Log<LogType::Info>("Git commit hash: {}", GIT_COMMIT_HASH);
-
-    logger.Log<LogType::Info>("Loading dynamic config...");
-
+    logger.Log<Info>("Starting SickPool!");
+    logger.Log<Info>("Git commit hash: {}", GIT_COMMIT_HASH);
+    
+    logger.Log<Info>("Loading dynamic config...");
+    
     if (signal(SIGINT, SigintHandler) == SIG_ERR)
     {
-        logger.Log<LogType::Error>("Failed to register SIGINT...");
+        logger.Log<Error>("Failed to register SIGINT...");
     }
 
     CoinConfig coinConfig;
@@ -47,21 +57,20 @@ int main(int argc, char** argv)
     {
         if (argc < 2 || !std::ifstream(argv[1]).good())
         {
-            throw std::runtime_error("Bad config file specified");
+            throw std::invalid_argument("Bad config file specified");
         }
 
         simdjson::padded_string json = simdjson::padded_string::load(argv[1]);
         ParseCoinConfig(json, coinConfig, logger);
 
-        logger.Log<LogType::Info>("Coin symbol: {}", coinConfig.symbol);
+        logger.Log<Info>("Coin symbol: {}", coinConfig.symbol);
 
         if (coinConfig.symbol == "ZANO")
         {
             static constexpr StaticConf confs = ZanoStatic;
-            logger.Log<LogType::Info>("Static config:");
-            logger.Log<LogType::Info>("Diff1: {}", confs.DIFF1);
-            logger.Log<LogType::Info>("Share multiplier: {}",
-                                      pow2d(256) / confs.DIFF1);
+            logger.Log<Info>("Static config:");
+            logger.Log<Info>("Diff1: {}", confs.DIFF1);
+            logger.Log<Info>("Share multiplier: {}", pow2d(256) / confs.DIFF1);
 
             StratumServerCn<confs> stratum_server(std::move(coinConfig));
             stratum_bserver_ptr = dynamic_cast<StratumBase*>(&stratum_server);
@@ -69,14 +78,14 @@ int main(int argc, char** argv)
         }
         else
         {
-            logger.Log<LogType::Error>("Unknown coin symbol: {} exitting...",
-                                       coinConfig.symbol);
+            logger.Log<Error>("Unknown coin symbol: {} exitting...",
+                              coinConfig.symbol);
         }
     }
     catch (const std::invalid_argument& e)
     {
-        logger.Log<LogType::Critical>("START-UP ERROR: {}.", e.what());
+        logger.Log<Critical>("START-UP ERROR: {}.", e.what());
         return EXIT_FAILURE;
     }
-    return EXIT_SUCCESS; // graceful exit
+    return EXIT_SUCCESS;  // graceful exit
 }

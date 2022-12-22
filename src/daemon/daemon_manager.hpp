@@ -84,15 +84,15 @@ class DaemonManager
         }
     }
 
-    bool SubmitBlock(const std::string_view block_hex,
+    virtual bool SubmitBlock(const std::string_view block_hex,
                      simdjson::ondemand::parser& parser)
     {
         std::string resultBody;
         constexpr std::string_view method = "submitblock";
-        int resCode = SendRpcReq(resultBody, 1, method,
-                                 DaemonRpc::GetParamsStr(block_hex));
 
-        if (resCode != 200)
+        if (int resCode = SendRpcReq(resultBody, 1, method,
+                                     DaemonRpc::GetArrayStr(block_hex));
+            resCode != 200)
         {
             logger.Log<LogType::Error>(
                 "Failed to send block submission, http code: {}, res: {}",
@@ -149,14 +149,13 @@ class DaemonManager
 
         constexpr std::string_view method = "getnetworkhashps";
         std::string result_body;
-        int res_code = SendRpcReq(result_body, 1, method);
-
-        if (res_code != 200)
+        
+        if (int res_code = SendRpcReq(result_body, 1, method);
+res_code != 200)
         {
             return false;
         }
 
-        ondemand::object res;
         try
         {
             auto doc = parser.iterate(result_body.data(), result_body.size(),
@@ -182,10 +181,10 @@ class DaemonManager
 
         std::string result_body;
         constexpr std::string_view method = "signrawtransactionwithwallet";
-        int res_code = SendRpcReq(result_body, 1, method,
-                                  DaemonRpc::GetParamsStr(funded_tx));
 
-        if (res_code != 200)
+        if (int res_code = SendRpcReq(result_body, 1, method,
+                                      DaemonRpc::GetArrayStr(funded_tx));
+            res_code != 200)
         {
             logger.Log<LogType::Error>(
                 "Failed to signrawtransaction, response: {}, rawtx: {}",
@@ -225,9 +224,9 @@ class DaemonManager
         std::string params =
             fmt::format("[\"{}\",{{\"fee_rate\":{},\"changeAddress\":\"{}\"}}]",
                         raw_tx, fee_rate, change_addr);
-        int res_code = SendRpcReq(result_body, 1, method, params);
 
-        if (res_code != 200)
+        
+        if (int res_code = SendRpcReq(result_body, 1, method, params); res_code != 200)
         {
             logger.Log<LogType::Error>(
                 "Failed to fundrawtransaction, response: {}", result_body);
@@ -244,7 +243,7 @@ class DaemonManager
 
             fund_res.hex = res["hex"].get_string();
             fund_res.fee = res["fee"].get_double();
-            fund_res.changepos = res["changepos"].get_int64();
+            fund_res.changepos = static_cast<int>(res["changepos"].get_int64());
         }
         catch (const simdjson_error& err)
         {
@@ -262,9 +261,10 @@ class DaemonManager
 
         constexpr std::string_view method = "getidentity";
         std::string result_body;
-        int res_code = SendRpcReq(result_body, 1, method,
-                                  DaemonRpc::GetParamsStr(addr));
-        if (res_code != 200)
+
+        if (int res_code = SendRpcReq(result_body, 1, method,
+                                      DaemonRpc::GetArrayStr(addr));
+            res_code != 200)
         {
             return false;
         }
@@ -297,10 +297,10 @@ class DaemonManager
 
         constexpr std::string_view method = "validateaddress";
         std::string result_body;
-        int res_code = SendRpcReq(result_body, 1, method,
-                                  DaemonRpc::GetParamsStr(addr));
 
-        if (res_code != 200)
+        if (int res_code = SendRpcReq(result_body, 1, method,
+                                      DaemonRpc::GetArrayStr(addr));
+            res_code != 200)
         {
             return false;
         }
@@ -338,11 +338,11 @@ class DaemonManager
         constexpr std::string_view method = "getblock";
 
             std::string res_body;
-        int res_code = SendRpcReq(res_body, 1, method,
-                                  DaemonRpc::GetParamsStr(block));
 
-        if (res_code != 200)
-        {
+            if (int res_code = SendRpcReq(res_body, 1, method,
+                                          DaemonRpc::GetArrayStr(block));
+                res_code != 200)
+            {
             return false;
         }
 
@@ -355,8 +355,8 @@ class DaemonManager
             block_res.validation_type = res["validationtype"] == "stake"
                                             ? ValidationType::STAKE
                                             : ValidationType::WORK;
-            block_res.confirmations = res["confirmations"].get_int64();
-            block_res.height = res["height"].get_int64();
+            block_res.confirmations = static_cast<int>(res["confirmations"].get_int64());
+            block_res.height = static_cast<uint32_t>(res["height"].get_int64());
 
             for (auto tx_id : res["tx"].get_array())
             {

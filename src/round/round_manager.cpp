@@ -26,30 +26,30 @@ RoundManager::RoundManager(const PersistenceLayer& pl,
 #endif
 }
 
-bool RoundManager::CloseRound(const BlockSubmission& submission,
-                              const double fee)
+RoundCloseRes RoundManager::CloseRound(
+    uint32_t& block_id, const BlockSubmission& submission, const double fee)
 {
+    PushPendingShares();  // push all pending shares, before locking
+
     std::scoped_lock round_lock(round_map_mutex, efforts_map_mutex);
 
     round_shares_t round_shares;
-    // PaymentManager::GetRewardsPROP(round_shares, submission.reward,
-    //                                efforts_map, round.total_effort, fee);
+    
     const double n = 2;
+
     auto [shares, resp] = GetLastNShares(round_progress, n);
     if (!PaymentManager::GetRewardsPPLNS(round_shares, shares,
                                          submission.reward, n, fee))
     {
+        return RoundCloseRes::BAD_SHARES_SUM;
     }
-    // if(!shares.empty())
 
     round.round_start_ms = submission.time_ms;
     round.total_effort = 0;
-    blocks_found++;
 
     ResetRoundEfforts();
 
-    return SetClosedRound(std::to_string(submission.chain), round_type,
-                          submission, round_shares, submission.time_ms);
+    return SetClosedRound(block_id, submission, round_shares, submission.time_ms);
 }
 
 void RoundManager::AddRoundShare(const MinerIdHex& miner, const double effort)
@@ -67,9 +67,8 @@ void RoundManager::AddRoundShare(const MinerIdHex& miner, const double effort)
         pending_shares.reserve(pending_shares.size() + 1000);
     }
 
-    Share curshare{.miner_id = miner.id, .progress = round_progress};
-
-    pending_shares.push_back(std::move(curshare));
+    pending_shares.emplace_back(
+        Share{.miner_id = miner.id, .progress = round_progress});
 #endif
 }
 
@@ -92,10 +91,10 @@ bool RoundManager::LoadCurrentRound()
 
         // append commands are not locking but since its before threads are
         // starting its ok set round start time
-        AppendSetMinerEffort(chain, EnumName<START_TIME>(), round_type,
-                             static_cast<double>(round.round_start_ms));
+        AppendSetRoundInfo(EnumName<START_TIME>(),
+                           static_cast<double>(round.round_start_ms));
         // reset round effort if we are starting it now hadn't started
-        AppendSetMinerEffort(chain, EnumName<TOTAL_EFFORT>(), round_type, 0);
+        AppendSetRoundInfo(EnumName<TOTAL_EFFORT>(), 0);
 
         if (!GetReplies())
         {

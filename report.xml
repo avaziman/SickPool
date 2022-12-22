@@ -21,16 +21,36 @@
     </build_environment>
     <execution_environment>
       <os_sysname>Linux</os_sysname>
-      <os_release>5.15.0-52-generic</os_release>
-      <os_version>#58-Ubuntu SMP Thu Oct 13 08:03:55 UTC 2022</os_version>
+      <os_release>5.15.0-56-generic</os_release>
+      <os_version>#62-Ubuntu SMP Tue Nov 22 19:54:14 UTC 2022</os_version>
       <host>L5</host>
       <arch>x86_64</arch>
       <command_line>command line to be provided</command_line>
       <uid>0</uid>
       <username>root</username>
-      <start_time>2022-11-03T20:44:22Z</start_time>
+      <start_time>2022-12-21T10:53:46Z</start_time>
     </execution_environment>
   </creator>
   <configuration>
   </configuration>
   <tdelta>0</tdelta>
+  <configuration>
+  </configuration>
+  <summary />
+  <open_fds_at_end>0</open_fds_at_end>
+  <max_open_flows>0</max_open_flows>
+  <total_flows>0</total_flows>
+  <flow_map_size>0</flow_map_size>
+  <total_packets>0</total_packets>
+  <rusage>
+    <utime>0.003306</utime>
+    <stime>0.006613</stime>
+    <maxrss>14036</maxrss>
+    <minflt>1310</minflt>
+    <majflt>19</majflt>
+    <nswap>0</nswap>
+    <inblock>2624</inblock>
+    <oublock>8</oublock>
+    <clocktime>0.554763</clocktime>
+  </rusage>
+</dfxml>

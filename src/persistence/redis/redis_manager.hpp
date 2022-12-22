@@ -33,8 +33,6 @@ using redis_unique_ptr =
 using redis_unique_ptr_context =
     std::unique_ptr<redisContext, std::function<void(redisContext *)>>;
 
-using payees_info_t = std::vector<std::pair<std::string, PayeeInfo>>;
-
 struct TsAggregation
 {
     std::string type;
@@ -59,14 +57,12 @@ class RedisManager
     bool GetActiveIds(std::vector<MinerIdHex> &addresses);
     bool SetActiveId(const MinerIdHex &id);
 
-    bool LoadUnpaidRewards(payees_info_t &rewards,
-                           const std::vector<MinerIdHex> &active_ids);
-
     bool TsMrange(std::vector<std::pair<WorkerFullId, double>> &last_averages,
                   std::string_view prefix, std::string_view type, int64_t from,
                   int64_t to, const TsAggregation *aggregation = nullptr);
 
     std::string hget(std::string_view key, std::string_view field);
+    double zscore(std::string_view key, std::string_view field);
 
     inline bool GetReplies(redis_unique_ptr *last_reply = nullptr)
     {
@@ -110,7 +106,7 @@ class RedisManager
     // for pub sub when we only want to get reply not send
     std::pair<int, redis_unique_ptr> GetOneReply(time_t timeout_sec = 0) const
     {
-        redisReply *reply;
+        redisReply *reply = nullptr;
 
         // remove the error so we can continue using the reader.
         rc_unique->err = 0;
@@ -125,55 +121,13 @@ class RedisManager
             }
         }
 
-        int res = redisGetReply(rc_unique.get(), (void **)&reply) != REDIS_OK;
-        if (!res)
+        int res = redisGetReply(rc_unique.get(), (void **)&reply);
+        if (res != REDIS_OK)
         {
             logger.Log<LogType::Critical>("Failed to get reply: {}",
                                           rc_unique->errstr);
         }
         return std::make_pair(res, redis_unique_ptr(reply, freeReplyObject));
-    }
-
-    bool AddPendingPayees(payees_info_t &payees)
-    {
-        using enum Prefix;
-        AppendCommand({"UNLINK", key_names.pending_payout});
-
-        int total_payees = 0, fee_payees = 0;
-        int64_t pending_amount = 0, pending_amount_fee = 0;
-
-        for (const auto &[addr, payee_info] : payees)
-        {
-            total_payees++;
-            pending_amount += payee_info.amount;
-            if (payee_info.settings.pool_block_only)
-            {
-                // minus represents feeless
-                AppendCommand({"HSET", key_names.pending_payout, addr,
-                               std::to_string(-payee_info.amount)});
-            }
-            else
-            {
-                AppendCommand({"HSET", key_names.pending_payout, addr,
-                               std::to_string(payee_info.amount)});
-                pending_amount_fee += payee_info.amount;
-                fee_payees++;
-            }
-        }
-
-        AppendCommand({"HSET", key_names.pending_payout, EnumName<PAYEES>(),
-                       std::to_string(total_payees)});
-        AppendCommand({"HSET", key_names.pending_payout, EnumName<FEE_PAYEES>(),
-                       std::to_string(fee_payees)});
-
-        AppendCommand({"HSET", key_names.pending_payout,
-                       EnumName<PENDING_AMOUNT>(),
-                       std::to_string(pending_amount)});
-        AppendCommand({"HSET", key_names.pending_payout,
-                       EnumName<PENDING_AMOUNT_FEE>(),
-                       std::to_string(pending_amount_fee)});
-
-        return GetReplies();
     }
 
     static int GetError() { return RedisManager::rc_unique->err; }
@@ -231,6 +185,13 @@ class RedisManager
     void AppendHset(std::string_view key, std::string_view field,
                     std::string_view val);
     void AppendTsAdd(std::string_view key_name, int64_t time, double value);
+
+    double ResToDouble(redis_unique_ptr r) const
+    {
+        if (!r || !r->str || r->type != REDIS_REPLY_STRING) return -1;
+
+        return std::strtod(r->str, nullptr);
+    }
 
     long ResToInt(redis_unique_ptr r) const
     {

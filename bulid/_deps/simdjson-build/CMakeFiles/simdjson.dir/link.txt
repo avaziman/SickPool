@@ -1,2 +1,0 @@
-/usr/bin/ar qc libsimdjson.a CMakeFiles/simdjson.dir/src/simdjson.cpp.o
-/usr/bin/ranlib libsimdjson.a

@@ -5,10 +5,12 @@ template <StaticConf confs>
 StratumServer<confs>::StratumServer(CoinConfig &&conf)
     : StratumBase(std::move(conf)),
       daemon_manager(coin_config.rpcs),
-      payment_manager(&persistence_layer, &daemon_manager, coin_config.pool_addr),
+      payment_manager(&persistence_layer, &daemon_manager,
+                      coin_config.pool_addr),
       job_manager(&daemon_manager, &payment_manager, coin_config.pool_addr),
       block_submitter(&daemon_manager, &round_manager),
-      stats_manager(persistence_layer, &diff_manager, &round_manager, &conf.stats)
+      stats_manager(persistence_layer, &diff_manager, &round_manager,
+                    &conf.stats)
 {
     static_assert(confs.DIFF1 != 0, "DIFF1 can't be zero!");
     persistence_layer.Init();
@@ -17,7 +19,7 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
             httpParser.allocate(HTTP_REQ_ALLOCATE, MAX_HTTP_JSON_DEPTH);
         error != simdjson::SUCCESS)
     {
-        logger.Log<LogType::Critical>(
+        logger.template Log<LogType::Critical>(
             "Failed to allocate http parser buffer: {}",
             simdjson::error_message(error));
         exit(EXIT_FAILURE);
@@ -39,7 +41,7 @@ template <StaticConf confs>
 StratumServer<confs>::~StratumServer()
 {
     stats_thread.request_stop();
-    this->logger.Log<LogType::Info>("Stratum destroyed.");
+    this->logger.template Log<LogType::Info>("Stratum destroyed.");
 }
 
 // TODO: test buffer too little
@@ -51,9 +53,7 @@ void StratumServer<confs>::HandleBlockNotify()
 
     if (!new_job)
     {
-        // new_job = job_manager.GetNewJob();
-
-        // logger.Log<LogType::Critical>(
+        // logger.template Log<LogType::Critical>(
         //     "Block update error: Failed to generate new job! retrying...");
         return;
     }
@@ -115,6 +115,8 @@ void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
         // only reset share set if we invalidated the old jobs!
         if (new_job->clean)
         {
+            round_manager.SetNewBlockStats(coin_config.symbol, new_job->height,
+                                           new_job->target_diff);
             for (const auto &[cli, _] : clients)
             {
                 cli->ptr->ResetShareSet();
@@ -122,17 +124,12 @@ void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
         }
     }
 
-    // payment_manager.UpdatePayouts(&round_manager, curtime_ms);
-
     // the estimated share amount is supposed to be meet at block time
     const double net_est_hr = new_job->expected_hashes / confs.BLOCK_TIME;
-    round_manager.netwrok_hr = net_est_hr;
-    round_manager.difficulty = new_job->target_diff;
+    stats_manager.SetNetworkStats(NetworkStats{
+        .network_hr = net_est_hr, .difficulty = new_job->target_diff});
 
-    round_manager.SetNewBlockStats(coin_config.symbol,
-                                   new_job->target_diff);
-
-    logger.Log<LogType::Info>(
+    logger.template Log<LogType::Info>(
         "Broadcasted new job: \n"
         "┌{0:─^{8}}┐\n"
         "│{1: ^{8}}│\n"
@@ -193,9 +190,8 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
         job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
                          share.extranonce2);
 #elif defined(STRATUM_PROTOCOL_CN)
-        // TODO: find way to upgrade to exclusive lock
-        // may be straved here
-        job->GetBlockHex(blockData, share.nonce);
+
+            job->GetBlockHex(blockData, share.nonce);
 #else
 
 #endif
@@ -210,20 +206,18 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
 
         // submit ASAP
         auto block_hex = std::string_view(blockData.data(), blockSize);
-        block_submitter.TrySubmit(coin_config.symbol, block_hex, httpParser);
+        block_submitter.TrySubmit(block_hex, httpParser);
 
-        logger.Log<LogType::Info>(
-            "Block hex: {}", std::string_view(blockData.data(), blockSize));
+        share_res.hash_bytes = job->GetBlockHash(share.nonce);
+        logger.template Log<LogType::Info>("Block hex: {}", block_hex);
 
         // job will remain safe thanks to the lock.
-        const std::string_view worker_full(cli->GetFullWorkerName());
         const auto chain_round = round_manager.GetChainRound();
         const uint64_t duration_ms = time - chain_round.round_start_ms;
-        const BlockType type = BlockType::POW;
 #ifndef STRATUM_PROTOCOL_CN
         if (job->is_payment)
         {
-            type = BlockType::POW_PAYMENT;
+            type = BlockStatus::POW_PAYMENT;
         }
 #else
 
@@ -236,25 +230,26 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
         // std::reverse(share_res.hash_bytes.begin(),
         //              share_res.hash_bytes.end());
 #endif
-        auto bs =
-            BlockSubmission{.confirmations = 0,
-                            .block_type = static_cast<uint8_t>(BlockType::POW),
-                            .chain = 0,
-                            .reward = job->coinbase_value,
-                            .time_ms = time,
-                            .duration_ms = duration_ms,
-                            .height = job->height,
-                            .number = 0, // submitter gets number
-                            .difficulty = share_res.difficulty,
-                            .effort_percent = effort_percent,
-                            .miner_id = cli->GetId().miner_id.id,
-                            .worker_id = cli->GetId().worker_id.id,
-                            .hash_bin = share_res.hash_bytes};
+        auto bs = BlockSubmission{
+            .id = 0,  // QUERY LATER
+            .miner_id = cli->GetId().miner_id.id,
+            .worker_id = cli->GetId().worker_id.id,
+            .block_type = static_cast<uint8_t>(BlockStatus::PENDING),
+            .chain = 0,
+            .reward = job->coinbase_value,
+            .time_ms = time,
+            .duration_ms = duration_ms,
+            .height = job->height,
+            .difficulty = share_res.difficulty,
+            .effort_percent = effort_percent,
+            .hash_bin = share_res.hash_bytes};
 
         auto submission = std::make_unique<BlockSubmission>(bs);
 
         block_submitter.AddImmatureBlock(std::move(submission),
                                          coin_config.pow_fee);
+        round_manager.AddRoundShare(cli->GetId().miner_id,
+                                    share_res.difficulty);
     }
     else if (share_res.code == ResCode::VALID_SHARE) [[likely]]
     {
@@ -263,7 +258,7 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     }
     else
     {
-        // logger.Log<LogType::Warn>(
+        // logger.template Log<LogType::Warn>(
         //             "Received bad share for job id: {}", share.job_id);
 
         rpc_res = RpcResult(share_res.code, share_res.message);
@@ -273,7 +268,7 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
 
     auto end = TIME_NOW();
 
-    // logger.Log<
+    // logger.template Log<
     //     LogType::Debug>(
     //     "Share processed in {}us, diff: {}, res: {}",
     //     std::chrono::duration_cast<std::chrono::microseconds>(end - start)
@@ -344,7 +339,7 @@ bool StratumServer<confs>::HandleConnected(connection_it *it)
         // disconnect if we don't have any jobs to not cause a crash, more
         // efficient to check here than everytime we broadcast a job (there will
         // not be case where job is empty after the first job.)
-        logger.Log<LogType::Warn>(
+        logger.template Log<LogType::Warn>(
             "Rejecting client connection, as there isn't a job!");
         return false;
     }
@@ -364,7 +359,8 @@ void StratumServer<confs>::DisconnectClient(
     std::unique_lock lock(clients_mutex);
     clients.erase(conn_ptr);
 
-    logger.Log<LogType::Info>("Stratum client disconnected. sock: {}", sock);
+    logger.template Log<LogType::Info>("Stratum client disconnected. sock: {}",
+                                       sock);
 }
 
 template <StaticConf confs>
@@ -411,8 +407,8 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
     std::string worker_full_str = fmt::format("{}.{}", address, worker);
     cli->SetAuthorized(worker_full_id, std::move(worker_full_str), stats_it);
 
-    logger.Log<LogType::Info>("Authorized worker: {}, address: {}", worker,
-                              address);
+    logger.template Log<LogType::Info>("Authorized worker: {}, address: {}",
+                                       worker, address);
 
     return RpcResult(ResCode::OK);
 }
@@ -430,7 +426,7 @@ RpcResult StratumServer<confs>::HandleAuthorize(
     }
     catch (const simdjson_error &err)
     {
-        logger.Log<LogType::Error>(
+        logger.template Log<LogType::Error>(
             "No worker name provided in authorization. err: {}", err.what());
 
         return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
@@ -439,7 +435,8 @@ RpcResult StratumServer<confs>::HandleAuthorize(
     const size_t sep = worker_full.find('.');
     if (sep == std::string::npos)
     {
-        logger.Log<LogType::Error>("Bad worker name format: {}", worker_full);
+        logger.template Log<LogType::Error>("Bad worker name format: {}",
+                                            worker_full);
 
         return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
     }

@@ -9,7 +9,6 @@
 #include "static_config.hpp"
 #include "stratum_server.hpp"
 
-static constexpr std::string_view field_str_cn = "StratumServerCn";
 
 template <StaticConf confs>
 class StratumServerCn : public StratumServer<confs>
@@ -24,6 +23,7 @@ class StratumServerCn : public StratumServer<confs>
     }
 
    private:
+    static constexpr std::string_view field_str_cn = "StratumServerCn";
     const Logger<field_str_cn> logger;
 
     RpcResult HandleAuthorize(StratumClient* cli,

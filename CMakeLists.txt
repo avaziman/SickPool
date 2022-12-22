@@ -38,7 +38,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3")
 else()
     # -g3 maximum debugging information
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -Wsubobject-linkage -Wmissing-template-keyword")
+    # link time optimization
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -O0 -g3 -DDEBUG=1-Wsubobject-linkage -Wmissing-template-keyword")
     add_compile_definitions(SIMDJSON_DEVELOPMENT_CHECKS)
 endif()
 
@@ -47,13 +48,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_subdirectory(src)
 
 # if (DEFINED WITH_UNIT_TEST)
-#     add_subdirectory(tests)
+    # add_subdirectory(tests)
 # endif()
 
 if (DEFINED WITH_NOTIFIER)
     add_subdirectory(stratum_notifier)
 endif()
+
 add_subdirectory(src/blocks)
+add_subdirectory(src/payments)
 
 add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME_CORE})

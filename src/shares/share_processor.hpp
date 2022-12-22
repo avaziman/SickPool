@@ -21,48 +21,52 @@
 class ShareProcessor
 {
    public:
-//     template <StratumProtocol sp>
-//     static inline bool VerifyShareParams(ShareResult& result, const JobT* job,
-//                                          std::string_view given_time,
-//                                          const int64_t curtime);
+    //     template <StratumProtocol sp>
+    //     static inline bool VerifyShareParams(ShareResult& result, const JobT*
+    //     job,
+    //                                          std::string_view given_time,
+    //                                          const int64_t curtime);
 
-//     template <>
-//     static inline bool VerifyShareParams<StratumProtocol::CN>(
-//         ShareResult& result, const JobT* job, std::string_view given_time,
-//         const int64_t curtime)
-//     {
-//         uint32_t shareTime = static_cast<uint32_t>(
-//             HexToUint(given_time.data(), given_time.size()));
-// // in btc the value in not reversed
-// #ifdef STRATUM_ZEC
-//         shareTime = bswap_32(shareTime);  // swap to little endian
-// #endif
+    //     template <>
+    //     static inline bool VerifyShareParams<StratumProtocol::CN>(
+    //         ShareResult& result, const JobT* job, std::string_view
+    //         given_time, const int64_t curtime)
+    //     {
+    //         uint32_t shareTime = static_cast<uint32_t>(
+    //             HexToUint(given_time.data(), given_time.size()));
+    // // in btc the value in not reversed
+    // #ifdef STRATUM_ZEC
+    //         shareTime = bswap_32(shareTime);  // swap to little endian
+    // #endif
 
-//         uint64_t minTime = job->min_time;
-//         uint64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
+    //         uint64_t minTime = job->min_time;
+    //         uint64_t maxTime = curtime / 1000 + MAX_FUTURE_BLOCK_TIME;
 
-//         if (shareTime < minTime || shareTime > maxTime)
-//         {
-//             result.code = ResCode::UNKNOWN;
-//             result.message =
-//                 fmt::format("Invalid nTime (min: {}, max: {}, given: {})",
-//                             minTime, maxTime, shareTime);
-//             result.difficulty =
-//                 static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
-//             return false;
-//         }
+    //         if (shareTime < minTime || shareTime > maxTime)
+    //         {
+    //             result.code = ResCode::UNKNOWN;
+    //             result.message =
+    //                 fmt::format("Invalid nTime (min: {}, max: {}, given:
+    //                 {})",
+    //                             minTime, maxTime, shareTime);
+    //             result.difficulty =
+    //                 static_cast<double>(BadDiff::INVALID_SHARE_DIFF);
+    //             return false;
+    //         }
 
-//         return true;
-//     }
+    //         return true;
+    //     }
 
     static constexpr std::string_view field_str = "ShareProcessor";
     static const Logger<field_str> logger;
 
     // template <StratumProtocol sp, HashAlgo ha>
-    // inline static void Hash(ShareResult& result, const Job<sp>* job, const ShareT<sp> share);
+    // inline static void Hash(ShareResult& result, const Job<sp>* job, const
+    // ShareT<sp> share);
 
     // template <StratumProtocol sp, HashAlgo ha>
-    // inline static void Hash(ShareResult& result, const Job<sp>* job, const ShareT<sp> share);
+    // inline static void Hash(ShareResult& result, const Job<sp>* job, const
+    // ShareT<sp> share);
 
     template <StaticConf confs>
     inline static void Process(
@@ -73,7 +77,8 @@ class ShareProcessor
     {
         // veirfy params before even hashing
 
-        // if (!VerifyShareParams<confs.STRATUM_PROTOCOL>(result, job, share.time,
+        // if (!VerifyShareParams<confs.STRATUM_PROTOCOL>(result, job,
+        // share.time,
         //                                                curTime))
         // {
         //     return;
@@ -89,7 +94,6 @@ class ShareProcessor
             currency::get_block_longhash_sick(
                 result.hash_bytes.data(), static_cast<uint64_t>(job->height),
                 job->template_hash.data(), share.nonce);
-            // std::ranges::reverse(result.hash_bytes);
         }
         else if constexpr (confs.HASH_ALGO == HashAlgo::VERUSHASH_V2b2)
         {
@@ -105,12 +109,11 @@ class ShareProcessor
         }
         else
         {
-            throw std::runtime_error("Missing hash function");
+            throw std::invalid_argument("Missing hash function");
         }
 
-        
-
-        logger.Log<LogType::Debug>("Share hash: {} ", HexlifyS(result.hash_bytes));
+        logger.Log<LogType::Debug>("Share hash: {} ",
+                                   HexlifyS(result.hash_bytes));
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
@@ -134,8 +137,7 @@ class ShareProcessor
             result.code = ResCode::VALID_BLOCK;
             return;
         }
-        else 
-        if (result.difficulty / cli->GetDifficulty() <
+        else if (result.difficulty / cli->GetDifficulty() <
                  0.99)  // allow 1% below
         {
             result.code = ResCode::LOW_DIFFICULTY_SHARE;

@@ -74,11 +74,11 @@ class StratumClient
         share_count = 0;
     }
 
-    void SetAuthorized(const WorkerFullId& id, std::string&& workerfull,
-                       worker_map::iterator& it)
+    void SetAuthorized(const WorkerFullId& full_id, std::string&& workerfull,
+                       const worker_map::iterator& worker_it)
     {
         is_authorized = true;
-        this->id = id;
+        this->id = full_id;
 
         this->worker_full = std::move(workerfull);
         std::string_view worker_full_sv(worker_full);
@@ -87,7 +87,7 @@ class StratumClient
         this->address = worker_full_sv.substr(0, dot);
         this->worker_name =
             worker_full_sv.substr(dot + 1, worker_full_sv.size() - 1);
-        this->stats_it = it;
+        this->stats_it = worker_it;
     }
 
 

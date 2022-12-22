@@ -49,12 +49,12 @@ class DaemonRpc
     }
 
     template <typename... KeyVal>
-    static std::string ToJsonStr(KeyVal... obj)
+    static std::string ToJsonObj(KeyVal... obj)
     {
         std::string res = "{";
-        auto append = [&res](auto x)
+        auto append = [&res](std::pair<std::string_view, auto> x)
         {
-            res += ToJsonStr(x);
+            res += ToJsonStr(x.first, x.second);
             res += ",";
         };
 
@@ -64,13 +64,13 @@ class DaemonRpc
     }
 
     template <typename T>
-    static std::string ToJsonStr(std::pair<std::string_view, T> arg)
+    static std::string ToJsonStr(std::string_view key, T val)
     {
-        return fmt::format("\"{}\":{}", arg.first, ToJsonStr(arg.second));
+        return fmt::format("\"{}\":{}", key, ToJsonStr(val));
     }
 
     template <typename... T>
-    static std::string GetParamsStr(T&&... args)
+    static std::string GetArrayStr(T&&... args)
     {
         std::string params_json = "[";
 
@@ -90,11 +90,10 @@ class DaemonRpc
                     std::string_view params_json,
                     std::string_view type = "POST /") /*const*/
     {
-        // int errCode;
         int res_code;
         size_t body_size;
         size_t send_size;
-        size_t sent;
+        ssize_t sent;
         size_t content_length;
         size_t content_received;
 
@@ -113,7 +112,7 @@ class DaemonRpc
 
         // generate the http request
 
-        std::size_t bodyLen = params_json.size() + 64;
+        std::size_t bodyLen = params_json.size() + 128;
         auto body = std::make_unique<char[]>(bodyLen);
 
         body_size = fmt::format_to_n(body.get(), bodyLen,
@@ -141,12 +140,12 @@ class DaemonRpc
 
         char headerBuff[HTTP_HEADER_SIZE];
 
-        int header_recv = 0;
-        char* end_of_header = nullptr;
+        size_t header_recv = 0;
+        const char* end_of_header = nullptr;
         // receive http header (and potentially part or the whole body)
         do
         {
-            std::size_t recvRes = recv(sockfd, headerBuff + header_recv,
+            ssize_t recvRes = recv(sockfd, headerBuff + header_recv,
                                        HTTP_HEADER_SIZE - header_recv, 0);
             if (recvRes <= 0)
             {

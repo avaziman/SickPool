@@ -9,14 +9,14 @@ Server<T>::Server(int port)
 
     if (epoll_fd == -1)
     {
-        throw std::runtime_error(fmt::format(
+        throw std::invalid_argument(fmt::format(
             "Failed to create epoll: {} -> {}.", errno, std::strerror(errno)));
     }
 
     InitListeningSock(port);
 
     if (listen(listening_fd, MAX_CONNECTIONS_QUEUE) == -1)
-        throw std::runtime_error(
+        throw std::invalid_argument(
             "Stratum server failed to enter listenning state.");
 
     logger.Log<LogType::Info>("Created listening socket on port: {}", port);
@@ -46,7 +46,7 @@ void Server<T>::Service()
     {
         if (errno == EBADF || errno == EFAULT || errno == EINVAL)
         {
-            throw std::runtime_error(fmt::format(
+            throw std::invalid_argument(fmt::format(
                 "Failed to epoll_wait: {} -> {}", errno, std::strerror(errno)));
         }
         else if (errno != EINTR)
@@ -110,7 +110,7 @@ void Server<T>::HandleReadable(connection_it *it)
 
         if (recv_res == -1)
         {
-            if (errno == EWOULDBLOCK || errno == EAGAIN)
+            if (/* errno == EWOULDBLOCK || */ errno == EAGAIN)
             {
                 RearmSocket(it);
             }
@@ -287,11 +287,11 @@ void Server<T>::InitListeningSock(int port)
     listening_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if (listening_fd == -1)
-        throw std::runtime_error("Failed to create stratum socket");
+        throw std::invalid_argument("Failed to create stratum socket");
 
     if (setsockopt(listening_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
                    sizeof(optval)) == -1)
-        throw std::runtime_error("Failed to set stratum socket options");
+        throw std::invalid_argument("Failed to set stratum socket options");
 
     // struct timeval timeout;
     // timeout.tv_sec = coin_config.socket_recv_timeout_seconds;
@@ -299,6 +299,7 @@ void Server<T>::InitListeningSock(int port)
     // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
     // sizeof(timeout)) == -1)
     //     throw std::runtime_error("Failed to set stratum socket options");
+
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
@@ -306,7 +307,7 @@ void Server<T>::InitListeningSock(int port)
 
     if (bind(listening_fd, (const sockaddr *)&addr, sizeof(addr)) == -1)
     {
-        throw std::runtime_error(
+        throw std::invalid_argument(
             fmt::format("Stratum server failed to bind to port: {}", port));
     }
 
@@ -317,7 +318,7 @@ void Server<T>::InitListeningSock(int port)
 
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listening_fd, &listener_ev) == -1)
     {
-        throw std::runtime_error(
+        throw std::invalid_argument(
             fmt::format("Failed to add listener socket to epoll set: {} -> {}",
                         errno, std::strerror(errno)));
     }

@@ -48,8 +48,8 @@ struct join
     {
         // add space for ';'
         constexpr std::size_t len = (Strs.size() + ...) + (sizeof...(Strs)) - 1;
-        std::array<char, len + 1> arr{};
-        auto append = [i = 0, &arr](auto const& s) mutable
+        std::array<char, len + 1> arrr{};
+        auto append = [i = 0, &arrr](auto const& s) mutable
         {
             for (char c : s)
             {
@@ -58,8 +58,8 @@ struct join
             arr[i++] = ':';
         };
         (append(Strs), ...);
-        arr[len] = 0;
-        return arr;
+        arrr[len] = 0;
+        return arrr;
     }
     // Give the joined string static storage
     static constexpr auto arr = impl();
@@ -74,7 +74,6 @@ static constexpr auto join_v = join<Strs...>::value;
 template <auto T>
 constexpr std::string_view EnumName()
 {
-    // std::string_view name(std::source_location::current().function_name());
     std::string_view name(std::source_location::current().function_name());
     auto var_pos = name.find('=') + 2;
     name = name.substr(var_pos,
@@ -82,13 +81,6 @@ constexpr std::string_view EnumName()
     // shortened
     name = name.substr(name.find("::") + 2);
 
-    // for (int i = 0; i < name.size(); i ++)
-    // {
-    //     // replace underscored with -, and make lowercase
-    //     char* c = (char*)(name.data() + i);
-    //     if (*c == '_') *c = '-';
-    //     *c = charToLower(*c);
-    // }
     return name;
 }
 
@@ -111,10 +103,9 @@ inline int fast_atoi(const char* str, int size)
     return val;
 }
 
-inline int SetHighPriorityThread(std::thread& thr)
+inline int SetHighPriorityThread(std::jthread& thr)
 {
     struct sched_param param;
-    int maxPriority;
 
     param.sched_priority = sched_get_priority_max(SCHED_FIFO);
     int res = pthread_setschedparam(thr.native_handle(), SCHED_FIFO, &param);
@@ -203,8 +194,6 @@ inline char VarInt(uint64_t& len)
         return 5;
     }
 
-    // problem
-    //  len = ((uint64_t)0xff << 64) | len;
     return 9;
 }
 
@@ -231,17 +220,9 @@ inline int intPow(int x, unsigned int p)
         return x * tmp * tmp;
 }
 
-// constexpr double BitsToDiff(const unsigned bits)
-// {
-//     const unsigned exponent_diff = 8 * (DIFF1_EXPONENT - ((bits >> 24) &
-//     0xFF)); const double significand = bits & 0xFFFFFF; return
-//     std::ldexp(DIFF1_COEFFICIENT / significand, exponent_diff);
-// }
-
 constexpr uint64_t pow2(int power)
 {
     // if (power == 0) return 1;
-
     // return 2 * pow2(power - 1);
 
     return (1ULL << power);
@@ -264,37 +245,4 @@ constexpr double GetExpectedHashes(const double diff)
     return diff * hash_multiplier;
     // for verus 2^ 24 / 0x0f0f0f = 17...
 }
-
-// ms
-inline int64_t GetDailyTimestamp()
-{
-    int64_t time = std::time(nullptr);
-    time = time - (time % 86400);
-    return time * 1000;
-}
-
-// https://bitcoin.stackexchange.com/questions/30467/what-are-the-equations-to-convert-between-bits-and-difficulty
-// static uint32_t DiffToBits(double difficulty)
-// {
-//     int shiftBytes;
-//     int64_t word;
-//     for (shiftBytes = 1; true; shiftBytes++)
-//     {
-//         word = (DIFF1_COEFFICIENT * pow(0x100, shiftBytes)) / difficulty;
-//         if (word >= 0xffff) break;
-//     }
-//     word &= 0xffffff;  // convert to int < 0xffffff
-//     int size = DIFF1_EXPONENT - shiftBytes;
-//     // the 0x00800000 bit denotes the sign, so if it is already set, divide
-//     the
-//     // mantissa by 0x100 and increase the size by a byte
-//     if (word & 0x800000)
-//     {
-//         word >>= 8;
-//         size++;
-//     }
-//     uint32_t bits = (size << 24) | word;
-//     return bits;
-// }
-
 #endif

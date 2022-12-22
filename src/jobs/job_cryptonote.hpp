@@ -26,11 +26,10 @@
 
 struct BlockTemplateCn
 {
-    // /*const*/ std::string_view prev_hash;
     const std::string block_bin;
     const std::string seed;
     const uint32_t height;
-    const uint64_t target_diff;
+    const double target_diff;
     const double expected_hashes;
     const uint32_t block_size;
     const uint64_t coinbase_value;
@@ -52,7 +51,8 @@ struct BlockTemplateCn
 
     auto GetTemplateHash(const currency::block& block) const
     {
-        std::string template_hash_blob = currency::get_block_hashing_blob(block);
+        std::string template_hash_blob =
+            currency::get_block_hashing_blob(block);
 
         return HashWrapper::CnFastHash(
             reinterpret_cast<uint8_t*>(template_hash_blob.data()),
@@ -65,27 +65,27 @@ struct BlockTemplateCn
     {
     }
 
-    bool operator==(const BlockTemplateCn& other) const {
+    bool operator==(const BlockTemplateCn& other) const
+    {
         return this->template_hash == other.template_hash;
     }
-
 
    private:
     // private constructor to reuse block without storing it in struct
     explicit BlockTemplateCn(const BlockTemplateResCn& btemplate,
                              const std::string& block_bin)
-        : BlockTemplateCn(btemplate, block_bin,
-                          UnserializeBlock(block_bin))
+        : BlockTemplateCn(btemplate, block_bin, UnserializeBlock(block_bin))
     {
     }
 
     explicit BlockTemplateCn(const BlockTemplateResCn& btemplate,
-                             std::string_view block_bin, const currency::block& block)
+                             std::string_view block_bin,
+                             const currency::block& block)
         :  // prev_hash(btemplate.prev_hash),
           block_bin(block_bin),
           seed(btemplate.seed),
           height(btemplate.height),
-          target_diff(btemplate.difficulty),
+          target_diff(static_cast<double>(btemplate.difficulty)),
           expected_hashes(
               GetExpectedHashes<ZanoStatic>(static_cast<double>(target_diff))),
           block_size(static_cast<uint32_t>(btemplate.blob.size() / 2)),
@@ -101,7 +101,8 @@ template <>
 class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
 {
    public:
-    explicit Job<StratumProtocol::CN>(const BlockTemplateResCn& bTemplate, bool clean)
+    explicit Job<StratumProtocol::CN>(const BlockTemplateResCn& bTemplate,
+                                      bool clean)
         : BlockTemplateCn(bTemplate),
           // job id is the block template hash hex
           JobBase(HexlifyS(template_hash), clean)
@@ -114,15 +115,28 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
         // nothing to do
     }
 
+    static constexpr auto nonce_offset = 1;  // right after major_version (u8)
     inline void GetBlockHex(std::string& res, const uint64_t nonce) const
     {
-        constexpr auto nonce_offset = 1;  // right after major_version (u8)
+        std::string cp;
+        cp.reserve(this->block_bin.size() * 2);
 
-        std::string cp(this->block_bin);
+        // copy block bin
+        cp = this->block_bin;
+        // set found nonce
         *reinterpret_cast<uint64_t*>(cp.data() + nonce_offset) = nonce;
 
-        res.resize(cp.size() * 2);
         Hexlify(res.data(), cp.data(), cp.size());
+    }
+
+    std::array<uint8_t, 32> GetBlockHash(uint64_t nonce) const
+    {
+        std::array<uint8_t, 32> arr;
+        std::string cp(this->block_bin);
+        *reinterpret_cast<uint64_t*>(cp.data() + nonce_offset) = nonce;
+        currency::block block = UnserializeBlock(cp);
+        *(reinterpret_cast<crypto::hash*>(arr.data())) = get_block_hash(block);
+        return arr;
     }
 
     template <StaticConf confs>
@@ -151,7 +165,8 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
             hex_target_sv, height);
     }
 
-    bool IsSameJob(const Job<StratumProtocol::CN>& other) {
+    bool IsSameJob(const Job<StratumProtocol::CN>& other) const
+    {
         return this->template_hash == other.template_hash;
     }
 };

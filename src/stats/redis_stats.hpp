@@ -43,14 +43,11 @@ class RedisStats : public RedisManager
                                    int64_t update_time_ms,
                                    const WorkerStats &ws);
 
-    bool UpdateIntervalStats(worker_map &worker_stats_list,
+    bool UpdateIntervalStats(worker_map &worker_stats_map,
                              miner_map &miner_stats_map,
                              std::unique_lock<std::shared_mutex> stats_mutex,
-                             double net_hr, double diff, uint32_t blocks_found,
-                             int64_t update_time_ms);
+                             const NetworkStats &ns, int64_t update_time_ms);
 
-    // bool SetNewBlockStats(std::string_view chain, int64_t curtime,
-    //                       double net_hr, double estimated_shares);
     bool ResetMinersWorkerCounts(const std::vector<MinerIdHex> &addresses,
                                  int64_t time_now);
     bool LoadAverageHashrateSum(
@@ -67,14 +64,7 @@ class RedisStats : public RedisManager
                              uint64_t curtime_ms);
 
     bool PopWorker(const WorkerFullId &fullid);
-    long GetMinerCount()
-    {
-        return GetInt(key_names.solver_count);
-    }
-    long GetWorkerCount(const MinerIdHex& id)
-    {
-        return GetInt(Format({key_names.miner_worker_count, id.GetHex()}));
-    }
+
 };
 
 #endif

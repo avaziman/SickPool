@@ -5,15 +5,22 @@
 #include <cppconn/prepared_statement.h>
 #include <cppconn/statement.h>
 #include <fmt/core.h>
+
 #include <memory>
-#include "stats.hpp"
 #include <mutex>
 
-#define PRINT_MYSQL_ERR(e) logger.Log<LogType::Critical>("Failed to mysql: {}", e.what())
-
+#include "block_submission.hpp"
 #include "coin_config.hpp"
 #include "redis_interop.hpp"
+#include "round_share.hpp"
+#include "stats.hpp"
 #include "utils/hex_utils.hpp"
+#include "redis_manager.hpp"
+#include "round_share.hpp"
+
+#define PRINT_MYSQL_ERR(e) \
+    logger.Log<LogType::Critical>("Failed to mysql: {}", e.what())
+
 class MySqlManager
 {
    private:
@@ -26,21 +33,45 @@ class MySqlManager
 
     static std::unique_ptr<sql::PreparedStatement> add_worker;
     static std::unique_ptr<sql::PreparedStatement> get_worker;
+    static std::unique_ptr<sql::PreparedStatement> add_reward;
+    static std::unique_ptr<sql::PreparedStatement> get_last_id;
+    static std::unique_ptr<sql::PreparedStatement> get_immature_blocks;
+    static std::unique_ptr<sql::PreparedStatement> get_unpaid_rewards;
+    static std::unique_ptr<sql::PreparedStatement> update_block_status;
+    static std::unique_ptr<sql::PreparedStatement> update_rewards;
+    static std::unique_ptr<sql::PreparedStatement> add_payout;
+    static std::unique_ptr<sql::PreparedStatement> add_payout_entry;
+
     static constexpr std::string_view logger_field = "MySQL";
     static const Logger<logger_field> logger;
 
     static std::mutex mutex;
 
    public:
-    explicit MySqlManager(const CoinConfig& cc);
-    void AddBlockSubmission(const BlockSubmission &submission) const;
+    explicit MySqlManager(const CoinConfig &cc);
+    bool AddBlockSubmission(uint32_t &id,
+                            const BlockSubmission &submission) const;
 
     void AddMiner(std::string_view address, std::string_view alias,
-                  uint64_t min_payout) const;
-    int GetMinerId(std::string_view address, std::string_view alias) const;
+                  uint64_t join_time, uint64_t min_payout) const;
+    int64_t GetMinerId(std::string_view address, std::string_view alias) const;
 
-    void AddWorker(MinerId minerid, std::string_view worker_name) const;
-    int GetWorkerId(MinerId minerid, std::string_view worker_name) const;
+    void AddWorker(MinerId minerid, std::string_view worker_name,
+                   uint64_t join_time) const;
+    int64_t GetWorkerId(MinerId minerid, std::string_view worker_name) const;
+
+    bool AddRoundRewards(const BlockSubmission &submission,
+                         const round_shares_t &miner_shares) const;
+
+    bool GetLastId(uint32_t& id) const;
+    bool LoadUnpaidRewards(std::vector<Payee> &rewards) const;
+    bool LoadImmatureBlocks(std::vector<BlockOverview> &submissions) const;
+    bool UpdateBlockStatus(uint32_t block_id, BlockStatus status) const;
+    bool UpdateImmatureRewards(uint32_t block_num, BlockStatus status,
+                               int64_t matured_time) const;
+
+    bool AddPayout(PayoutInfo &pinfo, const std::vector<Payee> &payees,
+                   uint64_t total) const;
 };
 
 #endif

@@ -1,38 +1,18 @@
 todo:
-make pay per last N timeframes round scheme
-instant payout (0.5% fee or fixed)!
+# instant payout (0.5% fee or fixed)!
 fix bug where diff is adjusted even if miner is too new
-maybe average remove is one before ts
-fix bad merkle root on paymentff
-
-fix on sinovate trying to launch 2 daemons (regtest + mainnet) = crash
+# fix on sinovate trying to launch 2 daemons (regtest + mainnet) = crash
 
 script that:
 edits .conf file
 sets stratumnotifier 
 adds redis functions
 
-fix no immature balance, 
-fix invalid mining notify (bad payment tx?)
-LoadMatureRewards on startup
-pos
 show share rate and share difficulty for each workers
-load immature blocks on startup
 setting to not show everyone ur profile
-adjust to staking age
-write health check??
-write tests to payments
-use sovler index immature balance instead of ...
-
-create a id address map use it intead of doesaddressexist
-
-commit fix to verus about not being able to pass 0 as expiryheight in createrawtransaction
-optimize coinbase generation by only generating it once and only changing the height afterwards (minimum effort)
-
-get rid of hash of chain balances use per miner instead hash
-
-test with big blocks
-maybe make client list std::map with hashrate as score to notify most powerful miners on jobs first
+# write health check??
+# write tests to payments
+# commit fix to verus about not being able to pass 0 as expiryheight in createrawtransaction
 
 later:
 show personal luck
