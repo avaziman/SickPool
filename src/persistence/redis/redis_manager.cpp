@@ -68,19 +68,6 @@ void RedisManager::Init()
     }
 }
 
-bool RedisManager::SetActiveId(const MinerIdHex &id)
-{
-    std::scoped_lock lock(rc_mutex);
-    // remove pending removal if there is
-    AppendCommand(
-        {"SREM", key_names.active_ids_map, fmt::format("-{}", id.GetHex())});
-
-    AppendCommand({"SADD", key_names.active_ids_map, id.GetHex()});
-
-    return GetReplies();
-}
-
-
 void RedisManager::AppendTsAdd(std::string_view key_name, int64_t time,
                                double value)
 {
@@ -123,25 +110,6 @@ void RedisManager::AppendTsCreateWorker(
                    "worker_name", worker_name});
 }
 
-bool RedisManager::GetActiveIds(std::vector<MinerIdHex> &addresses)
-{
-    std::scoped_lock locl(rc_mutex);
-
-    auto cmd = Command({"SMEMBERS", key_names.active_ids_map});
-
-    addresses.reserve(cmd->elements);
-    for (int i = 0; i < cmd->elements; i++)
-    {
-        std::string key(cmd->element[i]->str, cmd->element[i]->len);
-
-        uint32_t id;
-        std::from_chars(key.data(), key.data() + key.size(), id, 16);
-
-        addresses.push_back(MinerIdHex(id));
-    }
-    return cmd.get();
-}
-
 void RedisManager::AppendHset(std::string_view key, std::string_view field,
                               std::string_view val)
 {
@@ -166,78 +134,6 @@ std::string RedisManager::hget(std::string_view key, std::string_view field)
         return std::string(reply->str, reply->len);
     }
     return std::string();
-}
-
-bool RedisManager::TsMrange(
-    std::vector<std::pair<WorkerFullId, double>> &last_averages,
-    std::string_view prefix, std::string_view type, int64_t from, int64_t to,
-    const TsAggregation *aggregation)
-{
-    using namespace std::string_view_literals;
-    std::scoped_lock locl(rc_mutex);
-
-    redis_unique_ptr reply;
-    if (aggregation)
-    {
-        reply = Command({"TS.MRANGE"sv, std::to_string(from),
-                         std::to_string(to), "AGGREGATION"sv, aggregation->type,
-                         std::to_string(aggregation->time_bucket_ms),
-                         "FILTER"sv, fmt::format("prefix={}", prefix),
-                         fmt::format("type={}", type)});
-    }
-    else
-    {
-        reply =
-            Command({"TS.MRANGE"sv, std::to_string(from), std::to_string(to),
-                     "FILTER"sv, fmt::format("prefix={}", prefix),
-                     fmt::format("type={}", type)});
-    }
-
-    if (!reply.get()) return false;
-
-    last_averages.reserve(reply->elements);
-
-    for (int i = 0; i < reply->elements; i++)
-    {
-        auto entry = reply->element[i];
-
-        // everything that can go wrong with the reply
-        if (entry->type != REDIS_REPLY_ARRAY || entry->elements < 3 ||
-            !entry->element[2]->elements ||
-            entry->element[2]->element[0]->type != REDIS_REPLY_ARRAY)
-        {
-            continue;
-        }
-
-        char *addr_start = std::strrchr(entry->element[0]->str, ':');
-
-        if (addr_start == nullptr)
-        {
-            continue;
-        }
-
-        addr_start++;  // skip ':'
-
-        std::string id_hex(
-            addr_start,
-            (entry->element[0]->str + entry->element[0]->len) - addr_start);
-
-        MinerId miner_id;
-        WorkerId worker_id;
-
-        std::to_chars(id_hex.data(), id_hex.data() + sizeof(miner_id) * 2,
-                      miner_id);
-        std::to_chars(
-            id_hex.data() + sizeof(miner_id) * 2,
-            id_hex.data() + sizeof(miner_id) * 2 + sizeof(worker_id) * 2,
-            worker_id);
-
-        double hashrate = std::strtod(
-            entry->element[2]->element[0]->element[1]->str, nullptr);
-        last_averages.emplace_back(WorkerFullId(miner_id, worker_id), hashrate);
-    }
-
-    return true;
 }
 
 double RedisManager::zscore(std::string_view key, std::string_view field)

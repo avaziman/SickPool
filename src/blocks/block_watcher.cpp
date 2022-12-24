@@ -73,6 +73,7 @@ void BlockWatcher<confs>::CheckImmatureSubmissions()
                     : EnumName<BlockStatus::ORPHANED>());
 
             it = immature_block_submissions.erase(it);
+
         }
         else
         {

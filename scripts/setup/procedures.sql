@@ -1,6 +1,7 @@
 CREATE TABLE addresses (
     id INT UNSIGNED UNIQUE AUTO_INCREMENT,
     address char(255) NOT NULL UNIQUE,
+    address_md5 char(32) NOT NULL,
     alias char(255) UNIQUE
 );
 
@@ -60,7 +61,7 @@ CREATE TABLE payouts (
 
 CREATE TABLE payout_entries (
     payout_id INT UNSIGNED NOT NULL,
-    miner_id INT UNSIGNED NOT NULL,''
+    miner_id INT UNSIGNED NOT NULL,
     amount BIGINT UNSIGNED NOT NULL,
 
     FOREIGN KEY (payout_id) REFERENCES payouts(id),
@@ -150,9 +151,9 @@ CREATE PROCEDURE AddMiner(
     IN join_time BIGINT UNSIGNED
 ) BEGIN
 INSERT INTO
-    addresses (address, alias)
+    addresses (address, address_md5, alias)
 VALUES
-    (address, alias);
+    (address, MD5(address), alias);
 
 SET
     @id = LAST_INSERT_ID();
@@ -199,7 +200,7 @@ DELIMITER ;
 
 DELIMITER //
 CREATE PROCEDURE AddWorker(
-    IN minerid INT UNSIG,
+    IN minerid INT UNSIGNED,
     IN wname CHAR(255),
     IN join_time BIGINT UNSIGNED
 ) BEGIN
@@ -207,7 +208,6 @@ INSERT INTO
     workers (miner_id, name, join_time)
 VALUES
     (minerid, wname, join_time);
-
 END//
 DELIMITER ;
 

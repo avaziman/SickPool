@@ -65,7 +65,6 @@ struct KeyNames
     const std::string hashrate_pool_compact =
         Format({hashrate_pool, EnumName<COMPACT>()});
 
-    const std::string miner_worker_count = Format({coin, EnumName<SOLVER>(), EnumName<WORKER>(), EnumName<COUNT>()});
     const std::string worker_count = Format({coin, EnumName<WORKER_COUNT>()});
     const std::string worker_count_pool =
         Format({worker_count, EnumName<POOL>()});

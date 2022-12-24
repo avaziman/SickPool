@@ -3,37 +3,44 @@
     "control_port": 1111,
     "stratum_port": 4444,
     "redis": {
-        "redis_port": 6379,
-        "hashrate_ttl": 86400
+        "host": "127.0.0.1:6379",
+        "db_index": 0,
+        "hashrate_ttl_seconds": 86400
+    },
+    "mysql": {
+        "host": "127.0.0.1:3306",
+        "user": "root",
+        "pass": "password",
+        "db_name": "ZANO"
     },
     "stats": {
         "effort_interval_seconds": 10,
-        "hashrate_interval_seconds": 5,
-        "hashrate_interval_seconds1": 10,
-        "average_hashrate_interval_seconds": 5,
-        "mined_blocks_interval": 600,
-        "diff_adjust_seconds": 30000
+        "hashrate_interval_seconds": 300,
+        "average_hashrate_interval_seconds": 21600,
+        "mined_blocks_interval": 86400,
+        "diff_adjust_seconds": 300
     },
-    "pow_fee": 0.01,
+    "pow_fee": 0.0075,
     "pos_fee": 0.01,
-    "default_difficulty": 20000000.0,
-    "minimum_difficulty": 0.000001,
+    "default_difficulty": 5000000.0,
+    "minimum_difficulty": 10000,
     "target_shares_rate": 100.0,
     "pool_addr": "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp",
+    "redis_host": "127.0.0.1:6379",
     "socket_recv_timeout_seconds": 3,
-    "block_poll_interval": 1,
+    "block_poll_interval": 10,
     "payment_interval_seconds": 5,
     "min_payout_threshold": 10000000000000,
     "rpcs": [
         {
-            "host": "127.0.0.1:12111",
-            "auth": "iZ2bZfXdeN626rkyy9YsnfeT1Qq1K6XamE4brWm3tzP5hDUAig4dHmKSqe4yyq5dgbSPjmpLbfidqPyDXAuFY2J9544F95vagSF1Xqq3eCUp=="
+            "host": "127.0.0.1:11211",
+            "auth": ""
         }
     ],
     "payment_rpcs": [
         {
-            "host": "127.0.0.1:12111",
-            "auth": "iZ2bZfXdeN626rkyy9YsnfeT1Qq1K6XamE4brWm3tzP5hDUAig4dHmKSqe4yyq5dgbSPjmpLbfidqPyDXAuFY2J9544F95vagSF1Xqq3eCUp=="
+            "host": "127.0.0.1:12233",
+            "auth": ""
         }
     ]
 }

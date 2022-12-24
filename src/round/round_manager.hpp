@@ -23,7 +23,7 @@ class RoundManager : public PersistenceRound
     explicit RoundManager(const PersistenceLayer& pl,
                           const std::string& round_type);
     bool LoadCurrentRound();
-    void AddRoundShare(const MinerIdHex& miner, const double effort);
+    void AddRoundShare(const MinerId miner, const double effort);
     RoundCloseRes CloseRound(uint32_t& block_id, const BlockSubmission& submission, const double fee);
     void ResetRoundEfforts();
 

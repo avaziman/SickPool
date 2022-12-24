@@ -20,6 +20,20 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(fmt)
 
+FetchContent_Declare(
+    hiredis
+    GIT_REPOSITORY https://github.com/redis/hiredis.git
+    GIT_TAG tags/v1.1.0
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(hiredis)
+
+FetchContent_Declare(
+    mysqlcppconn
+    GIT_REPOSITORY https://github.com/mysql/mysql-connector-cpp.git
+    GIT_TAG tags/8.0.31
+    GIT_SHALLOW TRUE)
+FetchContent_GetProperties(mysqlcppconn)
+
 # optimized hash function
 add_subdirectory(crypto/cn)
 add_subdirectory(crypto/verushash)
@@ -50,9 +64,7 @@ file(GLOB SRC_FILES
 # BOOST
 FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED)
 
-include(FindPkgConfig)
-
-add_library(${PROJECT_NAME_CORE} ${SRC_FILES})
+add_library(${PROJECT_NAME_CORE} STATIC ${SRC_FILES})
 
 set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum
  PUBLIC static_config PUBLIC blocks PUBLIC round
@@ -60,25 +72,22 @@ set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC st
  PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
-find_path(HIREDIS_HEADER hiredis)
-find_library(HIREDIS_LIB hiredis)
-
-target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER})
+# find_path(HIREDIS_HEADER hiredis)
+# find_library(HIREDIS_LIB hiredis)
+target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER} ${mysqlcppconn_SOURCE_DIR}/include)
 
 target_link_libraries(
     ${PROJECT_NAME_CORE}
     ${Boost_LIBRARIES}
-    ${HIREDIS_LIB}
+
+    # ${HIREDIS_LIB}
+    hiredis_static
     mysqlcppconn
+    # mysqlcppconn-static
     pthread
     cryptonote_utils
     simdjson
     fmt::fmt
     sickverushash
-
     # sickx25x
 )
-
-# add_subdirectory(blocks)
-# add_subdirectory(daemon)
-# add_subdirectory(payments)

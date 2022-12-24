@@ -12,11 +12,10 @@
 #include "block_submission.hpp"
 #include "coin_config.hpp"
 #include "redis_interop.hpp"
+#include "redis_manager.hpp"
 #include "round_share.hpp"
 #include "stats.hpp"
 #include "utils/hex_utils.hpp"
-#include "redis_manager.hpp"
-#include "round_share.hpp"
 
 #define PRINT_MYSQL_ERR(e) \
     logger.Log<LogType::Critical>("Failed to mysql: {}", e.what())

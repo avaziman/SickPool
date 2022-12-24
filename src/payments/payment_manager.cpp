@@ -70,19 +70,19 @@ bool PaymentManager::GetRewardsPROP(round_shares_t& miner_shares,
     }
     miner_shares.reserve(miner_efforts.size());
 
-    for (auto& [addr, effort] : miner_efforts)
+    for (auto& [miner_id, effort] : miner_efforts)
     {
         RoundReward round_share;
         round_share.effort = effort;
         round_share.share = round_share.effort / total_effort;
         round_share.reward = static_cast<int64_t>(
             round_share.share * static_cast<double>(substracted_reward));
-        miner_shares.try_emplace(addr.id, round_share);
+        miner_shares.try_emplace(miner_id, round_share);
 
         logger.Log<LogType::Info>(
             "Miner round share: {}, effort: {}, share: {}, reward: "
             "{}, total effort: {}",
-            addr.GetHex(), round_share.effort, round_share.share,
+            miner_id, round_share.effort, round_share.share,
             round_share.reward, total_effort);
     }
 

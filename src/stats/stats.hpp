@@ -70,53 +70,9 @@ struct Id32
 
 using MinerId = uint32_t;
 using WorkerId = uint32_t;
-
-using MinerIdHex = Id32;
-using WorkerIdHex = Id32;
-
-struct WorkerFullId
-{
-    /*const*/ MinerIdHex miner_id;
-    /*const*/ WorkerIdHex worker_id;
-
-    char hex[sizeof(miner_id.hex) + sizeof(worker_id.hex)];
-    std::string_view GetHex() const
-    {
-        return std::string_view(hex, sizeof(hex));
-    }
-
-    explicit WorkerFullId(uint32_t mi, uint32_t wi)
-        : miner_id(mi), worker_id(wi)
-    {
-        fmt::format_to_n(
-            hex, sizeof(hex), "{}{}",
-            std::string_view(miner_id.hex, sizeof(miner_id.hex)),
-            std::string_view(worker_id.hex, sizeof(worker_id.hex)));
-    }
-
-    bool operator==(const WorkerFullId& i) const
-    {
-        return miner_id == i.miner_id && worker_id == i.worker_id;
-    }
-};
-
-template <>
-struct std::hash<Id32>
-{
-    std::size_t operator()(const Id32& s) const noexcept
-    {
-        return std::hash<uint32_t>{}(s.id);
-    }
-};
-
-template <>
-struct std::hash<WorkerFullId>
-{
-    std::size_t operator()(const WorkerFullId& s) const noexcept
-    {
-        return std::hash<Id32>{}(s.miner_id) << 32 |
-               std::hash<Id32>{}(s.worker_id);
-    }
+struct FullId {
+    MinerId miner_id;
+    WorkerId worker_id;
 };
 
 #pragma pack(push, 1)
@@ -127,14 +83,14 @@ struct Share
 };
 #pragma pack(pop)
 
-using worker_map = std::list<std::pair<WorkerFullId, WorkerStats>>;
+using worker_map = std::list<std::pair<FullId, WorkerStats>>;
 
-using miner_map = std::unordered_map<MinerIdHex, MinerStats>;
+using miner_map = std::unordered_map<MinerId, MinerStats>;
 
 using round_map_t = std::unordered_map<std::string, Round>;
 
 // miner -> effort
-using efforts_map_t = std::unordered_map<MinerIdHex, double>;
+using efforts_map_t = std::unordered_map<MinerId, double>;
 
 /* block submission attributes are
     sortable:

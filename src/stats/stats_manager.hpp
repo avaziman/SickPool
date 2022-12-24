@@ -41,8 +41,8 @@ class StatsManager
 
     bool LoadAvgHashrateSums(int64_t hr_time);
     void AddShare(const worker_map::iterator& it, const double diff);
-    bool AddWorker(WorkerFullId& worker_full_id, worker_map::iterator& it,
-                   const std::string_view address, std::string_view worker_full,
+    bool AddWorker(FullId& worker_full_id, worker_map::iterator& it,
+                   std::string_view address, std::string_view worker_full,
                    std::time_t curtime, std::string_view alias,
                    int64_t min_payout);
     void PopWorker(const worker_map::iterator& it);

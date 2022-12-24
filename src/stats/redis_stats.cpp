@@ -38,7 +38,7 @@ bool RedisStats::UpdateIntervalStats(
     // unnecessary
     for (auto &[worker_id, worker_stats] : worker_stats_map)
     {
-        AppendIntervalStatsUpdate(worker_id.GetHex(), EnumName<WORKER>(),
+        AppendIntervalStatsUpdate(std::to_string(worker_id.worker_id), EnumName<WORKER>(),
                                   update_time_ms, worker_stats);
         if (worker_stats.interval_hashrate > 0) pool_worker_count++;
 
@@ -46,17 +46,18 @@ bool RedisStats::UpdateIntervalStats(
         pool_hr += worker_stats.interval_hashrate;
     }
 
-    for (auto &[miner_addr, miner_stats] : miner_stats_map)
+    for (auto &[miner_id, miner_stats] : miner_stats_map)
     {
-        std::string hr_str = std::to_string(miner_stats.interval_hashrate);
+        std::string hr_str(std::to_string(miner_stats.interval_hashrate));
+        std::string miner_id_str(std::to_string(miner_id));
 
-        AppendIntervalStatsUpdate(miner_addr.GetHex(), EnumName<MINER>(),
+        AppendIntervalStatsUpdate(miner_id_str, EnumName<MINER>(),
                                   update_time_ms, miner_stats);
 
         AppendCommand({"ZADD"sv, key_names.miner_index_hashrate, hr_str,
-                       std::to_string(miner_addr.id)});
+                       std::to_string(miner_id)});
 
-        AppendUpdateWorkerCount(miner_addr, miner_stats.worker_count,
+        AppendUpdateWorkerCount(miner_id, miner_stats.worker_count,
                                 update_time_ms);
 
         if (miner_stats.interval_hashrate > 0) pool_miner_count++;
@@ -79,22 +80,22 @@ bool RedisStats::UpdateIntervalStats(
     return GetReplies();
 }
 
-bool RedisStats::ResetMinersWorkerCounts(
-    const std::vector<MinerIdHex> &addresses, int64_t time_now)
-{
-    using namespace std::string_view_literals;
-    for (const auto &[id, _] : addresses)
-    {
-        // reset worker count
-        AppendUpdateWorkerCount(id, 0, time_now);
-    }
+// bool RedisStats::ResetMinersWorkerCounts(
+//     const std::vector<MinerId> &addresses, int64_t time_now)
+// {
+//     using namespace std::string_view_literals;
+//     for (const auto &[id, _] : addresses)
+//     {
+//         // reset worker count
+//         AppendUpdateWorkerCount(id, 0, time_now);
+//     }
 
-    return GetReplies();
-}
+//     return GetReplies();
+// }
 
 bool RedisStats::AddNewMiner(std::string_view address,
                              std::string_view addr_lowercase,
-                             std::string_view alias, const MinerIdHex &id,
+                             std::string_view alias, MinerId id,
                              int64_t curime_ms, int64_t min_payout)
 {
     using namespace std::string_view_literals;
@@ -106,7 +107,7 @@ bool RedisStats::AddNewMiner(std::string_view address,
 
         auto chain = key_names.coin;
 
-        std::string id_str = std::to_string(id.id);
+        std::string id_str = std::to_string(id);
 
         std::string curime_ms_str = std::to_string(curime_ms / 1000);
 
@@ -121,7 +122,7 @@ bool RedisStats::AddNewMiner(std::string_view address,
     return GetReplies();
 }
 
-bool RedisStats::AddNewWorker(const WorkerFullId &full_id,
+bool RedisStats::AddNewWorker(FullId full_id,
                               std::string_view address_lowercase,
                               std::string_view worker_name,
                               std::string_view alias, uint64_t curtime_ms)
@@ -130,30 +131,24 @@ bool RedisStats::AddNewWorker(const WorkerFullId &full_id,
 
     std::scoped_lock lock(rc_mutex);
 
-    auto res = Command({"HSET",
-                        Format({key_names.miner, EnumName<WORKER>(),
-                                full_id.miner_id.GetHex()}),
-                        worker_name, full_id.worker_id.GetHex()});
-
     {
         RedisTransaction add_worker_tx(this);
 
-        AppendCreateStatsTsWorker(full_id.GetHex(), alias, address_lowercase,
+        AppendCreateStatsTsWorker(std::to_string(full_id.worker_id), alias, address_lowercase,
                                   worker_name, curtime_ms);
     }
-    AppendCommand({"INCR", Format({key_names.miner_worker_count, full_id.miner_id.GetHex()})});
 
     return GetReplies();
 }
 
-void RedisStats::AppendUpdateWorkerCount(MinerIdHex miner_id, int amount,
+void RedisStats::AppendUpdateWorkerCount(MinerId miner_id, int amount,
                                          int64_t update_time_ms) 
 {
     using namespace std::string_view_literals;
     std::string amount_str = std::to_string(amount);
 
     AppendCommand({"TS.ADD"sv,
-                   Format({key_names.worker_count, miner_id.GetHex()}),
+                   Format({key_names.worker_count, std::to_string(miner_id)}),
                    std::to_string(update_time_ms), amount_str});
 }
 
@@ -229,14 +224,14 @@ void RedisStats::AppendCreateStatsTsWorker(std::string_view addr,
                    "roll_avg", average_hashrate_ratio_str});
 }
 
-bool RedisStats::PopWorker(const WorkerFullId &fullid)
+bool RedisStats::PopWorker(WorkerId fullid)
 {
     std::scoped_lock lock(rc_mutex);
 
     // set pending inactive, (set inactive after payout check...)
-    AppendCommand({"SREM", key_names.active_ids_map, fullid.miner_id.GetHex()});
-    AppendCommand({"SADD", key_names.active_ids_map,
-                   fmt::format("-{}", fullid.miner_id.GetHex())});
+    // AppendCommand({"SREM", key_names.active_ids_map, fullid.miner_id.GetHex()});
+    // AppendCommand({"SADD", key_names.active_ids_map,
+    //                fmt::format("-{}", fullid.miner_id.GetHex())});
 
     return GetReplies();
 }

@@ -232,8 +232,8 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
 #endif
         auto bs = BlockSubmission{
             .id = 0,  // QUERY LATER
-            .miner_id = cli->GetId().miner_id.id,
-            .worker_id = cli->GetId().worker_id.id,
+            .miner_id = cli->GetId().miner_id,
+            .worker_id = cli->GetId().worker_id,
             .block_type = static_cast<uint8_t>(BlockStatus::PENDING),
             .chain = 0,
             .reward = job->coinbase_value,
@@ -393,7 +393,7 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
     auto addr_encoded = tools::base58::encode(addr_data);
 
     // string-views to non-local string
-    WorkerFullId worker_full_id(0, 0);
+    FullId worker_full_id(0, 0);
     worker_map::iterator stats_it;
     bool added_to_db = this->stats_manager.AddWorker(
         worker_full_id, stats_it, address, worker, GetCurrentTimeMs(), "",

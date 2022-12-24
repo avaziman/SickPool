@@ -52,11 +52,11 @@ RoundCloseRes RoundManager::CloseRound(
     return SetClosedRound(block_id, submission, round_shares, submission.time_ms);
 }
 
-void RoundManager::AddRoundShare(const MinerIdHex& miner, const double effort)
+void RoundManager::AddRoundShare(const MinerId miner_id, const double effort)
 {
     std::scoped_lock round_lock(efforts_map_mutex);
 
-    efforts_map[miner] += effort;
+    efforts_map[miner_id] += effort;
     round.total_effort += effort;
 
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
@@ -68,7 +68,7 @@ void RoundManager::AddRoundShare(const MinerIdHex& miner, const double effort)
     }
 
     pending_shares.emplace_back(
-        Share{.miner_id = miner.id, .progress = round_progress});
+        Share{.miner_id = miner_id, .progress = round_progress});
 #endif
 }
 
@@ -132,7 +132,7 @@ bool RoundManager::LoadEfforts()
 {
     bool res = GetMinerEfforts(efforts_map, key_names.coin, round_type);
 
-    std::vector<MinerIdHex> to_remove;
+    std::vector<MinerId> to_remove;
     for (auto& [id, effort] : efforts_map)
     {
         // remove special effort keys such as $total and $estimated
@@ -144,7 +144,7 @@ bool RoundManager::LoadEfforts()
         // else
         // {
         logger.Log<LogType::Info>("Loaded {} effort for address {} of {}",
-                                  round_type, id.GetHex(), effort);
+                                  round_type, id, effort);
         // }
     }
 

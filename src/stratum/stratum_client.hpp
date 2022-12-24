@@ -32,7 +32,7 @@ class StratumClient
     std::string_view GetAddress() const { return address; }
     std::string_view GetWorkerName() const { return worker_name; }
     std::string_view GetFullWorkerName() const { return worker_full; }
-    WorkerFullId GetId() const { return id; }
+    FullId GetId() const { return id; }
 
     void SetPendingDifficulty(double diff)
     {
@@ -74,7 +74,7 @@ class StratumClient
         share_count = 0;
     }
 
-    void SetAuthorized(const WorkerFullId& full_id, std::string&& workerfull,
+    void SetAuthorized(const FullId full_id, std::string&& workerfull,
                        const worker_map::iterator& worker_it)
     {
         is_authorized = true;
@@ -111,7 +111,7 @@ class StratumClient
 
     char extra_nonce_hex[EXTRANONCE_SIZE * 2];
     // std::string current_job_id;
-    WorkerFullId id;
+    FullId id;
     std::string worker_full;
     std::string_view address;
     std::string_view worker_name;

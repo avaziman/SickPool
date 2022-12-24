@@ -5,13 +5,13 @@
     "redis": {
         "host": "127.0.0.1:6379",
         "db_index": 0,
-        "hashrate_ttl": 25
+        "hashrate_ttl_seconds": 25
     },
     "mysql": {
         "host": "127.0.0.1:3306",
         "user": "root",
         "pass": "password",
-        "db_name": "test"
+        "db_name": "ZANO"
     },
     "stats": {
         "effort_interval_seconds": 10,

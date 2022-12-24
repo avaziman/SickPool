@@ -54,13 +54,6 @@ class RedisManager
     }
     void Init();
 
-    bool GetActiveIds(std::vector<MinerIdHex> &addresses);
-    bool SetActiveId(const MinerIdHex &id);
-
-    bool TsMrange(std::vector<std::pair<WorkerFullId, double>> &last_averages,
-                  std::string_view prefix, std::string_view type, int64_t from,
-                  int64_t to, const TsAggregation *aggregation = nullptr);
-
     std::string hget(std::string_view key, std::string_view field);
     double zscore(std::string_view key, std::string_view field);
 

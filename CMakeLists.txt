@@ -34,12 +34,12 @@ execute_process(
 set (CMAKE_BUILD_TYPE "Debug")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    # Makes the executable run the fastest on host cpu and enable optimizations
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3")
+    # set(CMAKE_EXE_LINKER_FLAGS "-static")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -static-libstdc++")
 else()
     # -g3 maximum debugging information
     # link time optimization
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -O0 -g3 -DDEBUG=1-Wsubobject-linkage -Wmissing-template-keyword")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -O0 -g3 -DDEBUG=1-Wsubobject-linkage -Wmissing-template-keyword -DSTATIC_CONCPP=1")
     add_compile_definitions(SIMDJSON_DEVELOPMENT_CHECKS)
 endif()
 

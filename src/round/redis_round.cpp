@@ -28,7 +28,7 @@ bool PersistenceRound::SetEffortStats(const efforts_map_t &miner_stats_map,
 
     for (const auto &[miner_id, miner_effort] : miner_stats_map)
     {
-        AppendSetMinerEffort(key_names.coin, std::to_string(miner_id.id),
+        AppendSetMinerEffort(key_names.coin, std::to_string(miner_id),
                              EnumName<POW>(), miner_effort);
     }
 
@@ -60,7 +60,7 @@ bool PersistenceRound::GetMinerEfforts(efforts_map_t &efforts,
 
         assert(err == std::errc{});
 
-        efforts[MinerIdHex(id)] = effort;
+        efforts[id] = effort;
     }
     return true;
 }
