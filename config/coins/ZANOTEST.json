@@ -23,7 +23,7 @@
     },
     "pow_fee": 0.01,
     "pos_fee": 0.01,
-    "default_difficulty": 5000.0,
+    "default_difficulty": 150000000.0,
     "default_difficulty1": 500.0,
     "minimum_difficulty": 0.000001,
     "target_shares_rate": 100.0,

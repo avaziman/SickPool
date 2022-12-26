@@ -173,7 +173,7 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     {
         ShareProcessor::Process<confs>(share_res, cli, wc, job.get(), share,
                                        time);
-        share_res.code = ResCode::VALID_SHARE;
+        // share_res.code = ResCode::VALID_SHARE;
     }
 
     if (share_res.code == ResCode::VALID_BLOCK) [[unlikely]]
@@ -251,7 +251,8 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
         rpc_res = RpcResult(share_res.code, share_res.message);
     }
 
-    stats_manager.AddShare(cli->stats_it, share_res.difficulty);
+    stats_manager.AddShare(cli->stats_it, cli->GetDifficulty());
+    // stats_manager.AddShare(cli->stats_it, share_res.difficulty);
 
     // logger.template Log<
     //     LogType::Debug>(
