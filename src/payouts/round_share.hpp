@@ -36,7 +36,7 @@ constexpr auto round_reward_size = sizeof(RoundReward);
 struct Payee
 {
     uint32_t miner_id;
-    uint64_t amount;
+    uint64_t amount_clean;  // substructed tx fee
     std::string address;
 };
 
@@ -45,6 +45,7 @@ struct PayoutInfo
     std::string txid;
     uint64_t tx_fee;
     uint64_t time;
+    uint64_t total;
     uint32_t id;
 };
 

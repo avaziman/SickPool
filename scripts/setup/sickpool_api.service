@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 User=pool
-ExecStart=/home/pool/actions-runner-api/_work/SickPoolAPI/SickPoolAPI/target/release/api
+ExecStart=/home/pool/api/api /home/pool/ZANO.json
 Restart=always
-StandardOutput=append:/home/pool/logs/api.log
-StandardError=append:/home/pool/logs/api_error.log
+StandardOutput=append:/home/pool/log/api.log
+StandardError=append:/home/pool/log/api_error.log
 
 [Install]
 WantedBy=multi-user.target

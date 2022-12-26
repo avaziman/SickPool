@@ -55,7 +55,7 @@ file(GLOB SRC_FILES
     "persistence/mysql/*.cpp"
     "persistence/*.cpp"
     "round/*.cpp"
-    "payments/*.cpp"
+    "payouts/*.cpp"
     "logger/*.cpp"
     "daemon/*.cpp"
 )
@@ -69,7 +69,7 @@ add_library(${PROJECT_NAME_CORE} STATIC ${SRC_FILES})
 set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum
  PUBLIC static_config PUBLIC blocks PUBLIC round
  PUBLIC persistence/redis PUBLIC persistence/mysql PUBLIC persistence
- PUBLIC payments PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
+ PUBLIC payouts PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
 # find_path(HIREDIS_HEADER hiredis)

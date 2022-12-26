@@ -26,19 +26,20 @@ RoundManager::RoundManager(const PersistenceLayer& pl,
 #endif
 }
 
-RoundCloseRes RoundManager::CloseRound(
-    uint32_t& block_id, const BlockSubmission& submission, const double fee)
+RoundCloseRes RoundManager::CloseRound(uint32_t& block_id,
+                                       const BlockSubmission& submission,
+                                       const double fee)
 {
     PushPendingShares();  // push all pending shares, before locking
 
     std::scoped_lock round_lock(round_map_mutex, efforts_map_mutex);
 
     round_shares_t round_shares;
-    
+
     const double n = 2;
 
     auto [shares, resp] = GetLastNShares(round_progress, n);
-    if (!PaymentManager::GetRewardsPPLNS(round_shares, shares,
+    if (!PayoutManager::GetRewardsPPLNS(round_shares, shares,
                                          submission.reward, n, fee))
     {
         return RoundCloseRes::BAD_SHARES_SUM;
@@ -49,7 +50,8 @@ RoundCloseRes RoundManager::CloseRound(
 
     ResetRoundEfforts();
 
-    return SetClosedRound(block_id, submission, round_shares, submission.time_ms);
+    return SetClosedRound(block_id, submission, round_shares,
+                          submission.time_ms);
 }
 
 void RoundManager::AddRoundShare(const MinerId miner_id, const double effort)
@@ -58,8 +60,11 @@ void RoundManager::AddRoundShare(const MinerId miner_id, const double effort)
 
     efforts_map[miner_id] += effort;
     round.total_effort += effort;
+}
 
-#if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
+void RoundManager::AddRoundSharePPLNS(const MinerId miner_id,
+                                      const double effort)
+{
     round_progress += effort;
 
     if (pending_shares.capacity() == pending_shares.size())
@@ -69,7 +74,6 @@ void RoundManager::AddRoundShare(const MinerId miner_id, const double effort)
 
     pending_shares.emplace_back(
         Share{.miner_id = miner_id, .progress = round_progress});
-#endif
 }
 
 bool RoundManager::LoadCurrentRound()

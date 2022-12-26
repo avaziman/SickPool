@@ -27,7 +27,8 @@
 class DaemonRpc
 {
    public:
-    DaemonRpc(const std::string& hostHeader, const std::string& authHeader)
+    explicit DaemonRpc(const std::string& hostHeader,
+                       const std::string& authHeader)
         : host_header(hostHeader), auth_header(authHeader)
     {
         SockAddr sock_addr(hostHeader);
@@ -37,21 +38,27 @@ class DaemonRpc
         rpc_addr.sin_port = sock_addr.port;
     }
 
-    static std::string ToJsonStr(int arg)
+    struct JsonStr : std::string
     {
-        std::string str = std::to_string(arg);
+    };
+
+    static JsonStr ToJsonStr(int64_t arg)
+    {
+        JsonStr str(std::to_string(arg));
         return str;
     }
 
-    static std::string ToJsonStr(std::string_view arg)
+    static JsonStr ToJsonStr(std::string_view arg)
     {
-        return fmt::format("\"{}\"", arg);
+        return JsonStr(fmt::format("\"{}\"", arg));
     }
 
+    static std::string ToJsonStr(const JsonStr& arg) { return arg; }
+
     template <typename... KeyVal>
-    static std::string ToJsonObj(KeyVal... obj)
+    static JsonStr ToJsonObj(KeyVal... obj)
     {
-        std::string res = "{";
+        JsonStr res("{");
         auto append = [&res](std::pair<std::string_view, auto> x)
         {
             res += ToJsonStr(x.first, x.second);
@@ -69,18 +76,33 @@ class DaemonRpc
         return fmt::format("\"{}\":{}", key, ToJsonStr(val));
     }
 
-    template <typename... T>
-    static std::string GetArrayStr(T&&... args)
+    // template <typename... T>
+    // static JsonStr GetArrayStr(T&&... args)
+    // {
+    //     JsonStr params_json("[");
+
+    //     auto append = [&params_json](auto s)
+    //     {
+    //         params_json.append(ToJsonStr(s));
+    //         params_json.append(",");
+    //     };
+
+    //     (append(args), ...);
+
+    //     params_json[params_json.size() - 1] = ']';
+    //     return params_json;
+    // }
+
+    template <typename T>
+    static JsonStr GetArrayStr(const std::vector<T>& args)
     {
-        std::string params_json = "[";
+        JsonStr params_json("[");
 
-        auto append = [&params_json](auto s)
+        for (const auto& s : args)
         {
-            params_json += ToJsonStr(s);
+            params_json.append(ToJsonStr(s));
             params_json.append(",");
-        };
-
-        (append(args), ...);
+        }
 
         params_json[params_json.size() - 1] = ']';
         return params_json;
@@ -146,7 +168,7 @@ class DaemonRpc
         do
         {
             ssize_t recvRes = recv(sockfd, headerBuff + header_recv,
-                                       HTTP_HEADER_SIZE - header_recv, 0);
+                                   HTTP_HEADER_SIZE - header_recv, 0);
             if (recvRes <= 0)
             {
                 return errno;

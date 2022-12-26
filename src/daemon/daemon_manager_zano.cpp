@@ -60,7 +60,7 @@ bool DaemonManagerZano::SubmitBlock(std::string_view block_hex,
 
     if (int res_code =
             SendRpcReq(result_body, 1, method,
-                       DaemonRpc::GetArrayStr(block_hex), "POST /json_rpc");
+                       DaemonRpc::GetArrayStr(std::vector{block_hex}), "POST /json_rpc");
         res_code != 200)
     {
         LOG_CODE_ERR(method, res_code, result_body);
@@ -100,9 +100,9 @@ bool DaemonManagerZano::Transfer(TransferResCn& transfer_res,
 {
     std::string result_body;
 
-    const auto method = "submitblock"sv;
+    const auto method = "transfer"sv;
 
-    std::vector<std::string> dest_strs;
+    std::vector<DaemonRpc::JsonStr> dest_strs;
     dest_strs.reserve(dests.size());
 
     for (const auto& [_id, amount, address] : dests)
@@ -111,12 +111,11 @@ bool DaemonManagerZano::Transfer(TransferResCn& transfer_res,
             DaemonRpc::ToJsonObj(std::make_pair("address"sv, address),
                                  std::make_pair("amount"sv, amount)));
     }
-    std::string params = "";
 
-    // TODO: fix
-    //  std::string params = DaemonRpc::ToJsonStr(
-    //      std::make_pair("destinations"sv, DaemonRpc::GetArrayStr(dest_strs)),
-    //      std::make_pair("fee"sv, fee), std::make_pair("mixin"sv, 0));
+    std::string params = DaemonRpc::ToJsonObj(
+        std::make_pair("destinations"sv, DaemonRpc::GetArrayStr(dest_strs)),
+        std::make_pair("fee"sv, fee),
+        std::make_pair("mixin"sv, 0));
 
     if (int res_code = SendRpcReq(result_body, 1, "transfer"sv, params,
                                   "POST /json_rpc"sv);
@@ -146,8 +145,8 @@ bool DaemonManagerZano::Transfer(TransferResCn& transfer_res,
 
 // zano daemon can shows orphaned blocks as confirmed...
 bool DaemonManagerZano::GetBlockHeaderByHash(BlockHeaderResCn& res,
-                                       std::string_view block_hash,
-                                       simdjson::ondemand::parser& parser)
+                                             std::string_view block_hash,
+                                             simdjson::ondemand::parser& parser)
 {
     std::string result_body;
 
@@ -181,18 +180,17 @@ bool DaemonManagerZano::GetBlockHeaderByHash(BlockHeaderResCn& res,
     return true;
 }
 
-bool DaemonManagerZano::GetBlockHeaderByHeight(BlockHeaderResCn& res,
-                                             uint32_t height,
-                                             simdjson::ondemand::parser& parser)
+bool DaemonManagerZano::GetBlockHeaderByHeight(
+    BlockHeaderResCn& res, uint32_t height, simdjson::ondemand::parser& parser)
 {
     std::string result_body;
 
     const std::string_view method = "getblockheaderbyheight"sv;
 
-    if (int res_code = SendRpcReq(
-            result_body, 1, method,
-            DaemonRpc::ToJsonObj(std::make_pair("height"sv, height)),
-            "GET /json_rpc");
+    if (int res_code =
+            SendRpcReq(result_body, 1, method,
+                       DaemonRpc::ToJsonObj(std::make_pair("height"sv, height)),
+                       "GET /json_rpc");
         res_code != 200)
     {
         LOG_CODE_ERR(method, res_code, result_body);
@@ -207,8 +205,7 @@ bool DaemonManagerZano::GetBlockHeaderByHeight(BlockHeaderResCn& res,
         auto obj = res.doc["result"].get_object();
         res.depth =
             static_cast<uint32_t>(obj["block_header"]["depth"].get_int64());
-        res.hash =
-            obj["block_header"]["hash"].get_string();
+        res.hash = obj["block_header"]["hash"].get_string();
     }
     catch (const simdjson_error& err)
     {

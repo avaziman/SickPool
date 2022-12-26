@@ -11,9 +11,9 @@ class JobManagerCryptoNote : public JobManager<JobCryptoNote>
 {
    public:
     explicit JobManagerCryptoNote(daemon_manager_t* daemon_manager,
-                         PaymentManager* payment_manager,
+                         PayoutManager* payout_manager,
                          const std::string& pool_addr)
-        : JobManager(daemon_manager, payment_manager, pool_addr)
+        : JobManager(daemon_manager, payout_manager, pool_addr)
     {
         BlockTemplateResCn res;
         if (!GetBlockTemplate(res))

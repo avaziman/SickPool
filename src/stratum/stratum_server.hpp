@@ -45,7 +45,7 @@ class StratumServer : public StratumBase
    protected:
 
     daemon_manager_t daemon_manager;
-    PaymentManager payment_manager;
+    PayoutManager payout_manager;
     job_manager_t job_manager;
     BlockSubmitter block_submitter;
     StatsManager stats_manager;

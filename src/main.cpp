@@ -37,7 +37,6 @@ void SigintHandler(int sig)
     logger.Log<Info>("Stopping stratum server...");
 
     stratum_bserver_ptr->Stop();
-    // }
 }
 
 int main(int argc, char** argv)

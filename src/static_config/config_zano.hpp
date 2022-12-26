@@ -8,17 +8,10 @@ const HashAlgo HASH_ALGO = HashAlgo::PROGPOWZ;
 static constexpr std::string_view target_zano_sv =
     "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
 
-// static constexpr std::string_view target_zano_sv =
-//     "ffff000000000000000000000000000000000000000000000000000000000000";
-
-// TODO: make uint256 arith
-static constexpr uint256 target_zano = uint256S(target_zano_sv.data());
-
 constexpr StaticConf ZanoStatic = {
     .COIN_SYMBOL = Coin::ZANO,
     .HASH_ALGO = HashAlgo::PROGPOWZ,
     .STRATUM_PROTOCOL = StratumProtocol::CN,
-    .DIFF1_TARGET = target_zano,
     .DIFF1 = HexToDouble<target_zano_sv>(),
     .MAX_BLOCK_SIZE = 2000000,
     .BLOCK_HASH_SIZE = 32,

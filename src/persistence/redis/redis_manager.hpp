@@ -17,7 +17,7 @@
 #include "coin_config.hpp"
 #include "key_names.hpp"
 #include "logger.hpp"
-#include "payments/round_share.hpp"
+#include "payouts/round_share.hpp"
 #include "redis_interop.hpp"
 #include "redis_transaction.hpp"
 #include "shares/share.hpp"
@@ -115,11 +115,7 @@ class RedisManager
         }
 
         int res = redisGetReply(rc_unique.get(), (void **)&reply);
-        if (res != REDIS_OK)
-        {
-            logger.Log<LogType::Critical>("Failed to get reply: {}",
-                                          rc_unique->errstr);
-        }
+
         return std::make_pair(res, redis_unique_ptr(reply, freeReplyObject));
     }
 

@@ -29,30 +29,28 @@ class Logger
     template <LogType type, typename... T>
     /*static*/ inline void Log(fmt::format_string<T...> message, T&&... args) const noexcept
     {
-        using enum fmt::color;
-
         std::scoped_lock lock(log_mutex);
         fmt::v9::text_style color;
         switch (type)
         {
             case LogType::Debug:
-                color = fg(green);
+                color = fmt::fg(fmt::color::green);
                 fmt::print(color, "[DEBUG]");
                 break;
             case LogType::Info:
-                color = fg(dodger_blue);
+                color = fmt::fg(fmt::color::dodger_blue);
                 fmt::print(color, "[INFO]");
                 break;
             case LogType::Warn:
-                color = fg(yellow);
+                color = fmt::fg(fmt::color::yellow);
                 fmt::print(color, "[WARN]");
                 break;
             case LogType::Error:
-                color = fg(red);
+                color = fmt::fg(fmt::color::red);
                 fmt::print(color, "[ERROR]");
                 break;
             case LogType::Critical:
-                color = fg(red);
+                color = fmt::fg(fmt::color::red);
                 fmt::print(color, "[CRITICAL]");
                 break;
         }

@@ -17,6 +17,7 @@ std::unique_ptr<sql::PreparedStatement> MySqlManager::update_block_status;
 std::unique_ptr<sql::PreparedStatement> MySqlManager::update_rewards;
 std::unique_ptr<sql::PreparedStatement> MySqlManager::add_payout;
 std::unique_ptr<sql::PreparedStatement> MySqlManager::add_payout_entry;
+std::unique_ptr<sql::PreparedStatement> MySqlManager::update_next_payout;
 
 const Logger<MySqlManager::logger_field> MySqlManager::logger;
 
@@ -63,7 +64,7 @@ MySqlManager::MySqlManager(const CoinConfig& cc)
                 "status=5"));  // pending orphaned
 
         get_unpaid_rewards = std::unique_ptr<sql::PreparedStatement>(
-            con->prepareStatement("CALL GetUnpaidRewards()"));
+            con->prepareStatement("CALL GetUnpaidRewards(?)"));
 
         update_block_status = std::unique_ptr<sql::PreparedStatement>(
             con->prepareStatement("UPDATE blocks SET status=? WHERE id=?"));
@@ -73,12 +74,13 @@ MySqlManager::MySqlManager(const CoinConfig& cc)
 
         add_payout =
             std::unique_ptr<sql::PreparedStatement>(con->prepareStatement(
-                "INSERT INTO payouts (txid, payee_amount, paid_amount, tx_fee, "
-                "time_ms) VALUES (?,?,?,?,?)"));
+                "CALL AddPayout(?,?,?,?,?)"));
 
         add_payout_entry = std::unique_ptr<sql::PreparedStatement>(
-            con->prepareStatement("INSERT INTO payout_entries (payout_id, "
-                                  "miner_id, amount) VALUES (?,?,?)"));
+            con->prepareStatement("CALL AddPayoutEntry(?,?,?,?)"));
+
+        update_next_payout = std::unique_ptr<sql::PreparedStatement>(
+            con->prepareStatement("UPDATE payout_stats SET next_ms=?"));
     }
     catch (const sql::SQLException& e)
     {
@@ -354,11 +356,31 @@ bool MySqlManager::UpdateImmatureRewards(
     return true;
 }
 
-bool MySqlManager::LoadUnpaidRewards(std::vector<Payee>& rewards) const
+bool MySqlManager::UpdateNextPayout(
+    uint64_t next_ms) const
+{
+    std::scoped_lock _(mutex);
+
+    update_next_payout->setUInt64(1, next_ms);
+
+    try
+    {
+        /* int affected = */ update_next_payout->executeUpdate();
+    }
+    catch (const sql::SQLException e)
+    {
+        PRINT_MYSQL_ERR(e);
+    }
+
+    return true;
+}
+
+bool MySqlManager::LoadUnpaidRewards(std::vector<Payee>& rewards, uint64_t minimum) const
 {
     std::scoped_lock _(mutex);
     std::unique_ptr<sql::ResultSet> res;
 
+    get_unpaid_rewards->setUInt64(1, minimum);
     try
     {
         do
@@ -382,13 +404,14 @@ bool MySqlManager::LoadUnpaidRewards(std::vector<Payee>& rewards) const
 }
 
 bool MySqlManager::AddPayout(PayoutInfo& pinfo,
-                             const std::vector<Payee>& payees, uint64_t total) const
+                             const std::vector<Payee>& payees,
+                             uint64_t individual_fee) const
 {
     std::scoped_lock _(mutex);
 
     add_payout->setString(1, pinfo.txid);
     add_payout->setUInt(2, static_cast<uint32_t>(payees.size()));
-    add_payout->setUInt64(3, total);
+    add_payout->setUInt64(3, pinfo.total);
     add_payout->setUInt64(4, pinfo.tx_fee);
     add_payout->setUInt64(5, pinfo.time);
 
@@ -408,7 +431,8 @@ bool MySqlManager::AddPayout(PayoutInfo& pinfo,
     {
         add_payout_entry->setUInt(1, pinfo.id);
         add_payout_entry->setUInt(2, payee.miner_id);
-        add_payout_entry->setUInt64(3, payee.amount);
+        add_payout_entry->setUInt64(3, payee.amount_clean);
+        add_payout_entry->setUInt64(4, individual_fee);
 
         try
         {

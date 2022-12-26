@@ -135,6 +135,7 @@ bool PersistenceRound::SetNewBlockStats(std::string_view chain, uint32_t height,
 
     AppendSetRoundInfo(EnumName<ESTIMATED_EFFORT>(), target_diff);
     AppendUpdateBlockHeight(height);
+    AppendCommand({"PUBLISH", block_key_names.block, "NEW BLOCK"});
     return GetReplies();
 }
 

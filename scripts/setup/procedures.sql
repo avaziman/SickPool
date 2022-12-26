@@ -282,10 +282,10 @@ DELIMITER ;
 -- DELIMITER ;
 
 DELIMITER //
-CREATE PROCEDURE GetUnpaidRewards() BEGIN
+CREATE PROCEDURE GetUnpaidRewards(IN minimum BIGINT UNSIGNED) BEGIN
     SELECT address_id, mature_balance, address FROM miners
     INNER JOIN addresses ON addresses.id = miners.address_id
-    WHERE mature_balance > minimum_payout;
+    WHERE mature_balance > IF(minimum_payout > minimum, minimum_payout, minimum);
 END//
 DELIMITER ;
 
@@ -301,5 +301,25 @@ CREATE PROCEDURE GetMinerOverview(IN addr CHAR(255)) BEGIN
     WHERE
         LOWER(address)=addr OR alias=addr
     ) AS temp INNER JOIN miners ON miners.address_id = id;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE AddPayoutEntry(IN payoutid INT UNSIGNED, IN minerid INT UNSIGNED, IN amount BIGINT UNSIGNED, IN individual_fee BIGINT UNSIGNED) BEGIN
+    INSERT INTO payout_entries (payout_id,miner_id, amount) VALUES (payoutid, minerid, amount);
+    UPDATE miners SET mature_balance = mature_balance - (amount + individual_fee) WHERE address_id=minerid;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE AddPayout(
+    IN txid CHAR(255), 
+    IN payee_amount INT UNSIGNED,
+    IN paid_amount BIGINT UNSIGNED,
+    IN tx_fee BIGINT UNSIGNED, 
+    IN time_ms BIGINT UNSIGNED) 
+BEGIN
+    INSERT INTO payouts (txid, payee_amount, paid_amount, tx_fee, time_ms) VALUES (txid, payee_amount, paid_amount, tx_fee, time_ms);
+    UPDATE payout_stats SET count=count+1, amount=amount+paid_amount;
 END//
 DELIMITER ;

@@ -91,7 +91,7 @@ class DaemonManager
         constexpr std::string_view method = "submitblock";
 
         if (int resCode = SendRpcReq(resultBody, 1, method,
-                                     DaemonRpc::GetArrayStr(block_hex));
+                                     DaemonRpc::GetArrayStr(std::vector{block_hex}));
             resCode != 200)
         {
             logger.Log<LogType::Error>(
@@ -183,7 +183,7 @@ res_code != 200)
         constexpr std::string_view method = "signrawtransactionwithwallet";
 
         if (int res_code = SendRpcReq(result_body, 1, method,
-                                      DaemonRpc::GetArrayStr(funded_tx));
+                                      DaemonRpc::GetArrayStr(std::vector{funded_tx}));
             res_code != 200)
         {
             logger.Log<LogType::Error>(
@@ -263,7 +263,7 @@ res_code != 200)
         std::string result_body;
 
         if (int res_code = SendRpcReq(result_body, 1, method,
-                                      DaemonRpc::GetArrayStr(addr));
+                                      DaemonRpc::GetArrayStr(std::vector{addr}));
             res_code != 200)
         {
             return false;
@@ -299,7 +299,7 @@ res_code != 200)
         std::string result_body;
 
         if (int res_code = SendRpcReq(result_body, 1, method,
-                                      DaemonRpc::GetArrayStr(addr));
+                                      DaemonRpc::GetArrayStr(std::vector{addr}));
             res_code != 200)
         {
             return false;
@@ -340,7 +340,7 @@ res_code != 200)
             std::string res_body;
 
             if (int res_code = SendRpcReq(res_body, 1, method,
-                                          DaemonRpc::GetArrayStr(block));
+                                          DaemonRpc::GetArrayStr(std::vector{block}));
                 res_code != 200)
             {
             return false;

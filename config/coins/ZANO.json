@@ -25,12 +25,12 @@
     "default_difficulty": 5000000.0,
     "minimum_difficulty": 10000,
     "target_shares_rate": 100.0,
-    "pool_addr": "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp",
+    "pool_addr": "ZxCRWPavrf2BnQomKFBEeoVXvRw9BvuQ9f21te9ct8P8Sbh4ZLKJmz5NT4S3zAFkkrBLWiUh2Pf9CMiyQMHQaCjw33jEeYgtj",
     "redis_host": "127.0.0.1:6379",
     "socket_recv_timeout_seconds": 3,
-    "block_poll_interval": 10,
+    "block_poll_interval": 1,
     "payment_interval_seconds": 5,
-    "min_payout_threshold": 10000000000000,
+    "min_payout_threshold": 100000000,
     "rpcs": [
         {
             "host": "127.0.0.1:11211",

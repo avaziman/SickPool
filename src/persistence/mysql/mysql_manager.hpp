@@ -40,6 +40,7 @@ class MySqlManager
     static std::unique_ptr<sql::PreparedStatement> update_rewards;
     static std::unique_ptr<sql::PreparedStatement> add_payout;
     static std::unique_ptr<sql::PreparedStatement> add_payout_entry;
+    static std::unique_ptr<sql::PreparedStatement> update_next_payout;
 
     static constexpr std::string_view logger_field = "MySQL";
     static const Logger<logger_field> logger;
@@ -63,14 +64,15 @@ class MySqlManager
                          const round_shares_t &miner_shares) const;
 
     bool GetLastId(uint32_t& id) const;
-    bool LoadUnpaidRewards(std::vector<Payee> &rewards) const;
+    bool LoadUnpaidRewards(std::vector<Payee> &rewards, uint64_t minimum) const;
     bool LoadImmatureBlocks(std::vector<BlockOverview> &submissions) const;
     bool UpdateBlockStatus(uint32_t block_id, BlockStatus status) const;
     bool UpdateImmatureRewards(uint32_t block_num, BlockStatus status,
                                int64_t matured_time) const;
 
+    bool UpdateNextPayout(uint64_t next_ms) const ;
     bool AddPayout(PayoutInfo &pinfo, const std::vector<Payee> &payees,
-                   uint64_t total) const;
+                   uint64_t amount_clean) const;
 };
 
 #endif

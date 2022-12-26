@@ -11,7 +11,7 @@
 #include "daemon_manager_t.hpp"
 #include "job_base_btc.hpp"
 #include "logger.hpp"
-#include "payment_manager.hpp"
+#include "payout_manager.hpp"
 #include "share.hpp"
 #include "static_config.hpp"
 #include "transaction.hpp"
@@ -21,11 +21,11 @@ class JobManager
 {
    public:
     explicit JobManager(daemon_manager_t* daemon_manager,
-                        PaymentManager* payment_manager,
+                        PayoutManager* payout_manager,
                         const std::string& pool_addr)
         : pool_addr(pool_addr),
           daemon_manager(daemon_manager),
-          payment_manager(payment_manager)
+          payout_manager(payout_manager)
     {
     }
 
@@ -75,7 +75,7 @@ class JobManager
     const std::string pool_addr;
 
     daemon_manager_t* daemon_manager;
-    PaymentManager* payment_manager;
+    PayoutManager* payout_manager;
 
     uint32_t job_count = 0;
 

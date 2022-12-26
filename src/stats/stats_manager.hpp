@@ -16,7 +16,7 @@
 #include "round_manager.hpp"
 #include "difficulty/difficulty_manager.hpp"
 #include "logger.hpp"
-#include "payments/payment_manager.hpp"
+#include "payouts/payout_manager.hpp"
 #include "redis_stats.hpp"
 #include "round.hpp"
 #include "shares/share.hpp"

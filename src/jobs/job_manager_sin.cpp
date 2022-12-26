@@ -5,7 +5,7 @@
 const job_t* JobManagerSin::GetNewJob(const BlockTemplateResSin& rpctemplate)
 {
     int64_t additional_fee = 0;
-    bool includes_payment = payment_manager->pending_payment.get();
+    bool includes_payment = payout_manager->pending_payment.get();
 
     // inf nodes outputs + dev fee outputs + coinbase reward output
     const std::size_t cb_outputs_count =
@@ -37,12 +37,12 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateResSin& rpctemplate)
 
     bool payment_guaranteed =
         includes_payment &&
-        block_size + payment_manager->pending_payment->td.data.size() <
+        block_size + payout_manager->pending_payment->td.data.size() <
             MAX_BLOCK_SIZE;
 
     // if (payment_guaranteed)
     // {
-    //     additional_fee += payment_manager->pending_payment->td.fee;
+    //     additional_fee += payout_manager->pending_payment->td.fee;
     // }
     // block_template.coinbase_value += additional_fee;
 
@@ -74,7 +74,7 @@ const job_t* JobManagerSin::GetNewJob(const BlockTemplateResSin& rpctemplate)
 
     if (payment_guaranteed)
     {
-        block_template.tx_list.AddTxData(payment_manager->pending_payment->td);
+        block_template.tx_list.AddTxData(payout_manager->pending_payment->td);
     }
 
 

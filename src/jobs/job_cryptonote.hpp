@@ -147,7 +147,7 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
 
         return fmt::format(
             "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":[\"0x{"
-            "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}",
+            "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}\n",
             id, std::string_view(this->id.data(), this->id.size()), seed,
             hex_target_sv, height);
     }
@@ -160,7 +160,7 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
 
         return fmt::format(
             "{{\"jsonrpc\":\"2.0\",\"result\":[\"0x{"
-            "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}",
+            "}\",\"0x{}\",\"0x{}\",\"0x{:016x}\"]}}\n",
             std::string_view(this->id.data(), this->id.size()), seed,
             hex_target_sv, height);
     }

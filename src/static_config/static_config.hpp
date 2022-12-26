@@ -17,7 +17,6 @@ struct StaticConf{
     const Coin COIN_SYMBOL;
     const HashAlgo HASH_ALGO;
     const StratumProtocol STRATUM_PROTOCOL;
-    const uint256 DIFF1_TARGET;
     const double DIFF1;
 
     uint32_t MAX_BLOCK_SIZE;

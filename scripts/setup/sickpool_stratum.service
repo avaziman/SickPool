@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 User=pool
-ExecStart=/home/pool/actions-runner-server/_work/SickPool/SickPool/build/SickPool /home/pool/actions-runner-server/_work/SickPool/SickPool/config/coins/SIN.json
+ExecStart=/home/pool/stratum/SickPool /home/pool/ZANO.json
 Restart=always
-StandardOutput=append:/home/pool/logs/pool.log
-StandardError=append:/home/pool/logs/pool_error.log
+StandardOutput=append:/home/pool/log/pool.log
+StandardError=append:/home/pool/log/pool_error.log
 
 [Install]
 WantedBy=multi-user.target

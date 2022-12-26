@@ -5,9 +5,9 @@ template <StaticConf confs>
 StratumServer<confs>::StratumServer(CoinConfig &&conf)
     : StratumBase(std::move(conf)),
       daemon_manager(coin_config.rpcs),
-      payment_manager(&persistence_layer, &daemon_manager,
+      payout_manager(&persistence_layer, &daemon_manager,
                       coin_config.pool_addr),
-      job_manager(&daemon_manager, &payment_manager, coin_config.pool_addr),
+      job_manager(&daemon_manager, &payout_manager, coin_config.pool_addr),
       block_submitter(&daemon_manager, &round_manager),
       stats_manager(persistence_layer, &diff_manager, &round_manager,
                     &conf.stats)
@@ -158,8 +158,6 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
                                             WorkerContextT *wc, ShareT &share)
 {
     uint64_t time = GetCurrentTimeMs();
-    // Benchmark<std::chrono::microseconds> share_bench("Share process");
-    auto start = TIME_NOW();
 
     ShareResult share_res;
     RpcResult rpc_res(ResCode::OK);
@@ -175,7 +173,7 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     {
         ShareProcessor::Process<confs>(share_res, cli, wc, job.get(), share,
                                        time);
-        // share_res.code = ResCode::VALID_BLOCK;
+        share_res.code = ResCode::VALID_SHARE;
     }
 
     if (share_res.code == ResCode::VALID_BLOCK) [[unlikely]]
@@ -196,14 +194,6 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
 
 #endif
 
-#ifndef STRATUM_PROTOCOL_CN
-        if (job->is_payment)
-        {
-            payment_manager.finished_payment.reset(
-                payment_manager.pending_payment.release());
-        }
-#endif
-
         // submit ASAP
         auto block_hex = std::string_view(blockData.data(), blockSize);
         block_submitter.TrySubmit(block_hex, httpParser);
@@ -214,14 +204,7 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
         // job will remain safe thanks to the lock.
         const auto chain_round = round_manager.GetChainRound();
         const uint64_t duration_ms = time - chain_round.round_start_ms;
-#ifndef STRATUM_PROTOCOL_CN
-        if (job->is_payment)
-        {
-            type = BlockStatus::POW_PAYMENT;
-        }
-#else
 
-#endif
         const double effort_percent =
             ((chain_round.total_effort) / job->expected_hashes) * 100.f;
 
@@ -248,13 +231,17 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
 
         block_submitter.AddImmatureBlock(std::move(submission),
                                          coin_config.pow_fee);
-        round_manager.AddRoundShare(cli->GetId().miner_id,
+
+        // take into account in PPLNS but not in round effort.
+        round_manager.AddRoundSharePPLNS(cli->GetId().miner_id,
                                     share_res.difficulty);
     }
     else if (share_res.code == ResCode::VALID_SHARE) [[likely]]
     {
         round_manager.AddRoundShare(cli->GetId().miner_id,
                                     share_res.difficulty);
+        round_manager.AddRoundSharePPLNS(cli->GetId().miner_id,
+                                         share_res.difficulty);
     }
     else
     {
@@ -265,8 +252,6 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
     }
 
     stats_manager.AddShare(cli->stats_it, share_res.difficulty);
-
-    auto end = TIME_NOW();
 
     // logger.template Log<
     //     LogType::Debug>(

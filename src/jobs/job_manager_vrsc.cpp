@@ -24,13 +24,13 @@ const job_t* JobManagerVrsc::GetNewJob(const std::string& json_template)
         ondemand::array txs = res["transactions"].get_array();
 
         int64_t additional_fee = 0;
-        bool includes_payment = payment_manager->pending_payment.get();
+        bool includes_payment = payout_manager->pending_payment.get();
 
         if (includes_payment)
         {
             blockTemplate.tx_list.AddTxData(
-                payment_manager->pending_payment->td);
-            additional_fee += payment_manager->pending_payment->td.fee;
+                payout_manager->pending_payment->td);
+            additional_fee += payout_manager->pending_payment->td.fee;
         }
 
         for (auto tx : txs)

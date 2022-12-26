@@ -112,8 +112,10 @@ class ShareProcessor
             throw std::invalid_argument("Missing hash function");
         }
 
+        #ifdef DEBUG
         logger.Log<LogType::Debug>("Share hash: {} ",
                                    HexlifyS(result.hash_bytes));
+        #endif
 
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
@@ -145,12 +147,6 @@ class ShareProcessor
                 fmt::format("Low difficulty share of {} (Expected: {})",
                             result.difficulty, cli->GetDifficulty());
 
-            // logger.Log<LogType::Debug>(
-            //             "Low difficulty share diff: {}, hash: {}",
-            //             result.Diff, hash.GetHex().c_str());
-            // logger.Log<LogType::Debug>(
-            //             "Block header: {}", BLOCK_HEADER_SIZE * 2,
-            // blockHeaderHex);
             return;
         }
 

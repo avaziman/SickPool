@@ -1,5 +1,5 @@
-#ifndef PAYMENT_MANAGER_HPP
-#define PAYMENT_MANAGER_HPP
+#ifndef payout_manager_HPP
+#define payout_manager_HPP
 #include <deque>
 #include <unordered_map>
 
@@ -23,10 +23,10 @@ enum class PaymentStatus
     BROADCASTED
 };
 
-class PaymentManager
+class PayoutManager
 {
    public:
-    explicit PaymentManager(RedisManager* rm, daemon_manager_t* dm,
+    explicit PayoutManager(RedisManager* rm, daemon_manager_t* dm,
                    const std::string& pool_addr);
 
     static bool GetRewardsPPLNS(round_shares_t& miner_shares,

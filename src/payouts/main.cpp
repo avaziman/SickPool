@@ -41,7 +41,7 @@ int main(int argc, char** argv)
     daemon_manager_t daemon_manager(coinConfig.payment_rpcs);
 
     persistence_block.SubscribeToMaturityChannel();
-    time_t curtime = time(nullptr);
+    time_t curtime = GetCurrentTimeMs() / 1000;
     time_t next_payment = curtime + coinConfig.payment_interval_seconds -
                           curtime % coinConfig.payment_interval_seconds;
 
@@ -63,44 +63,47 @@ int main(int argc, char** argv)
             // timeout reached, payment time!
             logger.Log<LogType::Info>("Payment time! {}", next_payment);
 
+            // min fee
+            PayoutInfo payout_info;
+            payout_info.tx_fee = 100000000;
+            payout_info.time = next_payment * 1000;
+
             // immediate payment time!
             std::vector<Payee> payees;
-            if (!persistence_block.LoadUnpaidRewards(payees))
+            if (!persistence_block.LoadUnpaidRewards(payees, payout_info.tx_fee))
             {
                 logger.Log<LogType::Error>("Failed to get unpaid rewards");
                 return -2;
             }
-            logger.Log<LogType::Info>("Payees peding payment: {}",
+            logger.Log<LogType::Info>("Payees pending payment: {}",
                                       payees.size());
 
-            // min fee
-            // substract fees
-            PayoutInfo payout_info;
-            payout_info.tx_fee = 10000000000;
-            payout_info.time = next_payment;
+            next_payment += coinConfig.payment_interval_seconds;
+            persistence_block.UpdateNextPayout(next_payment * 1000);
 
             if (payees.empty()) continue;
 
+            // substract fees
             const uint64_t individual_fee = payout_info.tx_fee / payees.size();
-            uint64_t total = 0;
-            for (auto& [_id, amount, addr] : payees)
+            for (auto& [_id, amount_clean, addr] : payees)
             {
-                int64_t amount_txfeed = amount - individual_fee;
-                total += amount_txfeed;
-                amount = amount_txfeed;
+                int64_t amount_txfeed = amount_clean - individual_fee;
+                payout_info.total += amount_txfeed;
+                amount_clean = amount_txfeed;
             }
 
-
             TransferResCn transfer_res;
-            if (!daemon_manager.Transfer(transfer_res, payees, payout_info.tx_fee,
-                                         parser))
+            if (!daemon_manager.Transfer(transfer_res, payees,
+                                         payout_info.tx_fee, parser))
             {
                 logger.Log<LogType::Info>("Failed to transfer funds!");
             }
-            payout_info.txid = transfer_res.txid;
-            persistence_block.AddPayout(payout_info, payees, total);
-
-            next_payment += coinConfig.payment_interval_seconds;
+            else
+            {
+                payout_info.txid = transfer_res.txid;
+                persistence_block.AddPayout(payout_info, payees, individual_fee);
+                logger.Log<LogType::Info>("Payment successful!");
+            }
         }
         else
         {

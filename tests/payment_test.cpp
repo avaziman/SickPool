@@ -2,7 +2,7 @@
 
 #include <span>
 
-#include "payments/payment_manager.hpp"
+#include "payouts/payout_manager.hpp"
 #include "round_share.hpp"
 #include "test_utils.hpp"
 
@@ -78,7 +78,7 @@ TEST(Payment, CalculateRewardsPPLNS)
 
 // TEST(Payment, GenerateTx)
 // {
-//     PaymentManager payment_manager(0, 0);
+//     PaymentManager payout_manager(0, 0);
 
 //     AgingBlock aged_block;
 //     aged_block.id = 4;
@@ -86,10 +86,10 @@ TEST(Payment, CalculateRewardsPPLNS)
 //     memset(aged_block.coinbase_txid, 17, sizeof(aged_block.coinbase_txid));
 
 //     reward_map_t rewards = {{"RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC", 1e8}};
-//     payment_manager.AppendAgedRewards(aged_block, rewards);
+//     payout_manager.AppendAgedRewards(aged_block, rewards);
 
 //     std::vector<uint8_t> bytes;
-//     payment_manager.tx.GetBytes(bytes);
+//     payout_manager.tx.GetBytes(bytes);
 
 //     char hex[bytes.size() * 2 + 1] = {0};
 //     Hexlify(hex, bytes.data(), bytes.size());

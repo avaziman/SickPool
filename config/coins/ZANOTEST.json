@@ -5,7 +5,7 @@
     "redis": {
         "host": "127.0.0.1:6379",
         "db_index": 0,
-        "hashrate_ttl_seconds": 25
+        "hashrate_ttl_seconds": 600
     },
     "mysql": {
         "host": "127.0.0.1:3306",
@@ -16,18 +16,18 @@
     "stats": {
         "effort_interval_seconds": 10,
         "hashrate_interval_seconds1": 10,
-        "hashrate_interval_seconds": 5,
-        "average_hashrate_interval_seconds": 15,
+        "hashrate_interval_seconds": 60,
+        "average_hashrate_interval_seconds": 120,
         "mined_blocks_interval": 10,
         "diff_adjust_seconds": 30000
     },
     "pow_fee": 0.01,
     "pos_fee": 0.01,
-    "default_difficulty": 5000000.0,
+    "default_difficulty": 5000.0,
     "default_difficulty1": 500.0,
     "minimum_difficulty": 0.000001,
     "target_shares_rate": 100.0,
-    "pool_addr": "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp",
+    "pool_addr": "ZxCRWPavrf2BnQomKFBEeoVXvRw9BvuQ9f21te9ct8P8Sbh4ZLKJmz5NT4S3zAFkkrBLWiUh2Pf9CMiyQMHQaCjw33jEeYgtj",
     "redis_host": "127.0.0.1:6379",
     "socket_recv_timeout_seconds": 3,
     "block_poll_interval": 10,
@@ -36,13 +36,13 @@
     "rpcs": [
         {
             "host": "127.0.0.1:12111",
-            "auth": "iZ2bZfXdeN626rkyy9YsnfeT1Qq1K6XamE4brWm3tzP5hDUAig4dHmKSqe4yyq5dgbSPjmpLbfidqPyDXAuFY2J9544F95vagSF1Xqq3eCUp=="
+            "auth": ""
         }
     ],
     "payment_rpcs": [
         {
-            "host": "127.0.0.1:12111",
-            "auth": "iZ2bZfXdeN626rkyy9YsnfeT1Qq1K6XamE4brWm3tzP5hDUAig4dHmKSqe4yyq5dgbSPjmpLbfidqPyDXAuFY2J9544F95vagSF1Xqq3eCUp=="
+            "host": "127.0.0.1:12233",
+            "auth": ""
         }
     ]
 }

@@ -1,8 +1,8 @@
-#include "payment_manager.hpp"
+#include "payout_manager.hpp"
 
-Logger<PaymentManager::field_str> PaymentManager::logger;
+Logger<PayoutManager::field_str> PayoutManager::logger;
 
-PaymentManager::PaymentManager(RedisManager* rm, daemon_manager_t* dm,
+PayoutManager::PayoutManager(RedisManager* rm, daemon_manager_t* dm,
                                const std::string& pool_addr)
     : redis_manager(rm), daemon_manager(dm), pool_addr(pool_addr)
 {
@@ -24,7 +24,7 @@ inline void AddSharePPLNS(round_shares_t& miner_shares, double& score_sum,
     miner_shares[id].effort += 1;
 }
 
-bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
+bool PayoutManager::GetRewardsPPLNS(round_shares_t& miner_shares,
                                      const std::span<Share> shares,
                                      const int64_t block_reward, const double n,
                                      const double fee)
@@ -55,7 +55,7 @@ bool PaymentManager::GetRewardsPPLNS(round_shares_t& miner_shares,
     return true;
 }
 
-bool PaymentManager::GetRewardsPROP(round_shares_t& miner_shares,
+bool PayoutManager::GetRewardsPROP(round_shares_t& miner_shares,
                                     const int64_t block_reward,
                                     const efforts_map_t& miner_efforts,
                                     double total_effort, double fee)
