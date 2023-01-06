@@ -31,8 +31,8 @@ execute_process(
     OUTPUT_VARIABLE GIT_COMMIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set (CMAKE_BUILD_TYPE "Debug")
 # set (CMAKE_BUILD_TYPE "Release")
+set (CMAKE_BUILD_TYPE "DEBUG")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     # set(CMAKE_EXE_LINKER_FLAGS "-static")
@@ -41,7 +41,7 @@ else()
     # -g3 maximum debugging information
     # link time optimization
     # SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -O0 -g3 -DDEBUG=1-Wsubobject-linkage -Wmissing-template-keyword -DSTATIC_CONCPP=1")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -O0 -g3 -DDEBUG=1-Wsubobject-linkage")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g3 -DDEBUG=1-Wsubobject-linkage")
     add_compile_definitions(SIMDJSON_DEVELOPMENT_CHECKS)
 endif()
 

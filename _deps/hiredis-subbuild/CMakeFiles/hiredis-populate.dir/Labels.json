@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/CMakeFiles/hiredis-populate"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/CMakeFiles/hiredis-populate.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/CMakeFiles/hiredis-populate-complete.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-build.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-configure.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-download.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-install.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-patch.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-test.rule"
+		},
+		{
+			"file" : "/home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-subbuild/hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"hiredis-populate"
+		],
+		"name" : "hiredis-populate"
+	}
+}

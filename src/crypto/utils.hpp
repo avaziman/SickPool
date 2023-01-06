@@ -245,4 +245,12 @@ constexpr double GetExpectedHashes(const double diff)
     return diff * hash_multiplier;
     // for verus 2^ 24 / 0x0f0f0f = 17...
 }
+
+inline std::string ToLowerCase(std::string_view s){
+    std::string lc;
+    lc.reserve(s.size());
+    std::ranges::transform(s, std::back_inserter(lc),
+                           [](char c) { return std::tolower(c); });
+    return lc;
+}
 #endif

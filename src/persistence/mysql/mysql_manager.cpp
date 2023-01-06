@@ -145,10 +145,10 @@ bool MySqlManager::GetLastId(uint32_t& id) const
     return true;
 }
 
-void MySqlManager::AddMiner(std::string_view address, std::string_view alias,
+int64_t MySqlManager::AddMiner(std::string_view address, std::string_view alias,
                             uint64_t join_time, uint64_t min_payout) const
 {
-    std::scoped_lock _(mutex);
+    std::unique_lock lock(mutex);
 
     add_miner->setString(1, std::string(address));
 
@@ -171,7 +171,10 @@ void MySqlManager::AddMiner(std::string_view address, std::string_view alias,
     catch (const sql::SQLException e)
     {
         PRINT_MYSQL_ERR(e);
+        return -1;
     }
+    lock.unlock();
+    return GetMinerId(address, alias);
 }
 
 int64_t MySqlManager::GetMinerId(std::string_view address,
@@ -211,10 +214,10 @@ int64_t MySqlManager::GetMinerId(std::string_view address,
     return id;
 }
 
-void MySqlManager::AddWorker(MinerId minerid, std::string_view worker_name,
+int64_t MySqlManager::AddWorker(MinerId minerid, std::string_view worker_name,
                              uint64_t join_time) const
 {
-    std::scoped_lock _(mutex);
+    std::unique_lock lock(mutex);
 
     add_worker->setUInt(1, minerid);
     add_worker->setString(2, std::string(worker_name));
@@ -227,7 +230,11 @@ void MySqlManager::AddWorker(MinerId minerid, std::string_view worker_name,
     catch (const sql::SQLException e)
     {
         PRINT_MYSQL_ERR(e);
+        return -1;
     }
+
+    lock.unlock();
+    return GetWorkerId(minerid, worker_name);
 }
 
 int64_t MySqlManager::GetWorkerId(MinerId minerid,

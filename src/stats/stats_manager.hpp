@@ -3,7 +3,6 @@
 
 #include <hiredis/hiredis.h>
 
-#include <vector>
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>
@@ -12,25 +11,27 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <vector>
 
-#include "round_manager.hpp"
 #include "difficulty/difficulty_manager.hpp"
 #include "logger.hpp"
 #include "payouts/payout_manager.hpp"
+#include "persistence_stats.hpp"
 #include "redis_stats.hpp"
 #include "round.hpp"
+#include "round_manager.hpp"
 #include "shares/share.hpp"
 #include "static_config/static_config.hpp"
 #include "stats/stats.hpp"
 #include "stratum_client.hpp"
-#include "persistence_stats.hpp"
 
 // update manager?
 class StatsManager
 {
    public:
-    explicit StatsManager(const PersistenceLayer& redis_manager, DifficultyManager* diff_manager,
-                 RoundManager* round_manager, const StatsConfig* cc);
+    explicit StatsManager(const PersistenceLayer& redis_manager,
+                          DifficultyManager* diff_manager,
+                          RoundManager* round_manager, const StatsConfig* cc);
 
     // Every hashrate_interval_seconds we need to write:
     // ) worker hashrate
@@ -41,10 +42,13 @@ class StatsManager
 
     bool LoadAvgHashrateSums(int64_t hr_time);
     void AddShare(const worker_map::iterator& it, const double diff);
-    bool AddWorker(FullId& worker_full_id, worker_map::iterator& it,
-                   std::string_view address, std::string_view worker_full,
-                   std::time_t curtime, std::string_view alias,
-                   int64_t min_payout);
+    bool AddWorker(int64_t& worker_id, worker_map::iterator& it,
+                   int64_t miner_id, std::string_view address,
+                   std::string_view worker_name, std::string_view alias);
+
+    bool AddMiner(int64_t& miner_id, std::string_view address,
+                  std::string_view alias, int64_t min_payout);
+
     void PopWorker(const worker_map::iterator& it);
 
     template <StaticConf confs>
@@ -52,6 +56,15 @@ class StatsManager
 
     bool UpdateEffortStats(int64_t update_time_ms);
     void SetNetworkStats(const NetworkStats& ns) { network_stats = ns; }
+
+    int64_t GetMinerId(std::string_view address, std::string_view alias) const
+    {
+        return persistence_stats.GetMinerId(address, alias);
+    }
+    int64_t GetWorkerId(MinerId minerid, std::string_view worker_name) const
+    {
+        return persistence_stats.GetWorkerId(minerid, worker_name);
+    }
     static uint32_t average_interval_ratio;
 
    private:

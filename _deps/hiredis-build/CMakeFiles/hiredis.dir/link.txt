@@ -1,0 +1,1 @@
+/usr/bin/gcc-10 -fPIC -shared -Wl,-soname,libhiredis.so.1.1.0 -o libhiredis.so.1.1.0 CMakeFiles/hiredis.dir/alloc.c.o CMakeFiles/hiredis.dir/async.c.o CMakeFiles/hiredis.dir/hiredis.c.o CMakeFiles/hiredis.dir/net.c.o CMakeFiles/hiredis.dir/read.c.o CMakeFiles/hiredis.dir/sds.c.o CMakeFiles/hiredis.dir/sockcompat.c.o 

@@ -53,7 +53,7 @@ void RedisManager::Init()
         AppendCommand({"TS.CREATE"sv, key_compact_name, "RETENTION"sv,
                        std::to_string(hashrate_ttl_ms * 7)});
 
-        // we want 12 times less points to fit in 7 days (1 hr instead of 5min)
+        // we want 12 times less points to fit in 7 days (2 hr instead of 10min)
         AppendCommand({"TS.CREATERULE"sv, key_name, key_compact_name,
                        "ROLL_AGGREGATION"sv, "roll_avg"sv, STRR(12)});
     }

@@ -58,9 +58,9 @@ bool DaemonManagerZano::SubmitBlock(std::string_view block_hex,
 
     const auto method = "submitblock"sv;
 
-    if (int res_code =
-            SendRpcReq(result_body, 1, method,
-                       DaemonRpc::GetArrayStr(std::vector{block_hex}), "POST /json_rpc");
+    if (int res_code = SendRpcReq(
+            result_body, 1, method,
+            DaemonRpc::GetArrayStr(std::vector{block_hex}), "POST /json_rpc");
         res_code != 200)
     {
         LOG_CODE_ERR(method, res_code, result_body);
@@ -114,8 +114,7 @@ bool DaemonManagerZano::Transfer(TransferResCn& transfer_res,
 
     std::string params = DaemonRpc::ToJsonObj(
         std::make_pair("destinations"sv, DaemonRpc::GetArrayStr(dest_strs)),
-        std::make_pair("fee"sv, fee),
-        std::make_pair("mixin"sv, 0));
+        std::make_pair("fee"sv, fee), std::make_pair("mixin"sv, 0));
 
     if (int res_code = SendRpcReq(result_body, 1, "transfer"sv, params,
                                   "POST /json_rpc"sv);
@@ -215,3 +214,38 @@ bool DaemonManagerZano::GetBlockHeaderByHeight(
 
     return true;
 }
+
+bool DaemonManagerZano::GetAliasAddress(AliasRes& res,
+                                        std::string_view alias,
+                                        simdjson::ondemand::parser& parser)
+{
+    std::string result_body;
+
+    const std::string_view method = "get_alias_details"sv;
+
+    if (int res_code = SendRpcReq(result_body, 1, method,
+                                  DaemonRpc::ToJsonObj(std::make_pair("alias"sv, alias)), "GET /json_rpc");
+        res_code != 200)
+    {
+        LOG_CODE_ERR(method, res_code, result_body);
+        return false;
+        }
+
+    try
+    {
+        res.doc = parser.iterate(result_body.data(), result_body.size(),
+                                  result_body.capacity());
+
+        auto obj = res.doc["result"].get_object();
+        res.address = obj["alias_details"]["address"].get_string();
+    }
+    catch (const simdjson_error& err)
+    {
+        LOG_PARSE_ERR(method, err);
+        return false;
+    }
+
+    return true;
+}
+
+

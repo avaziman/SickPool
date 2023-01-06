@@ -176,7 +176,7 @@ DELIMITER //
 CREATE PROCEDURE GetMiner(IN addr CHAR(255), IN ali CHAR(255)) BEGIN
 SELECT
     id
-from
+FROM
     addresses
 WHERE
     address = addr

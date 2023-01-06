@@ -52,11 +52,11 @@ class MySqlManager
     bool AddBlockSubmission(uint32_t &id,
                             const BlockSubmission &submission) const;
 
-    void AddMiner(std::string_view address, std::string_view alias,
+    int64_t AddMiner(std::string_view address, std::string_view alias,
                   uint64_t join_time, uint64_t min_payout) const;
     int64_t GetMinerId(std::string_view address, std::string_view alias) const;
 
-    void AddWorker(MinerId minerid, std::string_view worker_name,
+    int64_t AddWorker(MinerId minerid, std::string_view worker_name,
                    uint64_t join_time) const;
     int64_t GetWorkerId(MinerId minerid, std::string_view worker_name) const;
 

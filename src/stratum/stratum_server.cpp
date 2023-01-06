@@ -6,7 +6,7 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
     : StratumBase(std::move(conf)),
       daemon_manager(coin_config.rpcs),
       payout_manager(&persistence_layer, &daemon_manager,
-                      coin_config.pool_addr),
+                     coin_config.pool_addr),
       job_manager(&daemon_manager, &payout_manager, coin_config.pool_addr),
       block_submitter(&daemon_manager, &round_manager),
       stats_manager(persistence_layer, &diff_manager, &round_manager,
@@ -189,7 +189,7 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
                          share.extranonce2);
 #elif defined(STRATUM_PROTOCOL_CN)
 
-            job->GetBlockHex(blockData, share.nonce);
+        job->GetBlockHex(blockData, share.nonce);
 #else
 
 #endif
@@ -234,14 +234,14 @@ RpcResult StratumServer<confs>::HandleShare(StratumClient *cli,
 
         // take into account in PPLNS but not in round effort.
         round_manager.AddRoundSharePPLNS(cli->GetId().miner_id,
-                                    share_res.difficulty);
+                                         share_res.difficulty);
     }
     else if (share_res.code == ResCode::VALID_SHARE) [[likely]]
     {
         round_manager.AddRoundShare(cli->GetId().miner_id,
                                     share_res.difficulty);
         round_manager.AddRoundSharePPLNS(cli->GetId().miner_id,
-                                         share_res.difficulty);
+                                         cli->GetDifficulty());
     }
     else
     {
@@ -356,7 +356,28 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
 {
     using namespace simdjson;
 
-    bool isIdentity = false;
+    bool is_alias = address.starts_with("@");
+    std::string_view alias = address.substr(1);
+
+    currency::blobdata addr_blob(address.data(), address.size());
+    if (is_alias)
+    {
+        if (!daemon_manager.ValidateAlias(alias))
+        {
+            return RpcResult(ResCode::UNAUTHORIZED_WORKER,
+                             "Invalid alias name!");
+        }
+    }
+    else
+    {
+        uint64_t prefix;
+        if (currency::blobdata addr_data;
+            !tools::base58::decode_addr(addr_blob, prefix, addr_data))
+        {
+            return RpcResult(ResCode::UNAUTHORIZED_WORKER,
+                             fmt::format("Invalid address {}!", address));
+        }
+    }
 
     if (worker.size() > MAX_WORKER_NAME_LEN)
     {
@@ -365,33 +386,58 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
             "Worker name too long! (max " xSTRR(MAX_WORKER_NAME_LEN) " chars)");
     }
 
-    currency::blobdata addr_blob(address.data(), address.size());
-    uint64_t prefix;
-    currency::blobdata addr_data;
-    if (!tools::base58::decode_addr(addr_blob, prefix, addr_data))
-    {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                         fmt::format("Invalid address {}!", address));
-    }
+    AliasRes alias_res;
 
     // if the miner address is already in the database we have already
     // validated the address, let it through
-    auto addr_encoded = tools::base58::encode(addr_data);
+    int64_t miner_id = stats_manager.GetMinerId(address, alias);
 
-    // string-views to non-local string
-    FullId worker_full_id(0, 0);
-    worker_map::iterator stats_it;
-    bool added_to_db = this->stats_manager.AddWorker(
-        worker_full_id, stats_it, address, worker, GetCurrentTimeMs(), "",
-        this->coin_config.min_payout_threshold);
-
-    if (!added_to_db)
+    if (miner_id == -1)
     {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                         "Failed to add worker to database!");
+        if (is_alias)
+        {
+            if (daemon_manager.GetAliasAddress(alias_res, alias, httpParser))
+            {
+                alias = address;
+                address = alias_res.address;
+            }
+            else
+            {
+                return RpcResult(ResCode::UNAUTHORIZED_WORKER,
+                                 "Alias does not exist!");
+            }
+        }
+
+        if (!stats_manager.AddMiner(miner_id, address, alias,
+                                    this->coin_config.min_payout_threshold))
+        {
+            return RpcResult(
+                ResCode::UNAUTHORIZED_WORKER,
+                "Failed to add miner to database, please contact support!");
+        }
+        logger.template Log<LogType::Info>("New miner has joined the pool: {}",
+                                           address);
     }
+
+    worker_map::iterator stats_it;
+    int64_t worker_id =
+        stats_manager.GetWorkerId(static_cast<MinerId>(miner_id), worker);
+    if (worker_id == -1)
+    {
+        if (!stats_manager.AddWorker(worker_id, stats_it, miner_id, address, worker, alias))
+        {
+            return RpcResult(
+                ResCode::UNAUTHORIZED_WORKER,
+                "Failed to add worker to database, please contact support!");
+        }
+        logger.template Log<LogType::Info>("New worker has joined the pool: ",
+                                           worker);
+    }
+
     std::string worker_full_str = fmt::format("{}.{}", address, worker);
-    cli->SetAuthorized(worker_full_id, std::move(worker_full_str), stats_it);
+    cli->SetAuthorized(FullId{static_cast<MinerId>(miner_id),
+                              static_cast<WorkerId>(worker_id)},
+                       std::move(worker_full_str), stats_it);
 
     logger.template Log<LogType::Info>("Authorized worker: {}, address: {}",
                                        worker, address);
@@ -415,7 +461,8 @@ RpcResult StratumServer<confs>::HandleAuthorize(
         logger.template Log<LogType::Error>(
             "No worker name provided in authorization. err: {}", err.what());
 
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
+        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
+                         "Bad request, no worker name!");
     }
 
     const size_t sep = worker_full.find('.');
@@ -424,7 +471,8 @@ RpcResult StratumServer<confs>::HandleAuthorize(
         logger.template Log<LogType::Error>("Bad worker name format: {}",
                                             worker_full);
 
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Bad request");
+        return RpcResult(ResCode::UNAUTHORIZED_WORKER,
+                         "Bad request, bad worker format!");
     }
 
     std::string_view miner = worker_full.substr(0, sep);

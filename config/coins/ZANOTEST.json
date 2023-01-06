@@ -31,7 +31,7 @@
     "redis_host": "127.0.0.1:6379",
     "socket_recv_timeout_seconds": 3,
     "block_poll_interval": 10,
-    "payment_interval_seconds": 5,
+    "payment_interval_seconds": 1,
     "min_payout_threshold": 10000000000000,
     "rpcs": [
         {

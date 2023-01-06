@@ -156,64 +156,28 @@ void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
     }
 }
 
-bool StatsManager::AddWorker(FullId& full_id, worker_map::iterator& it,
-                             std::string_view address,
-                             std::string_view worker_name, int64_t curtime,
-                             std::string_view alias, int64_t min_payout)
+bool StatsManager::AddWorker(int64_t& worker_id, worker_map::iterator& it,
+                             int64_t miner_id, std::string_view address,
+                             std::string_view worker_name,
+                             std::string_view alias)
 {
     using namespace std::literals;
 
-    std::string addr_lowercase;
-    addr_lowercase.reserve(address.size());
-    std::ranges::transform(address, std::back_inserter(addr_lowercase),
-                           [](char c) { return std::tolower(c); });
+    const int64_t curtime = GetCurrentTimeMs();
+    std::string addr_lowercase = ToLowerCase(address);
 
-    int64_t miner_id = persistence_stats.GetMinerId(address, alias);
-    if (miner_id == -1)
+    worker_id = persistence_stats.AddWorker(static_cast<MinerId>(miner_id),
+                                            worker_name, curtime);
+
+    if (worker_id == -1) return false;
+    if (!persistence_stats.AddNewWorker(FullId(miner_id, worker_id),
+                                        addr_lowercase, worker_name, alias,
+                                        curtime))
     {
-        logger.Log<LogType::Info>("New miner has joined the pool: {}", address);
-
-        persistence_stats.AddMiner(address, alias, curtime, min_payout);
-
-        logger.Log<LogType::Info>("Miner {} added to database.", address);
-        return AddWorker(full_id, it, address, worker_name, curtime, alias,
-                         min_payout);
+        return false;
     }
-    else
-    {
-        // if he exists in sql db still try to add in redis just in case
-        persistence_stats.AddNewMiner(address, addr_lowercase, alias, miner_id,
-                                      curtime, min_payout);
-    }
+    logger.Log<LogType::Info>("Worker {} added to database.", worker_name);
 
-    // set active
-    // persistence_stats.SetActiveId(miner_id);
-
-    int64_t worker_id = persistence_stats.GetWorkerId(
-        static_cast<MinerId>(miner_id), worker_name);
-    if (worker_id == -1)
-    {
-        // new id
-        logger.Log<LogType::Info>("New worker has joined the pool: ",
-                                  worker_name);
-
-        persistence_stats.AddWorker(static_cast<MinerId>(miner_id), worker_name,
-                                    curtime);
-
-        logger.Log<LogType::Info>("Worker {} added to database.", worker_name);
-
-        return AddWorker(full_id, it, address, worker_name, curtime, alias,
-                         min_payout);
-    }
-    else
-    {
-        // if he exists in sql db still try to add in redis just in case
-        persistence_stats.AddNewWorker(FullId(miner_id, worker_id),
-                                       addr_lowercase, worker_name, alias,
-                                       curtime);
-    }
-
-    full_id = FullId(miner_id, worker_id);
     // if worker disconnect and wasnt removed yet remove it to avoid stats
     // problems
 
@@ -230,9 +194,28 @@ bool StatsManager::AddWorker(FullId& full_id, worker_map::iterator& it,
     //               });
 
     // constant time complexity insert
-    it = worker_stats_map.emplace(worker_stats_map.cend(), full_id,
+    it = worker_stats_map.emplace(worker_stats_map.cend(), worker_id,
                                   WorkerStats{});
 
+    return true;
+}
+
+bool StatsManager::AddMiner(int64_t& miner_id, std::string_view address,
+                            std::string_view alias, int64_t min_payout)
+{
+    const int64_t curtime = GetCurrentTimeMs();
+    std::string addr_lowercase = ToLowerCase(address);
+
+    miner_id = persistence_stats.AddMiner(address, alias, curtime, min_payout);
+
+    if (miner_id == -1) return false;
+    if (!persistence_stats.AddNewMiner(address, addr_lowercase, alias, miner_id,
+                                       curtime, min_payout))
+    {
+        return false;
+    }
+
+    logger.Log<LogType::Info>("Miner {} added to database.", address);
     return true;
 }
 

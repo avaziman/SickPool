@@ -74,8 +74,9 @@ bool RedisStats::UpdateIntervalStats(
 
     // pool hr, workers, miners
     AppendTsAdd(key_names.hashrate_pool, update_time_ms, pool_hr);
-    AppendTsAdd(key_names.worker_count_pool, update_time_ms, pool_miner_count);
-    AppendTsAdd(key_names.miner_count, update_time_ms, pool_worker_count);
+    AppendTsAdd(key_names.worker_count_pool, update_time_ms, pool_worker_count);
+    AppendTsAdd(key_names.miner_count, update_time_ms,
+                pool_miner_count );
 
     return GetReplies();
 }
@@ -210,7 +211,7 @@ void RedisStats::AppendCreateStatsTsWorker(std::string_view addr,
     for (std::string_view key_type :
          {key_names.hashrate, key_names.hashrate_average,
           key_names.shares_valid, key_names.shares_stale,
-          key_names.shares_invalid, key_names.worker_count})
+          key_names.shares_invalid})
     {
         auto key = Format({key_type, prefix, addr});
         key_type = key_type.substr(coin_sep);

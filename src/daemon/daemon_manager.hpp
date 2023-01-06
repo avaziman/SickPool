@@ -83,6 +83,7 @@ class DaemonManager
             rpcs.emplace_back(config.host, config.auth);
         }
     }
+    virtual ~DaemonManager() = default;
 
     virtual bool SubmitBlock(const std::string_view block_hex,
                      simdjson::ondemand::parser& parser)

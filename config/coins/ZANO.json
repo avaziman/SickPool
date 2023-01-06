@@ -15,7 +15,7 @@
     },
     "stats": {
         "effort_interval_seconds": 10,
-        "hashrate_interval_seconds": 300,
+        "hashrate_interval_seconds": 600,
         "average_hashrate_interval_seconds": 21600,
         "mined_blocks_interval": 86400,
         "diff_adjust_seconds": 300

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libhiredis.a CMakeFiles/hiredis_static.dir/alloc.c.o CMakeFiles/hiredis_static.dir/async.c.o CMakeFiles/hiredis_static.dir/hiredis.c.o CMakeFiles/hiredis_static.dir/net.c.o CMakeFiles/hiredis_static.dir/read.c.o CMakeFiles/hiredis_static.dir/sds.c.o CMakeFiles/hiredis_static.dir/sockcompat.c.o
+/usr/bin/ranlib libhiredis.a

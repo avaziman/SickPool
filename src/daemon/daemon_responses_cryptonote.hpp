@@ -33,4 +33,9 @@ struct BlockHeaderResCn
     uint32_t depth;
     std::string_view hash;
 };
+
+struct AliasRes  {
+    simdjson::ondemand::document doc;
+    std::string_view address;
+};
 #endif

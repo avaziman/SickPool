@@ -1,0 +1,11 @@
+# Hashes of file build rules.
+cfa1ef3fdd486f3113096c17b3c1d49e CMakeFiles/hiredis-populate
+4a1b738cd38bc7c4760508716fbecf1e CMakeFiles/hiredis-populate-complete
+23f5f15e841a2437817470192d285896 hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-build
+52f0db92e643655230328ec15565900d hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-configure
+468f10d2af961155fab5241f1b82c1b3 hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-download
+8b717d1d99e882bb5740a9c8bcac3472 hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-install
+1e4fc3e43db84d57f57a9c834ad1f574 hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-mkdir
+6830ebac3935efc7e0f8321f49459e0c hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-patch
+3cd667ced137e003b69a63504bdcf4c8 hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-test
+20670272755a013d7c56b98c1cb803bc hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-update

@@ -3,6 +3,7 @@
 #include "hash_algo.hpp"
 
 #define STRATUM_PROTOCOL_CN 1
+#define ALIAS_NAME_MAX_LEN 255
 const HashAlgo HASH_ALGO = HashAlgo::PROGPOWZ;
 
 static constexpr std::string_view target_zano_sv =
