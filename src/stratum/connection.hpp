@@ -21,13 +21,14 @@ struct Connection
     const int sockfd;
     const int timerfd;
     const std::string_view ip;
+    int expiration_count = 0;
 
     size_t req_pos = 0;
     char req_buff[REQ_BUFF_SIZE];
     std::shared_ptr<T> ptr;
     std::list<std::shared_ptr<Connection<T>>>::iterator it;
 
-    private:
+    // private:
      char ip_str[INET_ADDRSTRLEN] = {0};
 };
 

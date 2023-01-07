@@ -72,6 +72,7 @@ class StratumServer : public StratumBase
                               const JobT* job) const = 0;
     void HandleConsumeable(connection_it* conn) override;
     bool HandleConnected(connection_it* conn) override;
+    bool HandleTimeout(connection_it* conn, uint64_t timeout_streak) override;
 
     void DisconnectClient(
         const std::shared_ptr<Connection<StratumClient>> conn_ptr) override;

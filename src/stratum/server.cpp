@@ -3,7 +3,7 @@
 template class Server<StratumClient>;
 
 template <class T>
-Server<T>::Server(int port)
+Server<T>::Server(int port, int timeout_sec) : timeout_sec(timeout_sec)
 {
     epoll_fd = epoll_create1(0);
     timers_epoll_fd = epoll_create1(0);
@@ -52,7 +52,14 @@ void Server<T>::Service()
         {
             auto *conn_it = reinterpret_cast<connection_it *>(event.data.ptr);
 
-            if (!HandleEvent(conn_it, flags)) EraseClient(conn_it);
+            if (!HandleEvent(conn_it, flags))
+            {
+                EraseClient(conn_it);
+            }
+            else
+            {
+                (*(*conn_it))->expiration_count = 0;
+            }
         }
         else
         {
@@ -84,14 +91,17 @@ void Server<T>::Service()
         auto *conn_it = reinterpret_cast<connection_it *>(event.data.ptr);
 
         uint64_t expiration_count = 0;
-        auto timerfd = (*(*conn_it))->timerfd;
+        auto conn_ptr = (*(*conn_it));
 
-        if (!HandleTimeout(conn_it) ||
-            !RearmFd(conn_it, timerfd, timers_epoll_fd) ||
-            read(timerfd, &expiration_count, sizeof(expiration_count)) == -1)
+        if (read(conn_ptr->timerfd, &expiration_count,
+                 sizeof(expiration_count)) == -1 ||
+            !HandleTimeout(
+                conn_it, conn_ptr->expiration_count + expiration_count) ||
+            !RearmFd(conn_it, conn_ptr->timerfd, timers_epoll_fd))
         {
             EraseClient(conn_it);
         }
+        conn_ptr->expiration_count += expiration_count;
     }
 }
 
@@ -197,10 +207,9 @@ void Server<T>::HandleNewConnection()
 
     /* Only expire on expiration, no ticks */
 
-    auto timeout = 10;
     static itimerspec tspec{
-        .it_interval = timespec{.tv_sec = timeout, .tv_nsec = 0},
-        .it_value = timespec{.tv_sec = timeout, .tv_nsec = 0}};
+        .it_interval = timespec{.tv_sec = timeout_sec, .tv_nsec = 0},
+        .it_value = timespec{.tv_sec = timeout_sec, .tv_nsec = 0}};
 
     // since this is a union only one member can be assigned, data will be
     // assigned in rearm
@@ -222,7 +231,8 @@ void Server<T>::HandleNewConnection()
     /* relative timer*/
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_fd, &empty_conn_ev) == -1 ||
         timerfd_settime(timerfd, 0, &tspec, nullptr) == -1 ||
-        epoll_ctl(timers_epoll_fd, EPOLL_CTL_ADD, timerfd, &empty_conn_ev) == -1 ||
+        epoll_ctl(timers_epoll_fd, EPOLL_CTL_ADD, timerfd, &empty_conn_ev) ==
+            -1 ||
         !RearmFd(conn_it, conn_fd, epoll_fd) ||
         !RearmFd(conn_it, timerfd, timers_epoll_fd))
     {

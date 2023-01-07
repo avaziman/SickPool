@@ -26,7 +26,8 @@
     "difficulty": {
         "default_diff": 10000000.0,
         "minimum_diff": 0.000001,
-        "target_shares_rate": 4.0
+        "target_shares_rate1": 4.0,
+        "target_shares_rate": 40.0
     },
     "pool_addr": "ZxCRWPavrf2BnQomKFBEeoVXvRw9BvuQ9f21te9ct8P8Sbh4ZLKJmz5NT4S3zAFkkrBLWiUh2Pf9CMiyQMHQaCjw33jEeYgtj",
     "redis_host": "127.0.0.1:6379",

@@ -39,14 +39,14 @@ class Server
    public:
     using connection_it = std::list<std::shared_ptr<Connection<T>>>::iterator;
 
-    explicit Server(int port);
+    explicit Server(int port, int timeout_sec);
     ~Server();
     void Service();
 
     virtual void HandleConsumeable(connection_it* conn) = 0;
     // returns whether to reject the connection;
     virtual bool HandleConnected(connection_it* conn) = 0;
-    virtual bool HandleTimeout(connection_it* conn) = 0;
+    virtual bool HandleTimeout(connection_it* conn, uint64_t timeout_streak) = 0;
     virtual void HandleDisconnected(connection_it* conn) = 0;
 
    private:
@@ -55,6 +55,7 @@ class Server
     std::mutex connections_mutex;
     std::list<std::shared_ptr<Connection<T>>> connections;
 
+    const int timeout_sec;
     int listening_fd;
     int epoll_fd;
     int timers_epoll_fd;
