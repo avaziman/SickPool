@@ -6,6 +6,7 @@
 #include <netinet/tcp.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sys/timerfd.h>
 #include <unistd.h>
 
 #include <list>
@@ -14,6 +15,7 @@
 #include "connection.hpp"
 #include "logger.hpp"
 #include "stratum_client.hpp"
+
 // enum ConnectionEventType
 // {
 //     NONE,
@@ -37,17 +39,14 @@ class Server
    public:
     using connection_it = std::list<std::shared_ptr<Connection<T>>>::iterator;
 
-    Server(int port);
+    explicit Server(int port);
     ~Server();
     void Service();
-    bool RearmSocket(connection_it* it);
-    int AcceptConnection(sockaddr_in *addr, socklen_t *addr_size);
-    void EraseClient(connection_it* it);
-    void HandleNewConnection();
 
     virtual void HandleConsumeable(connection_it* conn) = 0;
     // returns whether to reject the connection;
     virtual bool HandleConnected(connection_it* conn) = 0;
+    virtual bool HandleTimeout(connection_it* conn) = 0;
     virtual void HandleDisconnected(connection_it* conn) = 0;
 
    private:
@@ -58,8 +57,15 @@ class Server
 
     int listening_fd;
     int epoll_fd;
+    int timers_epoll_fd;
 
     void InitListeningSock(int port);
-    void HandleReadable(connection_it* it);
+    bool HandleEvent(connection_it* it, uint32_t flags);
+    bool HandleReadable(connection_it* it);
+
+    bool RearmFd(connection_it* it, int fd, int efd) const;
+    int AcceptConnection(sockaddr_in* addr, socklen_t* addr_size) const;
+    void EraseClient(connection_it* it);
+    void HandleNewConnection();
 };
 #endif

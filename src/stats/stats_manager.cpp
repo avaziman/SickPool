@@ -156,7 +156,7 @@ void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
     }
 }
 
-bool StatsManager::AddWorker(int64_t& worker_id, worker_map::iterator& it,
+bool StatsManager::AddWorker(int64_t& worker_id,
                              int64_t miner_id, std::string_view address,
                              std::string_view worker_name,
                              std::string_view alias)
@@ -194,10 +194,14 @@ bool StatsManager::AddWorker(int64_t& worker_id, worker_map::iterator& it,
     //               });
 
     // constant time complexity insert
-    it = worker_stats_map.emplace(worker_stats_map.cend(), worker_id,
-                                  WorkerStats{});
+  
 
     return true;
+}
+
+worker_map::iterator StatsManager::AddExistingWorker(WorkerId worker_id){
+    return worker_stats_map.emplace(worker_stats_map.cend(), worker_id,
+                                  WorkerStats{});
 }
 
 bool StatsManager::AddMiner(int64_t& miner_id, std::string_view address,

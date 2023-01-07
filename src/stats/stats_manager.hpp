@@ -42,7 +42,7 @@ class StatsManager
 
     bool LoadAvgHashrateSums(int64_t hr_time);
     void AddShare(const worker_map::iterator& it, const double diff);
-    bool AddWorker(int64_t& worker_id, worker_map::iterator& it,
+    bool AddWorker(int64_t& worker_id,
                    int64_t miner_id, std::string_view address,
                    std::string_view worker_name, std::string_view alias);
 
@@ -56,7 +56,7 @@ class StatsManager
 
     bool UpdateEffortStats(int64_t update_time_ms);
     void SetNetworkStats(const NetworkStats& ns) { network_stats = ns; }
-
+    worker_map::iterator AddExistingWorker(WorkerId workerid);
     int64_t GetMinerId(std::string_view address, std::string_view alias) const
     {
         return persistence_stats.GetMinerId(address, alias);

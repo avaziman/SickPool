@@ -27,15 +27,18 @@ struct StatsConfig
     uint32_t diff_adjust_seconds;
 };
 
+struct DifficultyConfig{
+    double default_diff;
+    double minimum_diff;
+    double target_shares_rate; // per minute
+};
+
 struct CoinConfig
 {
     std::string symbol;
     std::string pool_addr;
     double pow_fee;
     double pos_fee;
-    double default_difficulty;
-    double target_shares_rate;
-    double minimum_difficulty;
     uint16_t stratum_port;
     uint16_t control_port;
     std::vector<RpcConfig> rpcs;
@@ -43,6 +46,7 @@ struct CoinConfig
 
     RedisConfig redis;
     MySqlConfig mysql;
+    DifficultyConfig diff_config;
     StatsConfig stats;
 
     uint32_t socket_recv_timeout_seconds;

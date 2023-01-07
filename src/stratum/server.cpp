@@ -6,6 +6,7 @@ template <class T>
 Server<T>::Server(int port)
 {
     epoll_fd = epoll_create1(0);
+    timers_epoll_fd = epoll_create1(0);
 
     if (epoll_fd == -1)
     {
@@ -27,7 +28,7 @@ Server<T>::~Server()
 {
     for (auto &it : connections)
     {
-        close(it->sock);
+        close(it->sockfd);
     }
     close(listening_fd);
     close(epoll_fd);
@@ -41,6 +42,23 @@ void Server<T>::Service()
     struct epoll_event events[MAX_CONNECTION_EVENTS];
     int epoll_res =
         epoll_wait(epoll_fd, events, MAX_CONNECTION_EVENTS, EPOLL_TIMEOUT);
+
+    for (int i = 0; i < epoll_res; i++)
+    {
+        auto event = events[i];
+        uint32_t flags = event.events;
+
+        if (event.data.fd != listening_fd)
+        {
+            auto *conn_it = reinterpret_cast<connection_it *>(event.data.ptr);
+
+            if (!HandleEvent(conn_it, flags)) EraseClient(conn_it);
+        }
+        else
+        {
+            HandleNewConnection();
+        }
+    }
 
     if (epoll_res == -1)
     {
@@ -58,48 +76,55 @@ void Server<T>::Service()
         }
     }
 
+    // immediate check
+    epoll_res = epoll_wait(timers_epoll_fd, events, MAX_CONNECTION_EVENTS, 0);
     for (int i = 0; i < epoll_res; i++)
     {
         auto event = events[i];
-        auto flags = event.events;
+        auto *conn_it = reinterpret_cast<connection_it *>(event.data.ptr);
 
-        if (event.data.fd != listening_fd)
+        uint64_t expiration_count = 0;
+        auto timerfd = (*(*conn_it))->timerfd;
+
+        if (!HandleTimeout(conn_it) ||
+            !RearmFd(conn_it, timerfd, timers_epoll_fd) ||
+            read(timerfd, &expiration_count, sizeof(expiration_count)) == -1)
         {
-            auto *conn_it = (connection_it *)(event.data.ptr);
-            int sockfd = (*conn_it)->get()->sock;
-
-            if (flags & EPOLLERR)
-            {
-                int error = 0;
-
-                if (socklen_t errlen = sizeof(error);
-                    getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void *)&error,
-                               &errlen) == 0)
-                {
-                    logger.Log<LogType::Warn>(
-                        "Received epoll error on socket fd {}, "
-                        "errno: {} -> {}",
-                        sockfd, error, std::strerror(error));
-                }
-
-                EraseClient(conn_it);
-                return;
-            }
-
-            HandleReadable(conn_it);
-        }
-        else
-        {
-            HandleNewConnection();
+            EraseClient(conn_it);
         }
     }
 }
 
 template <class T>
-void Server<T>::HandleReadable(connection_it *it)
+bool Server<T>::HandleEvent(connection_it *conn_it, uint32_t flags)
+{
+    int sockfd = (*conn_it)->get()->sockfd;
+
+    if (flags & EPOLLERR)
+    {
+        int error = 0;
+
+        if (socklen_t errlen = sizeof(error);
+            getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void *)&error, &errlen) ==
+            0)
+        {
+            logger.Log<LogType::Warn>(
+                "Received epoll error on socket fd {}, "
+                "errno: {} -> {}",
+                sockfd, error, std::strerror(error));
+        }
+
+        return false;
+    }
+
+    return HandleReadable(conn_it);
+}
+
+template <class T>
+bool Server<T>::HandleReadable(connection_it *it)
 {
     std::shared_ptr<Connection<T>> conn = *(*it);
-    const int sockfd = conn->sock;
+    const int sockfd = conn->sockfd;
     std::string ip(conn->ip);
     ssize_t recv_res = 0;
 
@@ -110,20 +135,17 @@ void Server<T>::HandleReadable(connection_it *it)
 
         if (recv_res == -1)
         {
-            if (/* errno == EWOULDBLOCK || */ errno == EAGAIN)
+            if ((/* errno == EWOULDBLOCK || */ errno != EAGAIN) ||
+                !RearmFd(it, conn->sockfd, epoll_fd))
             {
-                RearmSocket(it);
-            }
-            else
-            {
-                EraseClient(it);
-
                 logger.Log<LogType::Warn>(
                     "Client with ip {} disconnected because of socket (fd:"
                     "{}) error: {} -> {}.",
                     ip, sockfd, errno, std::strerror(errno));
+                return false;
             }
-            return;
+            // EAGAIN allowed
+            return true;
         }
 
         conn->req_pos += recv_res;
@@ -135,11 +157,10 @@ void Server<T>::HandleReadable(connection_it *it)
         if (recv_res == 0)
         {
             // should happened on flooded buffer
-            EraseClient(it);
 
             logger.Log<LogType::Info>(
-                "Client with ip {} (sock {}) disconnected.", ip, sockfd);
-            return;
+                "Client with ip {} (sockfd {}) disconnected.", ip, sockfd);
+            return false;
         }
     }
 }
@@ -162,22 +183,31 @@ void Server<T>::HandleNewConnection()
     }
 
     connection_it *conn_it = nullptr;
+    int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
 
     {
         std::unique_lock lock(connections_mutex);
-        connections.emplace_back(
-            std::make_shared<Connection<T>>(conn_fd, conn_addr.sin_addr));
+        connections.emplace_back(std::make_shared<Connection<T>>(
+            conn_fd, conn_addr.sin_addr, timerfd));
         connections.back()->it = --connections.end();
 
         conn_it = &connections.back()->it;
     }
     std::string ip((*(*conn_it))->ip);
 
-    // since this is a union only one member can be assigned
-    struct epoll_event conn_ev
+    /* Only expire on expiration, no ticks */
+
+    auto timeout = 10;
+    static itimerspec tspec{
+        .it_interval = timespec{.tv_sec = timeout, .tv_nsec = 0},
+        .it_value = timespec{.tv_sec = timeout, .tv_nsec = 0}};
+
+    // since this is a union only one member can be assigned, data will be
+    // assigned in rearm
+    struct epoll_event empty_conn_ev
     {
-        .events = EPOLLIN | EPOLLET | EPOLLONESHOT, .data = {
-            .ptr = conn_it,
+        .events = 0, .data = {
+            .ptr = nullptr,
         }
     };
 
@@ -189,45 +219,40 @@ void Server<T>::HandleNewConnection()
         return;
     }
 
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_fd, &conn_ev) == -1)
+    /* relative timer*/
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_fd, &empty_conn_ev) == -1 ||
+        timerfd_settime(timerfd, 0, &tspec, nullptr) == -1 ||
+        epoll_ctl(timers_epoll_fd, EPOLL_CTL_ADD, timerfd, &empty_conn_ev) == -1 ||
+        !RearmFd(conn_it, conn_fd, epoll_fd) ||
+        !RearmFd(conn_it, timerfd, timers_epoll_fd))
     {
         EraseClient(conn_it);
 
         logger.Log<LogType::Warn>(
-            "Failed to add socket of client with ip {} to epoll list errno: {} "
+            "Failed to add socket / socket timer of client with ip {} to "
+            "epoll list errno: {} "
             "-> errno: {}. ",
             ip, conn_fd, errno);
         return;
     }
 
-    logger.Log<LogType::Info>("Tcp client connected, ip: {}, sock {}", ip,
+    logger.Log<LogType::Info>("Tcp client connected, ip: {}, sockfd {}", ip,
                               conn_fd);
 }
 
 // ptr should point to struct that has Connection as its first member
 template <class T>
-bool Server<T>::RearmSocket(connection_it *it)
+bool Server<T>::RearmFd(connection_it *it, int fd, int efd) const
 {
     Connection<T> *conn = (*it)->get();
-    const int sockfd = conn->sock;
-
-    struct epoll_event conn_ev
-    {
-        .events = EPOLLIN | EPOLLET | EPOLLONESHOT, .data = {.ptr = it }
-    };
 
     // rearm socket in epoll interest list ~1us
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, sockfd, &conn_ev) == -1)
+    if (epoll_event conn_ev{.events = EPOLLIN | EPOLLET | EPOLLONESHOT,
+                            .data = {.ptr = it}};
+        epoll_ctl(efd, EPOLL_CTL_MOD, fd, &conn_ev) == -1)
     {
-        std::string ip(conn->ip);
-
-        EraseClient(it);
-
-        logger.Log<LogType::Warn>(
-            "Failed to rearm socket (fd: {}) of client with ip {} to"
-            "epoll list errno: {} "
-            "-> errno: {}. ",
-            sockfd, ip, errno, std::strerror(errno));
+        logger.Log<LogType::Warn>("Failed to rearm (fd: {}) to epoll (fd: {})",
+                                  fd, efd);
         return false;
     }
 
@@ -235,7 +260,7 @@ bool Server<T>::RearmSocket(connection_it *it)
 }
 
 template <class T>
-int Server<T>::AcceptConnection(sockaddr_in *addr, socklen_t *addr_size)
+int Server<T>::AcceptConnection(sockaddr_in *addr, socklen_t *addr_size) const
 {
     int flags = SOCK_NONBLOCK;
     int conn_fd = accept4(listening_fd, (sockaddr *)addr, addr_size, flags);
@@ -245,19 +270,22 @@ int Server<T>::AcceptConnection(sockaddr_in *addr, socklen_t *addr_size)
         return -1;
     }
 
-    int yes = 1;
-    if (setsockopt(conn_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1)
+    if (int yes = 1;
+        setsockopt(conn_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) == -1)
     {
         return -2;
     }
+
     return conn_fd;
 }
 
 template <class T>
 void Server<T>::EraseClient(connection_it *it)
 {
-    const int sockfd = (*it)->get()->sock;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, sockfd, nullptr) == -1)
+    const int sockfd = (*(*it))->sockfd;
+    const int timerfd = (*(*it))->timerfd;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, sockfd, nullptr) == -1 ||
+        epoll_ctl(timers_epoll_fd, EPOLL_CTL_DEL, timerfd, nullptr) == -1)
     {
         logger.Log<LogType::Warn>(
             "Failed to remove socket {} from epoll list errno: {} "
@@ -265,7 +293,7 @@ void Server<T>::EraseClient(connection_it *it)
             sockfd, errno, std::strerror(errno));
     }
 
-    if (close(sockfd) == -1)
+    if (close(sockfd) == -1 || close(timerfd) == -1)
     {
         logger.Log<LogType::Warn>(
             "Failed to close socket {} errno: {} "
@@ -292,13 +320,6 @@ void Server<T>::InitListeningSock(int port)
     if (setsockopt(listening_fd, SOL_SOCKET, SO_REUSEADDR, &optval,
                    sizeof(optval)) == -1)
         throw std::invalid_argument("Failed to set stratum socket options");
-
-    // struct timeval timeout;
-    // timeout.tv_sec = coin_config.socket_recv_timeout_seconds;
-    // timeout.tv_usec = 0;
-    // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-    // sizeof(timeout)) == -1)
-    //     throw std::runtime_error("Failed to set stratum socket options");
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;

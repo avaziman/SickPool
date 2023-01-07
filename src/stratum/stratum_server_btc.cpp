@@ -6,7 +6,7 @@ void StratumServerBtc<confs>::BroadcastJob(Connection<StratumClient> *conn,
                                  const JobT *job) const
 {
     auto notifyMsg = job->GetNotifyMessage();
-    SendRaw(conn->sock, notifyMsg.data(), notifyMsg.size());
+    SendRaw(conn->sockfd, notifyMsg.data(), notifyMsg.size());
 }
 
 template <StaticConf confs>
@@ -14,7 +14,7 @@ void StratumServerBtc<confs>::HandleReq(Connection<StratumClient>* conn, WorkerC
                                  std::string_view req)
 {
     int id = 0;
-    const int sock = conn->sock;
+    const int sock = conn->sockfd;
     const auto cli = conn->ptr.get();
 
     std::string_view method;
@@ -179,7 +179,7 @@ void StratumServerBtc<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
                                "difficulty\",\"params\":[{}]}}\n",
                                cli->GetDifficulty());
 
-    this->SendRaw(conn->sock, req.data(), req.size());
+    this->SendRaw(conn->sockfd, req.data(), req.size());
 
     logger.Log<LogType::Debug>( 
                 "Set difficulty for {} to {}", cli->GetFullWorkerName(),

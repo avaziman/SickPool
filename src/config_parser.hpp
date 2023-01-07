@@ -103,12 +103,16 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg,
                configDoc, logger);
     AssignJson("pow_fee", cnfg.pow_fee, configDoc, logger);
     AssignJson("pos_fee", cnfg.pos_fee, configDoc, logger);
-    AssignJson("default_difficulty", cnfg.default_difficulty, configDoc,
+
+    ob = configDoc["difficulty"].get_object();
+
+    AssignJson("default_diff", cnfg.diff_config.default_diff, ob,
                logger);
-    AssignJson("minimum_difficulty", cnfg.minimum_difficulty, configDoc,
+    AssignJson("minimum_diff", cnfg.diff_config.minimum_diff, ob,
                logger);
-    AssignJson("target_shares_rate", cnfg.target_shares_rate, configDoc,
+    AssignJson("target_shares_rate", cnfg.diff_config.target_shares_rate, ob,
                logger);
+
     AssignJson("pool_addr", cnfg.pool_addr, configDoc, logger);
     AssignJson("block_poll_interval", cnfg.block_poll_interval, configDoc,
                logger);

@@ -32,7 +32,7 @@ class StratumServerCn : public StratumServer<confs>
                               
     RpcResult HandleSubscribe(StratumClient* cli,
                               simdjson::ondemand::array& params) const;
-    RpcResult HandleSubmit(StratumClient* cli, WorkerContextT* wc,
+    RpcResult HandleSubmit(Connection<StratumClient> *con, WorkerContextT* wc,
                            simdjson::ondemand::array& params,
                            std::string_view worker);
 

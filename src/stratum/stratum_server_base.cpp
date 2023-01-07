@@ -4,7 +4,7 @@ StratumBase::StratumBase(CoinConfig &&conf)
     : Server<StratumClient>(conf.stratum_port),
       coin_config(std::move(conf)),
       persistence_layer(coin_config),
-      diff_manager(&clients, &clients_mutex, coin_config.target_shares_rate),
+      diff_manager(&clients, &clients_mutex, coin_config.diff_config),
       round_manager(persistence_layer, "pow"),
       control_server(coin_config.control_port, coin_config.block_poll_interval)
 {
@@ -14,7 +14,8 @@ StratumBase::StratumBase(CoinConfig &&conf)
 
 StratumBase::~StratumBase()
 {
-    // make sure threads are pending stop as there might have been an exception (Stop wasn't called)
+    // make sure threads are pending stop as there might have been an exception
+    // (Stop wasn't called)
     Stop();
     for (auto &t : processing_threads)
     {
@@ -62,7 +63,6 @@ void StratumBase::Listen()
             std::bind_front(&StratumBase::ServiceSockets, this));
     }
 
-    
     HandleNewJob();
 
     for (auto &t : processing_threads)
@@ -82,7 +82,8 @@ void StratumBase::HandleControlCommands(std::stop_token st)
         if (st.stop_requested()) break;
 
         HandleControlCommand(cmd, buff);
-        if(buff[0]){
+        if (buff[0])
+        {
             logger.Log<LogType::Info>("Processed control command: {}", buff);
         }
     }
@@ -107,6 +108,19 @@ void StratumBase::HandleControlCommand(ControlCommands cmd, const char *buff)
     }
 }
 
+bool StratumBase::HandleTimeout(connection_it *conn)
+{
+    auto conn_ptr = *(*conn);
+
+    logger.template Log<LogType::Info>("Worker with ip {} has timed out", conn_ptr->ip);
+
+    // will call handle disconnected
+    if (!conn_ptr->ptr->GetIsAuthorized())
+    {
+        return false;
+    }
+    return true;
+}
 void StratumBase::HandleDisconnected(connection_it *conn)
 {
     auto conn_ptr = *(*conn);

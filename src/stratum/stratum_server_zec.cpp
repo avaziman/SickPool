@@ -8,7 +8,7 @@ void StratumServerZec<confs>::HandleReq(Connection<StratumClient> *conn,
                                         std::string_view req)
 {
     int id = 0;
-    const int sock = conn->sock;
+    const int sock = conn->sockfd;
     const auto cli = conn->ptr.get();
 
     std::string_view method;
@@ -276,7 +276,7 @@ void StratumServerZec<confs>::UpdateDifficulty(
         "difficulty\",\"params\":[\"{}\"]}}\n",
         hex_target_sv);
 
-    this->SendRaw(conn->sock, msg.data(), msg.size());
+    this->SendRaw(conn->sockfd, msg.data(), msg.size());
 
     logger.Log<LogType::Debug>("Set difficulty for {} to {}",
                                conn->ptr->GetFullWorkerName(), hex_target_sv);

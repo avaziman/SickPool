@@ -9,7 +9,7 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
                                        WorkerContextT *wc, std::string_view req)
 {
     int id = 0;
-    const int sock = conn->sock;
+    const int sock = conn->sockfd;
     const auto cli = conn->ptr.get();
 
     std::string_view worker;
@@ -58,7 +58,7 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
     // eth_submitWork
     if (is_submit_work)
     {
-        res = HandleSubmit(cli, wc, params, worker);
+        res = HandleSubmit(conn, wc, params, worker);
     }
     else if (method == "eth_getWork")
     {
@@ -82,7 +82,7 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
 
 template <StaticConf confs>
 RpcResult StratumServerCn<confs>::HandleSubmit(
-    StratumClient *cli, WorkerContextT *wc, simdjson::ondemand::array &params,
+    Connection<StratumClient> *con, WorkerContextT *wc, simdjson::ondemand::array &params,
     std::string_view worker)
 {
     using namespace simdjson;
@@ -95,7 +95,7 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
     auto it = params.begin();
     error_code error;
 
-    if (!cli->GetIsAuthorized())
+    if (!con->ptr->GetIsAuthorized())
     {
         return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Unauthorized worker");
     }
@@ -128,14 +128,14 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
         return RpcResult(ResCode::UNKNOWN, parse_error);
     }
 
-    return this->HandleShare(cli, wc, share);
+    return this->HandleShare(con, wc, share);
 }
 template <StaticConf confs>
 void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
                                           const JobT *job, int id) const
 {
     std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get(), id);
-    this->SendRaw(conn->sock, msg.data(), msg.size());
+    this->SendRaw(conn->sockfd, msg.data(), msg.size());
 }
 
 template <StaticConf confs>
@@ -143,7 +143,7 @@ void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
                                           const JobT *job) const
 {
     std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get());
-    this->SendRaw(conn->sock, msg.data(), msg.size());
+    this->SendRaw(conn->sockfd, msg.data(), msg.size());
 }
 
 template <StaticConf confs>

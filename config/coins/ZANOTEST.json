@@ -19,14 +19,15 @@
         "hashrate_interval_seconds": 60,
         "average_hashrate_interval_seconds": 120,
         "mined_blocks_interval": 10,
-        "diff_adjust_seconds": 30000
+        "diff_adjust_seconds": 120
     },
     "pow_fee": 0.01,
     "pos_fee": 0.01,
-    "default_difficulty": 150000000.0,
-    "default_difficulty1": 500.0,
-    "minimum_difficulty": 0.000001,
-    "target_shares_rate": 100.0,
+    "difficulty": {
+        "default_diff": 10000000.0,
+        "minimum_diff": 0.000001,
+        "target_shares_rate": 4.0
+    },
     "pool_addr": "ZxCRWPavrf2BnQomKFBEeoVXvRw9BvuQ9f21te9ct8P8Sbh4ZLKJmz5NT4S3zAFkkrBLWiUh2Pf9CMiyQMHQaCjw33jEeYgtj",
     "redis_host": "127.0.0.1:6379",
     "socket_recv_timeout_seconds": 3,

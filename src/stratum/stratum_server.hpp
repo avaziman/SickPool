@@ -63,8 +63,8 @@ class StratumServer : public StratumBase
     void HandleNewJob() override;
     void HandleNewJob(const std::shared_ptr<JobT> new_job);
 
-    RpcResult HandleShare(StratumClient* cli, WorkerContextT* wc,
-                          ShareT& share);
+    RpcResult HandleShare(Connection<StratumClient>* con,
+                          WorkerContextT* wc, ShareT& share);
 
     virtual void UpdateDifficulty(Connection<StratumClient>* conn) = 0;
 

@@ -36,9 +36,11 @@ class StratumClient
 
     void SetPendingDifficulty(double diff)
     {
+        auto curtime = GetCurrentTimeMs();
         std::scoped_lock lock(shares_mutex);
         pending_diff = diff;
-        // last_adjusted = curTime;
+        share_count = 0;
+        last_adjusted = curtime;
     }
 
     void ActivatePendingDiff()
@@ -64,15 +66,9 @@ class StratumClient
     void ResetShareSet()
     {
         std::scoped_lock lock(shares_mutex);
-
         share_uset.clear();
     }
 
-    void ResetShareCount()
-    {
-        std::scoped_lock lock(shares_mutex);
-        share_count = 0;
-    }
 
     void SetAuthorized(const FullId full_id, std::string&& workerfull,
                        const worker_map::iterator& worker_it)

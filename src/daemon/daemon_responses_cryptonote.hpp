@@ -23,7 +23,6 @@ struct TransferResCn {
 
     std::string_view txid;
     std::size_t tx_size;
-    // std::string_view txhex;
 };
 
 struct BlockHeaderResCn

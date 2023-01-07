@@ -90,6 +90,7 @@ class StratumBase : public Server<StratumClient>
 
     virtual void HandleConsumeable(connection_it* conn) = 0;
     virtual bool HandleConnected(connection_it* conn) = 0;
+    bool HandleTimeout(connection_it* conn) override;
     void HandleDisconnected(connection_it* conn) override;
 };
 

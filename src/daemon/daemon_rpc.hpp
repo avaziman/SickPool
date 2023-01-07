@@ -76,23 +76,6 @@ class DaemonRpc
         return fmt::format("\"{}\":{}", key, ToJsonStr(val));
     }
 
-    // template <typename... T>
-    // static JsonStr GetArrayStr(T&&... args)
-    // {
-    //     JsonStr params_json("[");
-
-    //     auto append = [&params_json](auto s)
-    //     {
-    //         params_json.append(ToJsonStr(s));
-    //         params_json.append(",");
-    //     };
-
-    //     (append(args), ...);
-
-    //     params_json[params_json.size() - 1] = ']';
-    //     return params_json;
-    // }
-
     template <typename T>
     static JsonStr GetArrayStr(const std::vector<T>& args)
     {
