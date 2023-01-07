@@ -30,7 +30,6 @@ class StatsManager
 {
    public:
     explicit StatsManager(const PersistenceLayer& redis_manager,
-                          DifficultyManager* diff_manager,
                           RoundManager* round_manager, const StatsConfig* cc);
 
     // Every hashrate_interval_seconds we need to write:
@@ -72,7 +71,6 @@ class StatsManager
     Logger<field_str> logger;
     const StatsConfig* conf;
     PersistenceStats persistence_stats;
-    DifficultyManager* diff_manager;
     RoundManager* round_manager;
 
     NetworkStats network_stats;

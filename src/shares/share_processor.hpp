@@ -121,7 +121,7 @@ class ShareProcessor
         // convert to uint32, (this will lose data)
 
         if (auto shareEnd =
-                *reinterpret_cast<uint32_t*>(result.hash_bytes.begin());
+                *reinterpret_cast<uint32_t*>(result.hash_bytes.end() - sizeof(uint32_t));
             !cli->SetLastShare(shareEnd, curTime))
         {
             result.code = ResCode::DUPLICATE_SHARE;

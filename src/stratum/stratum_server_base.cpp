@@ -4,7 +4,6 @@ StratumBase::StratumBase(CoinConfig &&conf)
     : Server<StratumClient>(conf.stratum_port, static_cast<int>(60.0 / conf.diff_config.target_shares_rate * 2)),
       coin_config(std::move(conf)),
       persistence_layer(coin_config),
-      diff_manager(&clients, &clients_mutex, coin_config.diff_config),
       round_manager(persistence_layer, "pow"),
       control_server(coin_config.control_port, coin_config.block_poll_interval)
 {

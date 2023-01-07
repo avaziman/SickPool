@@ -24,13 +24,13 @@ struct StatsConfig
     uint32_t effort_interval_seconds;
     uint32_t average_hashrate_interval_seconds;
     uint32_t mined_blocks_interval;
-    uint32_t diff_adjust_seconds;
 };
 
 struct DifficultyConfig{
     double default_diff;
     double minimum_diff;
     double target_shares_rate; // per minute
+    uint32_t retarget_interval;
 };
 
 struct CoinConfig

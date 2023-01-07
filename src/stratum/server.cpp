@@ -3,7 +3,10 @@
 template class Server<StratumClient>;
 
 template <class T>
-Server<T>::Server(int port, int timeout_sec) : timeout_sec(timeout_sec)
+Server<T>::Server(int port, int timeout_sec)
+    : timeout_sec(timeout_sec),
+      tspec({.it_interval = timespec{.tv_sec = timeout_sec, .tv_nsec = 0},
+             .it_value = timespec{.tv_sec = timeout_sec, .tv_nsec = 0}})
 {
     epoll_fd = epoll_create1(0);
     timers_epoll_fd = epoll_create1(0);
@@ -59,6 +62,7 @@ void Server<T>::Service()
             else
             {
                 (*(*conn_it))->expiration_count = 0;
+                timerfd_settime((*(*conn_it))->timerfd, 0, &tspec, nullptr);
             }
         }
         else
@@ -95,8 +99,8 @@ void Server<T>::Service()
 
         if (read(conn_ptr->timerfd, &expiration_count,
                  sizeof(expiration_count)) == -1 ||
-            !HandleTimeout(
-                conn_it, conn_ptr->expiration_count + expiration_count) ||
+            !HandleTimeout(conn_it,
+                           conn_ptr->expiration_count + expiration_count) ||
             !RearmFd(conn_it, conn_ptr->timerfd, timers_epoll_fd))
         {
             EraseClient(conn_it);
@@ -204,12 +208,6 @@ void Server<T>::HandleNewConnection()
         conn_it = &connections.back()->it;
     }
     std::string ip((*(*conn_it))->ip);
-
-    /* Only expire on expiration, no ticks */
-
-    static itimerspec tspec{
-        .it_interval = timespec{.tv_sec = timeout_sec, .tv_nsec = 0},
-        .it_value = timespec{.tv_sec = timeout_sec, .tv_nsec = 0}};
 
     // since this is a union only one member can be assigned, data will be
     // assigned in rearm

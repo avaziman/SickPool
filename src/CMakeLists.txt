@@ -40,7 +40,6 @@ add_subdirectory(crypto/verushash)
 
 # add_subdirectory(daemon)
 # add_subdirectory(crypto/x25x)
-
 file(GLOB SRC_FILES
     "shares/*.cpp"
     "stratum/*.cpp"
@@ -48,6 +47,7 @@ file(GLOB SRC_FILES
 
     # "crypto/cn/crypto/*.c"
     # "crypto/cn/ethash/*.c"
+    "difficulty/*.cpp"
     "stats/*.cpp"
     "blocks/*.cpp"
     "jobs/*.cpp"

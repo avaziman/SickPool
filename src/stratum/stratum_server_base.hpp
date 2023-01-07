@@ -18,7 +18,6 @@ class StratumBase : public Server<StratumClient>
    protected:
     const CoinConfig coin_config;
     PersistenceLayer persistence_layer;
-    DifficultyManager diff_manager;
     RoundManager round_manager;
 
     // O(log n) delete + insert

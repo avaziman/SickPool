@@ -5,11 +5,9 @@ template void StatsManager::Start<ZanoStatic>(std::stop_token st);
 uint32_t StatsManager::average_interval_ratio;
 
 StatsManager::StatsManager(const PersistenceLayer& pl,
-                           DifficultyManager* diff_manager,
                            RoundManager* round_manager, const StatsConfig* cc)
     : conf(cc),
       persistence_stats(pl),
-      diff_manager(diff_manager),
       round_manager(round_manager)
 {
     StatsManager::average_interval_ratio =
@@ -32,13 +30,10 @@ void StatsManager::Start(std::stop_token st)
                                    (now % conf->hashrate_interval_seconds) +
                                    conf->hashrate_interval_seconds;
 
-    int64_t next_diff_update =
-        now - (now % conf->diff_adjust_seconds) + conf->diff_adjust_seconds;
-
     while (!st.stop_requested())
     {
         int64_t next_update = std::min(
-            {next_interval_update, next_effort_update, next_diff_update});
+            {next_interval_update, next_effort_update});
 
         // logger.Log<LogType::Info>(
         //             "Next stats update in: {}", next_update);
@@ -78,12 +73,6 @@ void StatsManager::Start(std::stop_token st)
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
             round_manager->PushPendingShares();
 #endif
-        }
-
-        if (next_update == next_diff_update)
-        {
-            diff_manager->Adjust(conf->diff_adjust_seconds, next_diff_update);
-            next_diff_update += conf->diff_adjust_seconds;
         }
 
         auto startChrono = system_clock::now();

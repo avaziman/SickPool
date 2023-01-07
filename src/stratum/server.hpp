@@ -50,6 +50,7 @@ class Server
     virtual void HandleDisconnected(connection_it* conn) = 0;
 
    private:
+    const itimerspec tspec;
 
     const Logger<field_str> logger;
     std::mutex connections_mutex;

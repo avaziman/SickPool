@@ -9,8 +9,7 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
                      coin_config.pool_addr),
       job_manager(&daemon_manager, &payout_manager, coin_config.pool_addr),
       block_submitter(&daemon_manager, &round_manager),
-      stats_manager(persistence_layer, &diff_manager, &round_manager,
-                    &conf.stats)
+      stats_manager(persistence_layer, &round_manager, &conf.stats)
 {
     static_assert(confs.DIFF1 != 0, "DIFF1 can't be zero!");
     persistence_layer.Init();
@@ -254,16 +253,13 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
     }
 
     stats_manager.AddShare(cli->stats_it, cli->GetDifficulty());
-    if (cli->GetShareCount() >
-        coin_config.diff_config.target_shares_rate *
-            (coin_config.stats.diff_adjust_seconds / 60.0) * 1.2)
+
+    if (cli->GetIsPendingDiff())
     {
-        cli->SetPendingDifficulty(cli->GetDifficulty() * 1.5);
         UpdateDifficulty(con);
-          BroadcastJob(con, job_manager.GetLastJob().get());
         cli->ActivatePendingDiff();
+        BroadcastJob(con, job_manager.GetLastJob().get());
     }
-    // stats_manager.AddShare(cli->stats_it, share_res.difficulty);
 
     // logger.template Log<
     //     LogType::Debug>(
@@ -329,7 +325,8 @@ bool StratumServer<confs>::HandleConnected(connection_it *it)
     std::shared_ptr<Connection<StratumClient>> conn = *(*it);
 
     conn->ptr = std::make_shared<StratumClient>(
-        GetCurrentTimeMs(), coin_config.diff_config.default_diff);
+        GetCurrentTimeMs(), coin_config.diff_config.default_diff,
+        coin_config.diff_config.target_shares_rate);
 
     if (job_manager.GetLastJob() == nullptr)
     {
@@ -356,8 +353,8 @@ void StratumServer<confs>::DisconnectClient(
     std::unique_lock lock(clients_mutex);
     clients.erase(conn_ptr);
 
-    logger.template Log<LogType::Info>("Stratum client disconnected. sockfd: {}",
-                                       sockfd);
+    logger.template Log<LogType::Info>(
+        "Stratum client disconnected. sockfd: {}", sockfd);
 }
 
 template <StaticConf confs>
@@ -429,13 +426,12 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
                                            address);
     }
 
-    
     int64_t worker_id =
         stats_manager.GetWorkerId(static_cast<MinerId>(miner_id), worker);
     if (worker_id == -1)
     {
-        if (!stats_manager.AddWorker(worker_id, miner_id, address,
-                                     worker, alias))
+        if (!stats_manager.AddWorker(worker_id, miner_id, address, worker,
+                                     alias))
         {
             return RpcResult(
                 ResCode::UNAUTHORIZED_WORKER,
@@ -495,7 +491,8 @@ RpcResult StratumServer<confs>::HandleAuthorize(
 }
 
 template <StaticConf confs>
-bool StratumServer<confs>::HandleTimeout(connection_it *conn, uint64_t timeout_streak)
+bool StratumServer<confs>::HandleTimeout(connection_it *conn,
+                                         uint64_t timeout_streak)
 {
     auto conn_ptr = *(*conn);
 
@@ -515,7 +512,8 @@ bool StratumServer<confs>::HandleTimeout(connection_it *conn, uint64_t timeout_s
     else
     {
         // decrease difficulty
-        conn_ptr->ptr->SetPendingDifficulty(conn_ptr->ptr->GetDifficulty() / std::pow(2, timeout_streak));
+        conn_ptr->ptr->SetPendingDifficulty(conn_ptr->ptr->GetDifficulty() /
+                                            std::pow(2, timeout_streak));
         conn_ptr->ptr->ActivatePendingDiff();
         BroadcastJob(conn_ptr.get(), job_manager.GetLastJob().get());
     }

@@ -96,8 +96,6 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg,
                cnfg.stats.average_hashrate_interval_seconds, ob, logger);
     AssignJson("mined_blocks_interval", cnfg.stats.mined_blocks_interval, ob,
                logger);
-    AssignJson("diff_adjust_seconds", cnfg.stats.diff_adjust_seconds, ob,
-               logger);
 
     AssignJson("socket_recv_timeout_seconds", cnfg.socket_recv_timeout_seconds,
                configDoc, logger);
@@ -111,6 +109,8 @@ void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg,
     AssignJson("minimum_diff", cnfg.diff_config.minimum_diff, ob,
                logger);
     AssignJson("target_shares_rate", cnfg.diff_config.target_shares_rate, ob,
+               logger);
+    AssignJson("retarget_interval", cnfg.diff_config.retarget_interval, ob,
                logger);
 
     AssignJson("pool_addr", cnfg.pool_addr, configDoc, logger);
