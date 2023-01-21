@@ -8,7 +8,7 @@ class RedisManager;
 class RedisTransaction
 {
    public:
-    RedisTransaction(RedisManager* redis_manager);
+    explicit RedisTransaction(RedisManager* redis_manager);
     ~RedisTransaction();
 
    private:

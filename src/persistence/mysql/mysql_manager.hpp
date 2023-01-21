@@ -41,6 +41,7 @@ class MySqlManager
     static std::unique_ptr<sql::PreparedStatement> add_payout;
     static std::unique_ptr<sql::PreparedStatement> add_payout_entry;
     static std::unique_ptr<sql::PreparedStatement> update_next_payout;
+    static std::unique_ptr<sql::PreparedStatement> update_alias;
 
     static constexpr std::string_view logger_field = "MySQL";
     static const Logger<logger_field> logger;
@@ -49,30 +50,32 @@ class MySqlManager
 
    public:
     explicit MySqlManager(const CoinConfig &cc);
-    bool AddBlockSubmission(uint32_t &id,
-                            const BlockSubmission &submission) const;
+    static bool AddBlockSubmission(uint32_t &id,
+                            const BlockSubmission &submission);
 
-    int64_t AddMiner(std::string_view address, std::string_view alias,
-                  uint64_t join_time, uint64_t min_payout) const;
-    int64_t GetMinerId(std::string_view address, std::string_view alias) const;
+    static int64_t AddMiner(std::string_view address, std::string_view alias,
+                  uint64_t join_time, uint64_t min_payout);
+    static std::pair<int64_t, std::string> GetMinerId(std::string_view address,
+                                               std::string_view alias);
 
-    int64_t AddWorker(MinerId minerid, std::string_view worker_name,
-                   uint64_t join_time) const;
-    int64_t GetWorkerId(MinerId minerid, std::string_view worker_name) const;
+    static int64_t AddWorker(MinerId minerid, std::string_view worker_name,
+                   uint64_t join_time);
+    static int64_t GetWorkerId(MinerId minerid, std::string_view worker_name);
 
-    bool AddRoundRewards(const BlockSubmission &submission,
-                         const round_shares_t &miner_shares) const;
+    static bool AddRoundRewards(const BlockSubmission &submission,
+                         const round_shares_t &miner_shares);
 
-    bool GetLastId(uint32_t& id) const;
-    bool LoadUnpaidRewards(std::vector<Payee> &rewards, uint64_t minimum) const;
-    bool LoadImmatureBlocks(std::vector<BlockOverview> &submissions) const;
-    bool UpdateBlockStatus(uint32_t block_id, BlockStatus status) const;
-    bool UpdateImmatureRewards(uint32_t block_num, BlockStatus status,
-                               int64_t matured_time) const;
+    static bool GetLastId(uint32_t& id);
+    static bool LoadUnpaidRewards(std::vector<Payee> &rewards, uint64_t minimum);
+    static bool LoadImmatureBlocks(std::vector<BlockOverview> &submissions);
+    static bool UpdateBlockStatus(uint32_t block_id, BlockStatus status);
+    static bool UpdateImmatureRewards(uint32_t block_num, BlockStatus status,
+                               int64_t matured_time);
 
-    bool UpdateNextPayout(uint64_t next_ms) const ;
-    bool AddPayout(PayoutInfo &pinfo, const std::vector<Payee> &payees,
-                   uint64_t amount_clean) const;
+    static bool UpdateAlias(int64_t id, std::string_view alias);
+    static bool UpdateNextPayout(uint64_t next_ms);
+    static bool AddPayout(PayoutInfo &pinfo, const std::vector<Payee> &payees,
+                   uint64_t amount_clean);
 };
 
 #endif

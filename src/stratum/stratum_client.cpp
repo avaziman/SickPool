@@ -2,7 +2,8 @@
 
 uint32_t StratumClient::extra_nonce_counter = 0;
 
-StratumClient::StratumClient(const int64_t time, const double diff, const double rate)
+StratumClient::StratumClient(const int64_t time, const double diff,
+                             const double rate, uint32_t retarget_interval)
     : connect_time(time),
       last_adjusted(time),
       last_share_time(time),
@@ -10,8 +11,8 @@ StratumClient::StratumClient(const int64_t time, const double diff, const double
       pending_diff(diff),
       extra_nonce(extra_nonce_counter++),
       extra_nonce_sv(extra_nonce_hex, sizeof(extra_nonce_hex)),
-      id(0,0),
-      var_diff(rate)
+      id(0, 0),
+      var_diff(rate, retarget_interval)
 {
     fmt::format_to_n(extra_nonce_hex, sizeof(extra_nonce_hex), "{:08x}",
                      extra_nonce);

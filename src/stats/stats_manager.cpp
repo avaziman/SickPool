@@ -6,9 +6,7 @@ uint32_t StatsManager::average_interval_ratio;
 
 StatsManager::StatsManager(const PersistenceLayer& pl,
                            RoundManager* round_manager, const StatsConfig* cc)
-    : conf(cc),
-      persistence_stats(pl),
-      round_manager(round_manager)
+    : conf(cc), persistence_stats(pl), round_manager(round_manager)
 {
     StatsManager::average_interval_ratio =
         cc->average_hashrate_interval_seconds / cc->hashrate_interval_seconds;
@@ -32,8 +30,8 @@ void StatsManager::Start(std::stop_token st)
 
     while (!st.stop_requested())
     {
-        int64_t next_update = std::min(
-            {next_interval_update, next_effort_update});
+        int64_t next_update =
+            std::min({next_interval_update, next_effort_update});
 
         // logger.Log<LogType::Info>(
         //             "Next stats update in: {}", next_update);
@@ -113,9 +111,9 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         if (ws.interval_hashrate > 0.d) miner_stats.worker_count++;
     }
 
-    return persistence_stats.UpdateIntervalStats(
-        worker_stats_map, miner_stats_map, std::move(stats_unique_lock),
-        network_stats, update_time_ms);
+    return persistence_stats.UpdateIntervalStats(worker_stats_map, miner_stats_map,
+                               std::move(stats_unique_lock), network_stats,
+                               update_time_ms);
 }
 
 void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
@@ -145,8 +143,8 @@ void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
     }
 }
 
-bool StatsManager::AddWorker(int64_t& worker_id,
-                             int64_t miner_id, std::string_view address,
+bool StatsManager::AddWorker(int64_t& worker_id, int64_t miner_id,
+                             std::string_view address,
                              std::string_view worker_name,
                              std::string_view alias)
 {
@@ -155,8 +153,7 @@ bool StatsManager::AddWorker(int64_t& worker_id,
     const int64_t curtime = GetCurrentTimeMs();
     std::string addr_lowercase = ToLowerCase(address);
 
-    worker_id = persistence_stats.AddWorker(static_cast<MinerId>(miner_id),
-                                            worker_name, curtime);
+    worker_id = PersistenceLayer::AddWorker(static_cast<MinerId>(miner_id), worker_name, curtime);
 
     if (worker_id == -1) return false;
     if (!persistence_stats.AddNewWorker(FullId(miner_id, worker_id),
@@ -183,14 +180,14 @@ bool StatsManager::AddWorker(int64_t& worker_id,
     //               });
 
     // constant time complexity insert
-  
 
     return true;
 }
 
-worker_map::iterator StatsManager::AddExistingWorker(WorkerId worker_id){
+worker_map::iterator StatsManager::AddExistingWorker(WorkerId worker_id)
+{
     return worker_stats_map.emplace(worker_stats_map.cend(), worker_id,
-                                  WorkerStats{});
+                                    WorkerStats{});
 }
 
 bool StatsManager::AddMiner(int64_t& miner_id, std::string_view address,
@@ -199,9 +196,12 @@ bool StatsManager::AddMiner(int64_t& miner_id, std::string_view address,
     const int64_t curtime = GetCurrentTimeMs();
     std::string addr_lowercase = ToLowerCase(address);
 
-    miner_id = persistence_stats.AddMiner(address, alias, curtime, min_payout);
+    miner_id = PersistenceLayer::AddMiner(address, alias, curtime, min_payout);
+    if (miner_id == -1)
+    {
+        return false;
+    }
 
-    if (miner_id == -1) return false;
     if (!persistence_stats.AddNewMiner(address, addr_lowercase, alias, miner_id,
                                        curtime, min_payout))
     {

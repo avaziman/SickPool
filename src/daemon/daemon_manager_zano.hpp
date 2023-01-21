@@ -30,7 +30,7 @@ class DaemonManagerZano : public DaemonManager
     bool GetAliasAddress(AliasRes& res, std::string_view alias,
                          simdjson::ondemand::parser& parser);
 
-    bool ValidateAlias(std::string_view alias)  const {
+    bool ValidateAliasEncoding(std::string_view alias)  const {
       constexpr static bool alphabet[256] = {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

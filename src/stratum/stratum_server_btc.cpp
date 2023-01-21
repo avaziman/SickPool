@@ -15,7 +15,8 @@ void StratumServerBtc<confs>::HandleReq(Connection<StratumClient>* conn, WorkerC
 {
     int id = 0;
     const int sock = conn->sockfd;
-    const auto cli = conn->ptr.get();
+    // safe to remove from list
+    std::shared_ptr<Connection<StratumClient>> cli = conn->ptr;
 
     std::string_view method;
     simdjson::ondemand::array params;

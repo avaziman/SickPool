@@ -48,6 +48,7 @@ class StratumBase : public Server<StratumClient>
         return res;
     }
 
+    //TODO: have without jsonrpc
     inline void SendRes(int sock, int req_id, const RpcResult& res) const
     {
         char buff[512];
@@ -57,14 +58,15 @@ class StratumBase : public Server<StratumClient>
         {
             len =
                 fmt::format_to_n(buff, sizeof(buff),
-                                 "{{\"id\":{},\"result\":{},\"error\":null}}\n",
+                                 "{{\"id\":{},\"jsonrpc\":\"2.0\",\"error\":null,\"result\":{}}}\n",
                                  req_id, res.msg)
                     .size;
         }
         else
         {
             len = fmt::format_to_n(buff, sizeof(buff),
-                                   "{{\"id\":{},\"result\":null,\"error\":[{},"
+                                   "{{\"id\":{},\"jsonrpc\":\"2.0\",\"result\":"
+                                   "null,\"error\":[{},"
                                    "\"{}\",null]}}\n",
                                    req_id, (int)res.code, res.msg)
                       .size;

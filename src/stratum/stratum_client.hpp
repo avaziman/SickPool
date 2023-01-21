@@ -21,7 +21,7 @@ class StratumClient
 {
    public:
     explicit StratumClient(const int64_t time, const double diff,
-                           const double rate);
+                           const double rate, uint32_t retarget_interval);
 
     double GetDifficulty() const { return current_diff; }
     double GetPendingDifficulty() const { return pending_diff.value(); }
@@ -55,7 +55,7 @@ class StratumClient
     {
         std::unique_lock lock(shares_mutex);
 
-        auto share_time = time - last_share_time;
+        uint64_t share_time = time - last_share_time;
         last_share_time = time;
         share_count++;
 
@@ -65,7 +65,9 @@ class StratumClient
 
         var_diff.Add(share_time);
 
-        if (double new_diff = var_diff.Adjust(current_diff); new_diff != 0.0)
+        if (double new_diff =
+                var_diff.Adjust(current_diff, time, last_adjusted);
+            new_diff != 0.0)
         {
             lock.unlock();
             SetPendingDifficulty(new_diff);

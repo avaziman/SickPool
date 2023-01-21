@@ -1,4 +1,6 @@
 **/build
+**/release
 # **/lib
 **/.vscode
 **/release
+**/_deps

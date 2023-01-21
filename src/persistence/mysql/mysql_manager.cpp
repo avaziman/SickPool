@@ -18,6 +18,7 @@ std::unique_ptr<sql::PreparedStatement> MySqlManager::update_rewards;
 std::unique_ptr<sql::PreparedStatement> MySqlManager::add_payout;
 std::unique_ptr<sql::PreparedStatement> MySqlManager::add_payout_entry;
 std::unique_ptr<sql::PreparedStatement> MySqlManager::update_next_payout;
+std::unique_ptr<sql::PreparedStatement> MySqlManager::update_alias;
 
 const Logger<MySqlManager::logger_field> MySqlManager::logger;
 
@@ -81,6 +82,9 @@ MySqlManager::MySqlManager(const CoinConfig& cc)
 
         update_next_payout = std::unique_ptr<sql::PreparedStatement>(
             con->prepareStatement("UPDATE payout_stats SET next_ms=?"));
+
+        update_alias = std::unique_ptr<sql::PreparedStatement>(
+            con->prepareStatement("UPDATE addresses SET alias=? WHERE id=?"));
     }
     catch (const sql::SQLException& e)
     {
@@ -90,7 +94,7 @@ MySqlManager::MySqlManager(const CoinConfig& cc)
 }
 
 bool MySqlManager::AddBlockSubmission(uint32_t& id,
-                                      const BlockSubmission& submission) const
+                                      const BlockSubmission& submission)
 {
     std::scoped_lock _(mutex);
     std::unique_ptr<sql::ResultSet> res;
@@ -120,7 +124,7 @@ bool MySqlManager::AddBlockSubmission(uint32_t& id,
 }
 
 // not mutexed as it should be called inside mutexed func
-bool MySqlManager::GetLastId(uint32_t& id) const
+bool MySqlManager::GetLastId(uint32_t& id)
 {
     std::unique_ptr<sql::ResultSet> res;
 
@@ -146,7 +150,7 @@ bool MySqlManager::GetLastId(uint32_t& id) const
 }
 
 int64_t MySqlManager::AddMiner(std::string_view address, std::string_view alias,
-                            uint64_t join_time, uint64_t min_payout) const
+                            uint64_t join_time, uint64_t min_payout)
 {
     std::unique_lock lock(mutex);
 
@@ -174,15 +178,16 @@ int64_t MySqlManager::AddMiner(std::string_view address, std::string_view alias,
         return -1;
     }
     lock.unlock();
-    return GetMinerId(address, alias);
+    return GetMinerId(address, alias).first;
 }
 
-int64_t MySqlManager::GetMinerId(std::string_view address,
-                                 std::string_view alias) const
+std::pair<int64_t, std::string> MySqlManager::GetMinerId(
+    std::string_view address, std::string_view alias)
 {
     std::scoped_lock _(mutex);
     std::unique_ptr<sql::ResultSet> res;
     int64_t id = -1;
+    std::string res_alias;
 
     get_miner->setString(1, std::string(address));
     if (!alias.empty())
@@ -203,6 +208,7 @@ int64_t MySqlManager::GetMinerId(std::string_view address,
             while (res->next())
             {
                 id = res->getUInt(1);
+                res_alias = res->getString(2);
             }
         } while (get_miner->getMoreResults());
     }
@@ -211,11 +217,11 @@ int64_t MySqlManager::GetMinerId(std::string_view address,
         PRINT_MYSQL_ERR(e);
     }
 
-    return id;
+    return std::make_pair(id, res_alias);
 }
 
 int64_t MySqlManager::AddWorker(MinerId minerid, std::string_view worker_name,
-                             uint64_t join_time) const
+                             uint64_t join_time)
 {
     std::unique_lock lock(mutex);
 
@@ -238,7 +244,7 @@ int64_t MySqlManager::AddWorker(MinerId minerid, std::string_view worker_name,
 }
 
 int64_t MySqlManager::GetWorkerId(MinerId minerid,
-                                  std::string_view worker_name) const
+                                  std::string_view worker_name)
 {
     std::scoped_lock _(mutex);
     std::unique_ptr<sql::ResultSet> res;
@@ -268,7 +274,7 @@ int64_t MySqlManager::GetWorkerId(MinerId minerid,
 }
 
 bool MySqlManager::AddRoundRewards(const BlockSubmission& submission,
-                                   const round_shares_t& miner_shares) const
+                                   const round_shares_t& miner_shares)
 {
     for (const auto& [miner_id, reward] : miner_shares)
     {
@@ -291,7 +297,7 @@ bool MySqlManager::AddRoundRewards(const BlockSubmission& submission,
 }
 
 bool MySqlManager::LoadImmatureBlocks(
-    std::vector<BlockOverview>& submissions) const
+    std::vector<BlockOverview>& submissions)
 {
     std::scoped_lock _(mutex);
     std::unique_ptr<sql::ResultSet> res;
@@ -323,7 +329,7 @@ bool MySqlManager::LoadImmatureBlocks(
 // TODO: perhaps make insert miner use  last id too
 
 bool MySqlManager::UpdateBlockStatus(uint32_t block_id,
-                                     BlockStatus status) const
+                                     BlockStatus status)
 {
     std::scoped_lock _(mutex);
 
@@ -344,7 +350,7 @@ bool MySqlManager::UpdateBlockStatus(uint32_t block_id,
 
 bool MySqlManager::UpdateImmatureRewards(
     uint32_t block_id, BlockStatus status,
-    [[maybe_unused]] int64_t matured_time) const
+    [[maybe_unused]] int64_t matured_time)
 {
     std::scoped_lock _(mutex);
 
@@ -364,7 +370,7 @@ bool MySqlManager::UpdateImmatureRewards(
 }
 
 bool MySqlManager::UpdateNextPayout(
-    uint64_t next_ms) const
+    uint64_t next_ms)
 {
     std::scoped_lock _(mutex);
 
@@ -382,7 +388,26 @@ bool MySqlManager::UpdateNextPayout(
     return true;
 }
 
-bool MySqlManager::LoadUnpaidRewards(std::vector<Payee>& rewards, uint64_t minimum) const
+bool MySqlManager::UpdateAlias(int64_t id, std::string_view alias)
+{
+    std::scoped_lock _(mutex);
+
+    update_alias->setString(1, std::string(alias));
+    update_alias->setInt64(2, id);
+
+    try
+    {
+        /* int affected = */ update_alias->executeUpdate();
+    }
+    catch (const sql::SQLException e)
+    {
+        PRINT_MYSQL_ERR(e);
+    }
+
+    return true;
+}
+
+bool MySqlManager::LoadUnpaidRewards(std::vector<Payee>& rewards, uint64_t minimum)
 {
     std::scoped_lock _(mutex);
     std::unique_ptr<sql::ResultSet> res;
@@ -412,7 +437,7 @@ bool MySqlManager::LoadUnpaidRewards(std::vector<Payee>& rewards, uint64_t minim
 
 bool MySqlManager::AddPayout(PayoutInfo& pinfo,
                              const std::vector<Payee>& payees,
-                             uint64_t individual_fee) const
+                             uint64_t individual_fee)
 {
     std::scoped_lock _(mutex);
 

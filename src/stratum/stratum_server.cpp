@@ -326,7 +326,8 @@ bool StratumServer<confs>::HandleConnected(connection_it *it)
 
     conn->ptr = std::make_shared<StratumClient>(
         GetCurrentTimeMs(), coin_config.diff_config.default_diff,
-        coin_config.diff_config.target_shares_rate);
+        coin_config.diff_config.target_shares_rate,
+        coin_config.diff_config.retarget_interval);
 
     if (job_manager.GetLastJob() == nullptr)
     {
@@ -348,13 +349,13 @@ template <StaticConf confs>
 void StratumServer<confs>::DisconnectClient(
     const std::shared_ptr<Connection<StratumClient>> conn_ptr)
 {
-    auto sockfd = conn_ptr->sockfd;
+    auto worker_name = conn_ptr->ptr->GetFullWorkerName();
     stats_manager.PopWorker(conn_ptr->ptr->stats_it);
     std::unique_lock lock(clients_mutex);
     clients.erase(conn_ptr);
 
-    logger.template Log<LogType::Info>(
-        "Stratum client disconnected. sockfd: {}", sockfd);
+    logger.template Log<LogType::Info>("Stratum worker {} disconnected.",
+                                       worker_name);
 }
 
 template <StaticConf confs>
@@ -366,14 +367,32 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
 
     bool is_alias = address.starts_with("@");
     std::string_view alias = address.substr(1);
-
     currency::blobdata addr_blob(address.data(), address.size());
+
+    if (worker.size() > MAX_WORKER_NAME_LEN)
+    {
+        return RpcResult(
+            ResCode::UNAUTHORIZED_WORKER,
+            "Worker name too long! (max " xSTRR(MAX_WORKER_NAME_LEN) " chars)");
+    }
+
     if (is_alias)
     {
-        if (!daemon_manager.ValidateAlias(alias))
+        AliasRes alias_res;
+        if (!daemon_manager.ValidateAliasEncoding(alias))
         {
             return RpcResult(ResCode::UNAUTHORIZED_WORKER,
                              "Invalid alias name!");
+        }
+
+        if (daemon_manager.GetAliasAddress(alias_res, alias, httpParser))
+        {
+            address = alias_res.address;
+        }
+        else
+        {
+            return RpcResult(ResCode::UNAUTHORIZED_WORKER,
+                             "Alias does not exist!");
         }
     }
     else
@@ -387,34 +406,12 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
         }
     }
 
-    if (worker.size() > MAX_WORKER_NAME_LEN)
-    {
-        return RpcResult(
-            ResCode::UNAUTHORIZED_WORKER,
-            "Worker name too long! (max " xSTRR(MAX_WORKER_NAME_LEN) " chars)");
-    }
-
-    AliasRes alias_res;
-
     // if the miner address is already in the database we have already
     // validated the address, let it through
-    int64_t miner_id = stats_manager.GetMinerId(address, alias);
+    auto [miner_id, db_alias] = PersistenceLayer::GetMinerId(address, alias);
 
     if (miner_id == -1)
     {
-        if (is_alias)
-        {
-            if (daemon_manager.GetAliasAddress(alias_res, alias, httpParser))
-            {
-                address = alias_res.address;
-            }
-            else
-            {
-                return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                                 "Alias does not exist!");
-            }
-        }
-
         if (!stats_manager.AddMiner(miner_id, address, alias,
                                     this->coin_config.min_payout_threshold))
         {
@@ -425,13 +422,20 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
         logger.template Log<LogType::Info>("New miner has joined the pool: {}",
                                            address);
     }
+    else if (is_alias && db_alias != alias &&
+             !PersistenceLayer::UpdateAlias(miner_id, alias))
+    {
+        return RpcResult(
+            ResCode::UNAUTHORIZED_WORKER,
+            "Failed to update miner identity, please contact support!");
+    }
 
     int64_t worker_id =
-        stats_manager.GetWorkerId(static_cast<MinerId>(miner_id), worker);
+        PersistenceLayer::GetWorkerId(static_cast<MinerId>(miner_id), worker);
     if (worker_id == -1)
     {
         if (!stats_manager.AddWorker(worker_id, miner_id, address, worker,
-                                     alias))
+                                         alias))
         {
             return RpcResult(
                 ResCode::UNAUTHORIZED_WORKER,

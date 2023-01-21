@@ -43,3 +43,6 @@ CACHE ONLY 100 last blocks rest on disk db
 
 
 add connection count
+
+save difficulty adjustment
+fix negative diff when gpu miner on low diff

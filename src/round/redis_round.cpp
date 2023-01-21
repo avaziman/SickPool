@@ -120,7 +120,8 @@ RoundCloseRes PersistenceRound::SetClosedRound(
                     submission.effort_percent);
 
         // reset miners efforts
-        AppendCommand({"UNLINK", key_names.round_efforts});
+        AppendCommand({"UNLINK"sv, key_names.round_efforts}); // updated more often
+        AppendCommand({"UNLINK"sv, key_names.miner_index_round_effort});
     }
 
     if (!GetReplies()) return RoundCloseRes::BAD_UPDATE_ROUND;

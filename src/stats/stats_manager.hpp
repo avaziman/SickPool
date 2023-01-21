@@ -56,14 +56,6 @@ class StatsManager
     bool UpdateEffortStats(int64_t update_time_ms);
     void SetNetworkStats(const NetworkStats& ns) { network_stats = ns; }
     worker_map::iterator AddExistingWorker(WorkerId workerid);
-    int64_t GetMinerId(std::string_view address, std::string_view alias) const
-    {
-        return persistence_stats.GetMinerId(address, alias);
-    }
-    int64_t GetWorkerId(MinerId minerid, std::string_view worker_name) const
-    {
-        return persistence_stats.GetWorkerId(minerid, worker_name);
-    }
     static uint32_t average_interval_ratio;
 
    private:

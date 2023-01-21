@@ -15,16 +15,20 @@
 class VarDiff
 {
    private:
-
-    std::array<uint32_t, 20> share_times;
-    uint32_t retarget_count = 0;
+    // default initialize, spent 2 hours on this...
+    std::array<uint64_t, 10> share_times{};
+    uint64_t retarget_count = 0;
     double retarget_sum = 0.0;
-    uint32_t sum = 0;
+    uint64_t sum = 0;
     int pos = 0;
     const double target_share_rate;
- 
+    const uint32_t retarget_interval;
+
    public:
-    explicit VarDiff(double rate) : target_share_rate(rate) {}
+    explicit VarDiff(double rate, uint32_t retarget_interval)
+        : target_share_rate(rate), retarget_interval(retarget_interval)
+    {
+    }
 
     void Add(uint64_t t)
     {
@@ -33,13 +37,14 @@ class VarDiff
         sum += t;
         sum -= share_times[pos];  // oldest value
         share_times[pos] = t;
+
         pos++;
     }
 
-    double Adjust(double curdiff)
+    double Adjust(double current_diff, uint64_t curtime, uint64_t last_adjusted)
     {
         // first retarget of first 5 shares
-        if (/* not time expired */ true)
+        if ((curtime - last_adjusted) / 1000 < retarget_interval)
         {
             if (retarget_count == 0)
             {
@@ -50,25 +55,24 @@ class VarDiff
             }
             else
             {
-                if (pos != share_times.size())
+                if (pos < share_times.size())
                 {
                     return 0.0;
                 }
             }
-
         }
 
-        const double current_share_time = static_cast<double>(sum) / static_cast<double>(pos) / 1000.0;
+        const double current_share_time =
+            static_cast<double>(sum) / static_cast<double>(pos) / 1000.0;
 
         retarget_sum += current_share_time;
         retarget_count++;
 
         // sum can't be zero because its called on share
-        const double current_diff = curdiff;
 
         // average minute rate of averages
         const double minute_rate =
-            60.0 / (retarget_sum / retarget_count);
+            60.0 / (retarget_sum / static_cast<double>(retarget_count));
 
         const double diff_multiplier = minute_rate / target_share_rate;
         double new_diff = current_diff * diff_multiplier;
@@ -79,9 +83,9 @@ class VarDiff
             variance_ratio > 0.1)
         {
             logger.Log<LogType::Debug>(
-                "Adjusted difficulty from {} to {}, share rate: {}",
-                current_diff, new_diff,
-                minute_rate);
+                "Adjusted difficulty from {} to {}, average share rate: {}, "
+                "current share rate: {}",
+                current_diff, new_diff, minute_rate, 60.0 / current_share_time);
 
             return new_diff;
         }
