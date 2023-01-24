@@ -43,12 +43,15 @@ class VarDiff
 
     double Adjust(double current_diff, uint64_t curtime, uint64_t last_adjusted)
     {
-        // first retarget of first 5 shares
-        if ((curtime - last_adjusted) / 1000 < retarget_interval)
+        // first retarget twice as fast
+
+        if (auto elapsed_time = (curtime - last_adjusted) / 1000;
+            elapsed_time < retarget_interval)
         {
             if (retarget_count == 0)
             {
-                if (pos < 5)
+                if (pos < share_times.size() / 2 &&
+                    elapsed_time < retarget_interval / 2)
                 {
                     return 0.0;
                 }
@@ -62,8 +65,16 @@ class VarDiff
             }
         }
 
-        const double current_share_time =
-            static_cast<double>(sum) / static_cast<double>(pos) / 1000.0;
+        double current_share_time;
+        if (sum != 0)
+        {
+            current_share_time =
+                static_cast<double>(sum) / static_cast<double>(pos) / 1000.0;
+        }
+        else
+        {
+            current_share_time = 0.0;
+        }
 
         retarget_sum += current_share_time;
         retarget_count++;
@@ -73,8 +84,17 @@ class VarDiff
         // average minute rate of averages
         const double minute_rate =
             60.0 / (retarget_sum / static_cast<double>(retarget_count));
+        double diff_multiplier = minute_rate / target_share_rate;
 
-        const double diff_multiplier = minute_rate / target_share_rate;
+        if (retarget_sum == 0.0)
+        {
+            diff_multiplier = 1.0 / static_cast<double>(retarget_count);
+        }
+        else if (current_share_time == 0.0)
+        {
+            diff_multiplier = 0.5;  // divide by 2 if no shares
+        }
+
         double new_diff = current_diff * diff_multiplier;
 
         const double variance = std::abs(new_diff - current_diff);
@@ -94,49 +114,6 @@ class VarDiff
     static constexpr std::string_view field_str_vardiff = "VarDiff";
 
     const static Logger<field_str_vardiff> logger;
-
-    // void Adjust(const int passed_seconds, const int64_t curtime_ms) const
-    // {
-    //     std::shared_lock read_lock(*clients_mutex);
-    //     for (auto& [conn, _] : *clients)
-    //     {
-    //         StratumClient* client = conn->ptr.get();
-    //         Adjust(client, passed_seconds, curtime_ms);
-    //     }
-    // }
-
-    // void Adjust(StratumClient* client, int passed_seconds,
-    //             int64_t curtime_ms) const
-    // {
-    //     // client hasn't been connected for long enough
-    //     if (curtime_ms - client->GetLastAdjusted() < passed_seconds) return;
-
-    //     const double current_diff = client->GetDifficulty();
-    //     const double minute_rate =
-    //         static_cast<double>(client->GetShareCount()) /
-    //         (passed_seconds / 60.0);
-
-    //     const double diff_multiplier = minute_rate / target_share_rate;
-
-    //     double new_diff = current_diff * diff_multiplier;
-    //     const double variance = std::abs(new_diff - current_diff);
-
-    //     const double variance_ratio = variance / current_diff;
-
-    //     if (minute_rate == 0)
-    //     {
-    //         new_diff = current_diff / 10;
-    //     }
-
-    //     if (variance_ratio > 0.1)
-    //     {
-    //         client->SetPendingDifficulty(new_diff);
-    //         logger.Log<LogType::Debug>(
-    //             "Adjusted difficulty for {} from {} to {}, share rate: {}",
-    //             client->GetFullWorkerName(), current_diff, new_diff,
-    //             minute_rate);
-    //     }
-    // }
 };
 
 #endif

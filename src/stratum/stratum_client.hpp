@@ -17,7 +17,7 @@
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
 
-class StratumClient
+class StratumClient : public VarDiff
 {
    public:
     explicit StratumClient(const int64_t time, const double diff,
@@ -27,7 +27,6 @@ class StratumClient
     double GetPendingDifficulty() const { return pending_diff.value(); }
     bool GetIsAuthorized() const { return is_authorized; }
     bool GetIsPendingDiff() const { return pending_diff.has_value(); }
-    uint32_t GetShareCount() const { return share_count; }
     int64_t GetLastAdjusted() const { return last_adjusted; }
 
     // make sting_view when unordered map supports it
@@ -41,7 +40,6 @@ class StratumClient
         auto curtime = GetCurrentTimeMs();
         std::scoped_lock lock(shares_mutex);
         pending_diff = diff;
-        share_count = 0;
         last_adjusted = curtime;
     }
 
@@ -57,23 +55,26 @@ class StratumClient
 
         uint64_t share_time = time - last_share_time;
         last_share_time = time;
-        share_count++;
 
         // checks for existance in O(1), fast duplicate check
         // sub 1 us!!!
         bool inserted = share_uset.insert(shareEnd).second;
 
-        var_diff.Add(share_time);
+        this->Add(share_time);
 
-        if (double new_diff =
-                var_diff.Adjust(current_diff, time, last_adjusted);
-            new_diff != 0.0)
-        {
-            lock.unlock();
-            SetPendingDifficulty(new_diff);
-        }
+        lock.unlock();
+        HandleAdjust(time);
 
         return inserted;
+    }
+
+    void HandleAdjust(uint64_t time)
+    {
+        if (double new_diff = this->Adjust(current_diff, time, last_adjusted);
+            new_diff != 0.0)
+        {
+            SetPendingDifficulty(new_diff);
+        }
     }
 
     void ResetShareSet()
@@ -112,9 +113,7 @@ class StratumClient
 
     uint64_t last_adjusted;
     uint64_t last_share_time;
-    uint32_t share_count = 0;
 
-    VarDiff var_diff;
     double current_diff;
     std::optional<double> pending_diff;
     bool is_authorized = false;

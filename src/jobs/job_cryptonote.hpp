@@ -140,9 +140,9 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
     }
 
     template <StaticConf confs>
-    std::string GetWorkMessage(const StratumClient* cli, int id) const
+    std::string GetWorkMessage(double diff, int id) const
     {
-        auto diff_hex = GetDifficultyHex<confs>(cli->GetDifficulty());
+        auto diff_hex = GetDifficultyHex<confs>(diff);
         std::string_view hex_target_sv(diff_hex.data(), diff_hex.size());
 
         return fmt::format(
@@ -153,9 +153,9 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
     }
 
     template <StaticConf confs>
-    std::string GetWorkMessage(const StratumClient* cli) const
+    std::string GetWorkMessage(double diff) const
     {
-        auto diff_hex = GetDifficultyHex<confs>(cli->GetDifficulty());
+        auto diff_hex = GetDifficultyHex<confs>(diff);
         std::string_view hex_target_sv(diff_hex.data(), diff_hex.size());
 
         return fmt::format(

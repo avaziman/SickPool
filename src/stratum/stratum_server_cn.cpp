@@ -131,18 +131,18 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
     return this->HandleShare(con, wc, share);
 }
 template <StaticConf confs>
-void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
-                                          const JobT *job, int id) const
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn, const JobT *job,
+                                          int id) const
 {
-    std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get(), id);
+    std::string msg = job->template GetWorkMessage<confs>(conn->ptr->GetDifficulty(), id);
     this->SendRaw(conn->sockfd, msg.data(), msg.size());
 }
 
 template <StaticConf confs>
-void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn, double diff,
                                           const JobT *job) const
 {
-    std::string msg = job->template GetWorkMessage<confs>(conn->ptr.get());
+    std::string msg = job->template GetWorkMessage<confs>(diff);
     this->SendRaw(conn->sockfd, msg.data(), msg.size());
 }
 

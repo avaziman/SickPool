@@ -32,7 +32,7 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 # set (CMAKE_BUILD_TYPE "Release")
-set (CMAKE_BUILD_TYPE "DEBUG")
+# set (CMAKE_BUILD_TYPE "DEBUG")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     # set(CMAKE_EXE_LINKER_FLAGS "-static")

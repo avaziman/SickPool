@@ -66,6 +66,7 @@ void StratumServer<confs>::HandleNewJob()
     HandleNewJob(job_manager.GetLastJob());
 }
 
+// ONLY UPDATE DIFFICULTY ON NEW JOB AS MINERS WILL IGNORE IT OTHERWISE...
 template <StaticConf confs>
 void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
 {
@@ -78,14 +79,24 @@ void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
             auto cli = conn->ptr.get();
             if (cli->GetIsAuthorized())
             {
+                double diff;
                 bool is_new_diff = cli->GetIsPendingDiff();
                 if (is_new_diff)
                 {
-                    cli->ActivatePendingDiff();
+                    diff = cli->GetPendingDifficulty();
                     UpdateDifficulty(conn.get());
                 }
+                else
+                {
+                    diff = cli->GetDifficulty();
+                }
 
-                BroadcastJob(conn.get(), new_job.get());
+                BroadcastJob(conn.get(), diff, new_job.get());
+
+                if (is_new_diff)
+                {
+                    cli->ActivatePendingDiff();
+                }
             }
         }
 
@@ -253,13 +264,6 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
     }
 
     stats_manager.AddShare(cli->stats_it, cli->GetDifficulty());
-
-    if (cli->GetIsPendingDiff())
-    {
-        UpdateDifficulty(con);
-        cli->ActivatePendingDiff();
-        BroadcastJob(con, job_manager.GetLastJob().get());
-    }
 
     // logger.template Log<
     //     LogType::Debug>(
@@ -435,7 +439,7 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
     if (worker_id == -1)
     {
         if (!stats_manager.AddWorker(worker_id, miner_id, address, worker,
-                                         alias))
+                                     alias))
         {
             return RpcResult(
                 ResCode::UNAUTHORIZED_WORKER,
@@ -504,8 +508,10 @@ bool StratumServer<confs>::HandleTimeout(connection_it *conn,
         "Worker with ip {} has timed out, expiration streak: {}", conn_ptr->ip,
         timeout_streak);
 
-    // will call handle disconnected
-    if (!conn_ptr->ptr->GetIsAuthorized())
+    // disconnect unauthorized miner after timeout, will call handle
+    // disconnected
+    auto cli = conn_ptr->ptr;
+    if (!cli->GetIsAuthorized())
     {
         logger.template Log<LogType::Warn>(
             "Disconnecting worker with ip {}, hasn't authorized.",
@@ -516,10 +522,11 @@ bool StratumServer<confs>::HandleTimeout(connection_it *conn,
     else
     {
         // decrease difficulty
-        conn_ptr->ptr->SetPendingDifficulty(conn_ptr->ptr->GetDifficulty() /
-                                            std::pow(2, timeout_streak));
-        conn_ptr->ptr->ActivatePendingDiff();
-        BroadcastJob(conn_ptr.get(), job_manager.GetLastJob().get());
+        // double new_diff =
+        //     // cli->GetDifficulty() / std::pow(2, timeout_streak);
+        //     cli->GetDifficulty() / static_cast<double>(timeout_streak);
+        // cli->SetPendingDifficulty(new_diff);
+        cli->HandleAdjust(GetCurrentTimeMs());
     }
     return true;
 }

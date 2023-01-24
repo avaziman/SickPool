@@ -112,11 +112,6 @@ class ShareProcessor
             throw std::invalid_argument("Missing hash function");
         }
 
-        #ifdef DEBUG
-        logger.Log<LogType::Debug>("Share hash: {} ",
-                                   HexlifyS(result.hash_bytes));
-        #endif
-
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
 
@@ -133,6 +128,12 @@ class ShareProcessor
 
         double raw_diff = BytesToDouble(result.hash_bytes);
         result.difficulty = confs.DIFF1 / raw_diff;
+
+#ifdef DEBUG
+        logger.Log<LogType::Debug>("Share hash: {}, diff: {}",
+                                   HexlifyS(result.hash_bytes),
+                                   result.difficulty);
+#endif
 
         if (result.difficulty >= job->target_diff) [[unlikely]]
         {

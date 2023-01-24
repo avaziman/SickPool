@@ -76,7 +76,7 @@ void StratumServerBtc<confs>::HandleReq(Connection<StratumClient>* conn, WorkerC
                 return;
             }
 
-            BroadcastJob(conn, job);
+            BroadcastJob(conn, job, conn);
             return;
         }
     }

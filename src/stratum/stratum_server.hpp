@@ -68,7 +68,7 @@ class StratumServer : public StratumBase
 
     virtual void UpdateDifficulty(Connection<StratumClient>* conn) = 0;
 
-    virtual void BroadcastJob(Connection<StratumClient>* conn,
+    virtual void BroadcastJob(Connection<StratumClient>* conn, double diff,
                               const JobT* job) const = 0;
     void HandleConsumeable(connection_it* conn) override;
     bool HandleConnected(connection_it* conn) override;

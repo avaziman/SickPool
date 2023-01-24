@@ -9,7 +9,6 @@
 #include "static_config.hpp"
 #include "stratum_server.hpp"
 
-
 template <StaticConf confs>
 class StratumServerCn : public StratumServer<confs>
 {
@@ -29,10 +28,10 @@ class StratumServerCn : public StratumServer<confs>
     RpcResult HandleAuthorize(StratumClient* cli,
                               simdjson::ondemand::array& params,
                               std::string_view worker);
-                              
+
     RpcResult HandleSubscribe(StratumClient* cli,
                               simdjson::ondemand::array& params) const;
-    RpcResult HandleSubmit(Connection<StratumClient> *con, WorkerContextT* wc,
+    RpcResult HandleSubmit(Connection<StratumClient>* con, WorkerContextT* wc,
                            simdjson::ondemand::array& params,
                            std::string_view worker);
 
@@ -44,7 +43,7 @@ class StratumServerCn : public StratumServer<confs>
     void BroadcastJob(Connection<StratumClient>* conn, const JobT* job,
                       int id) const;
 
-    void BroadcastJob(Connection<StratumClient>* conn,
+    void BroadcastJob(Connection<StratumClient>* conn, double diff,
                       const JobT* job) const override;
 };
 
