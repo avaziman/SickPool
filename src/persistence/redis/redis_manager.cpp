@@ -90,7 +90,7 @@ void RedisManager::AppendTsCreateMiner(std::string_view key,
     AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
                    std::to_string(retention_ms), "DUPLICATE_POLICY"sv,
                    duplicate_policy, "LABELS"sv, "type"sv, type, "prefix"sv,
-                   EnumName<Prefix::MINER>(), "address"sv, address, "id"sv,
+                   EnumName<Prefix::MINER>(), "address"sv, address, "alias"sv,
                    id});
 }
 
@@ -106,7 +106,7 @@ void RedisManager::AppendTsCreateWorker(
     AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
                    std::to_string(retention_ms), "DUPLICATE_POLICY"sv,
                    duplicate_policy, "LABELS"sv, "type"sv, type, "prefix"sv,
-                   EnumName<Prefix::WORKER>(), "address"sv, address, "id"sv, id,
+                   EnumName<Prefix::WORKER>(), "address"sv, address, "alias"sv, id,
                    "worker_name", worker_name});
 }
 
