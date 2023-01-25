@@ -111,9 +111,9 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         if (ws.interval_hashrate > 0.d) miner_stats.worker_count++;
     }
 
-    return persistence_stats.UpdateIntervalStats(worker_stats_map, miner_stats_map,
-                               std::move(stats_unique_lock), network_stats,
-                               update_time_ms);
+    return persistence_stats.UpdateIntervalStats(
+        worker_stats_map, miner_stats_map, std::move(stats_unique_lock),
+        network_stats, update_time_ms);
 }
 
 void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
@@ -153,12 +153,19 @@ bool StatsManager::AddWorker(int64_t& worker_id, int64_t miner_id,
     const int64_t curtime = GetCurrentTimeMs();
     std::string addr_lowercase = ToLowerCase(address);
 
-    worker_id = PersistenceLayer::AddWorker(static_cast<MinerId>(miner_id), worker_name, curtime);
+    // only add to sql db if doesn't exist
+    if (worker_id == -1)
+    {
+        worker_id = PersistenceLayer::AddWorker(static_cast<MinerId>(miner_id),
+                                                worker_name, curtime);
 
-    if (worker_id == -1) return false;
-    if (!persistence_stats.AddNewWorker(FullId(miner_id, worker_id),
-                                        addr_lowercase, worker_name, alias,
-                                        curtime))
+        if (worker_id == -1) return false;
+    }
+
+    // always add to redis db to make sure all timeserieses exist always
+    if (!persistence_stats.CreateWorkerStats(FullId(miner_id, worker_id),
+                                             addr_lowercase, worker_name, alias,
+                                             curtime))
     {
         return false;
     }
@@ -196,14 +203,18 @@ bool StatsManager::AddMiner(int64_t& miner_id, std::string_view address,
     const int64_t curtime = GetCurrentTimeMs();
     std::string addr_lowercase = ToLowerCase(address);
 
-    miner_id = PersistenceLayer::AddMiner(address, alias, curtime, min_payout);
+    // only add to sql db if doesn't exist
     if (miner_id == -1)
     {
-        return false;
+        miner_id =
+            PersistenceLayer::AddMiner(address, alias, curtime, min_payout);
+
+        if (miner_id == -1) return false;
     }
 
-    if (!persistence_stats.AddNewMiner(address, addr_lowercase, alias, miner_id,
-                                       curtime, min_payout))
+    // always add to redis db to make sure all timeserieses exist always
+    if (!persistence_stats.CreateMinerStats(addr_lowercase, alias, miner_id,
+                                            curtime))
     {
         return false;
     }

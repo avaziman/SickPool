@@ -94,10 +94,9 @@ bool RedisStats::UpdateIntervalStats(
 //     return GetReplies();
 // }
 
-bool RedisStats::AddNewMiner(std::string_view address,
-                             std::string_view addr_lowercase,
+bool RedisStats::CreateMinerStats(std::string_view addr_lowercase,
                              std::string_view alias, MinerId id,
-                             int64_t curime_ms, int64_t min_payout)
+                             int64_t curime_ms)
 {
     using namespace std::string_view_literals;
 
@@ -123,7 +122,7 @@ bool RedisStats::AddNewMiner(std::string_view address,
     return GetReplies();
 }
 
-bool RedisStats::AddNewWorker(FullId full_id,
+bool RedisStats::CreateWorkerStats(FullId full_id,
                               std::string_view address_lowercase,
                               std::string_view worker_name,
                               std::string_view alias, uint64_t curtime_ms)

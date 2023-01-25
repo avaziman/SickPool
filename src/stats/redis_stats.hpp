@@ -29,11 +29,11 @@ class RedisStats : public RedisManager
 
     const std::string average_hashrate_ratio_str;
 
-    bool AddNewMiner(std::string_view address, std::string_view addr_lowercase,
+    bool CreateMinerStats(std::string_view addr_lowercase,
                      std::string_view alias, MinerId id,
-                     int64_t curtime, int64_t min_payout);
+                     int64_t curtime);
 
-    bool AddNewWorker(FullId full_id, std::string_view address_lowercase,
+    bool CreateWorkerStats(FullId full_id, std::string_view address_lowercase,
                            std::string_view worker_name, std::string_view alias,
                            uint64_t curtime_ms);
 

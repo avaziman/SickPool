@@ -370,7 +370,8 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
     using namespace simdjson;
 
     bool is_alias = address.starts_with("@");
-    std::string_view alias = address.substr(1);
+    std::string_view alias;
+
     currency::blobdata addr_blob(address.data(), address.size());
 
     if (worker.size() > MAX_WORKER_NAME_LEN)
@@ -382,6 +383,7 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
 
     if (is_alias)
     {
+        alias = address.substr(1);
         AliasRes alias_res;
         if (!daemon_manager.ValidateAliasEncoding(alias))
         {
@@ -414,15 +416,17 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
     // validated the address, let it through
     auto [miner_id, db_alias] = PersistenceLayer::GetMinerId(address, alias);
 
+    // always try to add timeserieses
+    if (!stats_manager.AddMiner(miner_id, address, alias,
+                                this->coin_config.min_payout_threshold))
+    {
+        return RpcResult(
+            ResCode::UNAUTHORIZED_WORKER,
+            "Failed to add miner to database, please contact support!");
+    }
+
     if (miner_id == -1)
     {
-        if (!stats_manager.AddMiner(miner_id, address, alias,
-                                    this->coin_config.min_payout_threshold))
-        {
-            return RpcResult(
-                ResCode::UNAUTHORIZED_WORKER,
-                "Failed to add miner to database, please contact support!");
-        }
         logger.template Log<LogType::Info>("New miner has joined the pool: {}",
                                            address);
     }
@@ -436,15 +440,15 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
 
     int64_t worker_id =
         PersistenceLayer::GetWorkerId(static_cast<MinerId>(miner_id), worker);
+    if (!stats_manager.AddWorker(worker_id, miner_id, address, worker, alias))
+    {
+        return RpcResult(
+            ResCode::UNAUTHORIZED_WORKER,
+            "Failed to add worker to database, please contact support!");
+    }
+    
     if (worker_id == -1)
     {
-        if (!stats_manager.AddWorker(worker_id, miner_id, address, worker,
-                                     alias))
-        {
-            return RpcResult(
-                ResCode::UNAUTHORIZED_WORKER,
-                "Failed to add worker to database, please contact support!");
-        }
         logger.template Log<LogType::Info>("New worker has joined the pool: ",
                                            worker);
     }

@@ -16,14 +16,15 @@
     "stats": {
         "effort_interval_seconds": 10,
         "hashrate_interval_seconds1": 10,
-        "hashrate_interval_seconds": 60,
+        "hashrate_interval_seconds": 10,
         "average_hashrate_interval_seconds": 120,
         "mined_blocks_interval": 10
     },
     "pow_fee": 0.01,
     "pos_fee": 0.01,
     "difficulty": {
-        "default_diff": 500000000.0,
+        "default_diff1": 500000000.0,
+        "default_diff": 10000.0,
         "minimum_diff": 0.000001,
         "target_shares_rate1": 4.0,
         "target_shares_rate": 10.0,
