@@ -416,6 +416,11 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
     // validated the address, let it through
     auto [miner_id, db_alias] = PersistenceLayer::GetMinerId(address, alias);
 
+    if (miner_id == -1)
+    {
+        logger.template Log<LogType::Info>("New miner has joined the pool: {}",
+                                           address);
+    }
     // always try to add timeserieses
     if (!stats_manager.AddMiner(miner_id, address, alias,
                                 this->coin_config.min_payout_threshold))
@@ -425,11 +430,6 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
             "Failed to add miner to database, please contact support!");
     }
 
-    if (miner_id == -1)
-    {
-        logger.template Log<LogType::Info>("New miner has joined the pool: {}",
-                                           address);
-    }
     else if (is_alias && db_alias != alias &&
              !PersistenceLayer::UpdateAlias(miner_id, alias))
     {
@@ -440,24 +440,27 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
 
     int64_t worker_id =
         PersistenceLayer::GetWorkerId(static_cast<MinerId>(miner_id), worker);
+
+    if (worker_id == -1)
+    {
+        logger.template Log<LogType::Info>("New worker has joined the pool: ",
+                                           worker);
+    }
+
     if (!stats_manager.AddWorker(worker_id, miner_id, address, worker, alias))
     {
         return RpcResult(
             ResCode::UNAUTHORIZED_WORKER,
             "Failed to add worker to database, please contact support!");
     }
-    
-    if (worker_id == -1)
-    {
-        logger.template Log<LogType::Info>("New worker has joined the pool: ",
-                                           worker);
-    }
-    worker_map::iterator stats_it = stats_manager.AddExistingWorker(worker_id);
 
+    const auto fid = FullId{static_cast<MinerId>(miner_id),
+                            static_cast<WorkerId>(worker_id)};
+                            
     std::string worker_full_str = fmt::format("{}.{}", address, worker);
-    cli->SetAuthorized(FullId{static_cast<MinerId>(miner_id),
-                              static_cast<WorkerId>(worker_id)},
-                       std::move(worker_full_str), stats_it);
+    worker_map::iterator stats_it = stats_manager.AddExistingWorker(fid);
+
+    cli->SetAuthorized(fid, std::move(worker_full_str), stats_it);
 
     logger.template Log<LogType::Info>("Authorized worker: {}, address: {}",
                                        worker, address);

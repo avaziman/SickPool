@@ -191,7 +191,7 @@ bool StatsManager::AddWorker(int64_t& worker_id, int64_t miner_id,
     return true;
 }
 
-worker_map::iterator StatsManager::AddExistingWorker(WorkerId worker_id)
+worker_map::iterator StatsManager::AddExistingWorker(FullId worker_id)
 {
     return worker_stats_map.emplace(worker_stats_map.cend(), worker_id,
                                     WorkerStats{});

@@ -55,7 +55,7 @@ class StatsManager
 
     bool UpdateEffortStats(int64_t update_time_ms);
     void SetNetworkStats(const NetworkStats& ns) { network_stats = ns; }
-    worker_map::iterator AddExistingWorker(WorkerId workerid);
+    worker_map::iterator AddExistingWorker(FullId workerid);
     static uint32_t average_interval_ratio;
 
    private:
