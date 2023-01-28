@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "transaction.hpp"
 #include "block_template.hpp"
 #include "stats.hpp"
 

@@ -72,16 +72,16 @@ include _deps/simdjson-build/CMakeFiles/simdjson.dir/flags.make
 _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.o: _deps/simdjson-build/CMakeFiles/simdjson.dir/flags.make
 _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.o: _deps/simdjson-src/src/simdjson.cpp
 _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.o: _deps/simdjson-build/CMakeFiles/simdjson.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.o -MF CMakeFiles/simdjson.dir/src/simdjson.cpp.o.d -o CMakeFiles/simdjson.dir/src/simdjson.cpp.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src/src/simdjson.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.o -MF CMakeFiles/simdjson.dir/src/simdjson.cpp.o.d -o CMakeFiles/simdjson.dir/src/simdjson.cpp.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src/src/simdjson.cpp
 
 _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.i: cmake_force
-	@echo "Preprocessing CXX source to CMakeFiles/simdjson.dir/src/simdjson.cpp.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src/src/simdjson.cpp > CMakeFiles/simdjson.dir/src/simdjson.cpp.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/simdjson.dir/src/simdjson.cpp.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src/src/simdjson.cpp > CMakeFiles/simdjson.dir/src/simdjson.cpp.i
 
 _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.s: cmake_force
-	@echo "Compiling CXX source to assembly CMakeFiles/simdjson.dir/src/simdjson.cpp.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src/src/simdjson.cpp -o CMakeFiles/simdjson.dir/src/simdjson.cpp.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/simdjson.dir/src/simdjson.cpp.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src/src/simdjson.cpp -o CMakeFiles/simdjson.dir/src/simdjson.cpp.s
 
 # Object files for target simdjson
 simdjson_OBJECTS = \
@@ -93,7 +93,7 @@ simdjson_EXTERNAL_OBJECTS =
 _deps/simdjson-build/libsimdjson.a: _deps/simdjson-build/CMakeFiles/simdjson.dir/src/simdjson.cpp.o
 _deps/simdjson-build/libsimdjson.a: _deps/simdjson-build/CMakeFiles/simdjson.dir/build.make
 _deps/simdjson-build/libsimdjson.a: _deps/simdjson-build/CMakeFiles/simdjson.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX static library libsimdjson.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX static library libsimdjson.a"
 	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build && $(CMAKE_COMMAND) -P CMakeFiles/simdjson.dir/cmake_clean_target.cmake
 	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/simdjson.dir/link.txt --verbose=$(VERBOSE)
 
@@ -106,6 +106,6 @@ _deps/simdjson-build/CMakeFiles/simdjson.dir/clean:
 .PHONY : _deps/simdjson-build/CMakeFiles/simdjson.dir/clean
 
 _deps/simdjson-build/CMakeFiles/simdjson.dir/depend:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build/CMakeFiles/simdjson.dir/DependInfo.cmake
+	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build /home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build/CMakeFiles/simdjson.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : _deps/simdjson-build/CMakeFiles/simdjson.dir/depend
 

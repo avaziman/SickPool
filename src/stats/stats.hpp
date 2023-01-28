@@ -6,9 +6,6 @@
 #include <list>
 #include "redis_interop.hpp"
 #include "round.hpp"
-// thought about hashing the address to produce shorter identifier for storage
-// efficiency but it neglects the cryptocurrency's intent and requires another
-// hash to addr mapping...
 
 enum class BadDiff
 {
@@ -51,23 +48,6 @@ struct MinerStats : public WorkerStats
     uint32_t worker_count = 0;
 };
 
-struct Id32
-{
-    /*const*/ uint32_t id;
-    char hex[sizeof(id) * 2];
-    std::string_view GetHex() const
-    {
-        return std::string_view(hex, sizeof(hex));
-    }
-
-    explicit(false) Id32(uint32_t i) : id(i)
-    {
-        fmt::format_to_n(this->hex, sizeof(this->hex), "{:08x}", id);
-    }
-
-    bool operator==(const Id32& i) const { return this->id == i.id; }
-};
-
 using MinerId = uint32_t;
 using WorkerId = uint32_t;
 struct FullId {
@@ -86,8 +66,6 @@ struct Share
 using worker_map = std::list<std::pair<FullId, WorkerStats>>;
 
 using miner_map = std::unordered_map<MinerId, MinerStats>;
-
-using round_map_t = std::unordered_map<std::string, Round>;
 
 // miner -> effort
 using efforts_map_t = std::unordered_map<MinerId, double>;

@@ -57,37 +57,17 @@ RM = /opt/cmake-3.23.2-linux-x86_64/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/sickguy/Documents/Projects/SickPool/server
+CMAKE_SOURCE_DIR = /home/sickguy/Documents/Projects/SickPool/server/src/crypto/cn
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/sickguy/Documents/Projects/SickPool/server
+CMAKE_BINARY_DIR = /home/sickguy/Documents/Projects/SickPool/server/src/crypto/cn
 
 #=============================================================================
 # Targets provided globally by CMake.
 
-# Special rule for the target package
-package: preinstall
-	@echo "Run CPack packaging tool..."
-	cd /home/sickguy/Documents/Projects/SickPool/server && /opt/cmake-3.23.2-linux-x86_64/bin/cpack --config ./CPackConfig.cmake
-.PHONY : package
-
-# Special rule for the target package
-package/fast: package
-.PHONY : package/fast
-
-# Special rule for the target package_source
-package_source:
-	@echo "Run CPack packaging tool for source..."
-	cd /home/sickguy/Documents/Projects/SickPool/server && /opt/cmake-3.23.2-linux-x86_64/bin/cpack --config ./CPackSourceConfig.cmake /home/sickguy/Documents/Projects/SickPool/server/CPackSourceConfig.cmake
-.PHONY : package_source
-
-# Special rule for the target package_source
-package_source/fast: package_source
-.PHONY : package_source/fast
-
 # Special rule for the target edit_cache
 edit_cache:
-	@echo "Running CMake cache editor..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/ccmake -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : edit_cache
 
@@ -97,7 +77,7 @@ edit_cache/fast: edit_cache
 
 # Special rule for the target rebuild_cache
 rebuild_cache:
-	@echo "Running CMake to regenerate build system..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/cmake --regenerate-during-build -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : rebuild_cache
 
@@ -105,61 +85,16 @@ rebuild_cache:
 rebuild_cache/fast: rebuild_cache
 .PHONY : rebuild_cache/fast
 
-# Special rule for the target list_install_components
-list_install_components:
-	@echo "Available install components are: \"Unspecified\" \"simdjson_Development\""
-.PHONY : list_install_components
-
-# Special rule for the target list_install_components
-list_install_components/fast: list_install_components
-.PHONY : list_install_components/fast
-
-# Special rule for the target install
-install: preinstall
-	@echo "Install the project..."
-	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -P cmake_install.cmake
-.PHONY : install
-
-# Special rule for the target install
-install/fast: preinstall/fast
-	@echo "Install the project..."
-	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -P cmake_install.cmake
-.PHONY : install/fast
-
-# Special rule for the target install/local
-install/local: preinstall
-	@echo "Installing only the local directory..."
-	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
-.PHONY : install/local
-
-# Special rule for the target install/local
-install/local/fast: preinstall/fast
-	@echo "Installing only the local directory..."
-	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
-.PHONY : install/local/fast
-
-# Special rule for the target install/strip
-install/strip: preinstall
-	@echo "Installing the project stripped..."
-	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
-.PHONY : install/strip
-
-# Special rule for the target install/strip
-install/strip/fast: preinstall/fast
-	@echo "Installing the project stripped..."
-	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
-.PHONY : install/strip/fast
-
 # The main all target
 all: cmake_check_build_system
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -E cmake_progress_start /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles /home/sickguy/Documents/Projects/SickPool/server/src/crypto/cn//CMakeFiles/progress.marks
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/crypto/cn/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/sickguy/Documents/Projects/SickPool/server/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/sickguy/Documents/Projects/SickPool/server/src/crypto/cn/CMakeFiles /home/sickguy/Documents/Projects/SickPool/server/src/crypto/cn//CMakeFiles/progress.marks
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/sickguy/Documents/Projects/SickPool/server/src/crypto/cn/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/crypto/cn/clean
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 clean
 .PHONY : clean
 
 # The main clean target
@@ -168,39 +103,86 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/crypto/cn/preinstall
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/crypto/cn/preinstall
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
-# Convenience name for target.
-src/crypto/cn/CMakeFiles/cryptonote_utils.dir/rule:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 src/crypto/cn/CMakeFiles/cryptonote_utils.dir/rule
-.PHONY : src/crypto/cn/CMakeFiles/cryptonote_utils.dir/rule
+#=============================================================================
+# Target rules for targets named cryptonote_utils
 
-# Convenience name for target.
-cryptonote_utils: src/crypto/cn/CMakeFiles/cryptonote_utils.dir/rule
+# Build rule for target.
+cryptonote_utils: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 cryptonote_utils
 .PHONY : cryptonote_utils
 
 # fast build rule for target.
 cryptonote_utils/fast:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/build
 .PHONY : cryptonote_utils/fast
+
+CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.o: CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.o
+.PHONY : CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.o
+
+# target to build an object file
+CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.o
+.PHONY : CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.o
+
+CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.i: CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.i
+.PHONY : CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.i
+
+# target to preprocess a source file
+CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.i
+.PHONY : CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.i
+
+CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.s: CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.s
+.PHONY : CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.s
+
+# target to generate assembly for a file
+CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.s
+.PHONY : CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.c.s
+
+CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.o: CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.o
+.PHONY : CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.o
+
+# target to build an object file
+CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.o
+.PHONY : CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.o
+
+CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.i: CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.i
+.PHONY : CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.i
+
+# target to preprocess a source file
+CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.i
+.PHONY : CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.i
+
+CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.s: CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.s
+.PHONY : CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.s
+
+# target to generate assembly for a file
+CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.s
+.PHONY : CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.cpp.s
 
 common/base58.o: common/base58.cpp.o
 .PHONY : common/base58.o
 
 # target to build an object file
 common/base58.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/common/base58.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/common/base58.cpp.o
 .PHONY : common/base58.cpp.o
 
 common/base58.i: common/base58.cpp.i
@@ -208,7 +190,7 @@ common/base58.i: common/base58.cpp.i
 
 # target to preprocess a source file
 common/base58.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/common/base58.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/common/base58.cpp.i
 .PHONY : common/base58.cpp.i
 
 common/base58.s: common/base58.cpp.s
@@ -216,7 +198,7 @@ common/base58.s: common/base58.cpp.s
 
 # target to generate assembly for a file
 common/base58.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/common/base58.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/common/base58.cpp.s
 .PHONY : common/base58.cpp.s
 
 common/crypto_stream_operators.o: common/crypto_stream_operators.cpp.o
@@ -224,7 +206,7 @@ common/crypto_stream_operators.o: common/crypto_stream_operators.cpp.o
 
 # target to build an object file
 common/crypto_stream_operators.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/common/crypto_stream_operators.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/common/crypto_stream_operators.cpp.o
 .PHONY : common/crypto_stream_operators.cpp.o
 
 common/crypto_stream_operators.i: common/crypto_stream_operators.cpp.i
@@ -232,7 +214,7 @@ common/crypto_stream_operators.i: common/crypto_stream_operators.cpp.i
 
 # target to preprocess a source file
 common/crypto_stream_operators.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/common/crypto_stream_operators.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/common/crypto_stream_operators.cpp.i
 .PHONY : common/crypto_stream_operators.cpp.i
 
 common/crypto_stream_operators.s: common/crypto_stream_operators.cpp.s
@@ -240,7 +222,7 @@ common/crypto_stream_operators.s: common/crypto_stream_operators.cpp.s
 
 # target to generate assembly for a file
 common/crypto_stream_operators.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/common/crypto_stream_operators.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/common/crypto_stream_operators.cpp.s
 .PHONY : common/crypto_stream_operators.cpp.s
 
 crypto/RIPEMD160.o: crypto/RIPEMD160.c.o
@@ -248,7 +230,7 @@ crypto/RIPEMD160.o: crypto/RIPEMD160.c.o
 
 # target to build an object file
 crypto/RIPEMD160.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160.c.o
 .PHONY : crypto/RIPEMD160.c.o
 
 crypto/RIPEMD160.i: crypto/RIPEMD160.c.i
@@ -256,7 +238,7 @@ crypto/RIPEMD160.i: crypto/RIPEMD160.c.i
 
 # target to preprocess a source file
 crypto/RIPEMD160.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160.c.i
 .PHONY : crypto/RIPEMD160.c.i
 
 crypto/RIPEMD160.s: crypto/RIPEMD160.c.s
@@ -264,7 +246,7 @@ crypto/RIPEMD160.s: crypto/RIPEMD160.c.s
 
 # target to generate assembly for a file
 crypto/RIPEMD160.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160.c.s
 .PHONY : crypto/RIPEMD160.c.s
 
 crypto/RIPEMD160_helper.o: crypto/RIPEMD160_helper.cpp.o
@@ -272,7 +254,7 @@ crypto/RIPEMD160_helper.o: crypto/RIPEMD160_helper.cpp.o
 
 # target to build an object file
 crypto/RIPEMD160_helper.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160_helper.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160_helper.cpp.o
 .PHONY : crypto/RIPEMD160_helper.cpp.o
 
 crypto/RIPEMD160_helper.i: crypto/RIPEMD160_helper.cpp.i
@@ -280,7 +262,7 @@ crypto/RIPEMD160_helper.i: crypto/RIPEMD160_helper.cpp.i
 
 # target to preprocess a source file
 crypto/RIPEMD160_helper.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160_helper.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160_helper.cpp.i
 .PHONY : crypto/RIPEMD160_helper.cpp.i
 
 crypto/RIPEMD160_helper.s: crypto/RIPEMD160_helper.cpp.s
@@ -288,7 +270,7 @@ crypto/RIPEMD160_helper.s: crypto/RIPEMD160_helper.cpp.s
 
 # target to generate assembly for a file
 crypto/RIPEMD160_helper.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160_helper.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/RIPEMD160_helper.cpp.s
 .PHONY : crypto/RIPEMD160_helper.cpp.s
 
 crypto/chacha8.o: crypto/chacha8.c.o
@@ -296,7 +278,7 @@ crypto/chacha8.o: crypto/chacha8.c.o
 
 # target to build an object file
 crypto/chacha8.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/chacha8.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/chacha8.c.o
 .PHONY : crypto/chacha8.c.o
 
 crypto/chacha8.i: crypto/chacha8.c.i
@@ -304,7 +286,7 @@ crypto/chacha8.i: crypto/chacha8.c.i
 
 # target to preprocess a source file
 crypto/chacha8.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/chacha8.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/chacha8.c.i
 .PHONY : crypto/chacha8.c.i
 
 crypto/chacha8.s: crypto/chacha8.c.s
@@ -312,7 +294,7 @@ crypto/chacha8.s: crypto/chacha8.c.s
 
 # target to generate assembly for a file
 crypto/chacha8.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/chacha8.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/chacha8.c.s
 .PHONY : crypto/chacha8.c.s
 
 crypto/hash.o: crypto/hash.c.o
@@ -320,7 +302,7 @@ crypto/hash.o: crypto/hash.c.o
 
 # target to build an object file
 crypto/hash.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/hash.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/hash.c.o
 .PHONY : crypto/hash.c.o
 
 crypto/hash.i: crypto/hash.c.i
@@ -328,7 +310,7 @@ crypto/hash.i: crypto/hash.c.i
 
 # target to preprocess a source file
 crypto/hash.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/hash.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/hash.c.i
 .PHONY : crypto/hash.c.i
 
 crypto/hash.s: crypto/hash.c.s
@@ -336,7 +318,7 @@ crypto/hash.s: crypto/hash.c.s
 
 # target to generate assembly for a file
 crypto/hash.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/hash.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/hash.c.s
 .PHONY : crypto/hash.c.s
 
 crypto/keccak.o: crypto/keccak.c.o
@@ -344,7 +326,7 @@ crypto/keccak.o: crypto/keccak.c.o
 
 # target to build an object file
 crypto/keccak.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/keccak.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/keccak.c.o
 .PHONY : crypto/keccak.c.o
 
 crypto/keccak.i: crypto/keccak.c.i
@@ -352,7 +334,7 @@ crypto/keccak.i: crypto/keccak.c.i
 
 # target to preprocess a source file
 crypto/keccak.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/keccak.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/keccak.c.i
 .PHONY : crypto/keccak.c.i
 
 crypto/keccak.s: crypto/keccak.c.s
@@ -360,7 +342,7 @@ crypto/keccak.s: crypto/keccak.c.s
 
 # target to generate assembly for a file
 crypto/keccak.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/keccak.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/keccak.c.s
 .PHONY : crypto/keccak.c.s
 
 crypto/random.o: crypto/random.c.o
@@ -368,7 +350,7 @@ crypto/random.o: crypto/random.c.o
 
 # target to build an object file
 crypto/random.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/random.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/random.c.o
 .PHONY : crypto/random.c.o
 
 crypto/random.i: crypto/random.c.i
@@ -376,7 +358,7 @@ crypto/random.i: crypto/random.c.i
 
 # target to preprocess a source file
 crypto/random.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/random.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/random.c.i
 .PHONY : crypto/random.c.i
 
 crypto/random.s: crypto/random.c.s
@@ -384,7 +366,7 @@ crypto/random.s: crypto/random.c.s
 
 # target to generate assembly for a file
 crypto/random.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/random.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/random.c.s
 .PHONY : crypto/random.c.s
 
 crypto/tree-hash.o: crypto/tree-hash.c.o
@@ -392,7 +374,7 @@ crypto/tree-hash.o: crypto/tree-hash.c.o
 
 # target to build an object file
 crypto/tree-hash.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/tree-hash.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/tree-hash.c.o
 .PHONY : crypto/tree-hash.c.o
 
 crypto/tree-hash.i: crypto/tree-hash.c.i
@@ -400,7 +382,7 @@ crypto/tree-hash.i: crypto/tree-hash.c.i
 
 # target to preprocess a source file
 crypto/tree-hash.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/tree-hash.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/tree-hash.c.i
 .PHONY : crypto/tree-hash.c.i
 
 crypto/tree-hash.s: crypto/tree-hash.c.s
@@ -408,7 +390,7 @@ crypto/tree-hash.s: crypto/tree-hash.c.s
 
 # target to generate assembly for a file
 crypto/tree-hash.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/crypto/tree-hash.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/crypto/tree-hash.c.s
 .PHONY : crypto/tree-hash.c.s
 
 currency_core/basic_pow_helpers.o: currency_core/basic_pow_helpers.cpp.o
@@ -416,7 +398,7 @@ currency_core/basic_pow_helpers.o: currency_core/basic_pow_helpers.cpp.o
 
 # target to build an object file
 currency_core/basic_pow_helpers.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/basic_pow_helpers.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/basic_pow_helpers.cpp.o
 .PHONY : currency_core/basic_pow_helpers.cpp.o
 
 currency_core/basic_pow_helpers.i: currency_core/basic_pow_helpers.cpp.i
@@ -424,7 +406,7 @@ currency_core/basic_pow_helpers.i: currency_core/basic_pow_helpers.cpp.i
 
 # target to preprocess a source file
 currency_core/basic_pow_helpers.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/basic_pow_helpers.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/basic_pow_helpers.cpp.i
 .PHONY : currency_core/basic_pow_helpers.cpp.i
 
 currency_core/basic_pow_helpers.s: currency_core/basic_pow_helpers.cpp.s
@@ -432,7 +414,7 @@ currency_core/basic_pow_helpers.s: currency_core/basic_pow_helpers.cpp.s
 
 # target to generate assembly for a file
 currency_core/basic_pow_helpers.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/basic_pow_helpers.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/basic_pow_helpers.cpp.s
 .PHONY : currency_core/basic_pow_helpers.cpp.s
 
 currency_core/currency_format_utils.o: currency_core/currency_format_utils.cpp.o
@@ -440,7 +422,7 @@ currency_core/currency_format_utils.o: currency_core/currency_format_utils.cpp.o
 
 # target to build an object file
 currency_core/currency_format_utils.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils.cpp.o
 .PHONY : currency_core/currency_format_utils.cpp.o
 
 currency_core/currency_format_utils.i: currency_core/currency_format_utils.cpp.i
@@ -448,7 +430,7 @@ currency_core/currency_format_utils.i: currency_core/currency_format_utils.cpp.i
 
 # target to preprocess a source file
 currency_core/currency_format_utils.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils.cpp.i
 .PHONY : currency_core/currency_format_utils.cpp.i
 
 currency_core/currency_format_utils.s: currency_core/currency_format_utils.cpp.s
@@ -456,7 +438,7 @@ currency_core/currency_format_utils.s: currency_core/currency_format_utils.cpp.s
 
 # target to generate assembly for a file
 currency_core/currency_format_utils.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils.cpp.s
 .PHONY : currency_core/currency_format_utils.cpp.s
 
 currency_core/currency_format_utils_blocks.o: currency_core/currency_format_utils_blocks.cpp.o
@@ -464,7 +446,7 @@ currency_core/currency_format_utils_blocks.o: currency_core/currency_format_util
 
 # target to build an object file
 currency_core/currency_format_utils_blocks.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_blocks.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_blocks.cpp.o
 .PHONY : currency_core/currency_format_utils_blocks.cpp.o
 
 currency_core/currency_format_utils_blocks.i: currency_core/currency_format_utils_blocks.cpp.i
@@ -472,7 +454,7 @@ currency_core/currency_format_utils_blocks.i: currency_core/currency_format_util
 
 # target to preprocess a source file
 currency_core/currency_format_utils_blocks.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_blocks.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_blocks.cpp.i
 .PHONY : currency_core/currency_format_utils_blocks.cpp.i
 
 currency_core/currency_format_utils_blocks.s: currency_core/currency_format_utils_blocks.cpp.s
@@ -480,7 +462,7 @@ currency_core/currency_format_utils_blocks.s: currency_core/currency_format_util
 
 # target to generate assembly for a file
 currency_core/currency_format_utils_blocks.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_blocks.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_blocks.cpp.s
 .PHONY : currency_core/currency_format_utils_blocks.cpp.s
 
 currency_core/currency_format_utils_transactions.o: currency_core/currency_format_utils_transactions.cpp.o
@@ -488,7 +470,7 @@ currency_core/currency_format_utils_transactions.o: currency_core/currency_forma
 
 # target to build an object file
 currency_core/currency_format_utils_transactions.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_transactions.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_transactions.cpp.o
 .PHONY : currency_core/currency_format_utils_transactions.cpp.o
 
 currency_core/currency_format_utils_transactions.i: currency_core/currency_format_utils_transactions.cpp.i
@@ -496,7 +478,7 @@ currency_core/currency_format_utils_transactions.i: currency_core/currency_forma
 
 # target to preprocess a source file
 currency_core/currency_format_utils_transactions.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_transactions.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_transactions.cpp.i
 .PHONY : currency_core/currency_format_utils_transactions.cpp.i
 
 currency_core/currency_format_utils_transactions.s: currency_core/currency_format_utils_transactions.cpp.s
@@ -504,7 +486,7 @@ currency_core/currency_format_utils_transactions.s: currency_core/currency_forma
 
 # target to generate assembly for a file
 currency_core/currency_format_utils_transactions.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_transactions.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/currency_format_utils_transactions.cpp.s
 .PHONY : currency_core/currency_format_utils_transactions.cpp.s
 
 currency_core/difficulty.o: currency_core/difficulty.cpp.o
@@ -512,7 +494,7 @@ currency_core/difficulty.o: currency_core/difficulty.cpp.o
 
 # target to build an object file
 currency_core/difficulty.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/difficulty.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/difficulty.cpp.o
 .PHONY : currency_core/difficulty.cpp.o
 
 currency_core/difficulty.i: currency_core/difficulty.cpp.i
@@ -520,7 +502,7 @@ currency_core/difficulty.i: currency_core/difficulty.cpp.i
 
 # target to preprocess a source file
 currency_core/difficulty.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/difficulty.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/difficulty.cpp.i
 .PHONY : currency_core/difficulty.cpp.i
 
 currency_core/difficulty.s: currency_core/difficulty.cpp.s
@@ -528,7 +510,7 @@ currency_core/difficulty.s: currency_core/difficulty.cpp.s
 
 # target to generate assembly for a file
 currency_core/difficulty.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/currency_core/difficulty.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/currency_core/difficulty.cpp.s
 .PHONY : currency_core/difficulty.cpp.s
 
 ethash/ethash.o: ethash/ethash.cpp.o
@@ -536,7 +518,7 @@ ethash/ethash.o: ethash/ethash.cpp.o
 
 # target to build an object file
 ethash/ethash.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/ethash.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/ethash.cpp.o
 .PHONY : ethash/ethash.cpp.o
 
 ethash/ethash.i: ethash/ethash.cpp.i
@@ -544,7 +526,7 @@ ethash/ethash.i: ethash/ethash.cpp.i
 
 # target to preprocess a source file
 ethash/ethash.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/ethash.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/ethash.cpp.i
 .PHONY : ethash/ethash.cpp.i
 
 ethash/ethash.s: ethash/ethash.cpp.s
@@ -552,7 +534,7 @@ ethash/ethash.s: ethash/ethash.cpp.s
 
 # target to generate assembly for a file
 ethash/ethash.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/ethash.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/ethash.cpp.s
 .PHONY : ethash/ethash.cpp.s
 
 ethash/keccak.o: ethash/keccak.c.o
@@ -560,7 +542,7 @@ ethash/keccak.o: ethash/keccak.c.o
 
 # target to build an object file
 ethash/keccak.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccak.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccak.c.o
 .PHONY : ethash/keccak.c.o
 
 ethash/keccak.i: ethash/keccak.c.i
@@ -568,7 +550,7 @@ ethash/keccak.i: ethash/keccak.c.i
 
 # target to preprocess a source file
 ethash/keccak.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccak.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccak.c.i
 .PHONY : ethash/keccak.c.i
 
 ethash/keccak.s: ethash/keccak.c.s
@@ -576,7 +558,7 @@ ethash/keccak.s: ethash/keccak.c.s
 
 # target to generate assembly for a file
 ethash/keccak.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccak.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccak.c.s
 .PHONY : ethash/keccak.c.s
 
 ethash/keccakf1600.o: ethash/keccakf1600.c.o
@@ -584,7 +566,7 @@ ethash/keccakf1600.o: ethash/keccakf1600.c.o
 
 # target to build an object file
 ethash/keccakf1600.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccakf1600.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccakf1600.c.o
 .PHONY : ethash/keccakf1600.c.o
 
 ethash/keccakf1600.i: ethash/keccakf1600.c.i
@@ -592,7 +574,7 @@ ethash/keccakf1600.i: ethash/keccakf1600.c.i
 
 # target to preprocess a source file
 ethash/keccakf1600.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccakf1600.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccakf1600.c.i
 .PHONY : ethash/keccakf1600.c.i
 
 ethash/keccakf1600.s: ethash/keccakf1600.c.s
@@ -600,7 +582,7 @@ ethash/keccakf1600.s: ethash/keccakf1600.c.s
 
 # target to generate assembly for a file
 ethash/keccakf1600.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccakf1600.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccakf1600.c.s
 .PHONY : ethash/keccakf1600.c.s
 
 ethash/keccakf800.o: ethash/keccakf800.c.o
@@ -608,7 +590,7 @@ ethash/keccakf800.o: ethash/keccakf800.c.o
 
 # target to build an object file
 ethash/keccakf800.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccakf800.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccakf800.c.o
 .PHONY : ethash/keccakf800.c.o
 
 ethash/keccakf800.i: ethash/keccakf800.c.i
@@ -616,7 +598,7 @@ ethash/keccakf800.i: ethash/keccakf800.c.i
 
 # target to preprocess a source file
 ethash/keccakf800.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccakf800.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccakf800.c.i
 .PHONY : ethash/keccakf800.c.i
 
 ethash/keccakf800.s: ethash/keccakf800.c.s
@@ -624,7 +606,7 @@ ethash/keccakf800.s: ethash/keccakf800.c.s
 
 # target to generate assembly for a file
 ethash/keccakf800.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/keccakf800.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/keccakf800.c.s
 .PHONY : ethash/keccakf800.c.s
 
 ethash/managed.o: ethash/managed.cpp.o
@@ -632,7 +614,7 @@ ethash/managed.o: ethash/managed.cpp.o
 
 # target to build an object file
 ethash/managed.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/managed.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/managed.cpp.o
 .PHONY : ethash/managed.cpp.o
 
 ethash/managed.i: ethash/managed.cpp.i
@@ -640,7 +622,7 @@ ethash/managed.i: ethash/managed.cpp.i
 
 # target to preprocess a source file
 ethash/managed.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/managed.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/managed.cpp.i
 .PHONY : ethash/managed.cpp.i
 
 ethash/managed.s: ethash/managed.cpp.s
@@ -648,7 +630,7 @@ ethash/managed.s: ethash/managed.cpp.s
 
 # target to generate assembly for a file
 ethash/managed.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/managed.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/managed.cpp.s
 .PHONY : ethash/managed.cpp.s
 
 ethash/primes.o: ethash/primes.c.o
@@ -656,7 +638,7 @@ ethash/primes.o: ethash/primes.c.o
 
 # target to build an object file
 ethash/primes.c.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/primes.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/primes.c.o
 .PHONY : ethash/primes.c.o
 
 ethash/primes.i: ethash/primes.c.i
@@ -664,7 +646,7 @@ ethash/primes.i: ethash/primes.c.i
 
 # target to preprocess a source file
 ethash/primes.c.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/primes.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/primes.c.i
 .PHONY : ethash/primes.c.i
 
 ethash/primes.s: ethash/primes.c.s
@@ -672,7 +654,7 @@ ethash/primes.s: ethash/primes.c.s
 
 # target to generate assembly for a file
 ethash/primes.c.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/primes.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/primes.c.s
 .PHONY : ethash/primes.c.s
 
 ethash/progpow.o: ethash/progpow.cpp.o
@@ -680,7 +662,7 @@ ethash/progpow.o: ethash/progpow.cpp.o
 
 # target to build an object file
 ethash/progpow.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/progpow.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/progpow.cpp.o
 .PHONY : ethash/progpow.cpp.o
 
 ethash/progpow.i: ethash/progpow.cpp.i
@@ -688,7 +670,7 @@ ethash/progpow.i: ethash/progpow.cpp.i
 
 # target to preprocess a source file
 ethash/progpow.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/progpow.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/progpow.cpp.i
 .PHONY : ethash/progpow.cpp.i
 
 ethash/progpow.s: ethash/progpow.cpp.s
@@ -696,7 +678,7 @@ ethash/progpow.s: ethash/progpow.cpp.s
 
 # target to generate assembly for a file
 ethash/progpow.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/cn/CMakeFiles/cryptonote_utils.dir/build.make src/crypto/cn/CMakeFiles/cryptonote_utils.dir/ethash/progpow.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cryptonote_utils.dir/build.make CMakeFiles/cryptonote_utils.dir/ethash/progpow.cpp.s
 .PHONY : ethash/progpow.cpp.s
 
 # Help Target
@@ -706,14 +688,14 @@ help:
 	@echo "... clean"
 	@echo "... depend"
 	@echo "... edit_cache"
-	@echo "... install"
-	@echo "... install/local"
-	@echo "... install/strip"
-	@echo "... list_install_components"
-	@echo "... package"
-	@echo "... package_source"
 	@echo "... rebuild_cache"
 	@echo "... cryptonote_utils"
+	@echo "... CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.o"
+	@echo "... CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.i"
+	@echo "... CMakeFiles/3.23.2/CompilerIdC/CMakeCCompilerId.s"
+	@echo "... CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.o"
+	@echo "... CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.i"
+	@echo "... CMakeFiles/3.23.2/CompilerIdCXX/CMakeCXXCompilerId.s"
 	@echo "... common/base58.o"
 	@echo "... common/base58.i"
 	@echo "... common/base58.s"
@@ -788,6 +770,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

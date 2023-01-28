@@ -10,10 +10,8 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeFiles/3.23.2/CMakeSystem.cmake"
   "CMakeLists.txt"
   "hiredis-populate-prefix/tmp/hiredis-populate-mkdirs.cmake"
-  "/opt/cmake-3.23.2-linux-x86_64/share/cmake-3.23/Modules/CMakeDetermineSystem.cmake"
   "/opt/cmake-3.23.2-linux-x86_64/share/cmake-3.23/Modules/CMakeGenericSystem.cmake"
   "/opt/cmake-3.23.2-linux-x86_64/share/cmake-3.23/Modules/CMakeInitializeConfigs.cmake"
-  "/opt/cmake-3.23.2-linux-x86_64/share/cmake-3.23/Modules/CMakeSystem.cmake.in"
   "/opt/cmake-3.23.2-linux-x86_64/share/cmake-3.23/Modules/CMakeSystemSpecificInformation.cmake"
   "/opt/cmake-3.23.2-linux-x86_64/share/cmake-3.23/Modules/CMakeSystemSpecificInitialize.cmake"
   "/opt/cmake-3.23.2-linux-x86_64/share/cmake-3.23/Modules/ExternalProject.cmake"
@@ -34,7 +32,6 @@ set(CMAKE_MAKEFILE_OUTPUTS
 
 # Byproducts of CMake generate step:
 set(CMAKE_MAKEFILE_PRODUCTS
-  "CMakeFiles/3.23.2/CMakeSystem.cmake"
   "hiredis-populate-prefix/tmp/hiredis-populate-mkdirs.cmake"
   "hiredis-populate-prefix/tmp/hiredis-populate-gitclone.cmake"
   "hiredis-populate-prefix/src/hiredis-populate-stamp/hiredis-populate-gitinfo.txt"

@@ -8,15 +8,11 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/sickguy/Documents/Projects/SickPool/server/src/blocks/block_watcher.cpp" "src/CMakeFiles/SickPool_core.dir/blocks/block_watcher.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/blocks/block_watcher.cpp.o.d"
-  "/home/sickguy/Documents/Projects/SickPool/server/src/blocks/main.cpp" "src/CMakeFiles/SickPool_core.dir/blocks/main.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/blocks/main.cpp.o.d"
   "/home/sickguy/Documents/Projects/SickPool/server/src/crypto/base58.cpp" "src/CMakeFiles/SickPool_core.dir/crypto/base58.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/crypto/base58.cpp.o.d"
   "/home/sickguy/Documents/Projects/SickPool/server/src/crypto/hash_wrapper.cpp" "src/CMakeFiles/SickPool_core.dir/crypto/hash_wrapper.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/crypto/hash_wrapper.cpp.o.d"
-  "/home/sickguy/Documents/Projects/SickPool/server/src/crypto/transaction.cpp" "src/CMakeFiles/SickPool_core.dir/crypto/transaction.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/crypto/transaction.cpp.o.d"
-  "/home/sickguy/Documents/Projects/SickPool/server/src/crypto/transaction_btc.cpp" "src/CMakeFiles/SickPool_core.dir/crypto/transaction_btc.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/crypto/transaction_btc.cpp.o.d"
-  "/home/sickguy/Documents/Projects/SickPool/server/src/crypto/transaction_vrsc.cpp" "src/CMakeFiles/SickPool_core.dir/crypto/transaction_vrsc.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/crypto/transaction_vrsc.cpp.o.d"
   "/home/sickguy/Documents/Projects/SickPool/server/src/daemon/daemon_manager_sin.cpp" "src/CMakeFiles/SickPool_core.dir/daemon/daemon_manager_sin.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/daemon/daemon_manager_sin.cpp.o.d"
   "/home/sickguy/Documents/Projects/SickPool/server/src/daemon/daemon_manager_zano.cpp" "src/CMakeFiles/SickPool_core.dir/daemon/daemon_manager_zano.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/daemon/daemon_manager_zano.cpp.o.d"
+  "/home/sickguy/Documents/Projects/SickPool/server/src/difficulty/difficulty_manager.cpp" "src/CMakeFiles/SickPool_core.dir/difficulty/difficulty_manager.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/difficulty/difficulty_manager.cpp.o.d"
   "/home/sickguy/Documents/Projects/SickPool/server/src/jobs/job_manager.cpp" "src/CMakeFiles/SickPool_core.dir/jobs/job_manager.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/jobs/job_manager.cpp.o.d"
   "/home/sickguy/Documents/Projects/SickPool/server/src/jobs/job_manager_cryptonote.cpp" "src/CMakeFiles/SickPool_core.dir/jobs/job_manager_cryptonote.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/jobs/job_manager_cryptonote.cpp.o.d"
   "/home/sickguy/Documents/Projects/SickPool/server/src/jobs/job_manager_sin.cpp" "src/CMakeFiles/SickPool_core.dir/jobs/job_manager_sin.cpp.o" "gcc" "src/CMakeFiles/SickPool_core.dir/jobs/job_manager_sin.cpp.o.d"

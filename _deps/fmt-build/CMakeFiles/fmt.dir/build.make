@@ -72,30 +72,30 @@ include _deps/fmt-build/CMakeFiles/fmt.dir/flags.make
 _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o: _deps/fmt-build/CMakeFiles/fmt.dir/flags.make
 _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o: _deps/fmt-src/src/format.cc
 _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o: _deps/fmt-build/CMakeFiles/fmt.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o -MF CMakeFiles/fmt.dir/src/format.cc.o.d -o CMakeFiles/fmt.dir/src/format.cc.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/format.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o -MF CMakeFiles/fmt.dir/src/format.cc.o.d -o CMakeFiles/fmt.dir/src/format.cc.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/format.cc
 
 _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.i: cmake_force
-	@echo "Preprocessing CXX source to CMakeFiles/fmt.dir/src/format.cc.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/format.cc > CMakeFiles/fmt.dir/src/format.cc.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/fmt.dir/src/format.cc.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/format.cc > CMakeFiles/fmt.dir/src/format.cc.i
 
 _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.s: cmake_force
-	@echo "Compiling CXX source to assembly CMakeFiles/fmt.dir/src/format.cc.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/format.cc -o CMakeFiles/fmt.dir/src/format.cc.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/fmt.dir/src/format.cc.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/format.cc -o CMakeFiles/fmt.dir/src/format.cc.s
 
 _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o: _deps/fmt-build/CMakeFiles/fmt.dir/flags.make
 _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o: _deps/fmt-src/src/os.cc
 _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o: _deps/fmt-build/CMakeFiles/fmt.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o -MF CMakeFiles/fmt.dir/src/os.cc.o.d -o CMakeFiles/fmt.dir/src/os.cc.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/os.cc
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o -MF CMakeFiles/fmt.dir/src/os.cc.o.d -o CMakeFiles/fmt.dir/src/os.cc.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/os.cc
 
 _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.i: cmake_force
-	@echo "Preprocessing CXX source to CMakeFiles/fmt.dir/src/os.cc.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/os.cc > CMakeFiles/fmt.dir/src/os.cc.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/fmt.dir/src/os.cc.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/os.cc > CMakeFiles/fmt.dir/src/os.cc.i
 
 _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.s: cmake_force
-	@echo "Compiling CXX source to assembly CMakeFiles/fmt.dir/src/os.cc.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-10 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/os.cc -o CMakeFiles/fmt.dir/src/os.cc.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/fmt.dir/src/os.cc.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && /usr/bin/g++-12 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src/src/os.cc -o CMakeFiles/fmt.dir/src/os.cc.s
 
 # Object files for target fmt
 fmt_OBJECTS = \
@@ -109,7 +109,7 @@ _deps/fmt-build/libfmt.a: _deps/fmt-build/CMakeFiles/fmt.dir/src/format.cc.o
 _deps/fmt-build/libfmt.a: _deps/fmt-build/CMakeFiles/fmt.dir/src/os.cc.o
 _deps/fmt-build/libfmt.a: _deps/fmt-build/CMakeFiles/fmt.dir/build.make
 _deps/fmt-build/libfmt.a: _deps/fmt-build/CMakeFiles/fmt.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX static library libfmt.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX static library libfmt.a"
 	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && $(CMAKE_COMMAND) -P CMakeFiles/fmt.dir/cmake_clean_target.cmake
 	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/fmt.dir/link.txt --verbose=$(VERBOSE)
 
@@ -122,6 +122,6 @@ _deps/fmt-build/CMakeFiles/fmt.dir/clean:
 .PHONY : _deps/fmt-build/CMakeFiles/fmt.dir/clean
 
 _deps/fmt-build/CMakeFiles/fmt.dir/depend:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build/CMakeFiles/fmt.dir/DependInfo.cmake
+	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-src /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build /home/sickguy/Documents/Projects/SickPool/server/_deps/fmt-build/CMakeFiles/fmt.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : _deps/fmt-build/CMakeFiles/fmt.dir/depend
 

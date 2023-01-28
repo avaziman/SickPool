@@ -10,12 +10,6 @@
 #include "round_manager.hpp"
 #include "round_share.hpp"
 #include "stats.hpp"
-#include "transaction.hpp"
-
-class RoundManager;
-class RedisManager;
-
-
 
 enum class PaymentStatus
 {

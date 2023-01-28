@@ -14,7 +14,6 @@
 #include "payout_manager.hpp"
 #include "share.hpp"
 #include "static_config.hpp"
-#include "transaction.hpp"
 
 template <typename JobT>
 class JobManager

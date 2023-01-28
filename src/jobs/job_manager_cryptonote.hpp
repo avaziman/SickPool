@@ -3,7 +3,6 @@
 
 #include "daemon_responses_cryptonote.hpp"
 #include "job_manager.hpp"
-#include "transaction.hpp"
 #include "cn/serialization/serialization.h"
 #include "job_cryptonote.hpp"
 

@@ -72,100 +72,100 @@ include _deps/hiredis-build/CMakeFiles/hiredis_static.dir/flags.make
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/flags.make
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.o: _deps/hiredis-src/alloc.c
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.o -MF CMakeFiles/hiredis_static.dir/alloc.c.o.d -o CMakeFiles/hiredis_static.dir/alloc.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/alloc.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.o -MF CMakeFiles/hiredis_static.dir/alloc.c.o.d -o CMakeFiles/hiredis_static.dir/alloc.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/alloc.c
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.i: cmake_force
-	@echo "Preprocessing C source to CMakeFiles/hiredis_static.dir/alloc.c.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/alloc.c > CMakeFiles/hiredis_static.dir/alloc.c.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/hiredis_static.dir/alloc.c.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/alloc.c > CMakeFiles/hiredis_static.dir/alloc.c.i
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/alloc.c.s: cmake_force
-	@echo "Compiling C source to assembly CMakeFiles/hiredis_static.dir/alloc.c.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/alloc.c -o CMakeFiles/hiredis_static.dir/alloc.c.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/hiredis_static.dir/alloc.c.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/alloc.c -o CMakeFiles/hiredis_static.dir/alloc.c.s
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/flags.make
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.o: _deps/hiredis-src/async.c
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.o -MF CMakeFiles/hiredis_static.dir/async.c.o.d -o CMakeFiles/hiredis_static.dir/async.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/async.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.o -MF CMakeFiles/hiredis_static.dir/async.c.o.d -o CMakeFiles/hiredis_static.dir/async.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/async.c
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.i: cmake_force
-	@echo "Preprocessing C source to CMakeFiles/hiredis_static.dir/async.c.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/async.c > CMakeFiles/hiredis_static.dir/async.c.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/hiredis_static.dir/async.c.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/async.c > CMakeFiles/hiredis_static.dir/async.c.i
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/async.c.s: cmake_force
-	@echo "Compiling C source to assembly CMakeFiles/hiredis_static.dir/async.c.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/async.c -o CMakeFiles/hiredis_static.dir/async.c.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/hiredis_static.dir/async.c.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/async.c -o CMakeFiles/hiredis_static.dir/async.c.s
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/flags.make
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.o: _deps/hiredis-src/hiredis.c
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.o -MF CMakeFiles/hiredis_static.dir/hiredis.c.o.d -o CMakeFiles/hiredis_static.dir/hiredis.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/hiredis.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.o -MF CMakeFiles/hiredis_static.dir/hiredis.c.o.d -o CMakeFiles/hiredis_static.dir/hiredis.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/hiredis.c
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.i: cmake_force
-	@echo "Preprocessing C source to CMakeFiles/hiredis_static.dir/hiredis.c.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/hiredis.c > CMakeFiles/hiredis_static.dir/hiredis.c.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/hiredis_static.dir/hiredis.c.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/hiredis.c > CMakeFiles/hiredis_static.dir/hiredis.c.i
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/hiredis.c.s: cmake_force
-	@echo "Compiling C source to assembly CMakeFiles/hiredis_static.dir/hiredis.c.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/hiredis.c -o CMakeFiles/hiredis_static.dir/hiredis.c.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/hiredis_static.dir/hiredis.c.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/hiredis.c -o CMakeFiles/hiredis_static.dir/hiredis.c.s
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/flags.make
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.o: _deps/hiredis-src/net.c
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.o -MF CMakeFiles/hiredis_static.dir/net.c.o.d -o CMakeFiles/hiredis_static.dir/net.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/net.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.o -MF CMakeFiles/hiredis_static.dir/net.c.o.d -o CMakeFiles/hiredis_static.dir/net.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/net.c
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.i: cmake_force
-	@echo "Preprocessing C source to CMakeFiles/hiredis_static.dir/net.c.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/net.c > CMakeFiles/hiredis_static.dir/net.c.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/hiredis_static.dir/net.c.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/net.c > CMakeFiles/hiredis_static.dir/net.c.i
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/net.c.s: cmake_force
-	@echo "Compiling C source to assembly CMakeFiles/hiredis_static.dir/net.c.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/net.c -o CMakeFiles/hiredis_static.dir/net.c.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/hiredis_static.dir/net.c.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/net.c -o CMakeFiles/hiredis_static.dir/net.c.s
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/flags.make
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.o: _deps/hiredis-src/read.c
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.o -MF CMakeFiles/hiredis_static.dir/read.c.o.d -o CMakeFiles/hiredis_static.dir/read.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/read.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.o -MF CMakeFiles/hiredis_static.dir/read.c.o.d -o CMakeFiles/hiredis_static.dir/read.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/read.c
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.i: cmake_force
-	@echo "Preprocessing C source to CMakeFiles/hiredis_static.dir/read.c.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/read.c > CMakeFiles/hiredis_static.dir/read.c.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/hiredis_static.dir/read.c.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/read.c > CMakeFiles/hiredis_static.dir/read.c.i
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/read.c.s: cmake_force
-	@echo "Compiling C source to assembly CMakeFiles/hiredis_static.dir/read.c.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/read.c -o CMakeFiles/hiredis_static.dir/read.c.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/hiredis_static.dir/read.c.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/read.c -o CMakeFiles/hiredis_static.dir/read.c.s
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/flags.make
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.o: _deps/hiredis-src/sds.c
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.o -MF CMakeFiles/hiredis_static.dir/sds.c.o.d -o CMakeFiles/hiredis_static.dir/sds.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sds.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.o -MF CMakeFiles/hiredis_static.dir/sds.c.o.d -o CMakeFiles/hiredis_static.dir/sds.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sds.c
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.i: cmake_force
-	@echo "Preprocessing C source to CMakeFiles/hiredis_static.dir/sds.c.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sds.c > CMakeFiles/hiredis_static.dir/sds.c.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/hiredis_static.dir/sds.c.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sds.c > CMakeFiles/hiredis_static.dir/sds.c.i
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sds.c.s: cmake_force
-	@echo "Compiling C source to assembly CMakeFiles/hiredis_static.dir/sds.c.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sds.c -o CMakeFiles/hiredis_static.dir/sds.c.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/hiredis_static.dir/sds.c.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sds.c -o CMakeFiles/hiredis_static.dir/sds.c.s
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/flags.make
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.o: _deps/hiredis-src/sockcompat.c
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.o: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.o"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.o -MF CMakeFiles/hiredis_static.dir/sockcompat.c.o.d -o CMakeFiles/hiredis_static.dir/sockcompat.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sockcompat.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building C object _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.o"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.o -MF CMakeFiles/hiredis_static.dir/sockcompat.c.o.d -o CMakeFiles/hiredis_static.dir/sockcompat.c.o -c /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sockcompat.c
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.i: cmake_force
-	@echo "Preprocessing C source to CMakeFiles/hiredis_static.dir/sockcompat.c.i"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sockcompat.c > CMakeFiles/hiredis_static.dir/sockcompat.c.i
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/hiredis_static.dir/sockcompat.c.i"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sockcompat.c > CMakeFiles/hiredis_static.dir/sockcompat.c.i
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.s: cmake_force
-	@echo "Compiling C source to assembly CMakeFiles/hiredis_static.dir/sockcompat.c.s"
-	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-10 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sockcompat.c -o CMakeFiles/hiredis_static.dir/sockcompat.c.s
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/hiredis_static.dir/sockcompat.c.s"
+	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && /usr/bin/gcc-12 $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src/sockcompat.c -o CMakeFiles/hiredis_static.dir/sockcompat.c.s
 
 # Object files for target hiredis_static
 hiredis_static_OBJECTS = \
@@ -189,7 +189,7 @@ _deps/hiredis-build/libhiredis.a: _deps/hiredis-build/CMakeFiles/hiredis_static.
 _deps/hiredis-build/libhiredis.a: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/sockcompat.c.o
 _deps/hiredis-build/libhiredis.a: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/build.make
 _deps/hiredis-build/libhiredis.a: _deps/hiredis-build/CMakeFiles/hiredis_static.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking C static library libhiredis.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/sickguy/Documents/Projects/SickPool/server/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking C static library libhiredis.a"
 	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && $(CMAKE_COMMAND) -P CMakeFiles/hiredis_static.dir/cmake_clean_target.cmake
 	cd /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/hiredis_static.dir/link.txt --verbose=$(VERBOSE)
 
@@ -202,6 +202,6 @@ _deps/hiredis-build/CMakeFiles/hiredis_static.dir/clean:
 .PHONY : _deps/hiredis-build/CMakeFiles/hiredis_static.dir/clean
 
 _deps/hiredis-build/CMakeFiles/hiredis_static.dir/depend:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build/CMakeFiles/hiredis_static.dir/DependInfo.cmake
+	cd /home/sickguy/Documents/Projects/SickPool/server && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-src /home/sickguy/Documents/Projects/SickPool/server /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build /home/sickguy/Documents/Projects/SickPool/server/_deps/hiredis-build/CMakeFiles/hiredis_static.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : _deps/hiredis-build/CMakeFiles/hiredis_static.dir/depend
 

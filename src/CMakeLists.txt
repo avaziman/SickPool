@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.18)
 
 execute_process(COMMAND cxxbridge /home/sickguy/Documents/Projects/SickPool/api_rust/src/redis_interop.rs
-                OUTPUT_FILE ./persistence/redis/redis_interop.hpp
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    OUTPUT_FILE ./persistence/redis/redis_interop.hpp
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(FetchContent)
 
@@ -49,7 +49,7 @@ file(GLOB SRC_FILES
     # "crypto/cn/ethash/*.c"
     "difficulty/*.cpp"
     "stats/*.cpp"
-    "blocks/*.cpp"
+    "blocks/submitter/*.cpp"
     "jobs/*.cpp"
     "persistence/redis/*.cpp"
     "persistence/mysql/*.cpp"
@@ -64,12 +64,16 @@ file(GLOB SRC_FILES
 # BOOST
 FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED)
 
-add_library(${PROJECT_NAME_CORE} STATIC ${SRC_FILES})
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_library(${PROJECT_NAME_CORE} STATIC ${SRC_FILES})
+else()
+    add_library(${PROJECT_NAME_CORE} SHARED ${SRC_FILES})
+endif()
 
 set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum
- PUBLIC static_config PUBLIC blocks PUBLIC round
- PUBLIC persistence/redis PUBLIC persistence/mysql PUBLIC persistence
- PUBLIC payouts PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
+    PUBLIC static_config PUBLIC blocks/submitter PUBLIC round
+    PUBLIC persistence/redis PUBLIC persistence/mysql PUBLIC persistence
+    PUBLIC payouts PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
 # find_path(HIREDIS_HEADER hiredis)
@@ -83,11 +87,9 @@ target_link_libraries(
     # ${HIREDIS_LIB}
     hiredis_static
     mysqlcppconn
-    # mysqlcppconn-static
     pthread
     cryptonote_utils
     simdjson
     fmt::fmt
     sickverushash
-    # sickx25x
 )

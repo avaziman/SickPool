@@ -70,7 +70,8 @@ int main(int argc, char** argv)
 
             // immediate payment time!
             std::vector<Payee> payees;
-            if (!persistence_block.LoadUnpaidRewards(payees, payout_info.tx_fee))
+            if (!PersistenceBlock::LoadUnpaidRewards(payees,
+                                                     payout_info.tx_fee))
             {
                 logger.Log<LogType::Error>("Failed to get unpaid rewards");
                 return -2;
@@ -79,7 +80,7 @@ int main(int argc, char** argv)
                                       payees.size());
 
             next_payment += coinConfig.payment_interval_seconds;
-            persistence_block.UpdateNextPayout(next_payment * 1000);
+            PersistenceBlock::UpdateNextPayout(next_payment * 1000);
 
             if (payees.empty()) continue;
 
@@ -101,7 +102,8 @@ int main(int argc, char** argv)
             else
             {
                 payout_info.txid = transfer_res.txid;
-                persistence_block.AddPayout(payout_info, payees, individual_fee);
+                PersistenceBlock::AddPayout(payout_info, payees,
+                                            individual_fee);
                 logger.Log<LogType::Info>("Payment successful!");
             }
         }

@@ -67,7 +67,7 @@ CMAKE_BINARY_DIR = /home/sickguy/Documents/Projects/SickPool/server
 
 # Special rule for the target package
 package: preinstall
-	@echo "Run CPack packaging tool..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Run CPack packaging tool..."
 	cd /home/sickguy/Documents/Projects/SickPool/server && /opt/cmake-3.23.2-linux-x86_64/bin/cpack --config ./CPackConfig.cmake
 .PHONY : package
 
@@ -77,7 +77,7 @@ package/fast: package
 
 # Special rule for the target package_source
 package_source:
-	@echo "Run CPack packaging tool for source..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Run CPack packaging tool for source..."
 	cd /home/sickguy/Documents/Projects/SickPool/server && /opt/cmake-3.23.2-linux-x86_64/bin/cpack --config ./CPackSourceConfig.cmake /home/sickguy/Documents/Projects/SickPool/server/CPackSourceConfig.cmake
 .PHONY : package_source
 
@@ -87,7 +87,7 @@ package_source/fast: package_source
 
 # Special rule for the target edit_cache
 edit_cache:
-	@echo "Running CMake cache editor..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/ccmake -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : edit_cache
 
@@ -97,7 +97,7 @@ edit_cache/fast: edit_cache
 
 # Special rule for the target rebuild_cache
 rebuild_cache:
-	@echo "Running CMake to regenerate build system..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/cmake --regenerate-during-build -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
 .PHONY : rebuild_cache
 
@@ -107,7 +107,7 @@ rebuild_cache/fast: rebuild_cache
 
 # Special rule for the target list_install_components
 list_install_components:
-	@echo "Available install components are: \"Unspecified\" \"simdjson_Development\""
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\" \"simdjson_Development\""
 .PHONY : list_install_components
 
 # Special rule for the target list_install_components
@@ -116,37 +116,37 @@ list_install_components/fast: list_install_components
 
 # Special rule for the target install
 install: preinstall
-	@echo "Install the project..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -P cmake_install.cmake
 .PHONY : install
 
 # Special rule for the target install
 install/fast: preinstall/fast
-	@echo "Install the project..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -P cmake_install.cmake
 .PHONY : install/fast
 
 # Special rule for the target install/local
 install/local: preinstall
-	@echo "Installing only the local directory..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
 .PHONY : install/local
 
 # Special rule for the target install/local
 install/local/fast: preinstall/fast
-	@echo "Installing only the local directory..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
 .PHONY : install/local/fast
 
 # Special rule for the target install/strip
 install/strip: preinstall
-	@echo "Installing the project stripped..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
 .PHONY : install/strip
 
 # Special rule for the target install/strip
 install/strip/fast: preinstall/fast
-	@echo "Installing the project stripped..."
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
 	/opt/cmake-3.23.2-linux-x86_64/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
 .PHONY : install/strip/fast
 
@@ -194,54 +194,6 @@ SickPool_core: src/CMakeFiles/SickPool_core.dir/rule
 SickPool_core/fast:
 	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/build
 .PHONY : SickPool_core/fast
-
-blocks/block_watcher.o: blocks/block_watcher.cpp.o
-.PHONY : blocks/block_watcher.o
-
-# target to build an object file
-blocks/block_watcher.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/blocks/block_watcher.cpp.o
-.PHONY : blocks/block_watcher.cpp.o
-
-blocks/block_watcher.i: blocks/block_watcher.cpp.i
-.PHONY : blocks/block_watcher.i
-
-# target to preprocess a source file
-blocks/block_watcher.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/blocks/block_watcher.cpp.i
-.PHONY : blocks/block_watcher.cpp.i
-
-blocks/block_watcher.s: blocks/block_watcher.cpp.s
-.PHONY : blocks/block_watcher.s
-
-# target to generate assembly for a file
-blocks/block_watcher.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/blocks/block_watcher.cpp.s
-.PHONY : blocks/block_watcher.cpp.s
-
-blocks/main.o: blocks/main.cpp.o
-.PHONY : blocks/main.o
-
-# target to build an object file
-blocks/main.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/blocks/main.cpp.o
-.PHONY : blocks/main.cpp.o
-
-blocks/main.i: blocks/main.cpp.i
-.PHONY : blocks/main.i
-
-# target to preprocess a source file
-blocks/main.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/blocks/main.cpp.i
-.PHONY : blocks/main.cpp.i
-
-blocks/main.s: blocks/main.cpp.s
-.PHONY : blocks/main.s
-
-# target to generate assembly for a file
-blocks/main.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/blocks/main.cpp.s
-.PHONY : blocks/main.cpp.s
 
 crypto/base58.o: crypto/base58.cpp.o
 .PHONY : crypto/base58.o
@@ -291,78 +243,6 @@ crypto/hash_wrapper.cpp.s:
 	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/hash_wrapper.cpp.s
 .PHONY : crypto/hash_wrapper.cpp.s
 
-crypto/transaction.o: crypto/transaction.cpp.o
-.PHONY : crypto/transaction.o
-
-# target to build an object file
-crypto/transaction.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction.cpp.o
-.PHONY : crypto/transaction.cpp.o
-
-crypto/transaction.i: crypto/transaction.cpp.i
-.PHONY : crypto/transaction.i
-
-# target to preprocess a source file
-crypto/transaction.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction.cpp.i
-.PHONY : crypto/transaction.cpp.i
-
-crypto/transaction.s: crypto/transaction.cpp.s
-.PHONY : crypto/transaction.s
-
-# target to generate assembly for a file
-crypto/transaction.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction.cpp.s
-.PHONY : crypto/transaction.cpp.s
-
-crypto/transaction_btc.o: crypto/transaction_btc.cpp.o
-.PHONY : crypto/transaction_btc.o
-
-# target to build an object file
-crypto/transaction_btc.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction_btc.cpp.o
-.PHONY : crypto/transaction_btc.cpp.o
-
-crypto/transaction_btc.i: crypto/transaction_btc.cpp.i
-.PHONY : crypto/transaction_btc.i
-
-# target to preprocess a source file
-crypto/transaction_btc.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction_btc.cpp.i
-.PHONY : crypto/transaction_btc.cpp.i
-
-crypto/transaction_btc.s: crypto/transaction_btc.cpp.s
-.PHONY : crypto/transaction_btc.s
-
-# target to generate assembly for a file
-crypto/transaction_btc.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction_btc.cpp.s
-.PHONY : crypto/transaction_btc.cpp.s
-
-crypto/transaction_vrsc.o: crypto/transaction_vrsc.cpp.o
-.PHONY : crypto/transaction_vrsc.o
-
-# target to build an object file
-crypto/transaction_vrsc.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction_vrsc.cpp.o
-.PHONY : crypto/transaction_vrsc.cpp.o
-
-crypto/transaction_vrsc.i: crypto/transaction_vrsc.cpp.i
-.PHONY : crypto/transaction_vrsc.i
-
-# target to preprocess a source file
-crypto/transaction_vrsc.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction_vrsc.cpp.i
-.PHONY : crypto/transaction_vrsc.cpp.i
-
-crypto/transaction_vrsc.s: crypto/transaction_vrsc.cpp.s
-.PHONY : crypto/transaction_vrsc.s
-
-# target to generate assembly for a file
-crypto/transaction_vrsc.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/transaction_vrsc.cpp.s
-.PHONY : crypto/transaction_vrsc.cpp.s
-
 daemon/daemon_manager_sin.o: daemon/daemon_manager_sin.cpp.o
 .PHONY : daemon/daemon_manager_sin.o
 
@@ -410,6 +290,30 @@ daemon/daemon_manager_zano.s: daemon/daemon_manager_zano.cpp.s
 daemon/daemon_manager_zano.cpp.s:
 	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/daemon/daemon_manager_zano.cpp.s
 .PHONY : daemon/daemon_manager_zano.cpp.s
+
+difficulty/difficulty_manager.o: difficulty/difficulty_manager.cpp.o
+.PHONY : difficulty/difficulty_manager.o
+
+# target to build an object file
+difficulty/difficulty_manager.cpp.o:
+	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/difficulty/difficulty_manager.cpp.o
+.PHONY : difficulty/difficulty_manager.cpp.o
+
+difficulty/difficulty_manager.i: difficulty/difficulty_manager.cpp.i
+.PHONY : difficulty/difficulty_manager.i
+
+# target to preprocess a source file
+difficulty/difficulty_manager.cpp.i:
+	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/difficulty/difficulty_manager.cpp.i
+.PHONY : difficulty/difficulty_manager.cpp.i
+
+difficulty/difficulty_manager.s: difficulty/difficulty_manager.cpp.s
+.PHONY : difficulty/difficulty_manager.s
+
+# target to generate assembly for a file
+difficulty/difficulty_manager.cpp.s:
+	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/difficulty/difficulty_manager.cpp.s
+.PHONY : difficulty/difficulty_manager.cpp.s
 
 jobs/job_manager.o: jobs/job_manager.cpp.o
 .PHONY : jobs/job_manager.o
@@ -1074,33 +978,21 @@ help:
 	@echo "... package_source"
 	@echo "... rebuild_cache"
 	@echo "... SickPool_core"
-	@echo "... blocks/block_watcher.o"
-	@echo "... blocks/block_watcher.i"
-	@echo "... blocks/block_watcher.s"
-	@echo "... blocks/main.o"
-	@echo "... blocks/main.i"
-	@echo "... blocks/main.s"
 	@echo "... crypto/base58.o"
 	@echo "... crypto/base58.i"
 	@echo "... crypto/base58.s"
 	@echo "... crypto/hash_wrapper.o"
 	@echo "... crypto/hash_wrapper.i"
 	@echo "... crypto/hash_wrapper.s"
-	@echo "... crypto/transaction.o"
-	@echo "... crypto/transaction.i"
-	@echo "... crypto/transaction.s"
-	@echo "... crypto/transaction_btc.o"
-	@echo "... crypto/transaction_btc.i"
-	@echo "... crypto/transaction_btc.s"
-	@echo "... crypto/transaction_vrsc.o"
-	@echo "... crypto/transaction_vrsc.i"
-	@echo "... crypto/transaction_vrsc.s"
 	@echo "... daemon/daemon_manager_sin.o"
 	@echo "... daemon/daemon_manager_sin.i"
 	@echo "... daemon/daemon_manager_sin.s"
 	@echo "... daemon/daemon_manager_zano.o"
 	@echo "... daemon/daemon_manager_zano.i"
 	@echo "... daemon/daemon_manager_zano.s"
+	@echo "... difficulty/difficulty_manager.o"
+	@echo "... difficulty/difficulty_manager.i"
+	@echo "... difficulty/difficulty_manager.s"
 	@echo "... jobs/job_manager.o"
 	@echo "... jobs/job_manager.i"
 	@echo "... jobs/job_manager.s"
