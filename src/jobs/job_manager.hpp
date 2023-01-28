@@ -82,8 +82,8 @@ class JobManager
 
    private:
     std::shared_mutex jobs_mutex;
-    // unordered map is not thread safe for modifying and accessing different
     std::shared_ptr<JobT> last_job;
+    // unordered map is not thread safe for modifying and accessing different
     // elements, but a vector is, so we use other optimization (save last job)
     std::vector<std::shared_ptr<JobT>> jobs;
 };
