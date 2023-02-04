@@ -16,6 +16,7 @@
 #include "connection.hpp"
 #include "job.hpp"
 #include "jobs/job_manager.hpp"
+#include "job_vrsc.hpp"
 #include "logger.hpp"
 #include "server.hpp"
 #include "shares/share_processor.hpp"
@@ -24,30 +25,28 @@
 #include "stratum_server_base.hpp"
 
 template <StaticConf confs>
-class StratumServer : public StratumBase
+class StratumServer : public StratumBase, public StratumConstants
 {
    public:
     explicit StratumServer(CoinConfig&& conf);
     ~StratumServer() override;
     using WorkerContextT = WorkerContext<confs.BLOCK_HEADER_SIZE>;
     using JobT = Job<confs.STRATUM_PROTOCOL>;
+    using ShareT = StratumShareT<confs.STRATUM_PROTOCOL>;
 
    private:
-    using ShareT = StratumShare<confs.STRATUM_PROTOCOL>;
 
     static constexpr std::string_view field_str_stratum = "StratumServer";
     const Logger<field_str_stratum> logger;
-
+    
     std::jthread stats_thread;
     simdjson::ondemand::parser httpParser =
         simdjson::ondemand::parser(HTTP_REQ_ALLOCATE);
 
    protected:
-
-    daemon_manager_t daemon_manager;
-    PayoutManager payout_manager;
-    job_manager_t job_manager;
-    BlockSubmitter block_submitter;
+    JobManager<JobT, confs.COIN_SYMBOL> job_manager;
+    DaemonManagerT<confs.COIN_SYMBOL> daemon_manager;
+    BlockSubmitter<confs.COIN_SYMBOL> block_submitter;
     StatsManager stats_manager;
 
     virtual void HandleReq(Connection<StratumClient>* conn, WorkerContextT* wc,

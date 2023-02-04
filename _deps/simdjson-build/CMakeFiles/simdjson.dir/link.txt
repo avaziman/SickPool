@@ -1,2 +1,1 @@
-/usr/bin/ar qc libsimdjson.a CMakeFiles/simdjson.dir/src/simdjson.cpp.o
-/usr/bin/ranlib libsimdjson.a
+/usr/bin/g++-12 -fPIC  -O0 -g3 -DDEBUG=1 -O3 -DNDEBUG -shared -Wl,-soname,libsimdjson.so.13 -o libsimdjson.so.13.0.0 CMakeFiles/simdjson.dir/src/simdjson.cpp.o 

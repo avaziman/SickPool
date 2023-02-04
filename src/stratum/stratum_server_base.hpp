@@ -32,11 +32,10 @@ class StratumBase : public Server<StratumClient>
         const std::shared_ptr<Connection<StratumClient>> conn_ptr) = 0;
 
     inline std::stop_token GetStopToken() const { return control_thread.get_stop_token(); }
-    inline std::size_t SendRaw(int sock, const char* data,
-                               std::size_t len) const
+    inline std::size_t SendRaw(int sock, std::string_view msg) const
     {
         // dont send sigpipe
-        auto res = send(sock, data, len, MSG_NOSIGNAL);
+        auto res = send(sock, msg.data(), msg.size(), MSG_NOSIGNAL);
 
         if (res == -1)
         {
@@ -51,28 +50,25 @@ class StratumBase : public Server<StratumClient>
     //TODO: have without jsonrpc
     inline void SendRes(int sock, int req_id, const RpcResult& res) const
     {
-        char buff[512];
-        size_t len = 0;
+        std::string str;
 
         if (res.code == ResCode::OK)
         {
-            len =
-                fmt::format_to_n(buff, sizeof(buff),
-                                 "{{\"id\":{},\"jsonrpc\":\"2.0\",\"error\":null,\"result\":{}}}\n",
-                                 req_id, res.msg)
-                    .size;
+            str = fmt::format(
+                "{{\"id\":{},\"jsonrpc\":\"2.0\",\"error\":null,\"result\":{}}}"
+                "\n",
+                req_id, res.msg);
         }
         else
         {
-            len = fmt::format_to_n(buff, sizeof(buff),
-                                   "{{\"id\":{},\"jsonrpc\":\"2.0\",\"result\":"
-                                   "null,\"error\":[{},"
-                                   "\"{}\",null]}}\n",
-                                   req_id, (int)res.code, res.msg)
-                      .size;
+            str = fmt::format(
+                "{{\"id\":{},\"jsonrpc\":\"2.0\",\"result\":"
+                "null,\"error\":[{},"
+                "\"{}\",null]}}\n",
+                req_id, (int)res.code, res.msg);
         }
 
-        SendRaw(sock, buff, len);
+        SendRaw(sock, str);
     }
 
    private:

@@ -26,7 +26,7 @@ static void BM_BitsToDiffOld(benchmark::State& state)
     }
 }
 
-inline double GetExpectedHashesStatic(const double diff)
+inline double GetHashMultiplierStatic(const double diff)
 {
     // return diff * (16777216 / 0x0f0f0f); // 2^24
     return diff * (17.00000101327902);  // 2^ 24 / 0x0f0f0f = 17...z
@@ -36,7 +36,7 @@ static void BM_EXPECTED_HASHES(benchmark::State& state)
 {
     for (auto _ : state)
     {
-        GetExpectedHashes(rand());
+        GetHashMultiplier(rand());
     }
 }
 
@@ -44,7 +44,7 @@ static void BM_EXPECTED_HASHES_STATIC(benchmark::State& state)
 {
     for (auto _ : state)
     {
-        GetExpectedHashesStatic(rand());
+        GetHashMultiplierStatic(rand());
     }
 }
 

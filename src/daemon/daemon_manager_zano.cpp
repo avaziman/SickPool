@@ -3,10 +3,9 @@
 using namespace simdjson;
 using namespace std::string_view_literals;
 
-bool DaemonManagerZano::GetBlockTemplate(BlockTemplateResCn& templateRes,
-                                         std::string_view addr,
-                                         std::string_view extra_data,
-                                         simdjson::ondemand::parser& parser)
+bool DaemonManagerT<Coin::ZANO>::GetBlockTemplate(
+    BlockTemplateRes& templateRes, std::string_view addr,
+    std::string_view extra_data, simdjson::ondemand::parser& parser)
 {
     std::string result_body;
 
@@ -51,7 +50,7 @@ bool DaemonManagerZano::GetBlockTemplate(BlockTemplateResCn& templateRes,
     return true;
 }
 
-bool DaemonManagerZano::SubmitBlock(std::string_view block_hex,
+bool DaemonManagerT<Coin::ZANO>::SubmitBlock(std::string_view block_hex,
                                     simdjson::ondemand::parser& parser)
 {
     std::string result_body;
@@ -94,7 +93,7 @@ bool DaemonManagerZano::SubmitBlock(std::string_view block_hex,
     return true;
 }
 
-bool DaemonManagerZano::Transfer(TransferResCn& transfer_res,
+bool DaemonManagerT<Coin::ZANO>::Transfer(TransferResCn& transfer_res,
                                  const std::vector<Payee>& dests, int64_t fee,
                                  simdjson::ondemand::parser& parser)
 {
@@ -143,7 +142,7 @@ bool DaemonManagerZano::Transfer(TransferResCn& transfer_res,
 }
 
 // zano daemon can shows orphaned blocks as confirmed...
-bool DaemonManagerZano::GetBlockHeaderByHash(BlockHeaderResCn& res,
+bool DaemonManagerT<Coin::ZANO>::GetBlockHeaderByHash(BlockHeaderResCn& res,
                                              std::string_view block_hash,
                                              simdjson::ondemand::parser& parser)
 {
@@ -179,7 +178,7 @@ bool DaemonManagerZano::GetBlockHeaderByHash(BlockHeaderResCn& res,
     return true;
 }
 
-bool DaemonManagerZano::GetBlockHeaderByHeight(
+bool DaemonManagerT<Coin::ZANO>::GetBlockHeaderByHeight(
     BlockHeaderResCn& res, uint32_t height, simdjson::ondemand::parser& parser)
 {
     std::string result_body;
@@ -215,7 +214,7 @@ bool DaemonManagerZano::GetBlockHeaderByHeight(
     return true;
 }
 
-bool DaemonManagerZano::GetAliasAddress(AliasRes& res,
+bool DaemonManagerT<Coin::ZANO>::GetAliasAddress(AliasRes& res,
                                         std::string_view alias,
                                         simdjson::ondemand::parser& parser)
 {

@@ -38,7 +38,7 @@ int main(int argc, char** argv)
 
     const PersistenceLayer rm(coinConfig);
     PersistenceBlock persistence_block(rm);
-    daemon_manager_t daemon_manager(coinConfig.payment_rpcs);
+    DaemonManagerT daemon_manager(coinConfig.payment_rpcs);
 
     persistence_block.SubscribeToMaturityChannel();
     time_t curtime = GetCurrentTimeMs() / 1000;

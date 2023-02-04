@@ -14,26 +14,28 @@
 class MerkleTree
 {
    public:
-    // static void CalcRoot(
-    //     uint8_t* res, const std::vector<TransactionData>& txsData)
-    // {
-    //     std::vector<uint8_t> hashes;
-    //     uint32_t hash_count = txsData.size();
-
-    //     hashes.reserve(txsData.size() * HASH_SIZE);
-
-    //     for (int i = 0; i < hash_count; i++)
-    //     {
-    //         memcpy(hashes.data() + i * HASH_SIZE, txsData[i].hash,
-    //         HASH_SIZE);
-    //     }
-
-    //     CalcRoot(res, hashes, hash_count);
-    // }
-
-    static void CalcRoot(uint8_t* res, std::vector<uint8_t>& hashes,
-                         std::size_t hash_count)
+    template <typename TxRes>
+    static std::vector<uint8_t> GetHashes(const std::vector<TxRes>& txsData)
     {
+        std::vector<uint8_t> hashes;
+        uint32_t hash_count = txsData.size();
+
+        hashes.resize(txsData.size() * HASH_SIZE);
+
+        for (int i = 0; i < hash_count; i++)
+        {
+            std::array<uint8_t, HASH_SIZE> hash_bin = Unhexlify<HASH_SIZE * 2>(txsData[i].hash);
+            std::ranges::copy(hash_bin,
+                      hashes.data() + i * HASH_SIZE);
+        }
+
+        return hashes;
+    }
+
+    static std::array<uint8_t, HASH_SIZE> CalcRoot(std::vector<uint8_t>&& hashes)
+    {
+        std::size_t hash_count = hashes.size() / HASH_SIZE;
+        std::array<uint8_t, HASH_SIZE> res;
         while (hash_count > 1)
         {
             // if odd amount of leafs, duplicate the last
@@ -57,12 +59,14 @@ class MerkleTree
             hash_count /= 2;
         }
 
-        memcpy(res, hashes.data(), HASH_SIZE);
+        memcpy(res.data(), hashes.data(), HASH_SIZE);
+        return res;
     }
 
     // res needs to have coinbase txid, res needs to be HASH_SIZE
-    static void CalcRootFromSteps(uint8_t* res, const uint8_t* cb_txid, const std::vector<uint8_t>& steps,
-                         const std::size_t step_count)
+    static void CalcRootFromSteps(uint8_t* res, const uint8_t* cb_txid,
+                                  const std::vector<uint8_t>& steps,
+                                  const std::size_t step_count)
     {
         uint8_t buff[HASH_SIZE * 2];
         memcpy(buff, cb_txid, HASH_SIZE);
@@ -82,8 +86,9 @@ class MerkleTree
         {
             if (hash_count & 1)
             {
-                // bug here because the new reseve doesnt contain the hashes (it wasnt resized), so just make sure its big enough
-                // if (hashes.capacity() < (hash_count + 1) * HASH_SIZE)
+                // bug here because the new reseve doesnt contain the hashes (it
+                // wasnt resized), so just make sure its big enough if
+                // (hashes.capacity() < (hash_count + 1) * HASH_SIZE)
                 // {
                 //     hashes.reserve(hashes.capacity() + HASH_SIZE);
                 // }
@@ -92,9 +97,11 @@ class MerkleTree
                 hash_count++;
             }
 
-            memcpy(res.data() + i * HASH_SIZE, hashes.data() + HASH_SIZE, HASH_SIZE);
+            memcpy(res.data() + i * HASH_SIZE, hashes.data() + HASH_SIZE,
+                   HASH_SIZE);
 
-            // we can skip the first one as we won't use it (it's not even known)
+            // we can skip the first one as we won't use it (it's not even
+            // known)
             for (int j = 2; j < hash_count; j += 2)
             {
                 HashWrapper::SHA256d(hashes.data() + (j / 2) * HASH_SIZE,

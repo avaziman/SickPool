@@ -18,7 +18,7 @@ int main(int argc, char** argv)
 
     std::vector<std::unique_ptr<BlockSubmission>> immature_block_submissions;
     PersistenceLayer redis_manager(coinConfig);
-    daemon_manager_t daemon_manager(coinConfig.rpcs);
+    DaemonManagerT daemon_manager(coinConfig.rpcs);
 
     if (coinConfig.symbol == "ZANO")
     {

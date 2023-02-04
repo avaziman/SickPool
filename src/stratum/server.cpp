@@ -44,7 +44,8 @@ void Server<T>::Service()
 {
     struct epoll_event events[MAX_CONNECTION_EVENTS];
     int epoll_res =
-        epoll_wait(epoll_fd, events, MAX_CONNECTION_EVENTS, EPOLL_TIMEOUT);
+        epoll_wait(epoll_fd, events, MAX_CONNECTION_EVENTS,
+                   EPOLL_TIMEOUT);
 
     for (int i = 0; i < epoll_res; i++)
     {
@@ -88,7 +89,8 @@ void Server<T>::Service()
     }
 
     // immediate check
-    epoll_res = epoll_wait(timers_epoll_fd, events, MAX_CONNECTION_EVENTS, 0);
+    epoll_res = epoll_wait(timers_epoll_fd, events,
+                           MAX_CONNECTION_EVENTS, 0);
     for (int i = 0; i < epoll_res; i++)
     {
         auto event = events[i];
@@ -144,8 +146,9 @@ bool Server<T>::HandleReadable(connection_it *it)
 
     while (true)
     {
-        recv_res = recv(sockfd, conn->req_buff + conn->req_pos,
-                        REQ_BUFF_SIZE_REAL - conn->req_pos - 1, 0);
+        recv_res =
+            recv(sockfd, conn->req_buff + conn->req_pos,
+                 REQ_BUFF_SIZE_REAL - conn->req_pos - 1, 0);
 
         if (recv_res == -1)
         {

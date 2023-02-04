@@ -51,7 +51,7 @@ if(_IMPORT_PREFIX STREQUAL "/")
 endif()
 
 # Create imported target simdjson::simdjson
-add_library(simdjson::simdjson STATIC IMPORTED)
+add_library(simdjson::simdjson SHARED IMPORTED)
 
 set_target_properties(simdjson::simdjson PROPERTIES
   INTERFACE_COMPILE_DEFINITIONS "SIMDJSON_THREADS_ENABLED=1"

@@ -107,7 +107,7 @@ rebuild_cache/fast: rebuild_cache
 
 # Special rule for the target list_install_components
 list_install_components:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\" \"simdjson_Development\""
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\" \"simdjson_Development\" \"simdjson_Runtime\""
 .PHONY : list_install_components
 
 # Special rule for the target list_install_components
@@ -363,30 +363,6 @@ util/strencodings.cpp.s:
 	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/verushash/CMakeFiles/sickverushash.dir/build.make src/crypto/verushash/CMakeFiles/sickverushash.dir/util/strencodings.cpp.s
 .PHONY : util/strencodings.cpp.s
 
-utilstrencodings.o: utilstrencodings.cpp.o
-.PHONY : utilstrencodings.o
-
-# target to build an object file
-utilstrencodings.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/verushash/CMakeFiles/sickverushash.dir/build.make src/crypto/verushash/CMakeFiles/sickverushash.dir/utilstrencodings.cpp.o
-.PHONY : utilstrencodings.cpp.o
-
-utilstrencodings.i: utilstrencodings.cpp.i
-.PHONY : utilstrencodings.i
-
-# target to preprocess a source file
-utilstrencodings.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/verushash/CMakeFiles/sickverushash.dir/build.make src/crypto/verushash/CMakeFiles/sickverushash.dir/utilstrencodings.cpp.i
-.PHONY : utilstrencodings.cpp.i
-
-utilstrencodings.s: utilstrencodings.cpp.s
-.PHONY : utilstrencodings.s
-
-# target to generate assembly for a file
-utilstrencodings.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/crypto/verushash/CMakeFiles/sickverushash.dir/build.make src/crypto/verushash/CMakeFiles/sickverushash.dir/utilstrencodings.cpp.s
-.PHONY : utilstrencodings.cpp.s
-
 verus_clhash.o: verus_clhash.cpp.o
 .PHONY : verus_clhash.o
 
@@ -495,9 +471,6 @@ help:
 	@echo "... util/strencodings.o"
 	@echo "... util/strencodings.i"
 	@echo "... util/strencodings.s"
-	@echo "... utilstrencodings.o"
-	@echo "... utilstrencodings.i"
-	@echo "... utilstrencodings.s"
 	@echo "... verus_clhash.o"
 	@echo "... verus_clhash.i"
 	@echo "... verus_clhash.s"

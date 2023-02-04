@@ -17,7 +17,7 @@
 #include "coin_config.hpp"
 #include "key_names.hpp"
 #include "logger.hpp"
-#include "payouts/round_share.hpp"
+#include "round_share.hpp"
 #include "redis_interop.hpp"
 #include "redis_transaction.hpp"
 #include "shares/share.hpp"

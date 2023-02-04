@@ -8,17 +8,18 @@
 #include "block_submission.hpp"
 
 
+template <Coin coin>
 class BlockSubmitter
 {
    private:
-    daemon_manager_t* daemon_manager;
+    DaemonManagerT<coin>* daemon_manager;
     RoundManager* round_manager;
     static constexpr std::string_view field_str = "BlockSubmitter";
     std::mutex blocks_lock;
     Logger<field_str> logger;
 
    public:
-    explicit BlockSubmitter(daemon_manager_t* daemon_manager,
+    explicit BlockSubmitter(DaemonManagerT<coin>* daemon_manager,
                    RoundManager* round_manager)
         : 
         daemon_manager(daemon_manager),
@@ -53,10 +54,10 @@ class BlockSubmitter
                                                  *submission.get(), pow_fee);
             res != RoundCloseRes::OK)
         {
-            logger.Log<LogType::Critical>("Failed to close round! {}", static_cast<int>(res));
+            logger.template Log<LogType::Critical>("Failed to close round! {}", static_cast<int>(res));
         }
 
-        logger.Log<LogType::Info>(
+        logger.template Log<LogType::Info>(
             "Added new block submission: \n"
             "┌{0:─^{12}}┐\n"
             "│{1: ^{12}}│\n"
@@ -85,7 +86,7 @@ class BlockSubmitter
                         HexlifyS(submission->hash_bin)),
             72);
 
-        logger.Log<LogType::Info>(
+        logger.template Log<LogType::Info>(
             "Closed round for block submission no {} (immature).",
             submission->id);
 

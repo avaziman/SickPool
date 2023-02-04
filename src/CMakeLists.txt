@@ -55,7 +55,7 @@ file(GLOB SRC_FILES
     "persistence/mysql/*.cpp"
     "persistence/*.cpp"
     "round/*.cpp"
-    "payouts/*.cpp"
+    "payouts/manager/*.cpp"
     "logger/*.cpp"
     "daemon/*.cpp"
 )
@@ -73,7 +73,7 @@ endif()
 set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC stratum
     PUBLIC static_config PUBLIC blocks/submitter PUBLIC round
     PUBLIC persistence/redis PUBLIC persistence/mysql PUBLIC persistence
-    PUBLIC payouts PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
+    PUBLIC payouts/manager PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
 # find_path(HIREDIS_HEADER hiredis)

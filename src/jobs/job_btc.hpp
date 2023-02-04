@@ -61,12 +61,12 @@ struct BlockTemplateBtc
 };
 
 template<>
-class Job<StratumProtocol::BTC> : public JobBaseBtc
+class JobT<StratumProtocol::BTC> : public JobBaseBtc
 {
    public:
-    explicit JobBtc(const std::string& jobId,
+    explicit JobBtc(std::string&& jobId,
                     const BlockTemplateResBtc& bTemplate, bool is_payment)
-        : JobBaseBtc(jobId),
+        : JobBaseBtc(std::move(jobId)),
           bits(bTemplate.bits),
           //   coinb1(bTemplate.coinb1.begin(), bTemplate.coinb1.end()),
           //   coinb2(bTemplate.coinb2.begin(), bTemplate.coinb2.end()),
@@ -131,15 +131,11 @@ class Job<StratumProtocol::BTC> : public JobBaseBtc
                    8);
         }
 
-        size_t len =
-
-            notify_buff_sv = std::string_view(notify_buff, len);
-
         // memcpy(coinbase_tx_id,
         //        bTemplate.tx_list.transactions[0].data_hex.data(), HASH_SIZE);
     }
 
-    std::string GenNotifyMsg() override
+    std::string GenNotifyMsg() const override
     {
         std::vector<std::string> merkle_steps_str(merkle_steps_count);
 
@@ -210,12 +206,6 @@ class Job<StratumProtocol::BTC> : public JobBaseBtc
         constexpr auto MERKLE_ROOT_POS = VERSION_SIZE + PREVHASH_SIZE;
         MerkleTree::CalcRootFromSteps(buff + MERKLE_ROOT_POS, cbtxid,
                                       merkle_steps, merkle_steps_count);
-
-        // PrintHex(cbtxid, HASH_SIZE, "Coinb txid");
-        // PrintHex(coinbase_bin.get(), coinbase_size, "Coinb data");
-        // PrintHex(merkle_steps.data(), merkle_steps_count * HASH_SIZE,
-        //          "Merkle steps");
-        // PrintHex(buff + MERKLE_ROOT_POS, HASH_SIZE, "Merkle root");
 
         constexpr auto TIME_POS = MERKLE_ROOT_POS + MERKLE_ROOT_SIZE;
         Unhexlify(buff + TIME_POS, share.time.data(), TIME_SIZE * 2);

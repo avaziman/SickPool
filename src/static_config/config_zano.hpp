@@ -1,10 +1,10 @@
+#ifndef ZANO_CONFIG_HPP_
+#define ZANO_CONFIG_HPP_
 #include "crypto/verushash/arith_uint256.h"
 #include "crypto/verushash/uint256.h"
 #include "hash_algo.hpp"
-
-#define STRATUM_PROTOCOL_CN 1
-#define ALIAS_NAME_MAX_LEN 255
-const HashAlgo HASH_ALGO = HashAlgo::PROGPOWZ;
+#include "static_config.hpp"
+#define ZANO_ALIAS_NAME_MAX_LEN 255
 
 static constexpr std::string_view target_zano_sv =
     "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
@@ -24,3 +24,5 @@ constexpr StaticConf ZanoStatic = {
     .BLOCK_HEADER_SIZE = 81,
     .BLOCK_HEADER_STATIC_SIZE = 36,  // VERSION_SIZE + PREVHASH_SIZE
     .COINBASE_MATURITY = 10};
+
+#endif

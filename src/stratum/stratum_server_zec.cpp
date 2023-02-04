@@ -1,6 +1,7 @@
 #include "stratum_server_zec.hpp"
 
 #include "static_config.hpp"
+template class StratumServerZec<VrscStatic>;
 
 template <StaticConf confs>
 void StratumServerZec<confs>::HandleReq(Connection<StratumClient> *conn,
@@ -45,7 +46,7 @@ void StratumServerZec<confs>::HandleReq(Connection<StratumClient> *conn,
 
     if (method == "mining.submit")
     {
-        res = HandleSubmit(cli, wc, params);
+        res = HandleSubmit(conn, wc, params);
     }
     else if (method == "mining.subscribe")
     {
@@ -57,17 +58,11 @@ void StratumServerZec<confs>::HandleReq(Connection<StratumClient> *conn,
         if (res.code == ResCode::OK)
         {
             this->SendRes(sock, id, res);
-            UpdateDifficulty(cli);
+            UpdateDifficulty(conn);
 
-            const JobT *job = this->job_manager.GetLastJob();
+            const std::shared_ptr<JobT> job = this->job_manager.GetLastJob();
 
-            if (job == nullptr)
-            {
-                logger.Log<LogType::Critical>("No jobs to broadcast!");
-                return;
-            }
-
-            BroadcastJob(cli, job);
+            this->BroadcastJob(conn, 0.0, job.get());
             return;
         }
     }
@@ -134,13 +129,15 @@ RpcResult StratumServerZec<confs>::HandleSubscribe(
 //     if (split == std::string_view::npos)
 //     {
 //         return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-//                          "invalid worker name format, use: address/id@.worker");
+//                          "invalid worker name format, use:
+//                          address/id@.worker");
 //     }
 //     else if (worker_full.size() > MAX_WORKER_NAME_LEN + ADDRESS_LEN + 1)
 //     {
 //         return RpcResult(
 //             ResCode::UNAUTHORIZED_WORKER,
-//             "Worker name too long! (max " STRM(MAX_WORKER_NAME_LEN) " chars)");
+//             "Worker name too long! (max " STRM(MAX_WORKER_NAME_LEN) "
+//             chars)");
 //     }
 
 //     given_addr = worker_full.substr(0, split);
@@ -214,15 +211,15 @@ RpcResult StratumServerZec<confs>::HandleSubscribe(
 // https://zips.z.cash/zip-0301#mining-submit
 template <StaticConf confs>
 RpcResult StratumServerZec<confs>::HandleSubmit(
-    StratumClient *cli, WorkerContextT *wc, simdjson::ondemand::array &params)
+    Connection<StratumClient> *con, WorkerContextT *wc, simdjson::ondemand::array &params)
 {
     using namespace simdjson;
-    using namespace CoinConstantsZec;
 
     // parsing takes 0-1 us
     ShareZec share;
     std::string parse_error = "";
 
+    const auto cli = con->ptr;
     const auto end = params.end();
     auto it = params.begin();
     error_code error;
@@ -232,7 +229,7 @@ RpcResult StratumServerZec<confs>::HandleSubmit(
         parse_error = "Bad worker.";
     }
     else if (++it == end || (error = (*it).get_string().get(share.job_id)) ||
-             share.job_id.size() != JOBID_SIZE * 2)
+             share.job_id.size() != this->JOBID_SIZE * 2)
     {
         parse_error = "Bad job id.";
     }
@@ -261,12 +258,11 @@ RpcResult StratumServerZec<confs>::HandleSubmit(
         return RpcResult(ResCode::UNKNOWN, parse_error);
     }
 
-    return HandleShare(cli, wc, share);
+    return this->HandleShare(con, wc, share);
 }
 
 template <StaticConf confs>
-void StratumServerZec<confs>::UpdateDifficulty(
-    Connection<StratumClient> *conn)
+void StratumServerZec<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
 {
     auto diff_hex = GetDifficultyHex<confs>(conn->ptr->GetDifficulty());
     std::string_view hex_target_sv(diff_hex.data(), diff_hex.size());
@@ -276,8 +272,15 @@ void StratumServerZec<confs>::UpdateDifficulty(
         "difficulty\",\"params\":[\"{}\"]}}\n",
         hex_target_sv);
 
-    this->SendRaw(conn->sockfd, msg.data(), msg.size());
+    this->SendRaw(conn->sockfd, msg);
 
     logger.Log<LogType::Debug>("Set difficulty for {} to {}",
                                conn->ptr->GetFullWorkerName(), hex_target_sv);
+}
+
+template <StaticConf confs>
+void StratumServerZec<confs>::BroadcastJob(Connection<StratumClient> *conn,
+                                           double diff, const JobT *job) const
+{
+    this->SendRaw(conn->sockfd, job->notify_msg);
 }

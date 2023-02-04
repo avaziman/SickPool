@@ -24,6 +24,7 @@ enum class StratumProtocol
 enum class Coin
 {
     BTC,
+    VRSC,
     ZANO
 };
 

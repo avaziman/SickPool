@@ -11,6 +11,7 @@
 #include <set>
 #include <unordered_set>
 
+#include "config_vrsc.hpp"
 #include "difficulty_manager.hpp"
 #include "hash_wrapper.hpp"
 #include "stats.hpp"
@@ -109,7 +110,7 @@ class StratumClient : public VarDiff
     static uint32_t extra_nonce_counter;
 
     const uint32_t extra_nonce;
-    char extra_nonce_hex[EXTRANONCE_SIZE * 2];
+    char extra_nonce_hex[StratumConstants::EXTRANONCE_SIZE * 2];
 
     uint64_t last_adjusted;
     uint64_t last_share_time;

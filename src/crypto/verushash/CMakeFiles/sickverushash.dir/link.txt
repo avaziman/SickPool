@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsickverushash.a CMakeFiles/sickverushash.dir/arith_uint256.cpp.o CMakeFiles/sickverushash.dir/haraka.c.o CMakeFiles/sickverushash.dir/haraka_portable.c.o CMakeFiles/sickverushash.dir/ripemd160.cpp.o CMakeFiles/sickverushash.dir/sha256.cpp.o CMakeFiles/sickverushash.dir/uint256.cpp.o CMakeFiles/sickverushash.dir/util/strencodings.cpp.o CMakeFiles/sickverushash.dir/verus_clhash.cpp.o CMakeFiles/sickverushash.dir/verus_clhash_portable.cpp.o CMakeFiles/sickverushash.dir/verus_hash.cpp.o
+/usr/bin/ranlib libsickverushash.a

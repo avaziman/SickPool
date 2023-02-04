@@ -8,10 +8,10 @@
 #include "static_config.hpp"
 
 template <StratumProtocol sp>
-struct StratumShare{};
+struct StratumShareT{};
 
 template <> 
-struct StratumShare<StratumProtocol::ZEC>
+struct StratumShareT<StratumProtocol::ZEC>
 {
     // as in order of appearance
     std::string_view worker;
@@ -22,10 +22,10 @@ struct StratumShare<StratumProtocol::ZEC>
 
     uint32_t time;
 };
-using ShareZec = StratumShare<StratumProtocol::ZEC>;
+using ShareZec = StratumShareT<StratumProtocol::ZEC>;
 
 template <>
-struct StratumShare<StratumProtocol::BTC>
+struct StratumShareT<StratumProtocol::BTC>
 {
     // as in order of appearance
     std::string_view worker;
@@ -37,10 +37,10 @@ struct StratumShare<StratumProtocol::BTC>
     uint32_t time;
     uint32_t nonce;
 };
-using ShareBtc = StratumShare<StratumProtocol::BTC>;
+using ShareBtc = StratumShareT<StratumProtocol::BTC>;
 
 template <>
-struct StratumShare<StratumProtocol::CN>
+struct StratumShareT<StratumProtocol::CN>
 {
     std::string_view worker;
     
@@ -51,7 +51,7 @@ struct StratumShare<StratumProtocol::CN>
 
     uint64_t nonce;
 };
-using ShareCn = StratumShare<StratumProtocol::CN>;
+using ShareCn = StratumShareT<StratumProtocol::CN>;
 
 template <size_t BLOCK_HEADER_SIZE>
 struct WorkerContext
@@ -60,9 +60,7 @@ struct WorkerContext
     simdjson::ondemand::parser json_parser;
     uint8_t block_header[BLOCK_HEADER_SIZE];
 
-    #if HASH_ALGO == HASH_ALGO_VERUSHASH
     CVerusHashV2 hasher = CVerusHashV2(SOLUTION_VERUSHHASH_V2_2);
-    #endif
 };
 
 enum class ResCode

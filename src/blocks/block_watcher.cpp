@@ -3,7 +3,7 @@ template class BlockWatcher<ZanoStatic>;
 
 template <StaticConf confs>
 BlockWatcher<confs>::BlockWatcher(const PersistenceLayer* pl,
-                                  daemon_manager_t* daemon_manager)
+                                  DaemonManagerT* daemon_manager)
     : persistence_block(*pl), daemon_manager(daemon_manager)
 {
 }

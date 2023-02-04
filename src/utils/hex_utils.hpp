@@ -1,10 +1,10 @@
 #ifndef HEX_UTILS_HPP
 #define HEX_UTILS_HPP
 #include <array>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <string>
-#include <cmath>
 
 constexpr auto u64maxd = static_cast<double>(UINT64_MAX);
 
@@ -63,6 +63,15 @@ inline void ReverseHex(char* dest, const char* input, uint32_t size)
     }
 }
 
+template <size_t T>
+std::array<char, T> ReverseHexArr(std::string_view src)
+{
+    std::array<char, T> arr{};
+    ReverseHex(arr.data(), src.data(), src.size());
+
+    return arr;
+}
+
 constexpr char GetHex(char c)
 {
     // assumes all hex is in lowercase
@@ -97,7 +106,8 @@ constexpr void Hexlify(char* dest, const T* src, size_t srcSize)
     {
         unsigned char val = src[i];
 
-        char c1 = '0', c2 = '0';
+        char c1 = '0';
+        char c2 = '0';
         if (val < 16)
             c2 = hex[val];
         else
@@ -139,7 +149,7 @@ constexpr auto Hexlify()
 }
 
 inline void PrintHex(const uint8_t* b, std::size_t size,
-                     std::string comment = "")
+                     std::string_view comment = "")
 {
     std::cout << comment << ": ";
     for (int i = 0; i < size; i++)
@@ -159,6 +169,14 @@ constexpr void Unhexlify(unsigned char* dest, const char* src,
         unsigned char char2 = GetHex(src[i * 2 + 1]);
         dest[i] = char2 + char1 * 16;
     }
+}
+
+template <size_t size>
+constexpr std::array<uint8_t, size / 2> Unhexlify(std::string_view src)
+{
+    std::array<uint8_t, size / 2> res{};
+    Unhexlify(res.data(), src.data(), size);
+    return res;
 }
 
 template <size_t size>

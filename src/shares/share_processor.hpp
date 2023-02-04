@@ -22,14 +22,14 @@ class ShareProcessor
 {
    public:
     //     template <StratumProtocol sp>
-    //     static inline bool VerifyShareParams(ShareResult& result, const JobT*
+    //     static inline bool VerifyShareParams(ShareResult& result, const Job*
     //     job,
     //                                          std::string_view given_time,
     //                                          const int64_t curtime);
 
     //     template <>
     //     static inline bool VerifyShareParams<StratumProtocol::CN>(
-    //         ShareResult& result, const JobT* job, std::string_view
+    //         ShareResult& result, const Job* job, std::string_view
     //         given_time, const int64_t curtime)
     //     {
     //         uint32_t shareTime = static_cast<uint32_t>(
@@ -73,7 +73,7 @@ class ShareProcessor
         ShareResult& result, StratumClient* cli,
         WorkerContext<confs.BLOCK_HEADER_SIZE>* wc,
         const Job<confs.STRATUM_PROTOCOL>* job,
-        const StratumShare<confs.STRATUM_PROTOCOL>& share, int64_t curTime)
+        const StratumShareT<confs.STRATUM_PROTOCOL>& share, int64_t curTime)
     {
         // veirfy params before even hashing
 
@@ -84,10 +84,10 @@ class ShareProcessor
         //     return;
         // }
 
-        job->GetHeaderData(wc->block_header, share, cli->extra_nonce_sv);
-
-        // std::cout << "block header: " << std::endl;
-        // PrintHex(wc->block_header, BLOCK_HEADER_SIZE);
+        if constexpr (confs.STRATUM_PROTOCOL != StratumProtocol::CN)
+        {
+            job->GetHeaderData(wc->block_header, share, cli->extra_nonce_sv);
+        }
 
         if constexpr (confs.HASH_ALGO == HashAlgo::PROGPOWZ)
         {
@@ -98,14 +98,9 @@ class ShareProcessor
         else if constexpr (confs.HASH_ALGO == HashAlgo::VERUSHASH_V2b2)
         {
             // takes about 6-8 microseconds vs 8-12 on snomp
-            // HashWrapper::VerushashV2b2(result.hash_bytes.data(),
-            // wc->block_header,
-            //                            BLOCK_HEADER_SIZE, &wc->hasher);
-        }
-        else if constexpr (confs.HASH_ALGO == HashAlgo::X25X)
-        {
-            // HashWrapper::X25X(result.hash_bytes.data(), wc->block_header,
-            //                   BLOCK_HEADER_SIZE);
+            HashWrapper::VerushashV2b2(result.hash_bytes.data(),
+                                       wc->block_header, CoinConstantsZec::BLOCK_HEADER_SIZE,
+                                       &wc->hasher);
         }
         else
         {
@@ -115,9 +110,11 @@ class ShareProcessor
         // take from the end as first will have zeros
         // convert to uint32, (this will lose data)
 
-        if (auto shareEnd =
-                *reinterpret_cast<uint32_t*>(result.hash_bytes.end() - sizeof(uint32_t));
-            !cli->SetLastShare(shareEnd, curTime))
+        uint32_t share_end = 0;
+        std::memcpy(&share_end, result.hash_bytes.end() - sizeof(share_end),
+                    sizeof(share_end));
+
+        if (!cli->SetLastShare(share_end, curTime))
         {
             result.code = ResCode::DUPLICATE_SHARE;
             result.message = "Duplicate share";

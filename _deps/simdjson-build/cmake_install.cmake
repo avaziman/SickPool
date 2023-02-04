@@ -46,8 +46,49 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xsimdjson_Developmentx" OR NOT CMAKE
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include" TYPE FILE FILES "/home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-src/singleheader/simdjson.h")
 endif()
 
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xsimdjson_Runtimex" OR NOT CMAKE_INSTALL_COMPONENT)
+  foreach(file
+      "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so.13.0.0"
+      "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so.13"
+      )
+    if(EXISTS "${file}" AND
+       NOT IS_SYMLINK "${file}")
+      file(RPATH_CHECK
+           FILE "${file}"
+           RPATH "")
+    endif()
+  endforeach()
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES
+    "/home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build/libsimdjson.so.13.0.0"
+    "/home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build/libsimdjson.so.13"
+    )
+  foreach(file
+      "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so.13.0.0"
+      "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so.13"
+      )
+    if(EXISTS "${file}" AND
+       NOT IS_SYMLINK "${file}")
+      if(CMAKE_INSTALL_DO_STRIP)
+        execute_process(COMMAND "/usr/bin/strip" "${file}")
+      endif()
+    endif()
+  endforeach()
+endif()
+
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xsimdjson_Developmentx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE STATIC_LIBRARY FILES "/home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build/libsimdjson.a")
+  if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so" AND
+     NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so")
+    file(RPATH_CHECK
+         FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so"
+         RPATH "")
+  endif()
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/sickguy/Documents/Projects/SickPool/server/_deps/simdjson-build/libsimdjson.so")
+  if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so" AND
+     NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so")
+    if(CMAKE_INSTALL_DO_STRIP)
+      execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libsimdjson.so")
+    endif()
+  endif()
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xsimdjson_Developmentx" OR NOT CMAKE_INSTALL_COMPONENT)

@@ -137,7 +137,7 @@ RpcResult StratumServerBtc<confs>::HandleSubmit(StratumClient *cli, WorkerContex
         parse_error = "Bad worker.";
     }
     else if (++it == end || (error = (*it).get_string().get(share.job_id)) ||
-             share.job_id.size() != JOBID_SIZE * 2)
+             share.job_id.size() != this->JOBID_SIZE * 2)
     {
         parse_error = "Bad job id.";
     }

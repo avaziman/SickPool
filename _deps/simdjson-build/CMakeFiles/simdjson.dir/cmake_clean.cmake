@@ -1,8 +1,10 @@
 file(REMOVE_RECURSE
   "CMakeFiles/simdjson.dir/src/simdjson.cpp.o"
   "CMakeFiles/simdjson.dir/src/simdjson.cpp.o.d"
-  "libsimdjson.a"
   "libsimdjson.pdb"
+  "libsimdjson.so"
+  "libsimdjson.so.13"
+  "libsimdjson.so.13.0.0"
 )
 
 # Per-language clean rules from dependency scanning.

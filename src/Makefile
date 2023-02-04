@@ -107,7 +107,7 @@ rebuild_cache/fast: rebuild_cache
 
 # Special rule for the target list_install_components
 list_install_components:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\" \"simdjson_Development\""
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\" \"simdjson_Development\" \"simdjson_Runtime\""
 .PHONY : list_install_components
 
 # Special rule for the target list_install_components
@@ -243,30 +243,6 @@ crypto/hash_wrapper.cpp.s:
 	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/crypto/hash_wrapper.cpp.s
 .PHONY : crypto/hash_wrapper.cpp.s
 
-daemon/daemon_manager_sin.o: daemon/daemon_manager_sin.cpp.o
-.PHONY : daemon/daemon_manager_sin.o
-
-# target to build an object file
-daemon/daemon_manager_sin.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/daemon/daemon_manager_sin.cpp.o
-.PHONY : daemon/daemon_manager_sin.cpp.o
-
-daemon/daemon_manager_sin.i: daemon/daemon_manager_sin.cpp.i
-.PHONY : daemon/daemon_manager_sin.i
-
-# target to preprocess a source file
-daemon/daemon_manager_sin.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/daemon/daemon_manager_sin.cpp.i
-.PHONY : daemon/daemon_manager_sin.cpp.i
-
-daemon/daemon_manager_sin.s: daemon/daemon_manager_sin.cpp.s
-.PHONY : daemon/daemon_manager_sin.s
-
-# target to generate assembly for a file
-daemon/daemon_manager_sin.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/daemon/daemon_manager_sin.cpp.s
-.PHONY : daemon/daemon_manager_sin.cpp.s
-
 daemon/daemon_manager_zano.o: daemon/daemon_manager_zano.cpp.o
 .PHONY : daemon/daemon_manager_zano.o
 
@@ -315,30 +291,6 @@ difficulty/difficulty_manager.cpp.s:
 	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/difficulty/difficulty_manager.cpp.s
 .PHONY : difficulty/difficulty_manager.cpp.s
 
-jobs/job_manager.o: jobs/job_manager.cpp.o
-.PHONY : jobs/job_manager.o
-
-# target to build an object file
-jobs/job_manager.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/jobs/job_manager.cpp.o
-.PHONY : jobs/job_manager.cpp.o
-
-jobs/job_manager.i: jobs/job_manager.cpp.i
-.PHONY : jobs/job_manager.i
-
-# target to preprocess a source file
-jobs/job_manager.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/jobs/job_manager.cpp.i
-.PHONY : jobs/job_manager.cpp.i
-
-jobs/job_manager.s: jobs/job_manager.cpp.s
-.PHONY : jobs/job_manager.s
-
-# target to generate assembly for a file
-jobs/job_manager.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/jobs/job_manager.cpp.s
-.PHONY : jobs/job_manager.cpp.s
-
 jobs/job_manager_cryptonote.o: jobs/job_manager_cryptonote.cpp.o
 .PHONY : jobs/job_manager_cryptonote.o
 
@@ -362,30 +314,6 @@ jobs/job_manager_cryptonote.s: jobs/job_manager_cryptonote.cpp.s
 jobs/job_manager_cryptonote.cpp.s:
 	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/jobs/job_manager_cryptonote.cpp.s
 .PHONY : jobs/job_manager_cryptonote.cpp.s
-
-jobs/job_manager_sin.o: jobs/job_manager_sin.cpp.o
-.PHONY : jobs/job_manager_sin.o
-
-# target to build an object file
-jobs/job_manager_sin.cpp.o:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/jobs/job_manager_sin.cpp.o
-.PHONY : jobs/job_manager_sin.cpp.o
-
-jobs/job_manager_sin.i: jobs/job_manager_sin.cpp.i
-.PHONY : jobs/job_manager_sin.i
-
-# target to preprocess a source file
-jobs/job_manager_sin.cpp.i:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/jobs/job_manager_sin.cpp.i
-.PHONY : jobs/job_manager_sin.cpp.i
-
-jobs/job_manager_sin.s: jobs/job_manager_sin.cpp.s
-.PHONY : jobs/job_manager_sin.s
-
-# target to generate assembly for a file
-jobs/job_manager_sin.cpp.s:
-	cd /home/sickguy/Documents/Projects/SickPool/server && $(MAKE) $(MAKESILENT) -f src/CMakeFiles/SickPool_core.dir/build.make src/CMakeFiles/SickPool_core.dir/jobs/job_manager_sin.cpp.s
-.PHONY : jobs/job_manager_sin.cpp.s
 
 jobs/job_manager_vrsc.o: jobs/job_manager_vrsc.cpp.o
 .PHONY : jobs/job_manager_vrsc.o
@@ -984,24 +912,15 @@ help:
 	@echo "... crypto/hash_wrapper.o"
 	@echo "... crypto/hash_wrapper.i"
 	@echo "... crypto/hash_wrapper.s"
-	@echo "... daemon/daemon_manager_sin.o"
-	@echo "... daemon/daemon_manager_sin.i"
-	@echo "... daemon/daemon_manager_sin.s"
 	@echo "... daemon/daemon_manager_zano.o"
 	@echo "... daemon/daemon_manager_zano.i"
 	@echo "... daemon/daemon_manager_zano.s"
 	@echo "... difficulty/difficulty_manager.o"
 	@echo "... difficulty/difficulty_manager.i"
 	@echo "... difficulty/difficulty_manager.s"
-	@echo "... jobs/job_manager.o"
-	@echo "... jobs/job_manager.i"
-	@echo "... jobs/job_manager.s"
 	@echo "... jobs/job_manager_cryptonote.o"
 	@echo "... jobs/job_manager_cryptonote.i"
 	@echo "... jobs/job_manager_cryptonote.s"
-	@echo "... jobs/job_manager_sin.o"
-	@echo "... jobs/job_manager_sin.i"
-	@echo "... jobs/job_manager_sin.s"
 	@echo "... jobs/job_manager_vrsc.o"
 	@echo "... jobs/job_manager_vrsc.i"
 	@echo "... jobs/job_manager_vrsc.s"

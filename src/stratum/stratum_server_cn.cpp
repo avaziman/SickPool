@@ -135,7 +135,7 @@ void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn, const
                                           int id) const
 {
     std::string msg = job->template GetWorkMessage<confs>(conn->ptr->GetDifficulty(), id);
-    this->SendRaw(conn->sockfd, msg.data(), msg.size());
+    this->SendRaw(conn->sockfd, msg);
 }
 
 template <StaticConf confs>
@@ -143,7 +143,7 @@ void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn, doubl
                                           const JobT *job) const
 {
     std::string msg = job->template GetWorkMessage<confs>(diff);
-    this->SendRaw(conn->sockfd, msg.data(), msg.size());
+    this->SendRaw(conn->sockfd, msg);
 }
 
 template <StaticConf confs>

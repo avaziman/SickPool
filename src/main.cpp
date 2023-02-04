@@ -12,6 +12,7 @@
 #include "sock_addr.hpp"
 #include "static_config.hpp"
 #include "stratum/stratum_server.hpp"
+#include "stratum_server_zec.hpp"
 #include "stratum_server_cn.hpp"
 
 StratumBase* stratum_bserver_ptr;
@@ -37,6 +38,12 @@ void SigintHandler(int sig)
     logger.Log<Info>("Stopping stratum server...");
 
     stratum_bserver_ptr->Stop();
+}
+
+void PrintStaticStats(StaticConf confs){
+        logger.Log<Info>("Static config:");
+        logger.Log<Info>("Diff1: {}", confs.DIFF1);
+        logger.Log<Info>("Share multiplier: {}", pow2d(256) / confs.DIFF1);
 }
 
 int main(int argc, char** argv)
@@ -67,15 +74,20 @@ int main(int argc, char** argv)
         if (coinConfig.symbol == "ZANO")
         {
             static constexpr StaticConf confs = ZanoStatic;
-            logger.Log<Info>("Static config:");
-            logger.Log<Info>("Diff1: {}", confs.DIFF1);
-            logger.Log<Info>("Share multiplier: {}", pow2d(256) / confs.DIFF1);
+            PrintStaticStats(confs);
 
             StratumServerCn<confs> stratum_server(std::move(coinConfig));
             stratum_bserver_ptr = dynamic_cast<StratumBase*>(&stratum_server);
             stratum_server.Listen();
         }
-        else
+        else if (coinConfig.symbol == "VRSC"){
+            static constexpr StaticConf confs = VrscStatic;
+            PrintStaticStats(confs);
+
+            StratumServerZec<confs> stratum_server(std::move(coinConfig));
+            stratum_bserver_ptr = dynamic_cast<StratumBase*>(&stratum_server);
+            stratum_server.Listen();
+        }else 
         {
             logger.Log<Error>("Unknown coin symbol: {} exitting...",
                               coinConfig.symbol);
@@ -88,3 +100,4 @@ int main(int argc, char** argv)
     }
     return EXIT_SUCCESS;  // graceful exit
 }
+

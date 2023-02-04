@@ -2,15 +2,13 @@
 #define JOB_MANAGER_VRSC_HPP_
 
 #include "job_manager.hpp"
-
-class JobManagerVrsc : public JobManager
+#include "job_vrsc.hpp"
+class JobManagerVrsc : public JobManager<JobVrsc, Coin::VRSC>
 {
    public:
     using JobManager::JobManager;
-    using JobManager::GetNewJob;
     // will be used when new transactions come on the same block
-    BlockTemplateVrsc blockTemplate;
 
-    const JobT* GetNewJob(const std::string& json_template) override;
+    bool GetBlockTemplate(BlockTemplateResCn& res) override;
 };
 #endif

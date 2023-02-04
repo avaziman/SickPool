@@ -15,7 +15,8 @@
 
 #include "difficulty/difficulty_manager.hpp"
 #include "logger.hpp"
-#include "payouts/payout_manager.hpp"
+#include "payout_manager.hpp"
+#include "config_zano.hpp"
 #include "persistence_stats.hpp"
 #include "redis_stats.hpp"
 #include "round.hpp"
@@ -30,13 +31,12 @@ class StatsManager
 {
    public:
     explicit StatsManager(const PersistenceLayer& redis_manager,
-                          RoundManager* round_manager, const StatsConfig* cc);
+                          RoundManager* round_manager, const StatsConfig* cc, double hash_multiplier);
 
     // Every hashrate_interval_seconds we need to write:
     // ) worker hashrate
     // ) miner hashrate
     // ) pool hashrate
-    template <StaticConf confs>
     void Start(std::stop_token st);
 
     bool LoadAvgHashrateSums(int64_t hr_time);
@@ -50,7 +50,6 @@ class StatsManager
 
     void PopWorker(const worker_map::iterator& it);
 
-    template <StaticConf confs>
     bool UpdateIntervalStats(int64_t update_time_ms);
 
     bool UpdateEffortStats(int64_t update_time_ms);
@@ -64,6 +63,7 @@ class StatsManager
     const StatsConfig* conf;
     PersistenceStats persistence_stats;
     RoundManager* round_manager;
+    const double hash_multiplier;
 
     NetworkStats network_stats;
     // workers that have disconnected from the pool, clean them after stats

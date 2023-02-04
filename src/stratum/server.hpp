@@ -34,7 +34,7 @@
 inline constexpr std::string_view field_str = "Server";
 
 template <typename T>
-class Server
+class Server : public ServerConstants
 {
    public:
     using connection_it = std::list<std::shared_ptr<Connection<T>>>::iterator;

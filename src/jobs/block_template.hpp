@@ -85,7 +85,7 @@
 //           tx_count(static_cast<uint32_t>(max_tx_count - 1)),
 //           // target_diff(BitsToDiff(bits)),
 //           target_diff((bits)),  // TODO: use target...
-//           expected_hashes(/*GetExpectedHashes<confs>*/ target_diff)
+//           expected_hashes(/*GetHashMultiplier<confs>*/ target_diff)
 //     {
 //     }
 

@@ -6,6 +6,7 @@
 #include <string>
 #include <list>
 #include <memory>
+#include "constants.hpp"
 
 #include "static_config.hpp"
 
@@ -24,7 +25,7 @@ struct Connection
     int expiration_count = 0;
 
     size_t req_pos = 0;
-    char req_buff[REQ_BUFF_SIZE];
+    char req_buff[ServerConstants::REQ_BUFF_SIZE];
     std::shared_ptr<T> ptr;
     std::list<std::shared_ptr<Connection<T>>>::iterator it;
 

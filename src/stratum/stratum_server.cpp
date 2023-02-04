@@ -1,17 +1,17 @@
 #include "stratum_server.hpp"
 template class StratumServer<ZanoStatic>;
+template class StratumServer<VrscStatic>;
 
 template <StaticConf confs>
 StratumServer<confs>::StratumServer(CoinConfig &&conf)
     : StratumBase(std::move(conf)),
       daemon_manager(coin_config.rpcs),
-      payout_manager(&persistence_layer, &daemon_manager,
-                     coin_config.pool_addr),
-      job_manager(&daemon_manager, &payout_manager, coin_config.pool_addr),
+      job_manager(&daemon_manager, coin_config.pool_addr),
       block_submitter(&daemon_manager, &round_manager),
-      stats_manager(persistence_layer, &round_manager, &conf.stats)
+      stats_manager(persistence_layer, &round_manager, &conf.stats, GetHashMultiplier<confs>())
 {
     static_assert(confs.DIFF1 != 0, "DIFF1 can't be zero!");
+    job_manager.GetFirstJob();
     persistence_layer.Init();
 
     if (auto error =
@@ -33,7 +33,7 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
     }
 
     stats_thread = std::jthread(
-        std::bind_front(&StatsManager::Start<confs>, &stats_manager));
+        std::bind_front(&StatsManager::Start, &stats_manager));
 }
 
 template <StaticConf confs>
@@ -194,23 +194,26 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
         std::string blockData;
         blockData.reserve(blockSize);
 
-#ifdef STRATUM_PROTOCOL_ZEC
-        job->GetBlockHex(blockData, wc->block_header);
-#elif defined(STRATUM_PROTOCOL_BTC)
-        job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
-                         share.extranonce2);
-#elif defined(STRATUM_PROTOCOL_CN)
-
-        job->GetBlockHex(blockData, share.nonce);
-#else
-
-#endif
+        if constexpr (confs.STRATUM_PROTOCOL == StratumProtocol::ZEC)
+        {
+            // job->GetBlockHex(blockData, wc->block_header);
+        }
+        else if constexpr (confs.STRATUM_PROTOCOL == StratumProtocol::BTC)
+        {
+            job->GetBlockHex(blockData, wc->block_header, cli->extra_nonce_sv,
+                             share.extranonce2);
+        }
+        else if constexpr (confs.STRATUM_PROTOCOL == StratumProtocol::CN)
+        {
+            job->GetBlockHex(blockData, share.nonce);
+            // special hash
+            share_res.hash_bytes = job->GetBlockHash(share.nonce);
+        }
 
         // submit ASAP
         auto block_hex = std::string_view(blockData.data(), blockSize);
         block_submitter.TrySubmit(block_hex, httpParser);
 
-        share_res.hash_bytes = job->GetBlockHash(share.nonce);
         logger.template Log<LogType::Info>("Block hex: {}", block_hex);
 
         // job will remain safe thanks to the lock.
@@ -456,7 +459,7 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
 
     const auto fid = FullId{static_cast<MinerId>(miner_id),
                             static_cast<WorkerId>(worker_id)};
-                            
+
     std::string worker_full_str = fmt::format("{}.{}", address, worker);
     worker_map::iterator stats_it = stats_manager.AddExistingWorker(fid);
 

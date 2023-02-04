@@ -1,24 +1,22 @@
 #include "./stats_manager.hpp"
 
-template void StatsManager::Start<ZanoStatic>(std::stop_token st);
-
 uint32_t StatsManager::average_interval_ratio;
 
 StatsManager::StatsManager(const PersistenceLayer& pl,
-                           RoundManager* round_manager, const StatsConfig* cc)
-    : conf(cc), persistence_stats(pl), round_manager(round_manager)
+                           RoundManager* round_manager, const StatsConfig* cc,
+                           double hash_multiplier)
+    : conf(cc), persistence_stats(pl), round_manager(round_manager), hash_multiplier(hash_multiplier)
 {
     StatsManager::average_interval_ratio =
         cc->average_hashrate_interval_seconds / cc->hashrate_interval_seconds;
 }
 
-template <StaticConf confs>
 void StatsManager::Start(std::stop_token st)
 {
     using namespace std::chrono;
 
     logger.Log<LogType::Info>("Started stats manager...");
-    int64_t now = std::time(nullptr);
+    int64_t now = GetCurrentTimeMs() / 1000;
 
     // rounded to the nearest divisible effort_internval_seconds
     int64_t next_effort_update = now - (now % conf->effort_interval_seconds) +
@@ -43,7 +41,7 @@ void StatsManager::Start(std::stop_token st)
         if (next_update == next_interval_update)
         {
             next_interval_update += conf->hashrate_interval_seconds;
-            UpdateIntervalStats<confs>(update_time_ms);
+            UpdateIntervalStats(update_time_ms);
             // no need to lock as its after the stats update and adding shares
             // doesnt affect it
             std::unique_lock _(to_remove_mutex);
@@ -72,17 +70,11 @@ void StatsManager::Start(std::stop_token st)
             round_manager->PushPendingShares();
 #endif
         }
-
-        auto startChrono = system_clock::now();
-
-        auto endChrono = system_clock::now();
-        auto duration = duration_cast<microseconds>(endChrono - startChrono);
     }
 
     logger.Log<LogType::Info>("Stopped stats manager on thread {}", gettid());
 }
 
-template <StaticConf confs>
 bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 {
     using namespace std::string_view_literals;
@@ -98,7 +90,7 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
     for (auto& [worker_id, ws] : worker_stats_map)
     {
         ws.interval_hashrate =
-            GetExpectedHashes<confs>(ws.current_interval_effort) /
+            hash_multiplier * ws.current_interval_effort /
             (double)conf->hashrate_interval_seconds;
 
         auto& miner_stats = miner_stats_map[worker_id.miner_id];

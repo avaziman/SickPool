@@ -17,6 +17,7 @@
 #include "static_config.hpp"
 #include "utils.hpp"
 
+// has static notify message
 class JobBaseBtc : public JobBase
 {
    public:
@@ -62,7 +63,6 @@ class JobBaseBtc : public JobBase
     // virtual void GetHeaderData(uint8_t* buff, const share_t& share,
     //                    std::string_view nonce1) const = 0;
 
-   private:
     const std::string notify_msg;
 };
 

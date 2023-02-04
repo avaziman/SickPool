@@ -15,7 +15,7 @@
 #include "block_template.hpp"
 #include "cn/currency_core/currency_basic.h"
 #include "currency_format_utils_blocks.h"
-#include "daemon_responses_cryptonote.hpp"
+#include "daemon_manager_zano.hpp"
 #include "job.hpp"
 #include "job_base_btc.hpp"
 #include "serialization/serialization.h"
@@ -23,6 +23,7 @@
 #include "static_config.hpp"
 #include "stratum_client.hpp"
 #include "utils.hpp"
+using BlockTemplateResCn = DaemonManagerT<Coin::ZANO>::BlockTemplateRes;
 
 struct BlockTemplateCn
 {
@@ -43,13 +44,13 @@ struct BlockTemplateCn
     {
         currency::block res;
 
-        bool deres = t_unserializable_object_from_blob<currency::block>(
-            res, template_bin);
+        // bool deres =
+        t_unserializable_object_from_blob<currency::block>(res, template_bin);
 
         return res;
     }
 
-    auto GetTemplateHash(const currency::block& block) const
+    std::array<uint8_t, 32> GetTemplateHash(const currency::block& block) const
     {
         std::string template_hash_blob =
             currency::get_block_hashing_blob(block);
@@ -60,8 +61,7 @@ struct BlockTemplateCn
     }
 
     explicit BlockTemplateCn(const BlockTemplateResCn& btemplate)
-        :  // prev_hash(btemplate.prev_hash),
-          BlockTemplateCn(btemplate, UnhexlifyS(btemplate.blob))
+        : BlockTemplateCn(btemplate, UnhexlifyS(btemplate.blob))
     {
     }
 
@@ -81,13 +81,12 @@ struct BlockTemplateCn
     explicit BlockTemplateCn(const BlockTemplateResCn& btemplate,
                              std::string_view block_bin,
                              const currency::block& block)
-        :  // prev_hash(btemplate.prev_hash),
-          block_bin(block_bin),
+        : block_bin(block_bin),
           seed(btemplate.seed),
           height(btemplate.height),
           target_diff(static_cast<double>(btemplate.difficulty)),
-          expected_hashes(
-              GetExpectedHashes<ZanoStatic>(static_cast<double>(target_diff))),
+          expected_hashes(GetHashMultiplier<ZanoStatic>() *
+                          static_cast<double>(target_diff)),
           block_size(static_cast<uint32_t>(btemplate.blob.size() / 2)),
           coinbase_value(block.miner_tx.vout[0].amount),
           // include coinbase tx
@@ -109,13 +108,8 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
     {
     }
 
-    void GetHeaderData(uint8_t* buff, const ShareCn& share,
-                       std::string_view extranonce1) const /* override*/
-    {
-        // nothing to do
-    }
-
-    static constexpr auto nonce_offset = 1;  // right after major_version (u8)
+    // right after major_version (u8)
+    static constexpr auto nonce_offset = 1;
     inline void GetBlockHex(std::string& res, const uint64_t nonce) const
     {
         std::string cp;
@@ -174,5 +168,3 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
 using JobCryptoNote = Job<StratumProtocol::CN>;
 
 #endif
-
-// TODO: check if nonce2 hasnt change, reuse the coinbase txid?

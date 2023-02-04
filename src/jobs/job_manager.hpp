@@ -3,33 +3,57 @@
 #include <simdjson/simdjson.h>
 
 #include <algorithm>
+#include <mutex>
+#include <shared_mutex>
 #include <vector>
 
-#include "../crypto/hash_wrapper.hpp"
-#include "../daemon/daemon_rpc.hpp"
 #include "block_template.hpp"
-#include "daemon_manager_t.hpp"
-#include "job_base_btc.hpp"
+#include "daemon_manager_vrsc.hpp"
+#include "hash_algo.hpp"
+#include "hash_wrapper.hpp"
+#include "job_cryptonote.hpp"
+#include "job_vrsc.hpp"
 #include "logger.hpp"
 #include "payout_manager.hpp"
 #include "share.hpp"
 #include "static_config.hpp"
-
-template <typename JobT>
+template <typename Job, Coin coin>
 class JobManager
 {
    public:
-    explicit JobManager(daemon_manager_t* daemon_manager,
-                        PayoutManager* payout_manager,
-                        const std::string& pool_addr)
-        : pool_addr(pool_addr),
-          daemon_manager(daemon_manager),
-          payout_manager(payout_manager)
+    explicit JobManager(DaemonManagerT<coin>* daemon_manager,
+                        std::string_view pool_addr)
+        : pool_addr(pool_addr), daemon_manager(daemon_manager)
     {
+    }
+    virtual ~JobManager() = default;
+
+    void GetFirstJob()
+    {
+        typename DaemonManagerT<coin>::BlockTemplateRes res;
+        if (!GetBlockTemplate(res))
+        {
+            throw std::invalid_argument("Failed to generate first job!");
+        }
+
+        // insert first job at construction so we don't need to make sure
+        // last_job is valid
+        //  TODO: put in func (duplicate)
+        if constexpr (coin == Coin::ZANO)
+        {
+            // ID is template hash
+            std::make_shared<Job>(res, true);
+        }
+        else
+        {
+            std::string jobIdHex = fmt::format("{:08x}", job_count);
+
+            std::make_shared<Job>(std::move(jobIdHex), res, true);
+        }
     }
 
     // allow concurrect reading while not being modified
-    inline std::shared_ptr<JobT> GetJob(std::string_view hexId)
+    inline std::shared_ptr<Job> GetJob(std::string_view hexId)
     {
         std::shared_lock lock(jobs_mutex);
         for (const auto& job : jobs)
@@ -42,7 +66,7 @@ class JobManager
         return nullptr;
     }
 
-    inline std::shared_ptr<JobT> SetNewJob(std::shared_ptr<JobT> job)
+    inline std::shared_ptr<Job> SetNewJob(std::shared_ptr<Job> job)
     {
         job_count++;
 
@@ -52,7 +76,7 @@ class JobManager
             while (jobs.size())
             {
                 // incase a job is being used
-                std::shared_ptr<JobT> remove_job = std::move(jobs.back());
+                std::shared_ptr<Job> remove_job = std::move(jobs.back());
                 jobs.pop_back();
             }
         }
@@ -60,42 +84,76 @@ class JobManager
         return last_job;
     }
 
-    inline std::shared_ptr<JobT> GetLastJob()
+    inline std::shared_ptr<Job> GetLastJob()
     {
         std::shared_lock lock(jobs_mutex);
         return last_job;
     }
 
-   protected:
+    bool GetBlockTemplate(DaemonManagerT<coin>::BlockTemplateRes& btempate);
+
+    template <typename BlockTemplateResT>
+    // ASSUMES THIS IS NOT THE FIRST JOB
+    inline std::shared_ptr<Job> GetNewJob(const BlockTemplateResT& rpctemplate)
+    {
+        // only add the job if it's any different from the last one
+        bool clean = rpctemplate.height > last_job->height;
+
+        if (!clean
+        /* &&
+        *dynamic_cast<BlockTemplateCn*>(new_job.get()) ==
+            *dynamic_cast<BlockTemplateCn*>(last_job.get())*/)
+        {
+            return std::shared_ptr<Job>{};  // null shared ptr
+        }
+
+        std::shared_ptr<Job> new_job{};
+        if constexpr (coin == Coin::ZANO)
+        {
+            // ID is template hash
+            auto new_job = std::make_shared<Job>(rpctemplate, clean);
+        }
+        else
+        {
+            std::string jobIdHex = fmt::format("{:08x}", job_count);
+
+            new_job =
+                std::make_shared<Job>(std::move(jobIdHex), rpctemplate, clean);
+        }
+
+        return SetNewJob(std::move(new_job));
+    }
+
+    inline std::shared_ptr<Job> GetNewJob()
+    {
+        typename DaemonManagerT<coin>::BlockTemplateRes res;
+        if (!GetBlockTemplate(res))
+        {
+            this->logger.template Log<LogType::Critical>(
+                "Failed to get block template :(");
+            return std::shared_ptr<Job>{};
+        }
+
+        return GetNewJob(res);
+    }
+
+   private:
+    uint32_t job_count = 0;
+    std::shared_mutex jobs_mutex;
+    std::shared_ptr<Job> last_job;
+    // unordered map is not thread safe for modifying and accessing different
+    // elements, but a vector is, so we use other optimization (save last job)
+    std::vector<std::shared_ptr<Job>> jobs;
+
     // multiple jobs can use the same block template, (append transactions only)
     static constexpr std::string_view field_str = "JobManager";
     const Logger<field_str> logger;
     static constexpr std::string_view coinbase_extra = "SickPool.io";
     const std::string pool_addr;
 
-    daemon_manager_t* daemon_manager;
-    PayoutManager* payout_manager;
-
-    uint32_t job_count = 0;
+    DaemonManagerT<coin>* daemon_manager;
 
     simdjson::ondemand::parser jsonParser;
-
-   private:
-    std::shared_mutex jobs_mutex;
-    std::shared_ptr<JobT> last_job;
-    // unordered map is not thread safe for modifying and accessing different
-    // elements, but a vector is, so we use other optimization (save last job)
-    std::vector<std::shared_ptr<JobT>> jobs;
 };
-
-#if SICK_COIN == VRSC
-#include "job_manager_vrsc.hpp"
-using job_manager_t = JobManagerVrsc;
-#elif SICK_COIN == SIN
-#include "job_manager_sin.hpp"
-#else
-#include "job_manager_cryptonote.hpp"
-
-#endif
 
 #endif
