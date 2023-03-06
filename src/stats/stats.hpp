@@ -2,16 +2,11 @@
 #define STATS_HPP
 #include <fmt/core.h>
 
-#include <unordered_map>
 #include <list>
+#include <unordered_map>
+
 #include "redis_interop.hpp"
 #include "round.hpp"
-
-enum class BadDiff
-{
-    STALE_SHARE_DIFF = -1,
-    INVALID_SHARE_DIFF = -2
-};
 
 struct NetworkStats
 {
@@ -50,7 +45,8 @@ struct MinerStats : public WorkerStats
 
 using MinerId = uint32_t;
 using WorkerId = uint32_t;
-struct FullId {
+struct FullId
+{
     MinerId miner_id;
     WorkerId worker_id;
 };

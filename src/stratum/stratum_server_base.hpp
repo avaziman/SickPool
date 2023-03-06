@@ -73,8 +73,8 @@ class StratumBase : public Server<StratumClient>
 
    private:
     static constexpr std::string_view field_str = "StratumBase";
-    const Logger<field_str> logger;
-    
+    const Logger logger{field_str};
+
     std::vector<std::jthread> processing_threads;
 
     ControlServer control_server;

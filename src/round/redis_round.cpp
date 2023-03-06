@@ -70,14 +70,14 @@ void PersistenceRound::GetCurrentRound(Round *rnd, std::string_view chain,
 {
     std::string round_info_key = key_names.round_stats;
 
-    double total_effortd = zscore(round_info_key, EnumName<TOTAL_EFFORT>());
+    double total_effortd = std::stod(hget(round_info_key, EnumName<TOTAL_EFFORT>()));
     if (total_effortd == -1.0)
     {
         total_effortd = 0;
         AppendSetRoundInfo(EnumName<TOTAL_EFFORT>(), total_effortd);
     }
 
-    double start_timed = zscore(round_info_key, EnumName<START_TIME>());
+    double start_timed = std::stod(hget(round_info_key, EnumName<START_TIME>()));
     if (start_timed == -1.0)
     {
         start_timed = static_cast<double>(GetCurrentTimeMs());
@@ -85,7 +85,7 @@ void PersistenceRound::GetCurrentRound(Round *rnd, std::string_view chain,
     }
 
     double estimated_effortd =
-        zscore(round_info_key, EnumName<Prefix::ESTIMATED_EFFORT>());
+        std::stod(hget(round_info_key, EnumName<Prefix::ESTIMATED_EFFORT>()));
 
     rnd->round_start_ms = static_cast<uint64_t>(start_timed);
     rnd->estimated_effort = estimated_effortd;

@@ -4,7 +4,7 @@
 
 using enum Prefix;
 
-const Logger<RedisManager::logger_field> RedisManager::logger;
+const Logger RedisManager::logger{RedisManager::logger_field};
 redis_unique_ptr_context RedisManager::rc_unique;
 std::mutex RedisManager::rc_mutex;
 

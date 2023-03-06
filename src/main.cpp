@@ -17,7 +17,7 @@
 
 StratumBase* stratum_bserver_ptr;
 
-const Logger<config_field_str> logger;
+const Logger logger{config_field_str};
 using enum LogType;
 
 void SigintHandler(int sig)

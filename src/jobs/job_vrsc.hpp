@@ -5,6 +5,7 @@
 
 #include <array>
 #include <iomanip>
+#include <ranges>
 #include <sstream>
 #include <string>
 
@@ -12,6 +13,7 @@
 #include "config_vrsc.hpp"
 #include "constants.hpp"
 #include "daemon_manager_vrsc.hpp"
+#include "job.hpp"
 #include "job_base_btc.hpp"
 #include "merkle_tree.hpp"
 #include "share.hpp"
@@ -21,11 +23,11 @@ struct BlockTemplateZec
 {
     // ENCODED IN ORDER
 
-    const int32_t version;
+    const uint32_t version; /* int32*/
     const std::array<uint8_t, HASH_SIZE> prev_block_hash;
     const std::array<uint8_t, HASH_SIZE> merkle_root_hash;
     const std::array<uint8_t, HASH_SIZE> final_sroot_hash;
-    const uint64_t min_time;
+    const uint32_t min_time;
     const uint32_t bits;
 
     const uint32_t height;
@@ -35,21 +37,41 @@ struct BlockTemplateZec
     const double expected_hashes = 0;
     const uint32_t block_size = 0;
 
+    // EVERYTHING AS IN BLOCK ENCODING
     explicit BlockTemplateZec(
         const DaemonManagerT<Coin::VRSC>::BlockTemplateRes& bTemplate)
         : version(bTemplate.version),
-          prev_block_hash(Unhexlify<HASH_SIZE * 2>(bTemplate.prev_block_hash)),
+          prev_block_hash(
+              UnhexlifyRev<HASH_SIZE * 2>(bTemplate.prev_block_hash)),
           merkle_root_hash(MerkleTree::CalcRoot(
               MerkleTree::GetHashes(bTemplate.transactions))),
           final_sroot_hash(
-              Unhexlify<HASH_SIZE * 2>(bTemplate.final_sroot_hash)),
+              UnhexlifyRev<HASH_SIZE * 2>(bTemplate.final_sroot_hash)),
           min_time(bTemplate.min_time),
           bits(bTemplate.bits),
           height(bTemplate.height),
-          target_diff(0.0),
+          target_diff(HexToDouble(bTemplate.target)),
           coinbase_value(bTemplate.coinbase_value),
-          tx_count(bTemplate.transactions.size())
+          tx_count(static_cast<uint32_t>(bTemplate.transactions.size()))
     {
+    }
+
+    // only generating notify message once for efficiency
+    std::string GenerateNotifyMessage(std::string_view jobid,
+                                      std::string_view solution,
+                                      bool clean = true) const
+    {
+        // reverse all numbers for notify, they are written in correct order
+
+        return fmt::format(
+            "{{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+            "[\"{}\",\"{:08x}\",\"{}\",\"{}\",\"{}\",\"{"
+            ":08x}\",\"{:08x}\",{},\"{}\"]}}\n",
+            jobid,  // job id
+            bswap_32(version), HexlifyS(prev_block_hash),
+            HexlifyS(merkle_root_hash), HexlifyS(final_sroot_hash),
+            bswap_32(min_time), bswap_32(bits), clean,
+            std::string_view(solution.data(), 144));
     }
 };
 
@@ -64,7 +86,8 @@ class Job<StratumProtocol::ZEC>
         bool is_payment)
         : BlockTemplateZec(bTemplate),
           JobBaseBtc(std::move(jobId),
-                     GenerateNotifyMessage(bTemplate.solution))
+                     GenerateNotifyMessage(jobId, bTemplate.solution),
+                     bTemplate.transactions)
 
     {
         // difficulty is calculated from opposite byte encoding than in block
@@ -76,45 +99,44 @@ class Job<StratumProtocol::ZEC>
         //     ReverseHexArr(bTemplate.finals_root_hash);
     }
 
-    // only generating notify message once for efficiency
-    std::string GenerateNotifyMessage(std::string_view solution) const
+    void GetHeaderData(uint8_t* buff, const ShareZec& share,
+                       uint32_t nonce1) const /* override */
     {
-        // reverse all numbers for notify, they are written in correct order
+        // STATIC HEADER DATA (VERSION TO FINALSROOT)
+        memcpy(buff, &this->version, VERSION_SIZE + HASH_SIZE * 3);
 
-        return fmt::format(
-            "{{\"id\":null,\"method\":\"mining.notify\",\"params\":"
-            "[\"{}\",\"{:08x}\",\"{}\",\"{}\",\"{}\",\"{"
-            ":08x}\",\"{:08x}\",{},\"{}\"]}}\n",
-            id,  // job id
-            bswap_32(version), HexlifyS(prev_block_hash),
-            HexlifyS(merkle_root_hash), HexlifyS(final_sroot_hash),
-            bswap_32(min_time), bswap_32(bits), clean, solution);
+        constexpr int TIME_POS =
+            VERSION_SIZE + PREVHASH_SIZE + MERKLE_ROOT_SIZE + FINALSROOT_SIZE;
+
+        memcpy(buff + TIME_POS, &share.time, TIME_SIZE);
+
+        constexpr int BITS_POS = TIME_POS + TIME_SIZE;
+        memcpy(buff + BITS_POS, &this->bits, BITS_SIZE);
+
+        constexpr int NONCE1_POS = BITS_POS + BITS_SIZE;
+        memcpy(buff + NONCE1_POS, &nonce1, sizeof(nonce1));
+
+        constexpr int NONCE2_POS =
+            NONCE1_POS + StratumConstants::EXTRANONCE_SIZE;
+        Unhexlify(buff + NONCE2_POS, share.nonce2_sv.data(),
+                  EXTRANONCE2_SIZE * 2);
+
+        constexpr int SOLUTION_POS = NONCE2_POS + EXTRANONCE2_SIZE;
+        Unhexlify(buff + SOLUTION_POS, share.solution.data(),
+                  (SOLUTION_LENGTH_SIZE + SOLUTION_SIZE) * 2);
     }
 
-    void GetHeaderData(uint8_t* buff, const ShareZec& share,
-                       std::string_view nonce1) const /* override */
+    inline void GetBlockHex(std::string& res, const uint8_t* block_header) const
     {
-        // memcpy(buff, this->static_header_data, BLOCK_HEADER_STATIC_SIZE);
+        res.resize(BLOCK_HEADER_SIZE * 2 + transactions_hex.size());
+        Hexlify(res.data(), block_header, BLOCK_HEADER_SIZE);
+        std::ranges::copy(transactions_hex,
+                          res.begin() + (BLOCK_HEADER_SIZE * 2));
+    }
 
-        // constexpr int time_pos =
-        //     VERSION_SIZE + PREVHASH_SIZE + MERKLE_ROOT_SIZE +
-        //     FINALSROOT_SIZE;
-
-        // // WriteUnhex(buff + time_pos, share.time.data(), TIME_SIZE * 2);
-
-        // constexpr int nonce1_pos =
-        //     time_pos + TIME_SIZE +
-        //     BITS_SIZE;  // bits are already written from static
-
-        // // WriteUnhex(buff + nonce1_pos, nonce1.data(), EXTRANONCE_SIZE * 2);
-
-        // constexpr int nonce2_pos = nonce1_pos + EXTRANONCE_SIZE;
-        // // WriteUnhex(buff + nonce2_pos, share.nonce2.data(),
-        // //            EXTRANONCE2_SIZE * 2);
-
-        // constexpr int solution_pos = nonce2_pos + EXTRANONCE2_SIZE;
-        // WriteUnhex(buff + solution_pos, share.solution.data(),
-        //            (SOLUTION_LENGTH_SIZE + SOLUTION_SIZE) * 2);
+    bool operator==(const Job<StratumProtocol::ZEC>& other) const
+    {
+        return this->merkle_root_hash == other.merkle_root_hash;
     }
 };
 

@@ -1,32 +1,51 @@
 {
+    "symbol": "VRSC",
     "control_port": 1111,
     "stratum_port": 4444,
-    "redis_port": 6379,
+    "redis": {
+        "host": "127.0.0.1:6379",
+        "db_index": 0,
+        "hashrate_ttl_seconds": 600
+    },
+    "mysql": {
+        "host": "127.0.0.1:3306",
+        "user": "root",
+        "pass": "password",
+        "db_name": "VRSC"
+    },
+    "stats": {
+        "effort_interval_seconds": 10,
+        "hashrate_interval_seconds1": 10,
+        "hashrate_interval_seconds": 10,
+        "average_hashrate_interval_seconds": 120,
+        "mined_blocks_interval": 10
+    },
     "pow_fee": 0.01,
     "pos_fee": 0.01,
-    "default_diff1": 30000,
-    "default_diff": 1e5,
-    "target_shares_rate": 100.0,
+    "difficulty": {
+        "default_diff": 78960.000000,
+        "minimum_diff": 0.000001,
+        "target_shares_rate": 10.0,
+        "retarget_interval": 30
+    },
     "pool_addr": "RSicKPooLFbBeWZEgVrAkCxfAkPRQYwSnC",
     "redis_host": "127.0.0.1:6379",
-    "hashrate_interval_seconds1": 300,
-    "hashrate_interval_seconds": 10,
-    "effort_interval_seconds": 5,
-    "average_hashrate_interval_seconds1": 21600,
-    "average_hashrate_interval_seconds": 60,
-    "diff_adjust_seconds": 300,
-    "hashrate_ttl": 86400,
     "socket_recv_timeout_seconds": 3,
-    "payment_interval_seconds": 0,
-    "min_payout_threshold": 1,
+    "block_poll_interval": 10,
+    "payment_interval_seconds": 1,
+    "min_payout_threshold": 10000000000000,
     "rpcs": [
         {
-            "hostf": "127.0.0.1:27486",
-            "authf": "dXNlcjIxNDQwMzMwMDpwYXNzZDg5YmQ3Zjk1NGRhYTMzZjdjNDc5NDllN2QwYTQ5MjBmN2IzNjU0YTU5MjM0ZDllZDhmODBlNGU1ODgzNzMxNjY0",
             "host": "127.0.0.1:27397",
             "auth": "dXNlcjIwMzc1NTYyODY6cGFzc2Q4ZmMzZmVhMDhhYjFmZDg0NDU2YjZlZWFjZDQ0ODc4Mjc3YWZiOTdhMDY1NGRjODhhZTNlMzBlMTY5ZDYyZGJjNw==",
             "auth1": "YWRtaW4xOnBhc3MxMjM=",
             "host1": "127.0.0.1:6004"
+        }
+    ],
+    "payment_rpcs": [
+        {
+            "host": "127.0.0.1:12233",
+            "auth": ""
         }
     ]
 }

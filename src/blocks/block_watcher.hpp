@@ -23,7 +23,7 @@ class BlockWatcher
 
    private:
     static constexpr std::string_view logger_field = "BlockWatcher";
-    const Logger<logger_field> logger;
+    const Logger logger{logger_field};
     std::mutex blocks_lock;
     PersistenceBlock persistence_block;
     daemon_manager_t* daemon_manager;

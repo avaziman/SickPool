@@ -19,7 +19,7 @@ class StratumServerBtc : public StratumServer<confs>
      }
 
     private:
-     const Logger<field_str_btc> logger;
+     const Logger logger{field_str_btc};
 
      RpcResult HandleSubscribe(StratumClient* cli,
                                simdjson::ondemand::array& params) const;

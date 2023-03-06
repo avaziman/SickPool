@@ -4,6 +4,7 @@
 #include <simdjson.h>
 #include <sys/socket.h>
 
+#include <array>
 #include <cstring>
 #include <list>
 #include <memory>
@@ -100,8 +101,11 @@ class StratumClient : public VarDiff
         this->stats_it = worker_it;
     }
 
-    const std::string_view extra_nonce_sv;
     const int64_t connect_time;
+
+    const uint32_t extra_nonce;
+    const std::array<char, 8> extra_nonce_hex;
+    const std::string_view extra_nonce_sv;
 
     std::list<std::unique_ptr<StratumClient>>::iterator it;
     worker_map::iterator stats_it;
@@ -109,8 +113,7 @@ class StratumClient : public VarDiff
    private:
     static uint32_t extra_nonce_counter;
 
-    const uint32_t extra_nonce;
-    char extra_nonce_hex[StratumConstants::EXTRANONCE_SIZE * 2];
+
 
     uint64_t last_adjusted;
     uint64_t last_share_time;
@@ -121,7 +124,7 @@ class StratumClient : public VarDiff
 
     // std::string current_job_id;
 
-    FullId id;
+    FullId id = FullId(0,0);
     std::string worker_full;
     // both point to worker_full
     std::string_view address;

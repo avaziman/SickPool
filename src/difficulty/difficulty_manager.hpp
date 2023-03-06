@@ -113,7 +113,7 @@ class VarDiff
     }
     static constexpr std::string_view field_str_vardiff = "VarDiff";
 
-    const static Logger<field_str_vardiff> logger;
+    const static Logger logger;
 };
 
 #endif

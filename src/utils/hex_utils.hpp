@@ -1,5 +1,6 @@
 #ifndef HEX_UTILS_HPP
 #define HEX_UTILS_HPP
+#include <vector>
 #include <array>
 #include <cmath>
 #include <iomanip>
@@ -8,20 +9,29 @@
 
 constexpr auto u64maxd = static_cast<double>(UINT64_MAX);
 
-#define BIN_TO_DOUBLE_8B(bin)                                             \
-    const uint64_t* bin8 = reinterpret_cast<const uint64_t*>(bin.data()); \
-    static_assert(sizeof(bin) % 8 == 0, "Incompatible byte length");      \
-    double res = 0.0;                                                     \
-    for (int i = 0; i < sizeof(bin) / sizeof(uint64_t); i++)              \
-    {                                                                     \
-        res *= u64maxd;                                                   \
-        res += static_cast<double>(bin8[i]);                              \
-    }                                                                     \
-    return res
+// #define BIN_TO_DOUBLE_8B(bin)                                             \
+//     const uint64_t* bin8 = reinterpret_cast<const uint64_t*>(bin.data()); \
+//     static_assert(sizeof(bin) % 8 == 0, "Incompatible byte length");      \
+//     double res = 0.0;                                                     \
+//     for (int i = 0; i < sizeof(bin) / sizeof(uint64_t); i++)              \
+//     {                                                                     \
+//         res *= u64maxd;                                                   \
+//         res += static_cast<double>(bin8[i]);                              \
+//     }                                                                     \
+//     return res
 
 #define BIN_TO_DOUBLE_1B(bin)               \
     double res = 0.0;                       \
     for (int i = 0; i < sizeof(bin); i++)   \
+    {                                       \
+        res *= 256.0;                       \
+        res += static_cast<double>(bin[i]); \
+    }                                       \
+    return res
+
+#define BIN_TO_DOUBLE_1B_LE(bin)               \
+    double res = 0.0;                       \
+    for (int i = sizeof(bin) - 1; i > 0; i--)   \
     {                                       \
         res *= 256.0;                       \
         res += static_cast<double>(bin[i]); \
@@ -130,6 +140,14 @@ constexpr std::array<char, size * 2> Hexlify(
     return res;
 }
 
+inline std::array<char, 8> Hexlify(
+    const uint32_t src)
+{
+    std::array<char, 8> res;
+    Hexlify(res.data(), reinterpret_cast<const uint8_t*>(&src), sizeof(uint32_t));
+    return res;
+}
+
 template <size_t size>
 constexpr std::string HexlifyS(const std::array<uint8_t, size>& src)
 {
@@ -138,6 +156,16 @@ constexpr std::string HexlifyS(const std::array<uint8_t, size>& src)
     Hexlify(res.data(), src.data(), size);
     return res;
 }
+
+constexpr std::string HexlifyS(const std::vector<uint8_t>& src)
+{
+    std::string res;
+    auto size = src.size();
+    res.resize(size * 2);
+    Hexlify(res.data(), src.data(), size);
+    return res;
+}
+
 template <const std::string_view& src>
 constexpr auto Hexlify()
 {
@@ -180,6 +208,15 @@ constexpr std::array<uint8_t, size / 2> Unhexlify(std::string_view src)
 }
 
 template <size_t size>
+constexpr std::array<uint8_t, size / 2> UnhexlifyRev(std::string_view src)
+{
+    std::array<uint8_t, size / 2> res{};
+    Unhexlify(res.data(), src.data(), size);
+    std::ranges::reverse(res);
+    return res;
+}
+
+template <size_t size>
 constexpr std::array<uint8_t, size / 2> Unhexlify(
     const std::array<char, size>& src)
 {
@@ -203,6 +240,13 @@ constexpr static double BytesToDouble(const std::array<uint8_t, size>& bin)
     BIN_TO_DOUBLE_1B(bin);
 }
 
+template <size_t size>
+constexpr static double BytesToDoubleLE(const std::array<uint8_t, size>& bin)
+{
+    // BIN_TO_DOUBLE_8B(bin);
+    BIN_TO_DOUBLE_1B_LE(bin);
+}
+
 template <const std::string_view& hex>
 constexpr static double HexToDouble()
 {
@@ -213,4 +257,12 @@ constexpr static double HexToDouble()
     BIN_TO_DOUBLE_1B(bin);
 }
 
+constexpr static double HexToDouble(std::string_view hex)
+{
+    std::array<char, 64> src{};
+    std::ranges::copy(hex, src.begin());
+    std::array<uint8_t, 32> bin = Unhexlify(src);
+
+    BIN_TO_DOUBLE_1B(bin);
+}
 #endif

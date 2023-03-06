@@ -87,7 +87,14 @@ class DaemonRpc
             params_json.append(",");
         }
 
-        params_json[params_json.size() - 1] = ']';
+        if (!args.empty())
+        {
+            params_json[params_json.size() - 1] = ']';
+        }
+        else
+        {
+            params_json += "]";
+        }
         return params_json;
     }
 

@@ -10,7 +10,7 @@ static constexpr auto CONFIG_PRINT_WIDTH = 40;
 
 template <typename Doc>
 void AssignJson(const char* name, std::string& obj, Doc& doc,
-                const Logger<config_field_str>& logger)
+                const Logger& logger)
 {
     try
     {
@@ -29,7 +29,7 @@ void AssignJson(const char* name, std::string& obj, Doc& doc,
 
 template <typename Doc>
 void AssignJson(const char* name, double& obj, Doc& doc,
-                const Logger<config_field_str>& logger)
+                const Logger& logger)
 {
     try
     {
@@ -46,7 +46,7 @@ void AssignJson(const char* name, double& obj, Doc& doc,
 
 template <typename T, typename Doc>
 void AssignJson(const char* name, T& obj, Doc& doc,
-                const Logger<config_field_str>& logger)
+                const Logger& logger)
 {
     try
     {
@@ -62,7 +62,7 @@ void AssignJson(const char* name, T& obj, Doc& doc,
 }
 
 void ParseCoinConfig(const simdjson::padded_string& json, CoinConfig& cnfg,
-                     const Logger<config_field_str>& logger)
+                     const Logger& logger)
 {
     using namespace simdjson;
     ondemand::parser confParser;

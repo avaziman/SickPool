@@ -1,10 +1,15 @@
 #ifndef LOGGER_HPP_
 #define LOGGER_HPP_
 
-#include <mutex>
+#include <fmt/chrono.h>
 #include <fmt/color.h>
 #include <fmt/format.h>
-#include <cstdio>
+#include <fmt/ostream.h>
+
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <mutex>
 
 enum class LogType
 {
@@ -15,49 +20,76 @@ enum class LogType
     Critical = 4,
 };
 
-template <std::string_view const& field_str>
 class Logger
 {
    public:
-    Logger() = default;
+    static std::string GetNowString()
+    {
+        const auto now = std::chrono::system_clock::now();
+        return fmt::format("{:%y%m%d %H:%M:%OS}", now);
+    }
+
+    explicit Logger(std::string_view field_str)
+    {
+        std::string file_name =
+            fmt::format("./logs/{}", field_str, GetNowString());
+
+        std::filesystem::create_directory("./logs");
+
+        log_stream.open(file_name);
+
+        if (!log_stream.good())
+        {
+            throw std::invalid_argument("Failed to open log file");
+        }
+    };
+
+    mutable std::ofstream log_stream;
     mutable std::mutex log_mutex;
 
-    // Logger(){
-
-    // }
-
     template <LogType type, typename... T>
-    /*static*/ inline void Log(fmt::format_string<T...> message, T&&... args) const noexcept
+    /*static*/ inline void Log(fmt::format_string<T...> message,
+                               T&&... args) const noexcept
     {
+        using namespace fmt;
+        using enum fmt::color;
         std::scoped_lock lock(log_mutex);
-        fmt::v9::text_style color;
+        v9::text_style color;
+        const char* prefix = nullptr;
+
         switch (type)
         {
             case LogType::Debug:
-                color = fmt::fg(fmt::color::green);
-                fmt::print(color, "[DEBUG]");
+                color = fg(green);
+                prefix = "DEBUG";
                 break;
             case LogType::Info:
-                color = fmt::fg(fmt::color::dodger_blue);
-                fmt::print(color, "[INFO]");
+                color = fg(dodger_blue);
+                prefix = "INFO";
                 break;
             case LogType::Warn:
-                color = fmt::fg(fmt::color::yellow);
-                fmt::print(color, "[WARN]");
+                color = fg(yellow);
+                prefix = "WARN";
                 break;
             case LogType::Error:
-                color = fmt::fg(fmt::color::red);
-                fmt::print(color, "[ERROR]");
+                color = fg(red);
+                prefix = "ERROR";
                 break;
             case LogType::Critical:
-                color = fmt::fg(fmt::color::red);
-                fmt::print(color, "[CRITICAL]");
+                color = fg(red);
+                prefix = "CRITICAL";
                 break;
         }
 
-        fmt::print(color, "[{}] ", field_str);
-        fmt::print(message, std::forward<T>(args)...);
-        fmt::print("\n");
+        log_stream << prefix << " ";
+        print(log_stream, message, std::forward<T>(args)...);
+        print(log_stream, "{}", "\n");
+
+#ifdef DEBUG
+        std::cout << prefix;
+        print(message, std::forward<T>(args)...);
+        print("{}", "\n");
+#endif
     }
 };
 

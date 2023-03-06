@@ -61,7 +61,7 @@ class DaemonManager
 
    protected:
     static constexpr std::string_view logger_field = "DaemonManager";
-    const Logger<logger_field> logger;
+    const Logger logger{logger_field};
 
    private:
     std::vector<DaemonRpc> rpcs;

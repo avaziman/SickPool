@@ -12,11 +12,11 @@ template <Coin coin>
 class BlockSubmitter
 {
    private:
+    static constexpr std::string_view field_str = "BlockSubmitter";
     DaemonManagerT<coin>* daemon_manager;
     RoundManager* round_manager;
-    static constexpr std::string_view field_str = "BlockSubmitter";
     std::mutex blocks_lock;
-    Logger<field_str> logger;
+    Logger logger{field_str};
 
    public:
     explicit BlockSubmitter(DaemonManagerT<coin>* daemon_manager,

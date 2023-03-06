@@ -13,21 +13,18 @@ void StratumServerZec<confs>::HandleReq(Connection<StratumClient> *conn,
     const auto cli = conn->ptr.get();
 
     std::string_view method;
+    simdjson::ondemand::document doc;
     simdjson::ondemand::array params;
 
-    auto start = std::chrono::steady_clock::now();
-
-    // std::cout << "last char -> " << (int)buffer[]
-    simdjson::ondemand::document doc;
     try
     {
         doc = wc->json_parser.iterate(req.data(), req.size(),
                                       req.size() + simdjson::SIMDJSON_PADDING);
 
-        simdjson::ondemand::object req = doc.get_object();
-        id = static_cast<int>(req["id"].get_int64());
-        method = req["method"].get_string();
-        params = req["params"].get_array();
+        simdjson::ondemand::object req_obj = doc.get_object();
+        id = static_cast<int>(req_obj["id"].get_int64());
+        method = req_obj["method"].get_string();
+        params = req_obj["params"].get_array();
     }
     catch (const simdjson::simdjson_error &err)
     {
@@ -36,11 +33,6 @@ void StratumServerZec<confs>::HandleReq(Connection<StratumClient> *conn,
             "Request JSON parse error: {}\nRequest: {}\n", err.what(), req);
         return;
     }
-    auto end = std::chrono::steady_clock::now();
-    auto dur =
-        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-            .count();
-    // std::cout << "req parse took: " << dur << "micro seconds." << std::endl;
 
     RpcResult res(ResCode::UNKNOWN);
 
@@ -216,40 +208,9 @@ RpcResult StratumServerZec<confs>::HandleSubmit(
     using namespace simdjson;
 
     // parsing takes 0-1 us
-    ShareZec share;
-    std::string parse_error = "";
+    std::string parse_error{};
 
-    const auto cli = con->ptr;
-    const auto end = params.end();
-    auto it = params.begin();
-    error_code error;
-
-    if (it == end || (error = (*it).get_string().get(share.worker)))
-    {
-        parse_error = "Bad worker.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.job_id)) ||
-             share.job_id.size() != this->JOBID_SIZE * 2)
-    {
-        parse_error = "Bad job id.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.time_sv)) ||
-             share.time_sv.size() != sizeof(share.time) * 2)
-    {
-        parse_error = "Bad time.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.nonce2)) ||
-             share.nonce2.size() != EXTRANONCE2_SIZE * 2)
-    {
-        parse_error = "Bad nonce2.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.solution)) ||
-             share.solution.size() !=
-                 (SOLUTION_SIZE + SOLUTION_LENGTH_SIZE) * 2)
-    {
-        parse_error = "Bad solution.";
-    }
-    share.time = HexToUint(share.time_sv.data(), sizeof(share.time) * 2);
+    ShareZec share(params, parse_error);
 
     if (!parse_error.empty())
     {
@@ -269,7 +230,7 @@ void StratumServerZec<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
 
     std::string msg = fmt::format(
         "{{\"id\":null,\"method\":\"mining.set_"
-        "difficulty\",\"params\":[\"{}\"]}}\n",
+        "target\",\"params\":[\"{}\"]}}\n",
         hex_target_sv);
 
     this->SendRaw(conn->sockfd, msg);

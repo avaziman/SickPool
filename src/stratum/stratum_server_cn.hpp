@@ -23,7 +23,7 @@ class StratumServerCn : public StratumServer<confs>
 
    private:
     static constexpr std::string_view field_str_cn = "StratumServerCn";
-    const Logger<field_str_cn> logger;
+    const Logger logger{field_str_cn};
 
     RpcResult HandleAuthorize(StratumClient* cli,
                               simdjson::ondemand::array& params,

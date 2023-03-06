@@ -5,7 +5,10 @@ uint32_t StatsManager::average_interval_ratio;
 StatsManager::StatsManager(const PersistenceLayer& pl,
                            RoundManager* round_manager, const StatsConfig* cc,
                            double hash_multiplier)
-    : conf(cc), persistence_stats(pl), round_manager(round_manager), hash_multiplier(hash_multiplier)
+    : conf(cc),
+      persistence_stats(pl),
+      round_manager(round_manager),
+      hash_multiplier(hash_multiplier)
 {
     StatsManager::average_interval_ratio =
         cc->average_hashrate_interval_seconds / cc->hashrate_interval_seconds;
@@ -44,20 +47,20 @@ void StatsManager::Start(std::stop_token st)
             UpdateIntervalStats(update_time_ms);
             // no need to lock as its after the stats update and adding shares
             // doesnt affect it
-            std::unique_lock _(to_remove_mutex);
-            for (auto it = to_remove.begin(); it != to_remove.end();)
-            {
-                if (it->second >= average_interval_ratio)
-                {
-                    worker_stats_map.erase(it->first);
-                    it = to_remove.erase(it);
-                }
-                else
-                {
-                    it->second++;
-                    ++it;
-                }
-            }
+            // std::unique_lock _(to_remove_mutex);
+            // for (auto it = to_remove.begin(); it != to_remove.end();)
+            // {
+            //     if (it->second >= average_interval_ratio)
+            //     {
+            //         worker_stats_map.erase(it->first);
+            //         it = to_remove.erase(it);
+            //     }
+            //     else
+            //     {
+            //         it->second++;
+            //         ++it;
+            //     }
+            // }
         }
 
         // possible that both need to be updated at the same time
@@ -89,9 +92,8 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
 
     for (auto& [worker_id, ws] : worker_stats_map)
     {
-        ws.interval_hashrate =
-            hash_multiplier * ws.current_interval_effort /
-            (double)conf->hashrate_interval_seconds;
+        ws.interval_hashrate = hash_multiplier * ws.current_interval_effort /
+                               (double)conf->hashrate_interval_seconds;
 
         auto& miner_stats = miner_stats_map[worker_id.miner_id];
         miner_stats.interval_hashrate += ws.interval_hashrate;
@@ -108,31 +110,36 @@ bool StatsManager::UpdateIntervalStats(int64_t update_time_ms)
         network_stats, update_time_ms);
 }
 
-void StatsManager::AddShare(const worker_map::iterator& it, const double diff)
+void StatsManager::AddValidShare(const worker_map::iterator& it,
+                                 const double diff)
 {
     // can be added simultaneously as each client has its own stats object
     std::shared_lock shared_lock(stats_list_smutex);
     auto& [fid, worker_stats] = *it;
 
-    if (diff == static_cast<double>(BadDiff::STALE_SHARE_DIFF))
-    {
-        worker_stats.interval_stale_shares++;
-    }
-    else if (diff == static_cast<double>(BadDiff::INVALID_SHARE_DIFF))
-    {
-        worker_stats.interval_invalid_shares++;
-    }
-    else
-    {
-        worker_stats.interval_valid_shares++;
-        worker_stats.current_interval_effort += diff;
+    worker_stats.interval_valid_shares++;
+    worker_stats.current_interval_effort += diff;
 
-        logger.Log<LogType::Debug>(
-            "[THREAD {}] Logged share with diff: {} for {} total PPLNS round "
-            "diff: {}",
-            gettid(), diff, fid.worker_id,
-            worker_stats.current_interval_effort);
-    }
+    // logger.Log<LogType::Debug>(
+    //     "[THREAD {}] Logged share with diff: {} for {} total PPLNS round "
+    //     "diff: {}",
+    //     gettid(), diff, fid.worker_id,
+    //     worker_stats.current_interval_effort);
+}
+
+void StatsManager::AddStaleShare(const worker_map::iterator& it)
+{
+    std::shared_lock shared_lock(stats_list_smutex);
+    auto& [fid, worker_stats] = *it;
+
+    worker_stats.interval_stale_shares++;
+}
+
+void StatsManager::AddInvalidShare(const worker_map::iterator& it)
+{
+    std::shared_lock shared_lock(stats_list_smutex);
+    auto& [fid, worker_stats] = *it;
+    worker_stats.interval_invalid_shares++;
 }
 
 bool StatsManager::AddWorker(int64_t& worker_id, int64_t miner_id,

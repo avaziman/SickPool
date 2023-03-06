@@ -9,22 +9,6 @@
 static constexpr std::string_view target_vrsc_sv =
     "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
 
-constexpr StaticConf VrscStatic = {
-    .COIN_SYMBOL = Coin::VRSC,
-    .HASH_ALGO = HashAlgo::VERUSHASH_V2b2,
-    .STRATUM_PROTOCOL = StratumProtocol::ZEC,
-    .DIFF1 = HexToDouble<target_vrsc_sv>(),
-    .MAX_BLOCK_SIZE = 2000000,
-    .BLOCK_HASH_SIZE = 32,
-    .PREVHASH_SIZE = 32,
-    .MERKLE_ROOT_SIZE = 32,
-    .MAX_FUTURE_BLOCK_TIME = 60,
-    .BLOCK_TIME = 60 * 2,
-    .ADDRESS_LEN = 34,
-    .BLOCK_HEADER_SIZE = 81,
-    .BLOCK_HEADER_STATIC_SIZE = 36,  // VERSION_SIZE + PREVHASH_SIZE
-    .COINBASE_MATURITY = 100};
-
 struct CoinConstantsZec
 {
 
@@ -61,11 +45,22 @@ static constexpr uint32_t EXTRANONCE2_SIZE = NONCE_SIZE - StratumConstants::EXTR
 
 static constexpr uint32_t BLOCK_VERSION = 0x04000100;
 static constexpr uint32_t BLOCK_HEADER_SIZE = (140 + 3 + 1344);
-
-static constexpr uint32_t BLOCK_HEADER_STATIC_SIZE =
-    VERSION_SIZE + PREVHASH_SIZE + MERKLE_ROOT_SIZE + FINALSROOT_SIZE +
-    TIME_SIZE /* time, not static but we override */
-    + BITS_SIZE;
 };  // namespace CoinConstantsVrsc
+
+constexpr StaticConf VrscStatic = {
+    .COIN_SYMBOL = Coin::VRSC,
+    .HASH_ALGO = HashAlgo::VERUSHASH_V2b2,
+    .STRATUM_PROTOCOL = StratumProtocol::ZEC,
+    .DIFF1 = HexToDouble<target_vrsc_sv>(),
+    .MAX_BLOCK_SIZE = 2000000,
+    .BLOCK_HASH_SIZE = 32,
+    .PREVHASH_SIZE = 32,
+    .MERKLE_ROOT_SIZE = 32,
+    .MAX_FUTURE_BLOCK_TIME = 60,
+    .BLOCK_TIME = 60 * 2,
+    .ADDRESS_LEN = 34,
+    .BLOCK_HEADER_SIZE = CoinConstantsZec::BLOCK_HEADER_SIZE,
+    .BLOCK_HEADER_STATIC_SIZE = 36,  // VERSION_SIZE + PREVHASH_SIZE
+    .COINBASE_MATURITY = 100};
 
 #endif

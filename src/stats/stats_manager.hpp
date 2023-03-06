@@ -40,7 +40,9 @@ class StatsManager
     void Start(std::stop_token st);
 
     bool LoadAvgHashrateSums(int64_t hr_time);
-    void AddShare(const worker_map::iterator& it, const double diff);
+    void AddValidShare(const worker_map::iterator& it, const double diff);
+    void AddInvalidShare(const worker_map::iterator& it);
+    void AddStaleShare(const worker_map::iterator& it);
     bool AddWorker(int64_t& worker_id,
                    int64_t miner_id, std::string_view address,
                    std::string_view worker_name, std::string_view alias);
@@ -59,7 +61,7 @@ class StatsManager
 
    private:
     static constexpr std::string_view field_str = "StatsManager";
-    Logger<field_str> logger;
+    Logger logger{field_str};
     const StatsConfig* conf;
     PersistenceStats persistence_stats;
     RoundManager* round_manager;

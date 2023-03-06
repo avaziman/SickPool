@@ -32,6 +32,6 @@ class PayoutManager
 
    private:
     static constexpr std::string_view field_str = "PaymentManager";
-    static Logger<field_str> logger;
+    static Logger logger;
 };
 #endif

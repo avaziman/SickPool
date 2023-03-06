@@ -1,6 +1,6 @@
 #include "payout_manager.hpp"
 
-Logger<PayoutManager::field_str> PayoutManager::logger;
+Logger PayoutManager::logger{PayoutManager::field_str};
 
 inline void AddSharePPLNS(round_shares_t& miner_shares, double& score_sum,
                           const double n, const double score,

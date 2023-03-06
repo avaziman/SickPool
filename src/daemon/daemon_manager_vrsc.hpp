@@ -6,6 +6,7 @@
 #include "daemon_manager_t.hpp"
 #include "daemon_responses_cryptonote.hpp" // ORGANIZE
 #include "round_share.hpp"
+#include "daemon_responses_btc.hpp"
 
 template <>
 class DaemonManagerT<Coin::VRSC> : public DaemonManager
@@ -14,12 +15,6 @@ class DaemonManagerT<Coin::VRSC> : public DaemonManager
     using DaemonManager::DaemonManager;
 
     // in the order they appear, in the type they appear
-    struct TxRes
-    {
-        std::string_view data;
-        std::string_view hash;
-        int64_t fee;
-    };
 
     // in the order they appear, in the type they appear
     // struct BlockTemplateRes
@@ -44,10 +39,9 @@ class DaemonManagerT<Coin::VRSC> : public DaemonManager
         std::string_view final_sroot_hash;
         std::string_view solution;
         std::vector<TxRes> transactions;
-        std::string_view coinbase_hex;
         int64_t coinbase_value;
         std::string_view target;
-        int64_t min_time;
+        uint32_t min_time;
         uint32_t bits;
         uint32_t height;
     };

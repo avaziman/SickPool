@@ -9,7 +9,7 @@
 using enum Prefix;
 
 static constexpr std::string_view logger_field = "PaymentManager";
-const Logger<logger_field> logger;
+const Logger logger{logger_field};
 
 // on each matured pool block: check if the updated
 // balances meets the payout threshold if yes
@@ -25,7 +25,7 @@ int main(int argc, char** argv)
     }
 
     simdjson::ondemand::parser parser;
-    Logger<config_field_str> conf_logger;
+    Logger conf_logger{config_field_str};
     CoinConfig coinConfig;
     simdjson::padded_string json = simdjson::padded_string::load(argv[1]);
     ParseCoinConfig(json, coinConfig, conf_logger);

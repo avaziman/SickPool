@@ -52,7 +52,7 @@ class Server : public ServerConstants
    private:
     const itimerspec tspec;
 
-    const Logger<field_str> logger;
+    const Logger logger{field_str};
     std::mutex connections_mutex;
     std::list<std::shared_ptr<Connection<T>>> connections;
 

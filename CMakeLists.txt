@@ -33,7 +33,8 @@ execute_process(
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     # set(CMAKE_EXE_LINKER_FLAGS "-static")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -static-libstdc++")
+    # KEEP DEBUG SYMBOLS 
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g3 -static-libstdc++")
 else()
     # -g3 maximum debugging information
     # link time optimization
@@ -47,7 +48,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_subdirectory(src)
 
 # if (DEFINED WITH_UNIT_TEST)
-    # add_subdirectory(tests)
+    add_subdirectory(tests)
 # endif()
 
 if (DEFINED WITH_NOTIFIER)

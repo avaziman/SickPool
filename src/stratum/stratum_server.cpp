@@ -8,7 +8,8 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
       daemon_manager(coin_config.rpcs),
       job_manager(&daemon_manager, coin_config.pool_addr),
       block_submitter(&daemon_manager, &round_manager),
-      stats_manager(persistence_layer, &round_manager, &conf.stats, GetHashMultiplier<confs>())
+      stats_manager(persistence_layer, &round_manager, &conf.stats,
+                    GetHashMultiplier<confs>())
 {
     static_assert(confs.DIFF1 != 0, "DIFF1 can't be zero!");
     job_manager.GetFirstJob();
@@ -32,8 +33,8 @@ StratumServer<confs>::StratumServer(CoinConfig &&conf)
         HashWrapper::InitVerusHash();
     }
 
-    stats_thread = std::jthread(
-        std::bind_front(&StatsManager::Start, &stats_manager));
+    stats_thread =
+        std::jthread(std::bind_front(&StatsManager::Start, &stats_manager));
 }
 
 template <StaticConf confs>
@@ -70,8 +71,6 @@ void StratumServer<confs>::HandleNewJob()
 template <StaticConf confs>
 void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
 {
-    int64_t curtime_ms = GetCurrentTimeMs();
-
     {
         std::shared_lock clients_read_lock(clients_mutex);
         for (const auto &[conn, _] : clients)
@@ -161,7 +160,7 @@ void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
         fmt::format("Block reward: {}", new_job->coinbase_value),
         fmt::format("Transaction count: {}", new_job->tx_count),
         fmt::format("Block size: {}", new_job->block_size * 2),
-        new_job->id.size() + 10);
+        std::max(int(new_job->id.size()), 40));
 }
 
 template <StaticConf confs>
@@ -177,15 +176,15 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
 
     if (job == nullptr)
     {
-        share_res.code = ResCode::JOB_NOT_FOUND;
-        share_res.message = "Job not found";
-        share_res.difficulty = static_cast<double>(BadDiff::STALE_SHARE_DIFF);
+        stats_manager.AddStaleShare(cli->stats_it);
+
+        return RpcResult(ResCode::JOB_NOT_FOUND,
+                         "Job not found");  // copy ellision
     }
     else
     {
         ShareProcessor::Process<confs>(share_res, cli, wc, job.get(), share,
                                        time);
-        // share_res.code = ResCode::VALID_SHARE;
     }
 
     if (share_res.code == ResCode::VALID_BLOCK) [[unlikely]]
@@ -196,7 +195,7 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
 
         if constexpr (confs.STRATUM_PROTOCOL == StratumProtocol::ZEC)
         {
-            // job->GetBlockHex(blockData, wc->block_header);
+            job->GetBlockHex(blockData, wc->block_header.data());
         }
         else if constexpr (confs.STRATUM_PROTOCOL == StratumProtocol::BTC)
         {
@@ -223,11 +222,6 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
         const double effort_percent =
             ((chain_round.total_effort) / job->expected_hashes) * 100.f;
 
-#if HASH_ALGO == HASH_ALGO_X25X
-        HashWrapper::X22I(share_res.hash_bytes.data(), wc->block_header);
-        // std::reverse(share_res.hash_bytes.begin(),
-        //              share_res.hash_bytes.end());
-#endif
         auto bs = BlockSubmission{
             .id = 0,  // QUERY LATER
             .miner_id = cli->GetId().miner_id,
@@ -250,6 +244,9 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
         // take into account in PPLNS but not in round effort.
         round_manager.AddRoundSharePPLNS(cli->GetId().miner_id,
                                          share_res.difficulty);
+
+        stats_manager.AddValidShare(cli->stats_it, cli->GetDifficulty());
+        return RpcResult(ResCode::VALID_SHARE);
     }
     else if (share_res.code == ResCode::VALID_SHARE) [[likely]]
     {
@@ -257,25 +254,13 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
                                     share_res.difficulty);
         round_manager.AddRoundSharePPLNS(cli->GetId().miner_id,
                                          cli->GetDifficulty());
-    }
-    else
-    {
-        // logger.template Log<LogType::Warn>(
-        //             "Received bad share for job id: {}", share.job_id);
-
-        rpc_res = RpcResult(share_res.code, share_res.message);
+        stats_manager.AddValidShare(cli->stats_it, cli->GetDifficulty());
+        return RpcResult(ResCode::VALID_SHARE);
     }
 
-    stats_manager.AddShare(cli->stats_it, cli->GetDifficulty());
+    stats_manager.AddInvalidShare(cli->stats_it);
 
-    // logger.template Log<
-    //     LogType::Debug>(
-    //     "Share processed in {}us, diff: {}, res: {}",
-    //     std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-    //         .count(),
-    //     share_res.difficulty, (int)share_res.code);
-
-    return rpc_res;
+    return RpcResult(share_res.code, share_res.message);
 }
 
 // the shared pointer makes sure the client won't be freed as long as we are
@@ -406,12 +391,12 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
     }
     else
     {
-        uint64_t prefix;
-        if (currency::blobdata addr_data;
-            !tools::base58::decode_addr(addr_blob, prefix, addr_data))
+        std::vector<uint8_t> data;
+        // DECODEBASE58CHECK
+        if (!DecodeBase58(std::string(address), data))
         {
             return RpcResult(ResCode::UNAUTHORIZED_WORKER,
-                             fmt::format("Invalid address {}!", address));
+                             fmt::format("Invalid address {} !", address));
         }
     }
 
@@ -520,8 +505,8 @@ bool StratumServer<confs>::HandleTimeout(connection_it *conn,
 
     // disconnect unauthorized miner after timeout, will call handle
     // disconnected
-    auto cli = conn_ptr->ptr;
-    if (!cli->GetIsAuthorized())
+
+    if (auto cli = conn_ptr->ptr; !cli->GetIsAuthorized())
     {
         logger.template Log<LogType::Warn>(
             "Disconnecting worker with ip {}, hasn't authorized.",
@@ -531,11 +516,6 @@ bool StratumServer<confs>::HandleTimeout(connection_it *conn,
     }
     else
     {
-        // decrease difficulty
-        // double new_diff =
-        //     // cli->GetDifficulty() / std::pow(2, timeout_streak);
-        //     cli->GetDifficulty() / static_cast<double>(timeout_streak);
-        // cli->SetPendingDifficulty(new_diff);
         cli->HandleAdjust(GetCurrentTimeMs());
     }
     return true;

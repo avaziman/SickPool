@@ -32,6 +32,7 @@ file(GLOB SRC_FILES
     job_construction_test.cpp
     merkle_root_test.cpp
     stratum_test.cpp
+    jobs/job_vrsc_test.cpp
 )
 
 add_executable(${PROJECT_NAME_TESTS} ${SRC_FILES})

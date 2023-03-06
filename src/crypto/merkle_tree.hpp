@@ -25,15 +25,17 @@ class MerkleTree
         for (int i = 0; i < hash_count; i++)
         {
             std::array<uint8_t, HASH_SIZE> hash_bin = Unhexlify<HASH_SIZE * 2>(txsData[i].hash);
-            std::ranges::copy(hash_bin,
+            // hashes are given in BE
+            std::ranges::reverse_copy(hash_bin,
                       hashes.data() + i * HASH_SIZE);
         }
 
         return hashes;
     }
 
-    static std::array<uint8_t, HASH_SIZE> CalcRoot(std::vector<uint8_t>&& hashes)
+    static std::array<uint8_t, HASH_SIZE> CalcRoot(std::vector<uint8_t>&& h)
     {
+        auto hashes = std::move(h);
         std::size_t hash_count = hashes.size() / HASH_SIZE;
         std::array<uint8_t, HASH_SIZE> res;
         while (hash_count > 1)

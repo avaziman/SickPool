@@ -44,7 +44,7 @@ class MySqlManager
     static std::unique_ptr<sql::PreparedStatement> update_alias;
 
     static constexpr std::string_view logger_field = "MySQL";
-    static const Logger<logger_field> logger;
+    static const Logger logger;
 
     static std::mutex mutex;
 

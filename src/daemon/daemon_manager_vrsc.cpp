@@ -255,6 +255,8 @@ bool DaemonManagerT<Coin::VRSC>::GetBlockTemplate(
         // can't iterate after we get the string_view
         ondemand::array txs = res["transactions"].get_array();
 
+        // COINBASE TX
+        templateRes.transactions.push_back(TxRes{});
         for (auto tx : txs)
         {
             std::string_view tx_data_hex = tx["data"].get_string();
@@ -265,14 +267,19 @@ bool DaemonManagerT<Coin::VRSC>::GetBlockTemplate(
                                                   fee);
         }
 
-        templateRes.coinbase_hex = res["coinbasetxn"]["data"].get_string();
+        TxRes coinbase{.data = res["coinbasetxn"]["data"].get_string(),
+                       .hash = res["coinbasetxn"]["hash"].get_string(),
+                       .fee = res["coinbasetxn"]["fee"].get_int64()};
+
+        templateRes.transactions[0] = coinbase;
         templateRes.coinbase_value =
             res["coinbasetxn"]["coinbasevalue"].get_int64();
 
         templateRes.target = res["target"].get_string();
         templateRes.min_time = res["mintime"].get_int64();
         std::string_view bits_sv = res["bits"].get_string();
-        templateRes.bits = HexToUint(bits_sv.data(), sizeof(uint32_t) * 2);
+        std::from_chars(bits_sv.data(), bits_sv.data() + bits_sv.size(),
+                        templateRes.bits, 16);
 
         templateRes.height = static_cast<uint32_t>(res["height"].get_int64());
     }
@@ -285,8 +292,7 @@ bool DaemonManagerT<Coin::VRSC>::GetBlockTemplate(
 }
 
 bool DaemonManagerT<Coin::VRSC>::GetAliasAddress(
-    AliasRes& id_res, std::string_view addr,
-    simdjson::ondemand::parser& parser)
+    AliasRes& id_res, std::string_view addr, simdjson::ondemand::parser& parser)
 {
     using namespace simdjson;
 

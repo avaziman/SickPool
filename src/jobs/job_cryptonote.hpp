@@ -37,9 +37,6 @@ struct BlockTemplateCn
     const uint32_t tx_count;
     const std::array<uint8_t, 32> template_hash;
 
-    explicit BlockTemplateCn() = default;
-    BlockTemplateCn& operator=(BlockTemplateCn&&) = default;
-
     currency::block UnserializeBlock(const std::string& template_bin) const
     {
         currency::block res;
@@ -86,7 +83,7 @@ struct BlockTemplateCn
           height(btemplate.height),
           target_diff(static_cast<double>(btemplate.difficulty)),
           expected_hashes(GetHashMultiplier<ZanoStatic>() *
-                          static_cast<double>(target_diff)),
+                          target_diff),
           block_size(static_cast<uint32_t>(btemplate.blob.size() / 2)),
           coinbase_value(block.miner_tx.vout[0].amount),
           // include coinbase tx
@@ -118,7 +115,8 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
         // copy block bin
         cp = this->block_bin;
         // set found nonce
-        *reinterpret_cast<uint64_t*>(cp.data() + nonce_offset) = nonce;
+        char* nonce_pos = cp.data() + nonce_offset;
+        std::copy(&nonce, &nonce + sizeof(nonce), nonce_pos);
 
         Hexlify(res.data(), cp.data(), cp.size());
     }
@@ -127,7 +125,8 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
     {
         std::array<uint8_t, 32> arr;
         std::string cp(this->block_bin);
-        *reinterpret_cast<uint64_t*>(cp.data() + nonce_offset) = nonce;
+        std::copy(&nonce, &nonce + sizeof(nonce), cp.data() + nonce_offset);
+
         currency::block block = UnserializeBlock(cp);
         *(reinterpret_cast<crypto::hash*>(arr.data())) = get_block_hash(block);
         return arr;
@@ -159,10 +158,10 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
             hex_target_sv, height);
     }
 
-    bool IsSameJob(const Job<StratumProtocol::CN>& other) const
-    {
+    bool operator==(const Job<StratumProtocol::CN>& other) const {
         return this->template_hash == other.template_hash;
-    }
+
+    } 
 };
 
 using JobCryptoNote = Job<StratumProtocol::CN>;

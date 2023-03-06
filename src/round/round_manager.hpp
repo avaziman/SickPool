@@ -43,7 +43,7 @@ class RoundManager : public PersistenceRound
     bool LoadEfforts();
 
     static constexpr std::string_view field_str = "RoundManager";
-    const Logger<field_str> logger;
+    const Logger logger{field_str};
     const std::string round_type;
 
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS

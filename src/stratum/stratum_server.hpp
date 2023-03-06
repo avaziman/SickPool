@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <deque>
+#include <algorithm>
 #include <functional>
 #include <iterator>
 #include <map>
@@ -11,6 +12,7 @@
 #include <thread>
 #include <vector>
 
+#include "base58.h"
 #include "cn/common/base58.h"
 #include "block_submitter.hpp"
 #include "connection.hpp"
@@ -37,7 +39,7 @@ class StratumServer : public StratumBase, public StratumConstants
    private:
 
     static constexpr std::string_view field_str_stratum = "StratumServer";
-    const Logger<field_str_stratum> logger;
+    const Logger logger{field_str_stratum};
     
     std::jthread stats_thread;
     simdjson::ondemand::parser httpParser =

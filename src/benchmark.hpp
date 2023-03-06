@@ -24,7 +24,7 @@ class Benchmark
     }
 
    private:
-    static inline Logger<logger_name> logger;
+    static inline Logger logger{logger_name};
     std::string name;
     std::chrono::time_point<std::chrono::steady_clock> start;
 };

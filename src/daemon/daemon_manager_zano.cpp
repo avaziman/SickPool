@@ -51,7 +51,7 @@ bool DaemonManagerT<Coin::ZANO>::GetBlockTemplate(
 }
 
 bool DaemonManagerT<Coin::ZANO>::SubmitBlock(std::string_view block_hex,
-                                    simdjson::ondemand::parser& parser)
+                                             simdjson::ondemand::parser& parser)
 {
     std::string result_body;
 
@@ -94,8 +94,9 @@ bool DaemonManagerT<Coin::ZANO>::SubmitBlock(std::string_view block_hex,
 }
 
 bool DaemonManagerT<Coin::ZANO>::Transfer(TransferResCn& transfer_res,
-                                 const std::vector<Payee>& dests, int64_t fee,
-                                 simdjson::ondemand::parser& parser)
+                                          const std::vector<Payee>& dests,
+                                          int64_t fee,
+                                          simdjson::ondemand::parser& parser)
 {
     std::string result_body;
 
@@ -142,9 +143,9 @@ bool DaemonManagerT<Coin::ZANO>::Transfer(TransferResCn& transfer_res,
 }
 
 // zano daemon can shows orphaned blocks as confirmed...
-bool DaemonManagerT<Coin::ZANO>::GetBlockHeaderByHash(BlockHeaderResCn& res,
-                                             std::string_view block_hash,
-                                             simdjson::ondemand::parser& parser)
+bool DaemonManagerT<Coin::ZANO>::GetBlockHeaderByHash(
+    BlockHeaderResCn& res, std::string_view block_hash,
+    simdjson::ondemand::parser& parser)
 {
     std::string result_body;
 
@@ -214,29 +215,36 @@ bool DaemonManagerT<Coin::ZANO>::GetBlockHeaderByHeight(
     return true;
 }
 
-bool DaemonManagerT<Coin::ZANO>::GetAliasAddress(AliasRes& res,
-                                        std::string_view alias,
-                                        simdjson::ondemand::parser& parser)
+bool DaemonManagerT<Coin::ZANO>::GetAliasAddress(
+    AliasRes& res, std::string_view alias, simdjson::ondemand::parser& parser)
 {
     std::string result_body;
 
     const std::string_view method = "get_alias_details"sv;
 
-    if (int res_code = SendRpcReq(result_body, 1, method,
-                                  DaemonRpc::ToJsonObj(std::make_pair("alias"sv, alias)), "GET /json_rpc");
+    if (int res_code =
+            SendRpcReq(result_body, 1, method,
+                       DaemonRpc::ToJsonObj(std::make_pair("alias"sv, alias)),
+                       "GET /json_rpc");
         res_code != 200)
     {
         LOG_CODE_ERR(method, res_code, result_body);
         return false;
-        }
+    }
 
     try
     {
         res.doc = parser.iterate(result_body.data(), result_body.size(),
-                                  result_body.capacity());
+                                 result_body.capacity());
 
         auto obj = res.doc["result"].get_object();
         res.address = obj["alias_details"]["address"].get_string();
+
+        std::string_view status = obj["status"];
+        if (status != "OK")
+        {
+            return false;
+        }
     }
     catch (const simdjson_error& err)
     {
@@ -246,5 +254,3 @@ bool DaemonManagerT<Coin::ZANO>::GetAliasAddress(AliasRes& res,
 
     return true;
 }
-
-

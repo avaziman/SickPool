@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include "utils/hex_utils.hpp"
+#define HASH_SIZE_HEX (2 * HASH_SIZE)
 
 // the default
 namespace CoinConstantsBtc

@@ -4,6 +4,7 @@
 #include "stratum_server.hpp"
 #include "stratum_client.hpp"
 #include "share.hpp"
+#include "constants.hpp"
 #include "config_vrsc.hpp"
 
 static constexpr std::string_view field_str_zec = "StratumServerZec";
@@ -21,7 +22,7 @@ class StratumServerZec : public StratumServer<confs>, public CoinConstantsZec
     using WorkerContextT = StratumServer<confs>::WorkerContextT;
     using JobT = StratumServer<confs>::JobT;
 
-    const Logger<field_str_zec> logger;
+    const Logger logger{field_str_zec};
 
     RpcResult HandleSubscribe(StratumClient* cli,
                               simdjson::ondemand::array& params) const;

@@ -39,17 +39,19 @@ class JobManager
         // insert first job at construction so we don't need to make sure
         // last_job is valid
         //  TODO: put in func (duplicate)
+        std::shared_ptr<Job> new_job;
         if constexpr (coin == Coin::ZANO)
         {
             // ID is template hash
-            std::make_shared<Job>(res, true);
+            new_job = std::make_shared<Job>(res, true);
         }
         else
         {
             std::string jobIdHex = fmt::format("{:08x}", job_count);
 
-            std::make_shared<Job>(std::move(jobIdHex), res, true);
+            new_job = std::make_shared<Job>(std::move(jobIdHex), res, true);
         }
+        SetNewJob(std::move(new_job));
     }
 
     // allow concurrect reading while not being modified
@@ -99,19 +101,12 @@ class JobManager
         // only add the job if it's any different from the last one
         bool clean = rpctemplate.height > last_job->height;
 
-        if (!clean
-        /* &&
-        *dynamic_cast<BlockTemplateCn*>(new_job.get()) ==
-            *dynamic_cast<BlockTemplateCn*>(last_job.get())*/)
-        {
-            return std::shared_ptr<Job>{};  // null shared ptr
-        }
 
         std::shared_ptr<Job> new_job{};
         if constexpr (coin == Coin::ZANO)
         {
             // ID is template hash
-            auto new_job = std::make_shared<Job>(rpctemplate, clean);
+            new_job = std::make_shared<Job>(rpctemplate, clean);
         }
         else
         {
@@ -119,6 +114,11 @@ class JobManager
 
             new_job =
                 std::make_shared<Job>(std::move(jobIdHex), rpctemplate, clean);
+        }
+
+        if (!clean && last_job == new_job)
+        {
+            return std::shared_ptr<Job>{};  // null shared ptr
         }
 
         return SetNewJob(std::move(new_job));
@@ -147,7 +147,7 @@ class JobManager
 
     // multiple jobs can use the same block template, (append transactions only)
     static constexpr std::string_view field_str = "JobManager";
-    const Logger<field_str> logger;
+    const Logger logger{field_str};
     static constexpr std::string_view coinbase_extra = "SickPool.io";
     const std::string pool_addr;
 

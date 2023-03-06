@@ -20,7 +20,7 @@ std::unique_ptr<sql::PreparedStatement> MySqlManager::add_payout_entry;
 std::unique_ptr<sql::PreparedStatement> MySqlManager::update_next_payout;
 std::unique_ptr<sql::PreparedStatement> MySqlManager::update_alias;
 
-const Logger<MySqlManager::logger_field> MySqlManager::logger;
+const Logger MySqlManager::logger{MySqlManager::logger_field};
 
 MySqlManager::MySqlManager(const CoinConfig& cc)
 {

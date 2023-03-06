@@ -128,7 +128,7 @@ class RedisManager
 
     static std::mutex rc_mutex;
     static constexpr std::string_view logger_field = "Redis";
-    static const Logger<logger_field> logger;
+    static const Logger logger;
 
     void AppendCommand(std::initializer_list<std::string_view> args)
     {
