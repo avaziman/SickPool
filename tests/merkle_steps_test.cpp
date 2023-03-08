@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -13,35 +14,32 @@ using namespace std::string_literals;
 // return merkle steps as they are passed in the job notification
 // from hex txids as from daemon (reversed block encoding)
 
+constexpr auto HASHSIZE = 32;
+using HashT = std::array<uint8_t, HASH_SIZE>;
+
 std::vector<std::string> GetMerkleSteps(
     std::initializer_list<std::string_view> txids_hex)
 {
     HashWrapper::InitSHA256();
 
-    std::vector<uint8_t> txids_bin(txids_hex.size() * HASH_SIZE);
-    std::vector<uint8_t> res_bin(txids_bin.size());
+    std::vector<HashT> txids_bin;
 
-    int i = 0;
     // unhexlify and reverse to block encoding
     for (std::string_view txid_hex : txids_hex)
     {
-        Unhexlify(txids_bin.data() + i * HASH_SIZE, txid_hex.data(),
-                  HASH_SIZE_HEX);
-        std::reverse(txids_bin.data() + i * HASH_SIZE,
-                     txids_bin.data() + (i + 1) * HASH_SIZE);
-        i++;
+        auto hash = Unhexlify<HASH_SIZE * 2>(txid_hex);
+        std::ranges::reverse(hash);
+        txids_bin.push_back(hash);
     }
 
-    int step_count =
-        MerkleTree::CalcSteps(res_bin, txids_bin, txids_hex.size());
+    auto steps_bin = MerkleTree<HASHSIZE>::CalcSteps(txids_bin);
 
-    std::vector<std::string> res_hex(step_count);
-    for (int i = 0; i < step_count; i++)
+    std::vector<std::string> res_hex;
+    for (const auto& step : steps_bin)
     {
-        std::string step_hex;
-        step_hex.resize(HASH_SIZE_HEX);
-        Hexlify(step_hex.data(), res_bin.data() + i * HASH_SIZE, HASH_SIZE);
-        res_hex[i] = step_hex;
+        auto step_hex = Hexlify(step);
+
+        res_hex.push_back(std::string(step_hex.begin(), step_hex.size()));
     }
 
     return res_hex;
@@ -52,20 +50,20 @@ std::vector<std::string> GetMerkleSteps(
 std::string GetRootFromSteps(std::string cbtxid,
                              std::vector<std::string>& steps)
 {
-    std::vector<uint8_t> steps_bin(steps.size() * HASH_SIZE);
+    std::vector<HashT> steps_bin;
     uint8_t cbtxid_bin[HASH_SIZE];
 
-    for (int i = 0; i < steps.size(); i++)
+    for (const auto& step : steps)
     {
-        Unhexlify(steps_bin.data() + i * HASH_SIZE, steps[i].data(),
-                  HASH_SIZE_HEX);
+        auto step_bin = Unhexlify<HASHSIZE * 2>(step);
+        steps_bin.push_back(step_bin);
     }
 
     Unhexlify(cbtxid_bin, cbtxid.data(), HASH_SIZE_HEX);
 
     uint8_t merkle_root_bin[HASH_SIZE];
-    MerkleTree::CalcRootFromSteps(merkle_root_bin, cbtxid_bin, steps_bin,
-                                  steps.size());
+    MerkleTree<HASHSIZE>::CalcRootFromSteps(merkle_root_bin, cbtxid_bin,
+                                            steps_bin, steps.size());
 
     std::string merkle_root_hex;
     merkle_root_hex.resize(HASH_SIZE_HEX);

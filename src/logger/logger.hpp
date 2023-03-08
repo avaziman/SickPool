@@ -26,30 +26,39 @@ class Logger
     static std::string GetNowString()
     {
         const auto now = std::chrono::system_clock::now();
-        return fmt::format("{:%y%m%d %H:%M:%OS}", now);
+        return fmt::format("{:%y%m%d-%H:%M:%OS}", now);
     }
+
+    const std::string log_folder = "./logs";
 
     explicit Logger(std::string_view field_str)
     {
-        std::string file_name =
-            fmt::format("./logs/{}", field_str, GetNowString());
+        std::string folder_name = fmt::format("{}/{}", log_folder, field_str);
+        std::string file_name = folder_name + "/" + GetNowString();
 
-        std::filesystem::create_directory("./logs");
+        try
+        {
+            std::filesystem::create_directory(log_folder);
+            std::filesystem::create_directory(folder_name);
+        }
+        catch (const std::filesystem::filesystem_error& err)
+        {
+        }
 
         log_stream.open(file_name);
 
-        if (!log_stream.good())
-        {
-            throw std::invalid_argument("Failed to open log file");
-        }
-    };
+        // if (!log_stream.good())
+        // {
+        //     throw std::invalid_argument("Failed to open log file: {}", file_name);
+        // }
+    }
 
     mutable std::ofstream log_stream;
     mutable std::mutex log_mutex;
 
     template <LogType type, typename... T>
     /*static*/ inline void Log(fmt::format_string<T...> message,
-                               T&&... args) const noexcept
+                               T&&... args) const
     {
         using namespace fmt;
         using enum fmt::color;
@@ -81,12 +90,13 @@ class Logger
                 break;
         }
 
-        log_stream << prefix << " ";
+        log_stream << GetNowString() << " " << prefix << " ";
         print(log_stream, message, std::forward<T>(args)...);
         print(log_stream, "{}", "\n");
 
 #ifdef DEBUG
-        std::cout << prefix;
+        std::cout << GetNowString() << " " << prefix << " ";
+
         print(message, std::forward<T>(args)...);
         print("{}", "\n");
 #endif

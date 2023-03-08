@@ -4,10 +4,12 @@ After=network.target
 
 [Service]
 User=pool
+WorkingDirectory=/home/pool/stratum
 ExecStart=/home/pool/stratum/SickPool /home/pool/ZANO.json
 Restart=always
 StandardOutput=append:/home/pool/log/pool.log
 StandardError=append:/home/pool/log/pool_error.log
+LimitCORE=infinity
 
 [Install]
 WantedBy=multi-user.target

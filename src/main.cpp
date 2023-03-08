@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     logger.Log<Info>("Git commit hash: {}", GIT_COMMIT_HASH);
     
     logger.Log<Info>("Loading dynamic config...");
-    
+
     if (signal(SIGINT, SigintHandler) == SIG_ERR)
     {
         logger.Log<Error>("Failed to register SIGINT...");

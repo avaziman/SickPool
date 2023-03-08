@@ -14,6 +14,7 @@
 
 #include "block_template.hpp"
 #include "cn/currency_core/currency_basic.h"
+#include "currency_format_utils_abstract.h"
 #include "currency_format_utils_blocks.h"
 #include "daemon_manager_zano.hpp"
 #include "job.hpp"
@@ -27,6 +28,7 @@ using BlockTemplateResCn = DaemonManagerT<Coin::ZANO>::BlockTemplateRes;
 
 struct BlockTemplateCn
 {
+    using HashT = std::array<uint8_t, 32>;
     const std::string block_bin;
     const std::string seed;
     const uint32_t height;
@@ -36,6 +38,7 @@ struct BlockTemplateCn
     const uint64_t coinbase_value;
     const uint32_t tx_count;
     const std::array<uint8_t, 32> template_hash;
+    const std::array<uint8_t, 32> merkle_root_hash;
 
     currency::block UnserializeBlock(const std::string& template_bin) const
     {
@@ -47,7 +50,7 @@ struct BlockTemplateCn
         return res;
     }
 
-    std::array<uint8_t, 32> GetTemplateHash(const currency::block& block) const
+    HashT GetTemplateHash(const currency::block& block) const
     {
         std::string template_hash_blob =
             currency::get_block_hashing_blob(block);
@@ -55,6 +58,27 @@ struct BlockTemplateCn
         return HashWrapper::CnFastHash(
             reinterpret_cast<uint8_t*>(template_hash_blob.data()),
             template_hash_blob.size());
+    }
+
+    HashT GetMerkleRoot(const currency::block& block) const
+    {
+        HashT hash;
+        size_t size;
+
+        currency::get_object_hash(
+            static_cast<const currency::transaction_prefix&>(block.miner_tx),
+            reinterpret_cast<crypto::hash&>(hash), size);
+
+        std::vector<HashT> hashes;
+        hashes.reserve(block.tx_hashes.size());
+
+        hashes.push_back(hash);
+        for (const auto& h : block.tx_hashes)
+        {
+            hashes.push_back(reinterpret_cast<const HashT&>(h));
+        }
+
+        return MerkleTree<sizeof(HashT)>::CalcRoot(std::move(hashes));
     }
 
     explicit BlockTemplateCn(const BlockTemplateResCn& btemplate)
@@ -82,12 +106,12 @@ struct BlockTemplateCn
           seed(btemplate.seed),
           height(btemplate.height),
           target_diff(static_cast<double>(btemplate.difficulty)),
-          expected_hashes(GetHashMultiplier<ZanoStatic>() *
-                          target_diff),
+          expected_hashes(GetHashMultiplier<ZanoStatic>() * target_diff),
           block_size(static_cast<uint32_t>(btemplate.blob.size() / 2)),
           coinbase_value(block.miner_tx.vout[0].amount),
           // include coinbase tx
           tx_count(static_cast<uint32_t>(block.tx_hashes.size() + 1)),
+          merkle_root_hash(GetMerkleRoot(block)),
           template_hash(GetTemplateHash(block))
     {
     }
@@ -158,10 +182,10 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
             hex_target_sv, height);
     }
 
-    bool operator==(const Job<StratumProtocol::CN>& other) const {
+    bool operator==(const Job<StratumProtocol::CN>& other) const
+    {
         return this->template_hash == other.template_hash;
-
-    } 
+    }
 };
 
 using JobCryptoNote = Job<StratumProtocol::CN>;

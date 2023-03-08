@@ -43,8 +43,8 @@ struct BlockTemplateZec
         : version(bTemplate.version),
           prev_block_hash(
               UnhexlifyRev<HASH_SIZE * 2>(bTemplate.prev_block_hash)),
-          merkle_root_hash(MerkleTree::CalcRoot(
-              MerkleTree::GetHashes(bTemplate.transactions))),
+          merkle_root_hash(MerkleTree<32>::CalcRoot(
+              MerkleTree<32>::GetHashes(bTemplate.transactions))),
           final_sroot_hash(
               UnhexlifyRev<HASH_SIZE * 2>(bTemplate.final_sroot_hash)),
           min_time(bTemplate.min_time),
