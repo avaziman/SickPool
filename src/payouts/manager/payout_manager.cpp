@@ -30,7 +30,7 @@ bool PayoutManager::GetRewardsPPLNS(round_shares_t& miner_shares,
 
     for (ssize_t i = shares.size() - 1; i > 0; i--)
     {
-        const double score = shares[i].progress - shares[i - 1].progress;
+        const double score = shares[i].diff;
 
         AddSharePPLNS(miner_shares, score_sum, n, score, block_reward, fee,
                       shares[i].miner_id);

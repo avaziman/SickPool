@@ -8,15 +8,14 @@ template <StaticConf confs>
 void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
                                        WorkerContextT *wc, std::string_view req)
 {
-    int id = 0;
+    using namespace std::string_view_literals;
+    int64_t id = 0;
     const int sock = conn->sockfd;
     const auto cli = conn->ptr.get();
 
     std::string_view worker;
     std::string_view method;
     simdjson::ondemand::array params;
-
-    auto start = std::chrono::steady_clock::now();
 
     bool is_submit_work = false;
     bool is_login = false;
@@ -29,11 +28,13 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
                                       req.size() + simdjson::SIMDJSON_PADDING);
 
         simdjson::ondemand::object req_ob = doc.get_object();
-        id = static_cast<int>(req_ob["id"].get_int64());
+        id = req_ob["id"].get_int64();
         method = req_ob["method"].get_string();
 
-        if ((is_submit_work = method == "eth_submitWork") ||
-            (is_login = method == "eth_submitLogin"))
+        is_submit_work = method == "eth_submitWork"sv;
+        is_login = !is_submit_work && method == "eth_submitLogin"sv;
+
+        if (is_submit_work || is_login)
         {
             worker = req_ob["worker"].get_string();
         }
@@ -47,11 +48,6 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
             "Request JSON parse error: {}\nRequest: {}\n", err.what(), req);
         return;
     }
-    auto end = std::chrono::steady_clock::now();
-    auto dur =
-        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-            .count();
-    // std::cout << "req parse took: " << dur << "micro seconds." << std::endl;
 
     RpcResult res(ResCode::UNKNOWN);
 
@@ -74,22 +70,34 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
     else
     {
         res = RpcResult(ResCode::UNKNOWN, "Unknown method");
-        logger.template Log<LogType::Warn>("Unknown request method: {}", method);
+        logger.template Log<LogType::Warn>("Unknown request method: {}",
+                                           method);
     }
 
     this->SendRes(sock, id, res);
 }
 
+#define GetArrField(FIELD_NAME, IT, END, FIELD, FIELD_SIZE) \
+    if (IT == END)                                          \
+    {                                                       \
+        parse_error_str = "Missing field " FIELD_NAME;      \
+    }                                                       \
+    if (FIELD.size() != FIELD_SIZE)                         \
+    {                                                       \
+        parse_error_str = "Bad size of field " FIELD_NAME;  \
+    }                                                       \
+    error = (*IT).get<decltype(FIELD)>().get(FIELD)
+
 template <StaticConf confs>
 RpcResult StratumServerCn<confs>::HandleSubmit(
-    Connection<StratumClient> *con, WorkerContextT *wc, simdjson::ondemand::array &params,
-    std::string_view worker)
+    Connection<StratumClient> *con, WorkerContextT *wc,
+    simdjson::ondemand::array &params, std::string_view worker)
 {
     using namespace simdjson;
     // parsing takes 0-1 us
     ShareCn share;
     share.worker = worker;
-    std::string parse_error = "";
+    std::string parse_error_str = "";
 
     const auto end = params.end();
     auto it = params.begin();
@@ -100,47 +108,38 @@ RpcResult StratumServerCn<confs>::HandleSubmit(
         return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Unauthorized worker");
     }
 
-    if (it == end || (error = (*it).get_string().get(share.nonce_sv)) ||
-        share.nonce_sv.size() != sizeof(share.nonce) * 2 + 2)
-    {
-        parse_error = "Bad nonce.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.job_id)) ||
-             share.job_id.size() != confs.BLOCK_HASH_SIZE * 2 + 2)
-    {
-        parse_error = "Bad header pow hash.";
-    }
-    else if (++it == end ||
-             (error = (*it).get_string().get(share.mix_digest)) ||
-             share.mix_digest.size() != confs.BLOCK_HASH_SIZE * 2 + 2)
-    {
-        parse_error = "Bad mix digest.";
-    }
+    GetArrField("nonce", it, end, share.nonce_sv, sizeof(share.nonce) * 2 + 2);
+    GetArrField("header pow", ++it, end, share.job_id,
+                confs.BLOCK_HASH_SIZE * 2 + 2);
+    GetArrField("mix digest", ++it, end, share.mix_digest,
+                confs.BLOCK_HASH_SIZE * 2 + 2);
 
     share.nonce = HexToUint(share.nonce_sv.data() + 2, sizeof(share.nonce) * 2);
     share.job_id =
         share.job_id.substr(2);  // remove the hex prefix as we don't save it.
 
-    if (!parse_error.empty())
+    if (!parse_error_str.empty())
     {
         logger.template Log<LogType::Critical>("Failed to parse submit: {}",
-                                      parse_error);
-        return RpcResult(ResCode::UNKNOWN, parse_error);
+                                               parse_error_str);
+        return RpcResult(ResCode::UNKNOWN, parse_error_str);
     }
 
     return this->HandleShare(con, wc, share);
 }
+
 template <StaticConf confs>
-void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn, const JobT *job,
-                                          int id) const
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
+                                          const JobT *job, int id) const
 {
-    std::string msg = job->template GetWorkMessage<confs>(conn->ptr->GetDifficulty(), id);
+    std::string msg =
+        job->template GetWorkMessage<confs>(conn->ptr->GetDifficulty(), id);
     this->SendRaw(conn->sockfd, msg);
 }
 
 template <StaticConf confs>
-void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn, double diff,
-                                          const JobT *job) const
+void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
+                                          double diff, const JobT *job) const
 {
     std::string msg = job->template GetWorkMessage<confs>(diff);
     this->SendRaw(conn->sockfd, msg);

@@ -27,8 +27,6 @@ struct WorkerStats
     double average_hashrate_sum = 0.0;
     double current_interval_effort = 0.0;
 
-    // uint32_t connection_count = 0;
-
     inline void ResetInterval()
     {
         this->current_interval_effort = 0;
@@ -55,7 +53,7 @@ struct FullId
 struct Share
 {
     const MinerId miner_id;
-    const double progress;
+    double diff;
 };
 #pragma pack(pop)
 

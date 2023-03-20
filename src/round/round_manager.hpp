@@ -47,7 +47,6 @@ class RoundManager : public PersistenceRound
     const std::string round_type;
 
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
-    double round_progress = 0.0;  // PPLNS
     // use raw bytes, to pass directly to redis in one command
     std::vector<Share> pending_shares;
 #endif

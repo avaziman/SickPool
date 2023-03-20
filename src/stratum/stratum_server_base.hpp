@@ -48,7 +48,7 @@ class StratumBase : public Server<StratumClient>
     }
 
     //TODO: have without jsonrpc
-    inline void SendRes(int sock, int req_id, const RpcResult& res) const
+    inline void SendRes(int sock, int64_t req_id, const RpcResult& res) const
     {
         std::string str;
 

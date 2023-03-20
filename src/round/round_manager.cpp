@@ -15,14 +15,7 @@ RoundManager::RoundManager(const PersistenceLayer& pl,
     // get the last share
     auto [res, rep] = GetSharesBetween(-2, -1);
 
-    if (!res.empty())
-    {
-        round_progress = res.front().progress;
-    }
-    else
-    {
-        round_progress = 0;
-    }
+
 #endif
 }
 
@@ -38,15 +31,15 @@ RoundCloseRes RoundManager::CloseRound(uint32_t& block_id,
 
     const double n = 2;
 
-    auto [shares, resp] = GetLastNShares(round_progress, n);
-    if (!PayoutManager::GetRewardsPPLNS(round_shares, shares,
-                                         submission.reward, n, fee))
-    {
-        return RoundCloseRes::BAD_SHARES_SUM;
-    }
+    // auto [shares, resp] = GetLastNShares(round_progress, n);
+    // if (!PayoutManager::GetRewardsPPLNS(round_shares, shares,
+    //                                      submission.reward, n, fee))
+    // {
+    //     return RoundCloseRes::BAD_SHARES_SUM;
+    // }
 
-    round.round_start_ms = submission.time_ms;
-    round.total_effort = 0;
+    // round.round_start_ms = submission.time_ms;
+    // round.total_effort = 0;
 
     ResetRoundEfforts();
 
@@ -65,15 +58,13 @@ void RoundManager::AddRoundShare(const MinerId miner_id, const double effort)
 void RoundManager::AddRoundSharePPLNS(const MinerId miner_id,
                                       const double effort)
 {
-    round_progress += effort;
-
     if (pending_shares.capacity() == pending_shares.size())
     {
         pending_shares.reserve(pending_shares.size() + 1000);
     }
 
     pending_shares.emplace_back(
-        Share{.miner_id = miner_id, .progress = round_progress});
+        Share{.miner_id = miner_id, .diff = effort});
 }
 
 bool RoundManager::LoadCurrentRound()
