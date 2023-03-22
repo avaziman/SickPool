@@ -37,14 +37,13 @@ struct BlockTemplateCn
     const uint32_t block_size;
     const uint64_t coinbase_value;
     const uint32_t tx_count;
-    const std::array<uint8_t, 32> template_hash;
-    const std::array<uint8_t, 32> merkle_root_hash;
+    const HashT template_hash;
+    const uint64_t tx_sum;
 
     currency::block UnserializeBlock(const std::string& template_bin) const
     {
         currency::block res;
 
-        // bool deres =
         t_unserializable_object_from_blob<currency::block>(res, template_bin);
 
         return res;
@@ -60,25 +59,16 @@ struct BlockTemplateCn
             template_hash_blob.size());
     }
 
-    HashT GetMerkleRoot(const currency::block& block) const
+    // used to determine if a block is new based on tx hashes, fast, not including coinbase tx incase it changes randomally
+    uint64_t GetTxSum(const currency::block& block) const
     {
-        HashT hash;
-        size_t size;
-
-        currency::get_object_hash(
-            static_cast<const currency::transaction_prefix&>(block.miner_tx),
-            reinterpret_cast<crypto::hash&>(hash), size);
-
-        std::vector<HashT> hashes;
-        hashes.reserve(block.tx_hashes.size());
-
-        hashes.push_back(hash);
+        uint64_t sum = 0;
         for (const auto& h : block.tx_hashes)
         {
-            hashes.push_back(reinterpret_cast<const HashT&>(h));
+            sum += reinterpret_cast<const uint32_t&>(h);
         }
 
-        return MerkleTree<sizeof(HashT)>::CalcRoot(std::move(hashes));
+        return sum;
     }
 
     explicit BlockTemplateCn(const BlockTemplateResCn& btemplate)
@@ -111,8 +101,8 @@ struct BlockTemplateCn
           coinbase_value(block.miner_tx.vout[0].amount),
           // include coinbase tx
           tx_count(static_cast<uint32_t>(block.tx_hashes.size() + 1)),
-          merkle_root_hash(GetMerkleRoot(block)),
-          template_hash(GetTemplateHash(block))
+          template_hash(GetTemplateHash(block)),
+          tx_sum(GetTxSum(block))
     {
     }
 };
@@ -157,7 +147,7 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
     }
 
     template <StaticConf confs>
-    std::string GetWorkMessage(double diff, int id) const
+    std::string GetWorkMessage(double diff, int64_t id) const
     {
         auto diff_hex = GetDifficultyHex<confs>(diff);
         std::string_view hex_target_sv(diff_hex.data(), diff_hex.size());
@@ -184,7 +174,7 @@ class Job<StratumProtocol::CN> : public BlockTemplateCn, public JobBase
 
     bool operator==(const Job<StratumProtocol::CN>& other) const
     {
-        return this->template_hash == other.template_hash;
+        return this->tx_sum == other.tx_sum;
     }
 };
 

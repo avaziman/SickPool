@@ -28,6 +28,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(hiredis)
 
 FetchContent_Declare(
+    redis-plus-plus
+    GIT_REPOSITORY https://github.com/sewenew/redis-plus-plus.git
+    GIT_TAG tags/1.3.7
+    GIT_SHALLOW TRUE)
+FetchContent_GetProperties(redis-plus-plus)
+
+FetchContent_Declare(
     mysqlcppconn
     GIT_REPOSITORY https://github.com/mysql/mysql-connector-cpp.git
     GIT_TAG tags/8.0.31
@@ -76,18 +83,16 @@ set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC st
     PUBLIC payouts/manager PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
 
-# find_path(HIREDIS_HEADER hiredis)
-# find_library(HIREDIS_LIB hiredis)
 target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER} ${mysqlcppconn_SOURCE_DIR}/include)
 
 target_link_libraries(
     ${PROJECT_NAME_CORE}
-    ${Boost_LIBRARIES}
-
-    # ${HIREDIS_LIB}
-    hiredis_static
-    mysqlcppconn
+    # ${Boost_LIBRARIES}
     pthread
+
+    hiredis_static
+    redis++
+    mysqlcppconn
     cryptonote_utils
     simdjson
     fmt::fmt

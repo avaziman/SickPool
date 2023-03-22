@@ -41,7 +41,7 @@ class StratumServerCn : public StratumServer<confs>
     void UpdateDifficulty(Connection<StratumClient>* conn) override;
 
     void BroadcastJob(Connection<StratumClient>* conn, const JobT* job,
-                      int id) const;
+                      int64_t id) const;
 
     void BroadcastJob(Connection<StratumClient>* conn, double diff,
                       const JobT* job) const override;

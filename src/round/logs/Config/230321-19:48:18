@@ -1,0 +1,33 @@
+230321-19:48:18 INFO Starting SickPool!
+230321-19:48:18 INFO Git commit hash: 83429e8a2062c2b860bf31c8b9864ca6c64f6e79
+230321-19:48:18 INFO Loading dynamic config...
+230321-19:48:18 INFO symbol                                  : ZANO
+230321-19:48:18 INFO stratum_port                            : 4444
+230321-19:48:18 INFO control_port                            : 1111
+230321-19:48:18 INFO host                                    : 127.0.0.1:6379
+230321-19:48:18 INFO db_index                                : 0
+230321-19:48:18 INFO hashrate_ttl_seconds                    : 86400
+230321-19:48:18 INFO host                                    : 127.0.0.1:3306
+230321-19:48:18 INFO db_name                                 : ZANO
+230321-19:48:18 INFO user                                    : root
+230321-19:48:18 INFO pass                                    : password
+230321-19:48:18 INFO hashrate_interval_seconds               : 600
+230321-19:48:18 INFO effort_interval_seconds                 : 10
+230321-19:48:18 INFO average_hashrate_interval_seconds       : 21600
+230321-19:48:18 INFO mined_blocks_interval                   : 86400
+230321-19:48:18 INFO socket_recv_timeout_seconds             : 3
+230321-19:48:18 INFO pow_fee                                 : 0.0075
+230321-19:48:18 INFO pos_fee                                 : 0.01
+230321-19:48:18 INFO default_diff                            : 5000000
+230321-19:48:18 INFO minimum_diff                            : 10000
+230321-19:48:18 INFO target_shares_rate                      : 4
+230321-19:48:18 INFO retarget_interval                       : 120
+230321-19:48:18 INFO pool_addr                               : ZxCRWPavrf2BnQomKFBEeoVXvRw9BvuQ9f21te9ct8P8Sbh4ZLKJmz5NT4S3zAFkkrBLWiUh2Pf9CMiyQMHQaCjw33jEeYgtj
+230321-19:48:18 INFO block_poll_interval                     : 1
+230321-19:48:18 INFO payment_interval_seconds                : 5
+230321-19:48:18 INFO min_payout_threshold                    : 100000000
+230321-19:48:18 INFO Coin symbol: ZANO
+230321-19:48:18 INFO Static config:
+230321-19:48:18 INFO Diff1: 1.157920892373162e+77
+230321-19:48:18 INFO Share multiplier: 1
+230321-19:48:22 CRITICAL START-UP ERROR: Stratum server failed to bind to port: 4444.

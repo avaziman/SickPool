@@ -51,7 +51,6 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
 
     RpcResult res(ResCode::UNKNOWN);
 
-    // eth_submitWork
     if (is_submit_work)
     {
         res = HandleSubmit(conn, wc, params, worker);
@@ -77,60 +76,48 @@ void StratumServerCn<confs>::HandleReq(Connection<StratumClient> *conn,
     this->SendRes(sock, id, res);
 }
 
-#define GetArrField(FIELD_NAME, IT, END, FIELD, FIELD_SIZE) \
-    if (IT == END)                                          \
-    {                                                       \
-        parse_error_str = "Missing field " FIELD_NAME;      \
-    }                                                       \
-    if (FIELD.size() != FIELD_SIZE)                         \
-    {                                                       \
-        parse_error_str = "Bad size of field " FIELD_NAME;  \
-    }                                                       \
-    error = (*IT).get<decltype(FIELD)>().get(FIELD)
-
 template <StaticConf confs>
 RpcResult StratumServerCn<confs>::HandleSubmit(
     Connection<StratumClient> *con, WorkerContextT *wc,
     simdjson::ondemand::array &params, std::string_view worker)
 {
     using namespace simdjson;
+    using namespace std::string_view_literals;
+
     // parsing takes 0-1 us
     ShareCn share;
     share.worker = worker;
-    std::string parse_error_str = "";
 
-    const auto end = params.end();
-    auto it = params.begin();
-    error_code error;
+    std::string_view nonce_sv;
+    std::array<Field, 3> fields{{
+        Field{"nonce"sv, &nonce_sv, sizeof(share.nonce) * 2 + 2},
+        Field{"header pow"sv, &share.job_id,
+              confs.BLOCK_HASH_SIZE * 2 + 2},
+        Field{"mix digest"sv, &share.mix_digest,
+              confs.BLOCK_HASH_SIZE * 2 + 2},
+    }};
 
-    if (!con->ptr->GetIsAuthorized())
+    if (std::string parse_err = ParseShareParams(fields, params);
+        !parse_err.empty())
     {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Unauthorized worker");
+        return RpcResult(ResCode::UNKNOWN,
+                         "Failed to parse share: " + parse_err);
     }
 
-    GetArrField("nonce", it, end, share.nonce_sv, sizeof(share.nonce) * 2 + 2);
-    GetArrField("header pow", ++it, end, share.job_id,
-                confs.BLOCK_HASH_SIZE * 2 + 2);
-    GetArrField("mix digest", ++it, end, share.mix_digest,
-                confs.BLOCK_HASH_SIZE * 2 + 2);
-
-    share.nonce = HexToUint(share.nonce_sv.data() + 2, sizeof(share.nonce) * 2);
     share.job_id =
         share.job_id.substr(2);  // remove the hex prefix as we don't save it.
+    nonce_sv = nonce_sv.substr(2);
 
-    if (!parse_error_str.empty())
-    {
-        logger.template Log<LogType::Critical>("Failed to parse submit: {}",
-                                               parse_error_str);
-        return RpcResult(ResCode::UNKNOWN, parse_error_str);
-    }
+    std::from_chars(nonce_sv.data(), nonce_sv.data() + nonce_sv.size(),
+                    share.nonce, 16);
+    share.nonce = bswap_64(share.nonce);
 
     return this->HandleShare(con, wc, share);
 }
 
 template <StaticConf confs>
 void StratumServerCn<confs>::BroadcastJob(Connection<StratumClient> *conn,
-                                          const JobT *job, int id) const
+                                          const JobT *job, int64_t id) const
 {
     std::string msg =
         job->template GetWorkMessage<confs>(conn->ptr->GetDifficulty(), id);

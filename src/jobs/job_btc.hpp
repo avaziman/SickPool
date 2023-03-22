@@ -41,7 +41,7 @@ struct BlockTemplateBtc
     struct StaticHeaderBtc
     {
         int32_t version;
-        uint8_t prev_bhash[32];
+        std::array<uint8_t, 32> prev_bhash;
     };
 
     explicit BlockTemplateBtc(const BlockTemplateResBtc& tRes)
@@ -49,10 +49,10 @@ struct BlockTemplateBtc
           min_time(tRes.min_time)
     {
         static_header.version = tRes.version;
-        Unhexlify(static_header.prev_bhash, tRes.prev_block_hash.data(),
+        Unhexlify(static_header.prev_bhash.data(), tRes.prev_block_hash.data(),
                   tRes.prev_block_hash.size());
 
-        std::ranges::reverse(prev_bhash, prev_bhash + 32);
+        std::ranges::reverse(prev_bhash);
     }
 
     StaticHeaderBtc static_header;
@@ -248,7 +248,6 @@ class JobT<StratumProtocol::BTC> : public JobBaseBtc
     // char vector so we don't need to copy to calculate merkle root
     const std::vector<uint8_t> merkle_steps;
     int merkle_steps_count;
-    int written = 0;
 };
 
 using job_t = JobBtc;

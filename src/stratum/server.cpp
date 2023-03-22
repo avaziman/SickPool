@@ -314,6 +314,7 @@ void Server<T>::EraseClient(connection_it *it)
 
     HandleDisconnected(it);
 
+    // O(1)
     std::unique_lock lock(connections_mutex);
     connections.erase(*it);
 }

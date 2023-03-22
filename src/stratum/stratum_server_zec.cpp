@@ -8,7 +8,7 @@ void StratumServerZec<confs>::HandleReq(Connection<StratumClient> *conn,
                                         WorkerContextT *wc,
                                         std::string_view req)
 {
-    int id = 0;
+    int64_t id = 0;
     const int sock = conn->sockfd;
     const auto cli = conn->ptr.get();
 
@@ -22,7 +22,7 @@ void StratumServerZec<confs>::HandleReq(Connection<StratumClient> *conn,
                                       req.size() + simdjson::SIMDJSON_PADDING);
 
         simdjson::ondemand::object req_obj = doc.get_object();
-        id = static_cast<int>(req_obj["id"].get_int64());
+        id = req_obj["id"].get_int64();
         method = req_obj["method"].get_string();
         params = req_obj["params"].get_array();
     }
@@ -203,21 +203,34 @@ RpcResult StratumServerZec<confs>::HandleSubscribe(
 // https://zips.z.cash/zip-0301#mining-submit
 template <StaticConf confs>
 RpcResult StratumServerZec<confs>::HandleSubmit(
-    Connection<StratumClient> *con, WorkerContextT *wc, simdjson::ondemand::array &params)
+    Connection<StratumClient> *con, WorkerContextT *wc,
+    simdjson::ondemand::array &params)
 {
     using namespace simdjson;
+    using namespace std::string_view_literals;
 
-    // parsing takes 0-1 us
-    std::string parse_error{};
+    std::string_view time_sv;
+    ShareZec share;
 
-    ShareZec share(params, parse_error);
+    std::string_view nonce_sv;
+    std::array<Field, 5> fields{{
+        Field{"worker"sv, &share.worker, 0},
+        Field{"job id"sv, &share.job_id, this->JOBID_SIZE * 2},
+        Field{"time"sv, &time_sv, sizeof(share.time) * 2},
+        Field{"nonce2"sv, &share.nonce2_sv, EXTRANONCE2_SIZE * 2},
+        Field{"solution"sv, &share.solution,
+              (SOLUTION_SIZE + SOLUTION_LENGTH_SIZE) * 2}
+    }};
 
-    if (!parse_error.empty())
+    if (std::string parse_err = ParseShareParams(fields, params);
+        !parse_err.empty())
     {
-        logger.Log<LogType::Critical>("Failed to parse submit: {}",
-                                      parse_error);
-        return RpcResult(ResCode::UNKNOWN, parse_error);
+        return RpcResult(ResCode::UNKNOWN,
+                         "Failed to parse share: " + parse_err);
     }
+
+    std::from_chars(time_sv.data(), time_sv.data() + time_sv.size(), share.time, 16);
+    share.time = bswap_32(share.time);
 
     return this->HandleShare(con, wc, share);
 }
@@ -235,8 +248,8 @@ void StratumServerZec<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
 
     this->SendRaw(conn->sockfd, msg);
 
-    logger.Log<LogType::Debug>("Set difficulty for {} to {}",
-                               conn->ptr->GetFullWorkerName(), hex_target_sv);
+    // logger.Log<LogType::Debug>("Set difficulty for {} to {}",
+    //                            hex_target_sv);
 }
 
 template <StaticConf confs>

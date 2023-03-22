@@ -116,7 +116,7 @@ class JobManager
                 std::make_shared<Job>(std::move(jobIdHex), rpctemplate, clean);
         }
 
-        if (!clean && last_job == new_job)
+        if (!clean && *last_job == *new_job)
         {
             return std::shared_ptr<Job>{};  // null shared ptr
         }

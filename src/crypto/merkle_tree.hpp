@@ -37,9 +37,9 @@ class MerkleTree
     }
 
     // needs to be && so we can call from constructor
-    static HashT CalcRoot(std::vector<HashT>&& h)
+    static HashT CalcRoot(std::vector<HashT>&& _h)
     {
-        auto hashes = std::move(h);
+        auto hashes = std::move(_h);
         std::size_t hash_count = hashes.size();
         HashT res;
 
@@ -48,7 +48,7 @@ class MerkleTree
             // if odd amount of leafs, duplicate the last
             if (hash_count & 1)
             {
-                hashes.push_back(h.back());
+                hashes.push_back(hashes.back());
                 hash_count++;
             }
 

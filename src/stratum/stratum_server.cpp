@@ -76,13 +76,13 @@ void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
         for (const auto &[conn, _] : clients)
         {
             auto cli = conn->ptr.get();
-            if (cli->GetIsAuthorized())
+            if (cli->GetHasAuthorized())
             {
                 double diff;
-                bool is_new_diff = cli->GetIsPendingDiff();
-                if (is_new_diff)
+                std::optional<double> new_diff = cli->GetPendingDifficulty();
+                if (new_diff)
                 {
-                    diff = cli->GetPendingDifficulty();
+                    diff = new_diff.value();
                     UpdateDifficulty(conn.get());
                 }
                 else
@@ -92,7 +92,7 @@ void StratumServer<confs>::HandleNewJob(const std::shared_ptr<JobT> new_job)
 
                 BroadcastJob(conn.get(), diff, new_job.get());
 
-                if (is_new_diff)
+                if (new_diff)
                 {
                     cli->ActivatePendingDiff();
                 }
@@ -170,6 +170,13 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
     const auto cli = con->ptr.get();
     uint64_t time = GetCurrentTimeMs();
 
+    std::optional<FullId> authorized_id_opt = cli->GetAuthorizedId(share.worker);
+    if (!authorized_id_opt)
+    {
+        return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Unauthorized worker");
+    }
+    FullId authorized_id = authorized_id_opt.value();
+
     ShareResult share_res;
     RpcResult rpc_res(ResCode::OK);
     const std::shared_ptr<JobT> job = job_manager.GetJob(share.job_id);
@@ -224,8 +231,8 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
 
         auto bs = BlockSubmission{
             .id = 0,  // QUERY LATER
-            .miner_id = cli->GetId().miner_id,
-            .worker_id = cli->GetId().worker_id,
+            .miner_id = authorized_id.miner_id,
+            .worker_id = authorized_id.worker_id,
             .block_type = static_cast<uint8_t>(BlockStatus::PENDING),
             .chain = 0,
             .reward = job->coinbase_value,
@@ -242,20 +249,20 @@ RpcResult StratumServer<confs>::HandleShare(Connection<StratumClient> *con,
                                          coin_config.pow_fee);
 
         // take into account in PPLNS but not in round effort.
-        round_manager.AddRoundSharePPLNS(cli->GetId().miner_id,
+        round_manager.AddRoundSharePPLNS(authorized_id.miner_id,
                                          share_res.difficulty);
 
         stats_manager.AddValidShare(cli->stats_it, cli->GetDifficulty());
-        return RpcResult(ResCode::VALID_SHARE);
+        return RpcResult(ResCode::OK);
     }
     else if (share_res.code == ResCode::VALID_SHARE) [[likely]]
     {
-        round_manager.AddRoundShare(cli->GetId().miner_id,
+        round_manager.AddRoundShare(authorized_id.miner_id,
                                     share_res.difficulty);
-        round_manager.AddRoundSharePPLNS(cli->GetId().miner_id,
+        round_manager.AddRoundSharePPLNS(authorized_id.miner_id,
                                          cli->GetDifficulty());
         stats_manager.AddValidShare(cli->stats_it, cli->GetDifficulty());
-        return RpcResult(ResCode::VALID_SHARE);
+        return RpcResult(ResCode::OK);
     }
 
     stats_manager.AddInvalidShare(cli->stats_it);
@@ -341,13 +348,13 @@ template <StaticConf confs>
 void StratumServer<confs>::DisconnectClient(
     const std::shared_ptr<Connection<StratumClient>> conn_ptr)
 {
-    auto worker_name = conn_ptr->ptr->GetFullWorkerName();
     stats_manager.PopWorker(conn_ptr->ptr->stats_it);
     std::unique_lock lock(clients_mutex);
     clients.erase(conn_ptr);
 
-    logger.template Log<LogType::Info>("Stratum worker {} disconnected.",
-                                       worker_name);
+    // auto worker_name = conn_ptr->ptr->GetFullWorkerName();
+    // logger.template Log<LogType::Info>("Stratum worker {} disconnected.",
+    //                                    worker_name);
 }
 
 template <StaticConf confs>
@@ -445,10 +452,10 @@ RpcResult StratumServer<confs>::HandleAuthorize(StratumClient *cli,
     const auto fid = FullId{static_cast<MinerId>(miner_id),
                             static_cast<WorkerId>(worker_id)};
 
-    std::string worker_full_str = fmt::format("{}.{}", address, worker);
+    // std::string worker_full_str = fmt::format("{}.{}", address, worker);
     worker_map::iterator stats_it = stats_manager.AddExistingWorker(fid);
 
-    cli->SetAuthorized(fid, std::move(worker_full_str), stats_it);
+    cli->AuthorizeWorker(fid, worker, stats_it);
 
     logger.template Log<LogType::Info>("Authorized worker: {}, address: {}",
                                        worker, address);
@@ -506,7 +513,7 @@ bool StratumServer<confs>::HandleTimeout(connection_it *conn,
     // disconnect unauthorized miner after timeout, will call handle
     // disconnected
 
-    if (auto cli = conn_ptr->ptr; !cli->GetIsAuthorized())
+    if (auto cli = conn_ptr->ptr; !cli->GetHasAuthorized())
     {
         logger.template Log<LogType::Warn>(
             "Disconnecting worker with ip {}, hasn't authorized.",

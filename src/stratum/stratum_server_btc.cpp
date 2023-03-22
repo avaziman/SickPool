@@ -1,65 +1,59 @@
-#include "static_config.hpp"
 #include "stratum_server_btc.hpp"
+
+#include "static_config.hpp"
 
 template <StaticConf confs>
 void StratumServerBtc<confs>::BroadcastJob(Connection<StratumClient> *conn,
-                                 const JobT *job) const
+                                           const JobT *job) const
 {
     auto notifyMsg = job->GetNotifyMessage();
     SendRaw(conn->sockfd, notifyMsg.data(), notifyMsg.size());
 }
 
 template <StaticConf confs>
-void StratumServerBtc<confs>::HandleReq(Connection<StratumClient>* conn, WorkerContextT *wc,
-                                 std::string_view req)
+void StratumServerBtc<confs>::HandleReq(Connection<StratumClient> *conn,
+                                        WorkerContextT *wc,
+                                        std::string_view req)
 {
-    int id = 0;
+    using namespace std::string_view_literals;
+    int64_t id = 0;
     const int sock = conn->sockfd;
     // safe to remove from list
-    std::shared_ptr<Connection<StratumClient>> cli = conn->ptr;
+    auto cli = conn->ptr.get();
 
     std::string_view method;
     simdjson::ondemand::array params;
 
-    auto start = std::chrono::steady_clock::now();
-
-    // std::cout << "last char -> " << (int)buffer[]
     simdjson::ondemand::document doc;
     try
     {
         doc = wc->json_parser.iterate(req.data(), req.size(),
                                       req.size() + simdjson::SIMDJSON_PADDING);
 
-        simdjson::ondemand::object req = doc.get_object();
-        id = static_cast<int>(req["id"].get_int64());
-        method = req["method"].get_string();
-        params = req["params"].get_array();
+        simdjson::ondemand::object req_obj = doc.get_object();
+        id = req_obj["id"].get_int64();
+        method = req_obj["method"].get_string();
+        params = req_obj["params"].get_array();
     }
     catch (const simdjson::simdjson_error &err)
     {
         this->SendRes(sock, id, RpcResult(ResCode::UNKNOWN, "Bad request"));
         logger.Log<LogType::Error>(
-                    "Request JSON parse error: {}\nRequest: {}\n", err.what(),
-                    req);
+            "Request JSON parse error: {}\nRequest: {}\n", err.what(), req);
         return;
     }
-    auto end = std::chrono::steady_clock::now();
-    auto dur =
-        std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-            .count();
-    // std::cout << "req parse took: " << dur << "micro seconds." << std::endl;
 
     RpcResult res(ResCode::UNKNOWN);
 
-    if (method == "mining.submit")
+    if (method == "mining.submit"sv)
     {
         res = HandleSubmit(cli, wc, params);
     }
-    else if (method == "mining.subscribe")
+    else if (method == "mining.subscribe"sv)
     {
         res = HandleSubscribe(cli, params);
     }
-    else if (method == "mining.authorize")
+    else if (method == "mining.authorize"sv)
     {
         res = this->HandleAuthorize(cli, params);
         if (res.code == ResCode::OK)
@@ -71,8 +65,7 @@ void StratumServerBtc<confs>::HandleReq(Connection<StratumClient>* conn, WorkerC
 
             if (job == nullptr)
             {
-                logger.Log<LogType::Critical>( 
-                            "No jobs to broadcast!");
+                logger.Log<LogType::Critical>("No jobs to broadcast!");
                 return;
             }
 
@@ -83,8 +76,7 @@ void StratumServerBtc<confs>::HandleReq(Connection<StratumClient>* conn, WorkerC
     else
     {
         res = RpcResult(ResCode::UNKNOWN, "Unknown method");
-        logger.Log<LogType::Warn>(
-                    "Unknown request method: {}", method);
+        logger.Log<LogType::Warn>("Unknown request method: {}", method);
     }
 
     this->SendRes(sock, id, res);
@@ -104,8 +96,7 @@ RpcResult StratumServerBtc<confs>::HandleSubscribe(
 
     // null subscription ids
     auto res = fmt::format(
-        "[[[\"mining.set_difficulty\",null],"
-        "[\"mining.notify\",null]],\"{}\",{}]",
+        "[[[\"mining.set_difficulty\",null],[\"mining.notify\",null]],\"{}\",{}]",
         cli->extra_nonce_sv, EXTRANONCE2_SIZE);
 
     return RpcResult(ResCode::OK, res);
@@ -113,57 +104,34 @@ RpcResult StratumServerBtc<confs>::HandleSubscribe(
 
 // https://en.bitcoin.it/wiki/Stratum_mining_protocol#mining.submit
 template <StaticConf confs>
-RpcResult StratumServerBtc<confs>::HandleSubmit(StratumClient *cli, WorkerContextT *wc,
-                                         simdjson::ondemand::array &params)
+RpcResult StratumServerBtc<confs>::HandleSubmit(
+    StratumClient *cli, WorkerContextT *wc, simdjson::ondemand::array &params)
 {
+    using namespace std::string_view_literals;
     using namespace simdjson;
     using namespace CoinConstantsBtc;
 
     // parsing takes 0-1 us
     ShareBtc share;
-    std::string parse_error = "";
 
-    const auto end = params.end();
-    auto it = params.begin();
-    error_code error;
+    std::string_view nonce_sv;
+    std::string_view time_sv;
 
-    if (!cli->GetIsAuthorized())
-    {
-        return RpcResult(ResCode::UNAUTHORIZED_WORKER, "Unauthorized worker");
-    }
+    std::array<Field, 5> fields{{
+        Field{"worker"sv, &share.worker, 0},
+        Field{"job id"sv, &share.job_id, this->JOBID_SIZE * 2},
+        Field{"nonce2"sv, &share.extranonce2, EXTRANONCE2_SIZE * 2},
+        Field{"time"sv, &time_sv, sizeof(share.time) * 2},
+        Field{"nonce"sv, &nonce_sv, sizeof(share.nonce) * 2},
+    }};
+    share.time = HexToUint(time_sv.data(), sizeof(share.time) * 2);
+    share.nonce = HexToUint(nonce_sv.data(), sizeof(share.nonce) * 2);
 
-    if (it == end || (error = (*it).get_string().get(share.worker)))
+    if (std::string parse_err = ParseShareParams(fields, params);
+        !parse_err.empty())
     {
-        parse_error = "Bad worker.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.job_id)) ||
-             share.job_id.size() != this->JOBID_SIZE * 2)
-    {
-        parse_error = "Bad job id.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.extranonce2)) ||
-             share.extranonce2.size() != EXTRANONCE2_SIZE * 2)
-    {
-        parse_error = "Bad nonce2.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.time_sv)) ||
-             share.time_sv.size() != sizeof(share.time) * 2)
-    {
-        parse_error = "Bad time.";
-    }
-    else if (++it == end || (error = (*it).get_string().get(share.nonce_sv)) ||
-             share.nonce_sv.size() != sizeof(share.nonce) * 2)
-    {
-        parse_error = "Bad nonce.";
-    }
-    share.time = HexToUint(share.time_sv.data(), sizeof(share.time) * 2);
-    share.nonce = HexToUint(share.nonce_sv.data(), sizeof(share.nonce) * 2);
-
-    if (!parse_error.empty())
-    {
-        logger.Log<LogType::Critical>( 
-                    "Failed to parse submit: {}", parse_error);
-        return RpcResult(ResCode::UNKNOWN, parse_error);
+        return RpcResult(ResCode::UNKNOWN,
+                         "Failed to parse share: " + parse_err);
     }
 
     return HandleShare(cli, wc, share);
@@ -176,13 +144,11 @@ void StratumServerBtc<confs>::UpdateDifficulty(Connection<StratumClient> *conn)
     const auto cli = conn->ptr;
 
     std::string req = fmt::format(
-                               "{{\"id\":null,\"method\":\"mining.set_"
-                               "difficulty\",\"params\":[{}]}}\n",
-                               cli->GetDifficulty());
+        "{{\"id\":null,\"method\":\"mining.set_"
+        "difficulty\",\"params\":[{}]}}\n",
+        cli->GetDifficulty());
 
     this->SendRaw(conn->sockfd, req.data(), req.size());
 
-    logger.Log<LogType::Debug>( 
-                "Set difficulty for {} to {}", cli->GetFullWorkerName(),
-                cli->GetDifficulty());
+    logger.Log<LogType::Debug>("Set difficulty for {} to {}", cli->GetDifficulty());
 }

@@ -251,12 +251,11 @@ void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares
     double first_share_value = 0.0;
     double rem_sum = 0;
 
+    rc_lock.unlock();
     while (rem_sum < diff_sum)
     {
-        rc_lock.unlock();
         auto [rem_shares, resp] =
             GetSharesBetween(remove_count, remove_count + 10);
-        rc_lock.lock();
 
         for (Share share : rem_shares)
         {
@@ -275,6 +274,7 @@ void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares
 
     //// remove the unneccessary shares
     auto [keep_shares, resp] = GetSharesBetween(-1, -1 - remove_count);
+
     sv = std::string_view(reinterpret_cast<const char *>(keep_shares.data()),
           keep_shares.size() * sizeof(Share));
 
@@ -283,5 +283,6 @@ void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares
         keep_shares[0].diff = first_share_value;
     }
 
+    rc_lock.lock();
     Command({"SET", key_names.round_shares, sv});
 }

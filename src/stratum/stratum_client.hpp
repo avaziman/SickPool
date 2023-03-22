@@ -2,14 +2,14 @@
 #define STRATUM_CLIENT_HPP_
 #include <fmt/core.h>
 #include <simdjson.h>
-#include <sys/socket.h>
 
 #include <array>
-#include <cstring>
 #include <list>
 #include <memory>
 #include <optional>
 #include <set>
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "config_vrsc.hpp"
@@ -19,6 +19,17 @@
 #include "utils.hpp"
 #include "verushash/verus_hash.h"
 
+struct StringHash
+{
+    using is_transparent = void;  // enables heterogenous lookup
+
+    std::size_t operator()(std::string_view sv) const
+    {
+        std::hash<std::string_view> hasher;
+        return hasher(sv);
+    }
+};
+
 class StratumClient : public VarDiff
 {
    public:
@@ -26,16 +37,18 @@ class StratumClient : public VarDiff
                            const double rate, uint32_t retarget_interval);
 
     double GetDifficulty() const { return current_diff; }
-    double GetPendingDifficulty() const { return pending_diff.value(); }
-    bool GetIsAuthorized() const { return is_authorized; }
-    bool GetIsPendingDiff() const { return pending_diff.has_value(); }
-    int64_t GetLastAdjusted() const { return last_adjusted; }
+    std::optional<double> GetPendingDifficulty() const { return pending_diff; }
+    bool GetHasAuthorized() const { return !authorized_workers.empty(); }
 
-    // make sting_view when unordered map supports it
-    std::string_view GetAddress() const { return address; }
-    std::string_view GetWorkerName() const { return worker_name; }
-    std::string_view GetFullWorkerName() const { return worker_full; }
-    FullId GetId() const { return id; }
+    std::optional<FullId> GetAuthorizedId(std::string_view worker_name) const
+    {
+        if (auto it = authorized_workers.find(worker_name);
+            it != authorized_workers.end())
+        {
+            return std::optional<FullId>{(*it).second};
+        }
+        return std::optional<FullId>{};
+    }
 
     void SetPendingDifficulty(double diff)
     {
@@ -85,27 +98,20 @@ class StratumClient : public VarDiff
         share_uset.clear();
     }
 
-    void SetAuthorized(const FullId full_id, std::string&& workerfull,
-                       const worker_map::iterator& worker_it)
+    void AuthorizeWorker(const FullId full_id, std::string_view worker_name,
+                         worker_map::iterator worker_it)
     {
-        is_authorized = true;
-        this->id = full_id;
+        authorized_workers.try_emplace(std::string{worker_name}, full_id);
 
-        this->worker_full = std::move(workerfull);
-        std::string_view worker_full_sv(worker_full);
-
-        auto dot = worker_full_sv.find('.');
-        this->address = worker_full_sv.substr(0, dot);
-        this->worker_name =
-            worker_full_sv.substr(dot + 1, worker_full_sv.size() - 1);
         this->stats_it = worker_it;
     }
 
     const int64_t connect_time;
 
-    const uint32_t extra_nonce;
-    const std::array<char, 8> extra_nonce_hex;
-    const std::string_view extra_nonce_sv;
+    const uint32_t extra_nonce = extra_nonce_counter++;
+    const std::array<char, 8> extra_nonce_hex{Hexlify(extra_nonce)};
+    const std::string_view extra_nonce_sv{extra_nonce_hex.data(),
+                                          sizeof(extra_nonce_hex)};
 
     std::list<std::unique_ptr<StratumClient>>::iterator it;
     worker_map::iterator stats_it;
@@ -113,22 +119,20 @@ class StratumClient : public VarDiff
    private:
     static uint32_t extra_nonce_counter;
 
-
-
     uint64_t last_adjusted;
     uint64_t last_share_time;
 
     double current_diff;
     std::optional<double> pending_diff;
-    bool is_authorized = false;
 
     // std::string current_job_id;
 
-    FullId id = FullId(0,0);
+    FullId id = FullId(0, 0);
     std::string worker_full;
-    // both point to worker_full
-    std::string_view address;
-    std::string_view worker_name;
+
+    // support multiple workers for multiple addresses
+    std::unordered_map<std::string, FullId, StringHash, std::equal_to<>>
+        authorized_workers;
 
     std::mutex shares_mutex;
 
