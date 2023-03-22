@@ -26,10 +26,10 @@ using enum Prefix;
 //             AppendCommand(
 //                 {"ZINCRBY"sv, key_names.solver_index_mature, negative_reward_sv, addr});
 
-//             AppendCommand({"HINCRBY"sv, solver_key, EnumName<MATURE_BALANCE>(),
+//             pipe.command("HINCRBY"sv, solver_key, EnumName<MATURE_BALANCE>(),
 //                            negative_reward_sv});
 
-//             AppendCommand({"LPUSH"sv,
+//             pipe.command("LPUSH"sv,
 //                            Format({solver_key, EnumName<PAYOUTS>()}),
 //                            std::string_view((char*)&upayment, sizeof(UserPayment))});
 //         }

@@ -67,7 +67,7 @@ void StatsManager::Start(std::stop_token st)
         if (next_update == next_effort_update)
         {
             next_effort_update += conf->effort_interval_seconds;
-            round_manager->UpdateEffortStats(update_time_ms);
+            // round_manager->UpdateEffortStats(update_time_ms);
 
 #if PAYMENT_SCHEME == PAYMENT_SCHEME_PPLNS
             round_manager->PushPendingShares();

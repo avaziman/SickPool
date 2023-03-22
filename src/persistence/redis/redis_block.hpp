@@ -4,6 +4,7 @@
 #include "mysql_manager.hpp"
 #include "persistence_layer.hpp"
 #include "redis_manager.hpp"
+#include <optional>
 
 class PersistenceBlock : public PersistenceLayer
 {
@@ -13,11 +14,8 @@ class PersistenceBlock : public PersistenceLayer
     public:
      explicit PersistenceBlock(const PersistenceLayer& pl);
 
-     void AppendUpdateBlockHeight(uint32_t number);
+     void AppendUpdateBlockHeight(sw::redis::Pipeline& pipe, uint32_t number);
      uint32_t GetBlockHeight();
-
-     bool SubscribeToMaturityChannel();
-     bool SubscribeToBlockNotify();
 };
 
 #endif

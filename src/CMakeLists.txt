@@ -32,14 +32,16 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/sewenew/redis-plus-plus.git
     GIT_TAG tags/1.3.7
     GIT_SHALLOW TRUE)
-FetchContent_GetProperties(redis-plus-plus)
+FetchContent_MakeAvailable(redis-plus-plus)
+message("RPP: ${CMAKE_CURRENT_LIST_DIR}")
 
 FetchContent_Declare(
     mysqlcppconn
     GIT_REPOSITORY https://github.com/mysql/mysql-connector-cpp.git
     GIT_TAG tags/8.0.31
     GIT_SHALLOW TRUE)
-FetchContent_GetProperties(mysqlcppconn)
+FetchContent_MakeAvailable(mysqlcppconn)
+# FetchContent_GetProperties(mysqlcppconn)
 
 # optimized hash function
 add_subdirectory(crypto/cn)
@@ -69,7 +71,7 @@ file(GLOB SRC_FILES
 
 # dependencies
 # BOOST
-FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED)
+# FIND_PACKAGE(Boost 1.40 COMPONENTS program_options REQUIRED)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_library(${PROJECT_NAME_CORE} STATIC ${SRC_FILES})
@@ -81,10 +83,8 @@ set(SICKPOOL_INCLUDE PUBLIC . PUBLIC stats PUBLIC crypto PUBLIC daemon PUBLIC st
     PUBLIC static_config PUBLIC blocks/submitter PUBLIC round
     PUBLIC persistence/redis PUBLIC persistence/mysql PUBLIC persistence
     PUBLIC payouts/manager PUBLIC logger PUBLIC shares PUBLIC jobs PUBLIC difficulty PUBLIC control)
-target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE})
-
-target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${HIREDIS_HEADER} ${mysqlcppconn_SOURCE_DIR}/include)
-
+message("${redis++_SOURCE_DIR}/src")
+target_include_directories(${PROJECT_NAME_CORE} PUBLIC ${SICKPOOL_INCLUDE} ${redis++_SOURCE_DIR}/src/ #[[  ${mysqlcppconn_SOURCE_DIR}/include ]])
 target_link_libraries(
     ${PROJECT_NAME_CORE}
     # ${Boost_LIBRARIES}

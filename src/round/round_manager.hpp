@@ -28,7 +28,6 @@ class RoundManager : public PersistenceRound
     RoundCloseRes CloseRound(uint32_t& block_id, const BlockSubmission& submission, const double fee);
     void ResetRoundEfforts();
 
-    bool UpdateEffortStats(int64_t update_time_ms);
     inline Round GetChainRound() const { return round; };
 
     void PushPendingShares()
@@ -40,8 +39,6 @@ class RoundManager : public PersistenceRound
     }
 
    private:
-    bool LoadEfforts();
-
     static constexpr std::string_view field_str = "RoundManager";
     const Logger logger{field_str};
     const std::string round_type;

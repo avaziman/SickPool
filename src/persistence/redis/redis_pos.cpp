@@ -32,12 +32,12 @@
 //                         "Staker {} has earned {} staking minutes this round.",
 //                         addr, staking_days);
 
-//             AppendCommand({"HINCRBY"sv,
+//             pipe.command("HINCRBY"sv,
 //                            fmt::format("{}:pos:round-effort", chain), addr,
 //                            std::to_string(staking_days)});
 //         }
 
-//         AppendCommand({"HINCRBY"sv, fmt::format("{}:pos:round-effort", chain),
+//         pipe.command("HINCRBY"sv, fmt::format("{}:pos:round-effort", chain),
 //                        PrefixKey<Prefix::TOTAL_EFFORT>(), std::to_string(pool_staking_days)});
 //     }
 //     return GetReplies();

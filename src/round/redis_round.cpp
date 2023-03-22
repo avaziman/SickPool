@@ -6,92 +6,104 @@ PersistenceRound::PersistenceRound(const PersistenceLayer &pl)
 {
 }
 
-void PersistenceRound::AppendSetMinerEffort(std::string_view chain,
-                                            std::string_view miner,
-                                            std::string_view type,
-                                            double effort)
+void PersistenceRound::AppendSetMinerEffort(
+    sw::redis::Pipeline &pipe, std::string_view chain, std::string_view miner,
+    double effort)
 {
-    AppendCommand(
-        {"ZADD", key_names.round_efforts, std::to_string(effort), miner});
+    pipe.zadd(key_names.round_efforts, miner, effort);
 }
 
-void PersistenceRound::AppendSetRoundInfo(std::string_view field, double val)
+void PersistenceRound::AppendSetRoundInfo(sw::redis::Pipeline& pipe, std::string_view field, double val)
 {
-    AppendHset(key_names.round_stats, field, std::to_string(val));
+    pipe.hset(key_names.round_stats, field, std::to_string(val));
 }
 
-bool PersistenceRound::SetEffortStats(const efforts_map_t &miner_stats_map,
-                                      const double total_effort,
-                                      std::unique_lock<std::mutex> stats_mutex)
-{
-    std::scoped_lock redis_lock(rc_mutex);
+// TODO: add total effort on share update
+// bool PersistenceRound::SetEffortStats(const efforts_map_t &miner_stats_map,
+//                                       const double total_effort,
+//                                       std::unique_lock<std::mutex> stats_mutex)
+// {
+//     std::scoped_lock redis_lock(rc_mutex);
 
-    for (const auto &[miner_id, miner_effort] : miner_stats_map)
-    {
-        AppendSetMinerEffort(key_names.coin, std::to_string(miner_id),
-                             EnumName<POW>(), miner_effort);
-    }
+//     auto pipe =redis->pipeline(false);
+//     for (const auto &[miner_id, miner_effort] : miner_stats_map)
+//     {
+//         AppendSetMinerEffort(pipe, key_names.coin, std::to_string(miner_id),
+//                              EnumName<POW>(), miner_effort);
+//     }
 
-    AppendSetRoundInfo(EnumName<TOTAL_EFFORT>(), total_effort);
-    stats_mutex.unlock();
+//     AppendSetRoundInfo(pipe, EnumName<TOTAL_EFFORT>(), total_effort);
+//     stats_mutex.unlock();
+//     pipe.exec();
 
-    return GetReplies();
-}
+//     return true;
+//     // return GetReplies();
+// }
 
-bool PersistenceRound::GetMinerEfforts(efforts_map_t &efforts,
-                                       std::string_view chain,
-                                       std::string_view type)
-{
-    using namespace std::string_view_literals;
-    using enum Prefix;
+// bool PersistenceRound::GetMinerEfforts(efforts_map_t &efforts,
+//                                        std::string_view chain,
+//                                        std::string_view type)
+// {
+//     using namespace std::string_view_literals;
+//     using enum Prefix;
 
-    auto reply =
-        Command({"HGETALL"sv, Format({key_names.round_efforts, chain})});
+//     auto reply =
+//         Command({"HGETALL"sv, Format({key_names.round_efforts, chain));
 
-    for (int i = 0; i < reply->elements; i += 2)
-    {
-        std::string id_str(reply->element[i]->str, reply->element[i]->len);
+//     for (int i = 0; i < reply->elements; i += 2)
+//     {
+//         std::string id_str(reply->element[i]->str, reply->element[i]->len);
 
-        double effort = std::strtod(reply->element[i + 1]->str, nullptr);
+//         double effort = std::strtod(reply->element[i + 1]->str, nullptr);
 
-        MinerId id;
-        auto [_, err] = std::from_chars(id_str.data(),
-                                        id_str.data() + id_str.size(), id, 16);
+//         MinerId id;
+//         auto [_, err] = std::from_chars(id_str.data(),
+//                                         id_str.data() + id_str.size(), id, 16);
 
-        assert(err == std::errc{});
+//         assert(err == std::errc{);
 
-        efforts[id] = effort;
-    }
-    return true;
-}
+//         efforts[id] = effort;
+//     }
+//     return true;
+// }
 
 void PersistenceRound::GetCurrentRound(Round *rnd, std::string_view chain,
                                        std::string_view type)
 {
     std::string round_info_key = key_names.round_stats;
 
-    double total_effortd =
-        std::stod(hget(round_info_key, EnumName<TOTAL_EFFORT>()));
-    if (total_effortd == -1.0)
+    auto pipe2 = redis->pipeline(false);
+
+    std::optional<std::string> total_effortd =
+       redis->hget(round_info_key, EnumName<TOTAL_EFFORT>());
+    
+    if (!total_effortd)
     {
-        total_effortd = 0;
-        AppendSetRoundInfo(EnumName<TOTAL_EFFORT>(), total_effortd);
+        auto pipe =redis->pipeline(false);
+        AppendSetRoundInfo(pipe, EnumName<TOTAL_EFFORT>(), 0);
+        pipe.exec();
+
+        return GetCurrentRound(rnd, chain, type);
     }
 
-    double start_timed =
-        std::stod(hget(round_info_key, EnumName<START_TIME>()));
-    if (start_timed == -1.0)
+    std::optional<std::string> start_timed =
+       redis->hget(round_info_key, EnumName<START_TIME>());
+    if (!start_timed)
     {
-        start_timed = static_cast<double>(GetCurrentTimeMs());
-        AppendSetRoundInfo(EnumName<START_TIME>(), start_timed);
+        auto pipe = redis->pipeline(false);
+
+        auto curtime = GetCurrentTimeMs();
+        AppendSetRoundInfo(pipe, EnumName<START_TIME>(), curtime);
+        pipe.exec();
+
+        return GetCurrentRound(rnd, chain, type);
     }
 
-    double estimated_effortd =
-        std::stod(hget(round_info_key, EnumName<Prefix::ESTIMATED_EFFORT>()));
+    std::optional<std::string> estimated_effortd =
+       redis->hget(round_info_key, EnumName<Prefix::ESTIMATED_EFFORT>());
 
-    rnd->round_start_ms = static_cast<uint64_t>(start_timed);
-    rnd->estimated_effort = estimated_effortd;
-    rnd->total_effort = total_effortd;
+    rnd->round_start_ms = std::stoll(*start_timed);
+    rnd->estimated_effort = std::stod(*estimated_effortd);
 }
 
 RoundCloseRes PersistenceRound::SetClosedRound(
@@ -110,24 +122,22 @@ RoundCloseRes PersistenceRound::SetClosedRound(
 
     {
         // either close everything about the round or nothing
-        RedisTransaction close_round_tx(this);
+        // auto pipe =redis->transaction(false, false);
+        auto pipe =redis->pipeline(false);
 
-        AppendSetRoundInfo(EnumName<START_TIME>(),
+        AppendSetRoundInfo(pipe, EnumName<START_TIME>(),
                            static_cast<double>(time_ms));
         // reset round total effort
-        AppendSetRoundInfo(EnumName<TOTAL_EFFORT>(), 0);
+        AppendSetRoundInfo(pipe, EnumName<TOTAL_EFFORT>(), 0);
 
-        AppendTsAdd(block_key_names.mined_block_number, time_ms, 1.0);
-        AppendTsAdd(block_key_names.block_effort_percent, time_ms,
+        AppendTsAdd(pipe, block_key_names.mined_block_number, time_ms, 1.0);
+        AppendTsAdd(pipe, block_key_names.block_effort_percent, time_ms,
                     submission.effort_percent);
 
-        // reset miners efforts
-        AppendCommand(
-            {"UNLINK"sv, key_names.round_efforts});  // updated more often
-        AppendCommand({"UNLINK"sv, key_names.miner_index_round_effort});
+        // no need to reset miners efforts in PPLNS
+        pipe.exec();
     }
-
-    if (!GetReplies()) return RoundCloseRes::BAD_UPDATE_ROUND;
+    // if (!GetReplies()) return RoundCloseRes::BAD_UPDATE_ROUND;
 
     return RoundCloseRes::OK;
 }
@@ -136,11 +146,14 @@ bool PersistenceRound::SetNewBlockStats(std::string_view chain, uint32_t height,
                                         double target_diff)
 {
     std::scoped_lock lock(rc_mutex);
+    auto pipe =redis->pipeline(false);
+    AppendSetRoundInfo(pipe, EnumName<ESTIMATED_EFFORT>(), target_diff);
+    AppendUpdateBlockHeight(pipe, height);
+    pipe.publish(block_key_names.block, "NEW BLOCK");
 
-    AppendSetRoundInfo(EnumName<ESTIMATED_EFFORT>(), target_diff);
-    AppendUpdateBlockHeight(height);
-    AppendCommand({"PUBLISH", block_key_names.block, "NEW BLOCK"});
-    return GetReplies();
+    pipe.exec();
+    return true;
+    // return GetReplies();
 }
 
 // manual binary search :)
@@ -149,7 +162,7 @@ bool PersistenceRound::SetNewBlockStats(std::string_view chain, uint32_t height,
 // {
 //     std::unique_lock lock(rc_mutex);
 
-//     redis_unique_ptr res = Command({"STRLEN", key_names.round_shares});
+//     redis_unique_ptr res = Command({"STRLEN", key_names.round_shares);
 //     lock.unlock();
 
 //     const size_t len = res->integer / sizeof(Share);
@@ -194,7 +207,7 @@ bool PersistenceRound::SetNewBlockStats(std::string_view chain, uint32_t height,
 //     res = Command({"GETRANGE", key_names.round_shares,
 //                    std::to_string(-static_cast<ssize_t>(share_count) *
 //                                   static_cast<ssize_t>(sizeof(Share))),
-//                    std::to_string(-1)});
+//                    std::to_string(-1));
 
 //     std::string_view shares_sv(res->str, res->len);
 //     if (shares_sv.size() != share_count * sizeof(Share))
@@ -203,14 +216,14 @@ bool PersistenceRound::SetNewBlockStats(std::string_view chain, uint32_t height,
 //     }
 
 //     // remove the unneccessary shares
-//     auto res2 = Command({"SET", key_names.round_shares, shares_sv});
+//     auto res2 = Command({"SET", key_names.round_shares, shares_sv);
 
 //     return std::make_pair(
 //         std::span<Share>(reinterpret_cast<Share *>(res->str), share_count),
 //         std::move(res));
 // }
 
-std::pair<std::span<Share>, redis_unique_ptr>
+std::vector<Share>
 PersistenceRound::GetSharesBetween(ssize_t start, ssize_t end)
 {
     std::scoped_lock _(rc_mutex);
@@ -219,18 +232,16 @@ PersistenceRound::GetSharesBetween(ssize_t start, ssize_t end)
     ssize_t end_index = end * sizeof(Share) - 1;
     if (end < 0) end_index = end;  // we want till the end
 
-    auto res =
-        Command({"GETRANGE", key_names.round_shares,
-                 std::to_string(start_index), std::to_string(end_index)});
+    std::optional<std::string> res =
+       redis->getrange(key_names.round_shares,
+                 start_index, end_index);
 
-    if (!res || !res->str)
+    if (!res)
     {
-        return std::make_pair(std::span<Share>(), std::move(res));
+        return std::vector<Share>{};
     }
 
-    return std::make_pair(std::span<Share>(reinterpret_cast<Share *>(res->str),
-                                           res->len / sizeof(Share)),
-                          std::move(res));
+    return *reinterpret_cast<std::vector<Share> *>((*res).data());
 }
 
 void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares)
@@ -239,7 +250,7 @@ void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares
 
     std::string_view sv(reinterpret_cast<const char *>(pending_shares.data()),
                         pending_shares.size() * sizeof(Share));
-    Command({"APPEND", key_names.round_shares, sv});
+   redis->append(key_names.round_shares, sv);
 
     double diff_sum = 0;
     for (const Share &share : pending_shares)
@@ -254,7 +265,7 @@ void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares
     rc_lock.unlock();
     while (rem_sum < diff_sum)
     {
-        auto [rem_shares, resp] =
+        auto rem_shares =
             GetSharesBetween(remove_count, remove_count + 10);
 
         for (Share share : rem_shares)
@@ -273,7 +284,7 @@ void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares
 
 
     //// remove the unneccessary shares
-    auto [keep_shares, resp] = GetSharesBetween(-1, -1 - remove_count);
+    auto keep_shares = GetSharesBetween(-1, -1 - remove_count);
 
     sv = std::string_view(reinterpret_cast<const char *>(keep_shares.data()),
           keep_shares.size() * sizeof(Share));
@@ -284,5 +295,5 @@ void PersistenceRound::AddPendingShares(const std::vector<Share> &pending_shares
     }
 
     rc_lock.lock();
-    Command({"SET", key_names.round_shares, sv});
+   redis->set(key_names.round_shares, sv);
 }

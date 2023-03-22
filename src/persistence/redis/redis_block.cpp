@@ -9,8 +9,9 @@ PersistenceBlock::PersistenceBlock(const PersistenceLayer &pl)
 {
     using namespace std::string_view_literals;
 
-    const int64_t mined_blocks_interval_ms =
+    const uint64_t mined_blocks_interval_ms =
         conf->stats.mined_blocks_interval * 1000;
+    auto pipe =redis->pipeline(false);
 
     // mined blocks & effort percent
     for (const auto &[key_name, key_compact_name, aggregation] :
@@ -20,52 +21,42 @@ PersistenceBlock::PersistenceBlock(const PersistenceLayer &pl)
                           block_key_names.block_effort_percent_compact,
                           "AVG"sv)})
     {
-        AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
-                       std::to_string(mined_blocks_interval_ms)});
+        TimeSeries ts{mined_blocks_interval_ms, {}, DuplicatePolicy::BLOCK};
+        AppendTsCreate(pipe, key_name, ts);
 
-        AppendCommand({"TS.CREATE"sv, key_compact_name, "RETENTION"sv,
-                       std::to_string(mined_blocks_interval_ms * 30)});
+        // X30 duration
+        TimeSeries ts_compact{mined_blocks_interval_ms * 30, {}, DuplicatePolicy::BLOCK};
+        AppendTsCreate(pipe, key_compact_name, ts_compact);
 
-        AppendCommand({"TS.CREATERULE"sv, key_name, key_compact_name,
+        pipe.command("TS.CREATERULE"sv, key_name, key_compact_name,
                        "AGGREGATION"sv, aggregation,
-                       std::to_string(mined_blocks_interval_ms)});
+                       std::to_string(mined_blocks_interval_ms));
     }
 
-    if (!GetReplies())
-    {
-        throw std::invalid_argument(
-            "Failed to connect to add blocks timeserieses");
-    }
+    pipe.exec();
+    // if (!GetReplies())
+    // {
+    //     throw std::invalid_argument(
+    //         "Failed to connect to add blocks timeserieses");
+    // }
 }
 
-void PersistenceBlock::AppendUpdateBlockHeight(uint32_t number)
+void PersistenceBlock::AppendUpdateBlockHeight(sw::redis::Pipeline &pipe, uint32_t number)
 {
-    AppendHset(block_key_names.block_stats, EnumName<HEIGHT>(),
+    pipe.command(block_key_names.block_stats, EnumName<HEIGHT>(),
                std::to_string(number));
 }
 
-// bool PersistenceBlock::UpdateImmatureRewards(uint32_t id,
+// bool PersistenceBlock::UpdateImmatureRewards(uint32_t id,s
 //                                              int64_t matured_time, bool matured)
 // {
     //         // for payment manager...
-    //         AppendCommand({"PUBLISH", block_key_names.block_mature_channel,
-    //         "OK"});
+    //         pipe.publish(block_key_names.block_mature_channel,
+    //         "OK");
 // }
-
-bool PersistenceBlock::SubscribeToMaturityChannel()
-{
-    Command({"SUBSCRIBE", block_key_names.block_mature_channel});
-    return true;
-}
-
-bool PersistenceBlock::SubscribeToBlockNotify()
-{
-    Command({"SUBSCRIBE", block_key_names.block});
-    return true;
-}
 
 uint32_t PersistenceBlock::GetBlockHeight()
 {
-    return static_cast<uint32_t>(ResToInt(Command({"HGET", block_key_names.block_stats, EnumName<HEIGHT>()})));
+    return *(redis->command<std::optional<long long>>("HGET", block_key_names.block_stats, EnumName<HEIGHT>()));
 }
 #endif

@@ -3,38 +3,46 @@
 #include "payout_manager.hpp"
 
 using enum Prefix;
+using namespace sw::redis;
+using namespace std::string_view_literals;
 
 const Logger RedisManager::logger{RedisManager::logger_field};
-redis_unique_ptr_context RedisManager::rc_unique;
-std::mutex RedisManager::rc_mutex;
+std::mutex RedisManager::rc_mutex{};
+std::unique_ptr<Redis> RedisManager::redis{};
 
 RedisManager::RedisManager(const CoinConfig &conf)
     : conf(&conf), key_names(conf.symbol)
 {
     SockAddr addr(conf.redis.host);
+    ConnectionOptions connection_options;
+    connection_options.host = addr.ip_str;  // Required.
+    connection_options.port =
+        addr.port_original;  // Optional. The default port is 6379.
+    // connection_options.socket_timeout = std::chrono::milliseconds(200);
 
-    RedisManager::rc_unique = redis_unique_ptr_context(
-        redisConnect(addr.ip_str.c_str(), addr.port_original), redisFree);
+    ConnectionPoolOptions pool_options;
+    pool_options.size = 3;  // Pool size, i.e. max number of connections.
 
-    if (rc_unique->err)
-    {
-        logger.Log<LogType::Critical>("Failed to connect to redis: {}",
-                                      rc_unique->errstr);
-        throw std::invalid_argument("Failed to connect to redis");
-    }
+    RedisManager::redis = std::make_unique<Redis>(connection_options, pool_options);
 
-    Command({"SELECT", std::to_string(conf.redis.db_index)});
+    // if (rc_unique->err)
+    // {
+    //     logger.Log<LogType::Critical>("Failed to connect to redis: {}",
+    //                                   rc_unique->errstr);
+    //     throw std::invalid_argument("Failed to connect to redis");
+    // }
+
+   redis->command("SELECT", conf.redis.db_index);
 }
 void RedisManager::Init()
 {
     using namespace std::string_view_literals;
 
-    const int64_t hashrate_ttl_ms = conf->redis.hashrate_ttl_seconds * 1000;
-    const int64_t hashrate_interval_ms =
-        conf->stats.hashrate_interval_seconds * 1000;
+    const uint64_t hashrate_ttl_ms = conf->redis.hashrate_ttl_seconds * 1000;
+    auto pipe =redis->pipeline(false);
 
-    AppendCommand({"TS.CREATE"sv, key_names.hashrate_pool, "RETENTION"sv,
-                   std::to_string(hashrate_ttl_ms)});
+    pipe.command("TS.CREATE"sv, key_names.hashrate_pool, "RETENTION"sv,
+                 std::to_string(hashrate_ttl_ms));
 
     for (const auto &[key_name, key_compact_name] :
          {std::make_pair(key_names.hashrate_pool,
@@ -46,99 +54,40 @@ void RedisManager::Init()
           std::make_pair(key_names.miner_count, key_names.miner_count_compact),
           std::make_pair(key_names.difficulty, key_names.difficulty_compact)})
     {
-        AppendCommand({"TS.CREATE"sv, key_name, "RETENTION"sv,
-                       std::to_string(hashrate_ttl_ms)});
+        TimeSeries ts{hashrate_ttl_ms, {}, DuplicatePolicy::BLOCK};
+        AppendTsCreate(pipe, key_name, ts);
 
-        // we want x7 duration (7 days)
-        AppendCommand({"TS.CREATE"sv, key_compact_name, "RETENTION"sv,
-                       std::to_string(hashrate_ttl_ms * 7)});
+        // x7 duration (7 days)
+        TimeSeries ts_compact{hashrate_ttl_ms * 7, {}, DuplicatePolicy::BLOCK};
+        AppendTsCreate(pipe, key_name, ts_compact);
 
         // we want 12 times less points to fit in 7 days (2 hr instead of 10min)
-        AppendCommand({"TS.CREATERULE"sv, key_name, key_compact_name,
-                       "ROLL_AGGREGATION"sv, "roll_avg"sv, STRR(12)});
+        pipe.command("TS.CREATERULE"sv, key_name, key_compact_name,
+                     "ROLL_AGGREGATION"sv, "roll_avg"sv, STRR(12));
     }
 
-
-    if (!GetReplies())
-    {
-        logger.Log<LogType::Critical>(
-            "Failed to connect to add pool timeserieses", rc_unique->errstr);
-        throw std::invalid_argument(
-            "Failed to connect to add pool timeserieses");
-    }
+    pipe.exec();
+    // if (!GetReplies())
+    // {
+    //     logger.Log<LogType::Critical>(
+    //         "Failed to connect to add pool timeserieses", rc_unique->errstr);
+    //     throw std::invalid_argument(
+    //         "Failed to connect to add pool timeserieses");
+    // }
 }
 
-void RedisManager::AppendTsAdd(std::string_view key_name, int64_t time,
-                               double value)
+void RedisManager::AppendTsAdd(
+    sw::redis::Pipeline& pipe, std::string_view key_name, int64_t time,
+    double value)
 {
-    using namespace std::string_view_literals;
-    AppendCommand(
-        {"TS.ADD"sv, key_name, std::to_string(time), std::to_string(value)});
+    pipe.command("TS.ADD", key_name, std::to_string(time),
+                  std::to_string(value));
 }
 
-void RedisManager::AppendTsCreateMiner(std::string_view key,
-                                       std::string_view type,
-                                       std::string_view address,
-                                       std::string_view id,
-                                       uint64_t retention_ms,
-                                       std::string_view duplicate_policy)
+void RedisManager::AppendTsCreate(sw::redis::Pipeline& pipe, std::string_view key, const TimeSeries& ts)
 {
-    // cant have empty labels
-    if (id == "") id = "null";
 
-    using namespace std::string_view_literals;
-    AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
-                   std::to_string(retention_ms), "DUPLICATE_POLICY"sv,
-                   duplicate_policy, "LABELS"sv, "type"sv, type, "prefix"sv,
-                   EnumName<Prefix::MINER>(), "address"sv, address, "alias"sv,
-                   id});
-}
-
-void RedisManager::AppendTsCreateWorker(
-    std::string_view key, std::string_view type, std::string_view address,
-    std::string_view id, uint64_t retention_ms, std::string_view worker_name,
-    std::string_view duplicate_policy)
-{
-    // cant have empty labels
-    if (id == "") id = "null";
-
-    using namespace std::string_view_literals;
-    AppendCommand({"TS.CREATE"sv, key, "RETENTION"sv,
-                   std::to_string(retention_ms), "DUPLICATE_POLICY"sv,
-                   duplicate_policy, "LABELS"sv, "type"sv, type, "prefix"sv,
-                   EnumName<Prefix::WORKER>(), "address"sv, address, "alias"sv, id,
-                   "worker_name", worker_name});
-}
-
-void RedisManager::AppendHset(std::string_view key, std::string_view field,
-                              std::string_view val)
-{
-    AppendCommand({"HSET", key, field, val});
-}
-
-bool RedisManager::hset(std::string_view key, std::string_view field,
-                        std::string_view val)
-{
-    AppendHset(key, field, val);
-    return GetReplies();
-}
-
-std::string RedisManager::hget(std::string_view key, std::string_view field)
-{
-    using namespace std::string_view_literals;
-
-    if (auto reply = Command({"HGET"sv, key, field});
-        reply && reply->type == REDIS_REPLY_STRING)
-    {
-        // returns 0 if failed
-        return std::string(reply->str, reply->len);
-    }
-    return std::string();
-}
-
-double RedisManager::zscore(std::string_view key, std::string_view field)
-{
-    std::scoped_lock _(rc_mutex);
-
-    return ResToDouble(Command({"ZSCORE", key, field}));
+    // EnumName<ts.duplicate_policy>()
+    auto params = ts.GetCreateParams(key);
+    pipe.command(params.begin(), params.end());
 }
